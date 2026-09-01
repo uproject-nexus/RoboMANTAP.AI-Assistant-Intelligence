@@ -39,7 +39,7 @@ st.markdown("""
         margin-bottom: 20px;
         box-shadow: 0 4px 20px rgba(5, 150, 105, 0.15);
     }
-    .school-title { color: #ffffff; font-weight: 800; font-size: 16px; margin: 0; }
+    .school-title { color: #ffffff; font-weight: 800; font-size: 15px; margin: 0; }
     .school-subtitle { color: #6ee7b7; font-size: 11px; margin-top: 4px; font-weight: 500; }
     .stButton>button { width: 100%; min-height: 48px; font-size: 16px !important; border-radius: 8px !important; }
     </style>
@@ -117,8 +117,8 @@ with st.sidebar:
 # 1. TAMPILAN AWAL (HANYA 2 KOTAK JENJANG: MTS & MA)
 # -----------------------------------------------------------------------------
 if st.session_state.page == "landing":
-    st.markdown("<h2 style='text-align: center;'>🏆 BINA PRESTASI OMI 2026</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 25px; text-align: center;'>🏆 BINA PRESTASI OMI 2026</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
     st.write("---")
 
     col1, col2 = st.columns(2)
