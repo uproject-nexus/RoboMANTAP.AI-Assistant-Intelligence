@@ -314,7 +314,7 @@ elif st.session_state.page == "setup":
     with c2:
         st.subheader("2. Petunjuk CBT RoboMANTAP")
         st.markdown("""
-        * **Jumlah Soal:** TEPAT 5 Soal Pilihan Ganda Terintegrasi per Sesi.
+        * **Jumlah Soal:** TEPAT 3 Soal Terintegrasi per Sesi — Didesain agar kamu fokus 100%, paham mendalam, dan bisa latihan berulang kali tanpa rasa lelah!
         * **Standar Pembinaan:** Mengacu Juknis OMI 2026 (Sains, Keislaman, & Literasi Data).
         * **Skoring:** Benar (+4), Salah (-1), Kosong (0).
         """)
@@ -327,7 +327,7 @@ elif st.session_state.page == "setup":
                     st.session_state.stage,
                     st.session_state.selected_submateri
                 )
-                if quiz and len(quiz) == 5:
+                if quiz and len(quiz) == 3:
                     st.session_state.quiz_data = quiz
                     st.session_state.user_answers = {}
                     st.session_state.current_index = 0
@@ -337,7 +337,7 @@ elif st.session_state.page == "setup":
                     st.error("Gagal membuat paket soal. Coba klik tombol sekali lagi.")
 
 # -----------------------------------------------------------------------------
-# 4. ENGINE TEST INTERAKTIF (5 SOAL CBT)
+# 4. ENGINE TEST INTERAKTIF (3 SOAL CBT)
 # -----------------------------------------------------------------------------
 elif st.session_state.page == "quiz":
     quiz_data = st.session_state.quiz_data
@@ -348,8 +348,8 @@ elif st.session_state.page == "quiz":
     with col_h1:
         st.subheader(f"📝 CBT OMI: {st.session_state.mapel} ({st.session_state.stage})")
     with col_h2:
-        st.progress((curr_idx + 1) / 5)
-        st.caption(f"Soal **{curr_idx + 1}** dari **5**")
+        st.progress((curr_idx + 1) / 3)
+        st.caption(f"Soal **{curr_idx + 1}** dari **3**")
 
     st.write("---")
     st.markdown(f"#### **Soal No. {curr_idx + 1}**")
@@ -372,7 +372,7 @@ elif st.session_state.page == "quiz":
                 st.session_state.current_index -= 1
                 st.rerun()
     with col_nav3:
-        if curr_idx < 4:
+        if curr_idx < 2:
             if st.button("Berikutnya ➡️", type="primary", use_container_width=True):
                 st.session_state.current_index += 1
                 st.rerun()
@@ -412,18 +412,18 @@ elif st.session_state.page == "result":
         elif u_ans == q["correct_answer"]: benar += 1; total_skor += 4
         else: salah += 1; total_skor -= 1
 
-    if total_skor >= 16:
-        feedback_msg = f"🌟 **Luar Biasa! (Skor: {total_skor}/20)**\n\nRoboMANTAP bangga banget sama kamu! Pemahaman kamu di materi {st.session_state.mapel} sudah sangat tajam. Pertahankan fokus kamu untuk tahap OMI selanjutnya ya! 🚀✨"
+    if total_skor >= 12:
+        feedback_msg = f"🌟 **Luar Biasa! (Skor: {total_skor}/12)**\n\nRoboMANTAP bangga banget sama kamu! Pemahaman kamu di materi {st.session_state.mapel} sudah sangat tajam. Pertahankan fokus kamu untuk tahap OMI selanjutnya ya! 🚀✨"
         feedback_type = "success"
-    elif total_skor >= 8:
-        feedback_msg = f"👍 **Kerja Bagus! (Skor: {total_skor}/20)**\n\nUsaha yang mantap! Kamu sudah paham sebagian besar konsepnya. Coba cek pembahasan di bawah untuk memperbaiki sedikit kekeliruan tadi ya! 💪😊"
+    elif total_skor >= 5:
+        feedback_msg = f"👍 **Kerja Bagus! (Skor: {total_skor}/12)**\n\nUsaha yang mantap! Kamu sudah paham sebagian besar konsepnya. Coba cek pembahasan di bawah untuk memperbaiki sedikit kekeliruan tadi ya! 💪😊"
         feedback_type = "info"
     else:
-        feedback_msg = f"🌱 **Tetap Semangat! (Skor: {total_skor}/20)**\n\nJangan berkecil hati ya! Setiap kesalahan adalah proses belajar. Yuk pelajari pembahasan rinci di bawah dan coba latihan 5 soal lagi bersama RoboMANTAP! 🤖❤️"
+        feedback_msg = f"🌱 **Tetap Semangat! (Skor: {total_skor}/12)**\n\nJangan berkecil hati ya! Setiap kesalahan adalah proses belajar. Yuk pelajari pembahasan rinci di bawah dan coba latihan 5 soal lagi bersama RoboMANTAP! 🤖❤️"
         feedback_type = "warning"
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Total Skor CBT", f"{total_skor} / 20")
+    k1.metric("Total Skor CBT", f"{total_skor} / 12")
     k2.metric("Benar (+4)", f"{benar}")
     k3.metric("Salah (-1)", f"{salah}")
     k4.metric("Kosong (0)", f"{kosong}")
@@ -442,7 +442,7 @@ elif st.session_state.page == "result":
         if st.button("🔄 LATIHAN SOAL LAGI DONG! (SESI BARU)", type="primary", use_container_width=True):
             with st.spinner("Sabar ya 😊 RoboMANTAP sedang Menyiapkan soal OMI baru.."):
                 new_quiz = generate_quiz_batch(st.session_state.jenjang, st.session_state.mapel, st.session_state.stage, st.session_state.selected_submateri)
-                if new_quiz and len(new_quiz) == 5:
+                if new_quiz and len(new_quiz) == 3:
                     st.session_state.quiz_data = new_quiz
                     st.session_state.user_answers = {}
                     st.session_state.current_index = 0
