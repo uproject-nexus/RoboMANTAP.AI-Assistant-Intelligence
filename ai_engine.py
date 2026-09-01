@@ -74,7 +74,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     try:
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=system_prompt,
             config={"response_mime_type": "application/json"}
         )
@@ -111,7 +111,7 @@ def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     """
     try:
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=prompt
         )
         return response.text
