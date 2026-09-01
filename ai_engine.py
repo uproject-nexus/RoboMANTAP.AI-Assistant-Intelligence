@@ -75,6 +75,16 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
 
     return None
 
+def clean_display_text(text: str) -> str:
+    if not text:
+        return text
+    # 1. Ubah semua variasi \n berlapis (\\n, \\\n, dll) jadi newline nyata
+    text = re.sub(r'\\+n', '\n', text)
+    # 2. Hapus backslash liar yang menggantung di akhir/awal baris (\n\ atau \\\n)
+    text = re.sub(r'\n\\+', '\n', text)
+    text = re.sub(r'\\+\n', '\n', text)
+    return text
+
 @st.cache_data(ttl=600, show_spinner=False)
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
@@ -141,9 +151,14 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
         quiz_list = data.get("quiz", [])
         for q in quiz_list:
             if "question" in q:
-                q["question"] = q["question"].replace("\\n", "\n")
+                # Gunakan fungsi regex baru ini
+                q["question"] = clean_display_text(q["question"])     
             if "options" in q:
-                q["options"] = format_latex_options(q["options"])
+                cleaned_opts = []
+                for opt in q["options"]:
+                    clean_opt = clean_display_text(opt.replace("\\'", "").replace("'", ""))
+                    cleaned_opts.append(clean_opt)
+                q["options"] = format_latex_options(cleaned_opts)
             if "correct_answer" in q:
                 for opt in q["options"]:
                     if opt.startswith(q["correct_answer"][:2]):
