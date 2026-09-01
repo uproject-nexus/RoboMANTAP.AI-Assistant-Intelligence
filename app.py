@@ -366,11 +366,6 @@ elif st.session_state.page == "quiz":
 
     st.write("---")
     col_nav1, col_nav2, col_nav3 = st.columns([3, 6, 3])
-    with col_nav1:
-        if curr_idx > 0:
-            if st.button("⬅️ Sebelumnya", use_container_width=True):
-                st.session_state.current_index -= 1
-                st.rerun()
     with col_nav3:
         if curr_idx < 2:
             if st.button("Berikutnya ➡️", type="primary", use_container_width=True):
@@ -379,6 +374,11 @@ elif st.session_state.page == "quiz":
         else:
             if st.button("🏁 SUBMIT & SELESAIKAN", type="primary", use_container_width=True):
                 st.session_state.page = "result"
+                st.rerun()
+    with col_nav1:
+        if curr_idx > 0:
+            if st.button("⬅️ Sebelumnya", use_container_width=True):
+                st.session_state.current_index -= 1
                 st.rerun()
 
     with st.expander("Kamu bingung? Konsultasi di sini sama aku, RoboMANTAP! 😊"):
