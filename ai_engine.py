@@ -23,6 +23,7 @@ def format_latex_options(options):
         formatted.append(opt)
     return formatted
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
     Menghasilkan 1 paket latihan CBT 5 soal berbasis Kisi-Kisi Operasional OMI 2026.
