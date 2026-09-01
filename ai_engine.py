@@ -18,7 +18,7 @@ elif os.getenv("GEMINI_API_KEY"):
 if not api_keys:
     raise ValueError("GEMINI_API_KEYS tidak ditemukan. Pastikan Secrets sudah dikonfigurasi.")
 
-MODELS_TO_TRY = ["gemini-3.6-flash", "gemini-1.5-flash", "gemini-2.5-flash"]
+MODELS_TO_TRY = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-3.6-flash"]
 
 def format_latex_options(options):
     formatted = []
@@ -127,7 +127,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     ATURAN KECEPATAN & EFISIENSI:
     - Teks soal harus padat, to-the-point, dan tidak bertele-tele.
-    - Pembahasan (solution) MAKSIMAL 7 kalimat ringkas (langsung ke rumus/inti jawaban).
+    - Pembahasan (solution) MAKSIMAL 5 kalimat ringkas (langsung ke rumus/inti jawaban).
     - Dilarang menambahkan kalimat pembuka atau penutup yang tidak perlu.
 
     Format keluaran WAJIB berupa objek JSON murni:
@@ -148,7 +148,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
 
     if not raw_response:
-        st.error("⚠️ Semua kuota cadangan API sedang penuh. Silakan coba beberapa saat lagi.")
+        st.error("⚠️ Kuota sedang penuh nih. Silakan coba beberapa saat lagi ya!")
         return []
 
     try:
