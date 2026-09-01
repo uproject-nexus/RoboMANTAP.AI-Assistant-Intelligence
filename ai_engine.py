@@ -114,20 +114,18 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     - PENTING: Semua backslash LaTeX dalam JSON wajib ditulis ganda '\\\\' agar format JSON valid.
 
     Format keluaran WAJIB berupa objek JSON murni:
-    {{
-        "quiz": [
-            {{
-                "id": 1,
-                "question": "Teks soal 1 lengkap dengan konteks OMI 2026",
-                "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-                "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi di atas)",
-                "hint": "Petunjuk logika awal RoboMANTAP tanpa membocorkan jawaban akhir",
-                "solution": "Pembahasan runtut dan analitis step-by-step"
-            }}
-        ]
-    }}
+    {
+      "quiz": [
+        {
+          "id": 1,
+          "question": "Teks soal 1 singkat & padat",
+          "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+          "correct_answer": "Pilihan jawaban tepat"
+        }
+      ]
+    }
     """
-
+    
     raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
 
     if not raw_response:
