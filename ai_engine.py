@@ -2,7 +2,6 @@ import os
 import json
 import streamlit as st
 from google import genai
-from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,7 +28,6 @@ def format_latex_options(options):
         formatted.append(opt)
     return formatted
 
-@st.cache_data(ttl=3600, show_spinner=False)
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
     Menghasilkan 1 paket latihan CBT 5 soal berbasis Kisi-Kisi Operasional OMI 2026.
@@ -73,15 +71,11 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
         ]
     }}
     """
-
     try:
-        # Menggunakan model resmi Google API (gemini-2.5-flash)
         response = client.models.generate_content(
-            model="gemini-3.6-flash",
+            model="gemini-2.5-flash",
             contents=system_prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json"
-            )
+            config={"response_mime_type": "application/json"}
         )
         
         data = json.loads(response.text)
@@ -96,27 +90,34 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
                         break
         return quiz_list
     except Exception as e:
-        st.error("Terjadi kendala saat menghubungkan AI Engine. Silakan klik tombol sekali lagi.")
+        error_str = str(e)
+        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+            st.warning("⚠️ Server AI sedang mencapai batas limit harian. Silakan tunggu 30 detik atau perbarui API Key.")
+        else:
+            st.error("Terjadi kendala pada server AI. Silakan coba klik tombol sekali lagi.")
         return []
 
-def get_ai_hint(question: str, user_attempt: str, mapel: str = "Matematika"):
+
+def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     prompt = f"""
     Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
     Gunakan gaya bahasa menyapa 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
 
-    Mata Pelajaran: {mapel}
+    Mata Pelajaran / Bidang: {mapel}
     Soal OMI: {question}
     Ide Pengerjaan Siswa: {user_attempt}
 
-    Berikan petunjuk atau bimbingan logika interaktif yang menyemangati, memuji usahanya, dan membantu siswa menemukan celah penyelesaian soal {mapel} ini tanpa membocorkan jawaban akhir.
-    Ingat: Fokus pembimbingan tetap pada materi {mapel}, meskipun soal menggunakan konteks cerita integrasi.
-    Gunakan format LaTeX $...$ untuk setiap notasi matematika atau sains.
+    Instruksi Pembimbingan:
+    - Berikan petunjuk atau bimbingan logika interaktif yang menyemangati dan memuji usaha siswa.
+    - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini tanpa membocorkan jawaban akhir.
+    - Adaptasikan penjelasan sesuai jenis mata pelajaran {mapel} (baik yang berbasis analisis konsep, teori, narasi keislaman, data, maupun perhitungan numerik).
+    - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains pada penjelasan.
     """
     try:
         response = client.models.generate_content(
-            model="gemini-3.6-flash",
+            model="gemini-2.5-flash",
             contents=prompt
         )
         return response.text
     except Exception:
-        return "Yuk perhatikan lagi rumus dan petunjuk pada soal ini! Coba periksa kembali langkah perhitunganmu ya."
+        return "Yuk perhatikan lagi konsep dasar dan petunjuk pada soal ini! Coba periksa kembali langkah analisis atau pemahaman kamu ya."
