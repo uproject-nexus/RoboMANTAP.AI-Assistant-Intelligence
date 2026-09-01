@@ -2,12 +2,17 @@ import os
 import json
 import streamlit as st
 from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
+
 api_key = os.getenv("GEMINI_API_KEY")
+if not api_key and "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+
 if not api_key:
-    raise ValueError("GEMINI_API_KEY tidak ditemukan. Pastikan file .env sudah dikonfigurasi.")
+    raise ValueError("GEMINI_API_KEY tidak ditemukan. Pastikan Secrets/file .env sudah dikonfigurasi.")
 
 client = genai.Client(api_key=api_key)
 
@@ -64,19 +69,21 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
                 "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi di atas)",
                 "hint": "Petunjuk logika awal RoboMANTAP tanpa membocorkan jawaban akhir",
                 "solution": "Pembahasan runtut dan analitis step-by-step"
-            }},
-            ... (total 5 soal)
+            }}
         ]
     }}
     """
 
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=system_prompt,
-        config={"response_mime_type": "application/json"}
-    )
-
     try:
+        # Menggunakan model resmi Google API (gemini-2.5-flash)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=system_prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
+        )
+        
         data = json.loads(response.text)
         quiz_list = data.get("quiz", [])
         for q in quiz_list:
@@ -88,24 +95,31 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
                         q["correct_answer"] = opt
                         break
         return quiz_list
-    except Exception:
+    except Exception as e:
+        st.error("Terjadi kendala saat menghubungkan AI Engine. Silakan klik tombol sekali lagi.")
         return []
 
-def get_ai_hint(question: str, user_attempt: str, mapel: str = "Matematika"):
+def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     prompt = f"""
     Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
     Gunakan gaya bahasa menyapa 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
 
-    Mata Pelajaran: {mapel}
+    Mata Pelajaran / Bidang: {mapel}
     Soal OMI: {question}
     Ide Pengerjaan Siswa: {user_attempt}
 
-    Berikan petunjuk atau bimbingan logika interaktif yang menyemangati, memuji usahanya, dan membantu siswa menemukan celah penyelesaian soal {mapel} ini tanpa membocorkan jawaban akhir.
-    Ingat: Fokus pembimbingan tetap pada materi {mapel}, meskipun soal menggunakan konteks cerita integrasi.
-    Gunakan format LaTeX $...$ untuk setiap notasi matematika atau sains.
+    Instruksi Pembimbingan:
+    - Berikan petunjuk atau bimbingan logika interaktif yang menyemangati dan memuji usaha siswa.
+    - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini tanpa membocorkan jawaban akhir.
+    - Adaptasikan penjelasan sesuai jenis mata pelajaran {mapel} (baik yang berbasis analisis konsep, teori, narasi keislaman, data, maupun perhitungan numerik).
+    - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains pada penjelasan.
     """
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt
-    )
-    return response.text
+    
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        return response.text
+    except Exception:
+        return "Yuk perhatikan lagi konsep dasar dan petunjuk pada soal ini! Coba periksa kembali langkah analisis atau pemahaman kamu ya!"
