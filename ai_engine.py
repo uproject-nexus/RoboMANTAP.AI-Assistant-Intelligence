@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import streamlit as st
 from google import genai
 from google.genai import types
@@ -17,7 +18,6 @@ elif os.getenv("GEMINI_API_KEY"):
 if not api_keys:
     raise ValueError("GEMINI_API_KEYS tidak ditemukan. Pastikan Secrets sudah dikonfigurasi.")
 
-# Urutan model yang dicoba
 MODELS_TO_TRY = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
 
 def format_latex_options(options):
@@ -33,10 +33,27 @@ def format_latex_options(options):
         formatted.append(opt)
     return formatted
 
+def clean_json_text(text: str) -> str:
+    """
+    Membersihkan string JSON dari balikan AI yang mengandung notasi LaTeX
+    agar tidak menyebabkan error 'Invalid \\escape' saat json.loads().
+    """
+    if not text:
+        return ""
+    
+    # Hapus pemungkus markdown ```json ... ``` jika ada
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\n?", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\n?```$", "", text)
+
+    # Ubah backslash tunggal LaTeX (seperti \sqrt, \frac, \alpha, \{, \}) menjadi double backslash \\
+    text = re.sub(r'(?<!\\)\\([a-zA-Z\{\}\!\,;:_%\$\&\+\-\=])', r'\\\\\1', text)
+    return text
+
 def call_gemini_with_rotation(prompt: str, is_json: bool = False):
     """
     Memanggil API Gemini dengan perputaran otomatis API Key dan Model ID.
-    Jika Key A kena limit (429), otomatis pindah ke Key B, Key C, dst.
     """
     for key in api_keys:
         try:
@@ -52,9 +69,9 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
                     if response.text:
                         return response.text
                 except Exception:
-                    continue  # Coba model berikutnya jika model ini bermasalah
+                    continue
         except Exception:
-            continue  # Coba API key berikutnya jika key ini kena limit/error
+            continue
 
     return None
 
@@ -86,6 +103,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     ATURAN KHUSUS FORMATTING:
     - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
     - Jangan pernah menulis perintah LaTeX (seperti \\frac, \\sqrt) tanpa diapit '$'.
+    - PENTING: Semua backslash LaTeX dalam JSON wajib ditulis ganda '\\\\' agar format JSON valid.
 
     Format keluaran WAJIB berupa objek JSON murni:
     {{
@@ -102,14 +120,15 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     }}
     """
 
-    response_text = call_gemini_with_rotation(system_prompt, is_json=True)
+    raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
 
-    if not response_text:
+    if not raw_response:
         st.error("⚠️ Semua kuota cadangan API sedang penuh. Silakan coba beberapa saat lagi.")
         return []
 
     try:
-        data = json.loads(response_text)
+        cleaned_response = clean_json_text(raw_response)
+        data = json.loads(cleaned_response)
         quiz_list = data.get("quiz", [])
         for q in quiz_list:
             if "options" in q:
