@@ -57,7 +57,8 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
     """
     for key in api_keys:
         try:
-            client = genai.Client(api_key=key)
+            # Tambahkan http_options dengan timeout 15000 ms (15 detik)
+            client = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=15000))
             for model_name in MODELS_TO_TRY:
                 try:
                     config = types.GenerateContentConfig(response_mime_type="application/json") if is_json else None
