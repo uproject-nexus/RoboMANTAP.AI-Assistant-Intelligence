@@ -2,18 +2,23 @@ import os
 import json
 import streamlit as st
 from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
 
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key and "GEMINI_API_KEY" in st.secrets:
-    api_key = st.secrets["GEMINI_API_KEY"]
+# Ambil daftar API Keys dari Streamlit Secrets atau .env
+api_keys = []
+if "GEMINI_API_KEYS" in st.secrets:
+    api_keys = list(st.secrets["GEMINI_API_KEYS"])
+elif os.getenv("GEMINI_API_KEY"):
+    api_keys = [os.getenv("GEMINI_API_KEY")]
 
-if not api_key:
-    raise ValueError("GEMINI_API_KEY tidak ditemukan. Pastikan Secrets/file .env sudah dikonfigurasi.")
+if not api_keys:
+    raise ValueError("GEMINI_API_KEYS tidak ditemukan. Pastikan Secrets sudah dikonfigurasi.")
 
-client = genai.Client(api_key=api_key)
+# Urutan model yang dicoba
+MODELS_TO_TRY = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
 
 def format_latex_options(options):
     formatted = []
@@ -27,6 +32,31 @@ def format_latex_options(options):
                 opt = f"${opt}$"
         formatted.append(opt)
     return formatted
+
+def call_gemini_with_rotation(prompt: str, is_json: bool = False):
+    """
+    Memanggil API Gemini dengan perputaran otomatis API Key dan Model ID.
+    Jika Key A kena limit (429), otomatis pindah ke Key B, Key C, dst.
+    """
+    for key in api_keys:
+        try:
+            client = genai.Client(api_key=key)
+            for model_name in MODELS_TO_TRY:
+                try:
+                    config = types.GenerateContentConfig(response_mime_type="application/json") if is_json else None
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=config
+                    )
+                    if response.text:
+                        return response.text
+                except Exception:
+                    continue  # Coba model berikutnya jika model ini bermasalah
+        except Exception:
+            continue  # Coba API key berikutnya jika key ini kena limit/error
+
+    return None
 
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
@@ -71,14 +101,15 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
         ]
     }}
     """
+
+    response_text = call_gemini_with_rotation(system_prompt, is_json=True)
+
+    if not response_text:
+        st.error("⚠️ Semua kuota cadangan API sedang penuh. Silakan coba beberapa saat lagi.")
+        return []
+
     try:
-        response = client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents=system_prompt,
-            config={"response_mime_type": "application/json"}
-        )
-        
-        data = json.loads(response.text)
+        data = json.loads(response_text)
         quiz_list = data.get("quiz", [])
         for q in quiz_list:
             if "options" in q:
@@ -90,13 +121,8 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
                         break
         return quiz_list
     except Exception as e:
-        error_str = str(e)
-        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-            st.warning("⚠️ Server AI sedang mencapai batas limit harian. Silakan tunggu 30 detik atau perbarui API Key.")
-        else:
-            st.error("Terjadi kendala pada server AI. Silakan coba klik tombol sekali lagi.")
+        st.error(f"Gagal memproses format soal: {e}")
         return []
-
 
 def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     prompt = f"""
@@ -113,11 +139,9 @@ def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     - Adaptasikan penjelasan sesuai jenis mata pelajaran {mapel} (baik yang berbasis analisis konsep, teori, narasi keislaman, data, maupun perhitungan numerik).
     - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains pada penjelasan.
     """
-    try:
-        response = client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents=prompt
-        )
-        return response.text
-    except Exception:
-        return "Yuk perhatikan lagi konsep dasar dan petunjuk pada soal ini! Coba periksa kembali langkah analisis atau pemahaman kamu ya."
+    
+    hint_text = call_gemini_with_rotation(prompt, is_json=False)
+    if hint_text:
+        return hint_text
+
+    return "Yuk perhatikan lagi konsep dasar dan petunjuk pada soal ini! Coba periksa kembali langkah analisis atau pemahaman kamu ya."
