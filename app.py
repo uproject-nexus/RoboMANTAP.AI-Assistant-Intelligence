@@ -42,6 +42,28 @@ st.markdown("""
     .school-title { color: #ffffff; font-weight: 800; font-size: 15px; margin: 0; }
     .school-subtitle { color: #6ee7b7; font-size: 11px; margin-top: 4px; font-weight: 500; }
     .stButton>button { width: 100%; min-height: 48px; font-size: 16px !important; border-radius: 8px !important; }
+    /* Paksa Warna Tombol Utama Menjadi Hijau Emerald MANTAP */
+    div.stButton > button[kind="primary"],
+    div.stButton > button {
+        background-color: #059669 !important;
+        background-image: none !important;
+        color: #ffffff !important;
+        border: 1px solid #047857 !important;
+        width: 100%;
+        min-height: 48px;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        transition: all 0.3s ease;
+    }
+    
+    /* Efek Hover Tombol saat Diarahkan Kursor */
+    div.stButton > button[kind="primary"]:hover,
+    div.stButton > button:hover {
+        background-color: #047857 !important;
+        border-color: #065f46 !important;
+        box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4) !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
