@@ -1,0 +1,351 @@
+import base64
+import os
+import streamlit as st
+from ai_engine import generate_quiz_batch, get_ai_hint
+
+st.set_page_config(
+    page_title="RoboMANTAP-AI (Assistant Intelligence)",
+    page_icon="🎓",
+    layout="wide",
+    initial_sidebar_state="auto"
+)
+
+# Custom Styling
+st.markdown("""
+    <style>
+    .mode-card {
+        background-color: var(--secondary-background-color);
+        color: var(--text-color);
+        border: 1px solid rgba(128, 128, 128, 0.2);
+        padding: 24px;
+        border-radius: 12px;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    .mapel-card {
+        background-color: var(--secondary-background-color);
+        border: 1px solid rgba(5, 150, 105, 0.3);
+        padding: 16px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    .school-header {
+        background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
+        border: 1px solid #059669;
+        border-radius: 12px;
+        padding: 16px;
+        text-align: center;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 20px rgba(5, 150, 105, 0.15);
+    }
+    .school-title { color: #ffffff; font-weight: 800; font-size: 20px; margin: 0; }
+    .school-subtitle { color: #6ee7b7; font-size: 13px; margin-top: 4px; font-weight: 500; }
+    .stButton>button { width: 100%; min-height: 48px; font-size: 16px !important; border-radius: 8px !important; }
+    </style>
+""", unsafe_allow_html=True)
+
+# Helper Base64 Image
+def get_image_base64(path):
+    if os.path.exists(path):
+        with open(path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    return None
+
+logo_mantap_b64 = get_image_base64("logo.png")
+logo_nexus_b64 = get_image_base64("nexus_logo.png")
+
+img_mantap_html = f'<img src="data:image/png;base64,{logo_mantap_b64}" style="height: 70px; margin-bottom: 8px;">' if logo_mantap_b64 else '<div style="font-size: 32px;">🎓</div>'
+
+# Session States Initialization
+if "page" not in st.session_state: st.session_state.page = "landing"
+if "jenjang" not in st.session_state: st.session_state.jenjang = None
+if "mapel" not in st.session_state: st.session_state.mapel = None
+if "stage" not in st.session_state: st.session_state.stage = "Internal"
+if "selected_submateri" not in st.session_state: st.session_state.selected_submateri = []
+if "quiz_data" not in st.session_state: st.session_state.quiz_data = []
+if "user_answers" not in st.session_state: st.session_state.user_answers = {}
+if "current_index" not in st.session_state: st.session_state.current_index = 0
+
+# Database Kisi-Kisi Operasional OMI 2026 dari PDF Resmi
+KISI_KISI_OMI = {
+    "MTs (Sederajat SMP)": {
+        "Matematika": ["Bilangan", "Aljabar", "Aritmetika Sosial", "Geometri", "Peluang", "Statistika", "Perbandingan & Proporsi", "Problem Solving", "Konteks OMI (Keislaman & Sains)"],
+        "IPA Terintegrasi": ["Makhluk Hidup & Sel", "Sistem Organ", "Genetika & Keanekaragaman", "Ekologi", "Zat & Perubahannya", "Energi & Kalor", "Gerak & Gaya", "Getaran, Gelombang & Optik", "Listrik & Kemagnetan", "Bumi & Antariksa", "Eksperimen & Data", "Konteks OMI"],
+        "IPS Terintegrasi": ["Geografi", "Kependudukan", "Ekonomi", "Sejarah Indonesia", "Sejarah Islam", "Sosial & Budaya", "Kewarganegaraan", "Lingkungan & Pembangunan", "Literasi Data", "Konteks OMI"]
+    },
+    "MA (Sederajat SMA)": {
+        "Matematika Terintegrasi": ["Bilangan & Teori Bilangan", "Aljabar & Fungsi", "Geometri", "Kombinatorika & Peluang", "Statistika", "Problem Solving", "Konteks OMI"],
+        "Biologi Terintegrasi": ["Sel & Biokimia", "Genetika", "Fisiologi", "Botani & Zoologi", "Ekologi", "Evolusi & Keanekaragaman", "Bioteknologi & Lingkungan", "Konteks OMI"],
+        "Fisika Terintegrasi": ["Mekanika", "Fluida", "Getaran & Gelombang", "Optik", "Suhu & Kalor", "Listrik & Magnet", "Fisika Modern", "Eksperimen & Data", "Konteks OMI"],
+        "Kimia Terintegrasi": ["Struktur Atom & Periodik", "Ikatan Kimia", "Stoikiometri", "Larutan & Asam-Basa", "Redoks", "Termokimia & Kinetika", "Kesetimbangan", "Organik & Lingkungan", "Konteks OMI"],
+        "Ekonomi Terintegrasi": ["Ekonomi Dasar", "Mikroekonomi", "Makroekonomi", "Kebijakan Ekonomi", "Akuntansi", "Pasar Modal & Keuangan", "Ekonomi Digital", "Ekonomi Islam", "Analisis Data"],
+        "Geografi Terintegrasi": ["Peta & Keruangan", "Geologi & Geomorfologi", "Atmosfer & Iklim", "Hidrosfer", "Biosfer", "Kependudukan", "Sumber Daya & Lingkungan", "Bencana", "SIG & Data Spasial", "Konteks OMI"]
+    }
+}
+
+# Header Utama
+st.markdown(f"""
+<div class="school-header">
+    <div style="text-align: center;">
+        {img_mantap_html}
+    </div>
+    <div class="school-title">MA'HAD AL IRSYAD AL ISLAMIYYAH BONDOWOSO</div>
+    <div class="school-subtitle">
+        Madrasah Aliyah dan Tsanawiyah Al Irsyad Putri Bondowoso (MANTAP) &nbsp;•&nbsp; 
+        <span style="color: #6ee7b7; font-weight: 600;">Powered by RoboMANTAP-AI (Assistant Intelligence)</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Sidebar Control
+with st.sidebar:
+    st.markdown("### 🤖 RoboMANTAP-AI")
+    st.caption("Engineered by **U.Project Nexus**")
+    st.success("🟢 Engine Status: **Online**")
+    st.write("---")
+    st.markdown("#### 📋 Skoring CBT OMI\n* ✅ **Benar:** +4\n* ❌ **Salah:** -1\n* ⚪ **Kosong:** 0")
+    st.write("---")
+    if st.button("🏠 Kembali ke Beranda Utama", use_container_width=True):
+        st.session_state.page = "landing"
+        st.rerun()
+
+    sidebar_nexus_html = f'<div style="background: #ffffff; padding: 8px 16px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); display: inline-block; margin-bottom: 10px; border: 1px solid rgba(0,0,0,0.05);"><img src="data:image/png;base64,{logo_nexus_b64}" style="height: 70px; max-width: 100%; display: block; margin: 0 auto;"></div>' if logo_nexus_b64 else ''
+    st.markdown(f'<div style="text-align: center; margin-top: 15px;">{sidebar_nexus_html}<div style="font-size: 11px; opacity: 0.8; line-height: 1.4; margin-top: 4px;"><b style="color: var(--text-color);">U.Project Nexus System</b><br><span style="font-size: 10px;">AI Integration & B2B Solutions</span><br><span style="opacity: 0.6;">&copy; 2026 All Rights Reserved</span></div></div>', unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# 1. TAMPILAN AWAL (HANYA 2 KOTAK JENJANG: MTS & MA)
+# -----------------------------------------------------------------------------
+if st.session_state.page == "landing":
+    st.markdown("<h2 style='text-align: center;'>🏆 BINA PRESTASI OMI 2026</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
+    st.write("---")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("""
+        <div class="mode-card">
+            <h2>🏫 TINGKAT MTs</h2>
+            <p style="opacity: 0.7; font-size: 14px;">Madrasah Tsanawiyah Al Irsyad Putri</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Masuk Modul MTs ➔", key="btn_mts", use_container_width=True, type="primary"):
+            st.session_state.jenjang = "MTs (Sederajat SMP)"
+            st.session_state.page = "select_mapel"
+            st.rerun()
+
+    with col2:
+        st.markdown("""
+        <div class="mode-card">
+            <h2>🏛️ TINGKAT MA</h2>
+            <p style="opacity: 0.7; font-size: 14px;">Madrasah Aliyah Al Irsyad Putri</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Masuk Modul MA ➔", key="btn_ma", use_container_width=True, type="primary"):
+            st.session_state.jenjang = "MA (Sederajat SMA)"
+            st.session_state.page = "select_mapel"
+            st.rerun()
+
+# -----------------------------------------------------------------------------
+# 2. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026
+# -----------------------------------------------------------------------------
+elif st.session_state.page == "select_mapel":
+    st.markdown(f"### 📚 Pilih Bidang OMI 2026 - <span style='color: #059669;'>{st.session_state.jenjang}</span>", unsafe_allow_html=True)
+    if st.button("⬅️ Kembali Pilih Jenjang"):
+        st.session_state.page = "landing"
+        st.rerun()
+
+    st.write("---")
+    mapel_dict = KISI_KISI_OMI[st.session_state.jenjang]
+    cols = st.columns(len(mapel_dict))
+
+    for idx, (mapel_name, submateri_list) in enumerate(mapel_dict.items()):
+        with cols[idx % len(cols)]:
+            st.markdown(f"""
+            <div class="mapel-card">
+                <h4>{mapel_name}</h4>
+                <p style="font-size: 12px; opacity: 0.7;">{len(submateri_list)} Submateri Operasional</p>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"Pilih {mapel_name}", key=f"btn_mapel_{idx}", type="primary", use_container_width=True):
+                st.session_state.mapel = mapel_name
+                st.session_state.page = "setup"
+                st.rerun()
+
+# -----------------------------------------------------------------------------
+# 3. SETUP CBT & SUBMATERI SINKRON DENGAN PDF
+# -----------------------------------------------------------------------------
+elif st.session_state.page == "setup":
+    st.markdown(f"### ⚙️ Setup CBT: {st.session_state.mapel} ({st.session_state.jenjang})", unsafe_allow_html=True)
+    if st.button("⬅️ Ganti Mata Pelajaran"):
+        st.session_state.page = "select_mapel"
+        st.rerun()
+
+    st.write("---")
+    c1, c2 = st.columns([5, 7])
+
+    with c1:
+        st.subheader("1. Konfigurasi Ujian")
+        st.session_state.stage = st.radio("Pilih Tahap Pembinaan:", ["Internal", "Kab/Kota", "Provinsi", "Nasional"])
+        
+        available_submateri = KISI_KISI_OMI[st.session_state.jenjang][st.session_state.mapel]
+        st.session_state.selected_submateri = st.multiselect(
+            "Pilih Submateri (Kosongkan saja ya kalau  Kamu Mau pilih Semua Submateri 😊✨):",
+            available_submateri,
+            default=[],
+            placeholder="Pilih submateri di sini..."
+        )
+
+    with c2:
+        st.subheader("2. Petunjuk CBT RoboMANTAP")
+        st.markdown("""
+        * **Jumlah Soal:** TEPAT 5 Soal Pilihan Ganda Terintegrasi per Sesi.
+        * **Standar Pembinaan:** Mengacu Juknis OMI 2026 (Sains, Keislaman, & Literasi Data).
+        * **Skoring:** Benar (+4), Salah (-1), Kosong (0).
+        """)
+        st.write("")
+        if st.button("🚀 MARI MULAI SESI TEST SEKARANG!", type="primary", use_container_width=True):
+            with st.spinner(f"RoboMANTAP sedang merancang soal Kamu... {st.session_state.mapel}..."):
+                quiz = generate_quiz_batch(
+                    st.session_state.jenjang,
+                    st.session_state.mapel,
+                    st.session_state.stage,
+                    st.session_state.selected_submateri
+                )
+                if quiz and len(quiz) == 5:
+                    st.session_state.quiz_data = quiz
+                    st.session_state.user_answers = {}
+                    st.session_state.current_index = 0
+                    st.session_state.page = "quiz"
+                    st.rerun()
+                else:
+                    st.error("Gagal membuat paket soal. Coba klik tombol sekali lagi.")
+
+# -----------------------------------------------------------------------------
+# 4. ENGINE TEST INTERAKTIF (5 SOAL CBT)
+# -----------------------------------------------------------------------------
+elif st.session_state.page == "quiz":
+    quiz_data = st.session_state.quiz_data
+    curr_idx = st.session_state.current_index
+    q = quiz_data[curr_idx]
+
+    col_h1, col_h2 = st.columns([8, 4])
+    with col_h1:
+        st.subheader(f"📝 CBT OMI: {st.session_state.mapel} ({st.session_state.stage})")
+    with col_h2:
+        st.progress((curr_idx + 1) / 5)
+        st.caption(f"Soal **{curr_idx + 1}** dari **5**")
+
+    st.write("---")
+    st.markdown(f"#### **Soal No. {curr_idx + 1}**")
+    st.markdown(q["question"])
+    st.write("")
+
+    opts = q["options"]
+    saved_ans = st.session_state.user_answers.get(curr_idx, None)
+    default_opt_idx = opts.index(saved_ans) if saved_ans in opts else None
+
+    selected_option = st.radio("Pilih Jawaban Anda:", opts, index=default_opt_idx, key=f"radio_q_{curr_idx}")
+    if selected_option:
+        st.session_state.user_answers[curr_idx] = selected_option
+
+    st.write("---")
+    col_nav1, col_nav2, col_nav3 = st.columns([3, 6, 3])
+    with col_nav1:
+        if curr_idx > 0:
+            if st.button("⬅️ Sebelumnya", use_container_width=True):
+                st.session_state.current_index -= 1
+                st.rerun()
+    with col_nav3:
+        if curr_idx < 4:
+            if st.button("Berikutnya ➡️", type="primary", use_container_width=True):
+                st.session_state.current_index += 1
+                st.rerun()
+        else:
+            if st.button("🏁 SUBMIT & SELESAIKAN", type="primary", use_container_width=True):
+                st.session_state.page = "result"
+                st.rerun()
+
+    with st.expander("Kamu bingung? Konsultasi di sini sama aku, RoboMANTAP! 😊"):
+        st.caption("Fungsi kolom ini: Tulis ide awal atau rumus yang mau kamu coba, nanti RoboMANTAP bakal kasih petunjuk jalan keluarnya tanpa langsung bocorin jawaban!")
+        
+        attempt_input = st.text_input(
+            "Gagasan / Ide Logika Kamu apa coba?:",
+            placeholder="Contoh: Aku bingung nih harus mulai dari mana... 🤔",
+            key=f"hint_in_{curr_idx}"
+        )
+        
+        if st.button("Dapatkan Petunjuk dari RoboMANTAP! 🚀", key=f"btn_hint_{curr_idx}"):
+            if attempt_input.strip():
+                with st.spinner("RoboMANTAP lagi menganalisis ide kamu... ✨"):
+                    st.info(f"🤖 **RoboMANTAP:**\n\n{get_ai_hint(q['question'], attempt_input, st.session_state.mapel)}")
+            else:
+                st.info(f"💡 **Petunjuk Awal dari RoboMANTAP:** {q['hint']}")
+
+# -----------------------------------------------------------------------------
+# 5. SCORECARD & EVALUASI SESI
+# -----------------------------------------------------------------------------
+elif st.session_state.page == "result":
+    st.subheader(f"📊 Evaluasi CBT: {st.session_state.mapel} ({st.session_state.jenjang})")
+    quiz_data = st.session_state.quiz_data
+    user_answers = st.session_state.user_answers
+
+    benar, salah, kosong, total_skor = 0, 0, 0, 0
+    for idx, q in enumerate(quiz_data):
+        u_ans = user_answers.get(idx, None)
+        if u_ans is None: kosong += 1
+        elif u_ans == q["correct_answer"]: benar += 1; total_skor += 4
+        else: salah += 1; total_skor -= 1
+
+    if total_skor >= 16:
+        feedback_msg = f"🌟 **Luar Biasa! (Skor: {total_skor}/20)**\n\nRoboMANTAP bangga banget sama kamu! Pemahaman kamu di materi {st.session_state.mapel} sudah sangat tajam. Pertahankan fokus kamu untuk tahap OMI selanjutnya ya! 🚀✨"
+        feedback_type = "success"
+    elif total_skor >= 8:
+        feedback_msg = f"👍 **Kerja Bagus! (Skor: {total_skor}/20)**\n\nUsaha yang mantap! Kamu sudah paham sebagian besar konsepnya. Coba cek pembahasan di bawah untuk memperbaiki sedikit kekeliruan tadi ya! 💪😊"
+        feedback_type = "info"
+    else:
+        feedback_msg = f"🌱 **Tetap Semangat! (Skor: {total_skor}/20)**\n\nJangan berkecil hati ya! Setiap kesalahan adalah proses belajar. Yuk pelajari pembahasan rinci di bawah dan coba latihan 5 soal lagi bersama RoboMANTAP! 🤖❤️"
+        feedback_type = "warning"
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Total Skor CBT", f"{total_skor} / 20")
+    k2.metric("Benar (+4)", f"{benar}")
+    k3.metric("Salah (-1)", f"{salah}")
+    k4.metric("Kosong (0)", f"{kosong}")
+
+    # Tampilkan Box Pesan Support RoboMANTAP
+    if feedback_type == "success":
+        st.success(f"🤖 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
+    elif feedback_type == "info":
+        st.info(f"🤖 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
+    else:
+        st.warning(f"🤖 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
+
+    st.write("---")
+    col_act1, col_act2 = st.columns(2)
+    with col_act1:
+        if st.button("🔄 LATIHAN SOAL LAGI DONG! (SESI BARU)", type="primary", use_container_width=True):
+            with st.spinner("Sabar ya 😊 RoboMANTAP sedang Menyiapkan soal OMI baru.."):
+                new_quiz = generate_quiz_batch(st.session_state.jenjang, st.session_state.mapel, st.session_state.stage, st.session_state.selected_submateri)
+                if new_quiz and len(new_quiz) == 5:
+                    st.session_state.quiz_data = new_quiz
+                    st.session_state.user_answers = {}
+                    st.session_state.current_index = 0
+                    st.session_state.page = "quiz"
+                    st.rerun()
+
+    with col_act2:
+        if st.button("⚙️ Pilih Mata Pelajaran Lain", use_container_width=True):
+            st.session_state.page = "select_mapel"
+            st.rerun()
+
+    st.write("---")
+    st.markdown("### 📖 Pembahasan Rinci Pembina")
+    for idx, q in enumerate(quiz_data):
+        u_ans = user_answers.get(idx, "Tidak Dijawab")
+        is_correct = u_ans == q["correct_answer"]
+        status_icon = "✅ BENAR" if is_correct else ("❌ SALAH" if u_ans != "Tidak Dijawab" else "⚪ KOSONG")
+        with st.expander(f"Soal No. {idx + 1} [{status_icon}] - Jawaban Anda: {u_ans}"):
+            st.markdown(f"**Soal:**\n{q['question']}")
+            st.markdown(f"**Kunci Jawaban:** {q['correct_answer']}")
+            st.markdown(f"**Pembahasan:**\n{q['solution']}")
