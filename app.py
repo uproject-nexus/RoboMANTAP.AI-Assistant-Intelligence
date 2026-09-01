@@ -99,19 +99,86 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # Sidebar Control
+# -----------------------------------------------------------------------------
+# SIDEBAR: ADVANCED AI CONTROL CENTER
+# -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("### 🤖 RoboMANTAP-AI")
-    st.caption("Engineered by **U.Project Nexus**")
-    st.success("🟢 Engine Status: **Online**")
-    st.write("---")
-    st.markdown("#### 📋 Skoring CBT OMI\n* ✅ **Benar:** +4\n* ❌ **Salah:** -1\n* ⚪ **Kosong:** 0")
-    st.write("---")
+    # 1. Header Widget Persona AI + Engineered by Banner
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 16px; border-radius: 12px; border: 1px solid #059669; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div style="font-size: 26px; margin-bottom: 4px;">🤖</div>
+        <div style="color: #ffffff; font-weight: 700; font-size: 16px; letter-spacing: 0.5px;">RoboMANTAP AI</div>
+        <div style="color: #6ee7b7; font-size: 11px; font-weight: 500; margin-bottom: 6px;">Assistant Intelligence System</div>
+        <div style="font-size: 10px; color: #a7f3d0; opacity: 0.85; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 4px; font-style: italic;">Engineered by U.Project Nexus</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 2. AI Engine Live Telemetry Status
+    st.markdown("""
+    <div style="background: var(--secondary-background-color); border: 1px solid rgba(5, 150, 105, 0.3); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <span style="font-size: 11px; font-weight: 600; opacity: 0.7;">ENGINE STATUS</span>
+            <span style="font-size: 10px; background: #059669; color: white; padding: 2px 8px; border-radius: 12px; font-weight: 700;">LIVE 🟢</span>
+        </div>
+        <div style="font-size: 11px; line-height: 1.6; opacity: 0.9;">
+            ⚡ <b>Model:</b> U.Project Nexus Intelligence v3.6<br>
+            🎯 <b>Core:</b> Bina Prestasi OMI 2026<br>
+            ⏱️ <b>Response:</b> Real-time AI
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 3. Dynamic Active Session Monitor
+    if st.session_state.jenjang and st.session_state.mapel:
+        st.markdown(f"""
+        <div style="background: rgba(5, 150, 105, 0.08); border-left: 4px solid #059669; padding: 10px 12px; border-radius: 6px; margin-bottom: 15px;">
+            <div style="font-size: 10px; opacity: 0.6; text-transform: uppercase; font-weight: 700;">Sesi Aktif</div>
+            <div style="font-size: 12px; font-weight: 700; color: var(--text-color);">{st.session_state.mapel}</div>
+            <div style="font-size: 11px; opacity: 0.8;">{st.session_state.jenjang} • {st.session_state.stage}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # 4. Interactive CBT Rules Badge Card
+    st.markdown("""
+    <div style="background: var(--secondary-background-color); border: 1px solid rgba(128,128,128,0.2); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
+        <div style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 8px;">📋 ATURAN SKORING CBT</div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+            <span>✅ Jawaban Benar</span>
+            <b style="color: #059669;">+4 Poin</b>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+            <span>❌ Jawaban Salah</span>
+            <b style="color: #ef4444;">-1 Poin</b>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px;">
+            <span>⚪ Tidak Dijawab</span>
+            <b style="opacity: 0.6;">0 Poin</b>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 5. Quick Navigation Button
     if st.button("🏠 Kembali ke Beranda Utama", use_container_width=True):
         st.session_state.page = "landing"
+        st.session_state.jenjang = None
+        st.session_state.mapel = None
         st.rerun()
 
-    sidebar_nexus_html = f'<div style="background: #ffffff; padding: 8px 16px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); display: inline-block; margin-bottom: 10px; border: 1px solid rgba(0,0,0,0.05);"><img src="data:image/png;base64,{logo_nexus_b64}" style="height: 70px; max-width: 100%; display: block; margin: 0 auto;"></div>' if logo_nexus_b64 else ''
-    st.markdown(f'<div style="text-align: center; margin-top: 15px;">{sidebar_nexus_html}<div style="font-size: 11px; opacity: 0.8; line-height: 1.4; margin-top: 4px;"><b style="color: var(--text-color);">U.Project Nexus System</b><br><span style="font-size: 10px;">AI Integration & B2B Solutions</span><br><span style="opacity: 0.6;">&copy; 2026 All Rights Reserved</span></div></div>', unsafe_allow_html=True)
+    # 6. Developer & Provider Badge
+    sidebar_nexus_html = f'<div style="background: #ffffff; padding: 6px 14px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); display: inline-block; margin-bottom: 8px; border: 1px solid rgba(0,0,0,0.05);"><img src="data:image/png;base64,{logo_nexus_b64}" style="height: 42px; max-width: 100%; display: block; margin: 0 auto;"></div>' if logo_nexus_b64 else ''
+    
+    st.markdown(f"""
+    <div style="text-align: center; margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(128,128,128,0.2);">
+        <div style="font-size: 10px; opacity: 0.7; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Engineered by</div>
+        {sidebar_nexus_html}
+        <div style="font-size: 11px; opacity: 0.85; line-height: 1.3;">
+            <b style="color: var(--text-color);">U.Project Nexus System</b><br>
+            <span style="font-size: 10px; opacity: 0.7;">AI Integration & B2B Solutions</span><br>
+            <span style="font-size: 9px; opacity: 0.5;">&copy; 2026 All Rights Reserved</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 
 # -----------------------------------------------------------------------------
 # 1. TAMPILAN AWAL (HANYA 2 KOTAK JENJANG: MTS & MA)
