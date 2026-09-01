@@ -184,7 +184,7 @@ def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     Ide Pengerjaan Siswa: {user_attempt}
     
     ATURAN KECEPATAN & RESPON:
-    - Berikan petunjuk/bimbingan logika singkat MAKSIMAL 7 KALIMAT padat (maks 100 kata).
+    - Berikan petunjuk/bimbingan logika singkat MAKSIMAL 7 KALIMAT padat (maks 250 kata).
     - Langsung ke inti celah penyelesaian tanpa pembuka/basa-basi berlebihan.
     - Dilarang membocorkan jawaban akhir atau pilihan opsi yang benar.
     - Gunakan format LaTeX $...$ hanya jika ada rumus matematika/sains.
