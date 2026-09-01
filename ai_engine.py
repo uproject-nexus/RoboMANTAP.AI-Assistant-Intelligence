@@ -2,7 +2,6 @@ import os
 import json
 import streamlit as st
 from google import genai
-from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,7 +28,6 @@ def format_latex_options(options):
         formatted.append(opt)
     return formatted
 
-@st.cache_data(ttl=3600, show_spinner=False)
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
     Menghasilkan 1 paket latihan CBT 5 soal berbasis Kisi-Kisi Operasional OMI 2026.
@@ -75,13 +73,10 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     """
 
     try:
-        # Menggunakan model resmi Google API (gemini-2.5-flash)
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=system_prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json"
-            )
+            config={"response_mime_type": "application/json"}
         )
         
         data = json.loads(response.text)
@@ -96,7 +91,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
                         break
         return quiz_list
     except Exception as e:
-        st.error("Terjadi kendala saat menghubungkan AI Engine. Silakan klik tombol sekali lagi.")
+        st.error(f"Kendala Engine: {e}")
         return []
 
 def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
@@ -114,12 +109,11 @@ def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     - Adaptasikan penjelasan sesuai jenis mata pelajaran {mapel} (baik yang berbasis analisis konsep, teori, narasi keislaman, data, maupun perhitungan numerik).
     - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains pada penjelasan.
     """
-    
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=prompt
         )
         return response.text
     except Exception:
-        return "Yuk perhatikan lagi konsep dasar dan petunjuk pada soal ini! Coba periksa kembali langkah analisis atau pemahaman kamu ya!"
+        return "Yuk perhatikan lagi konsep dasar dan petunjuk pada soal ini! Coba periksa kembali langkah analisis atau pemahaman kamu ya."
