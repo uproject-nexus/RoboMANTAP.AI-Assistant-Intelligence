@@ -75,6 +75,7 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
 
     return None
 
+@st.cache_data(ttl=600, show_spinner=False)
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
     Menghasilkan 1 paket latihan CBT 5 soal berbasis Kisi-Kisi Operasional OMI 2026.
@@ -153,6 +154,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
         st.error(f"Gagal memproses format soal: {e}")
         return []
 
+@st.cache_data(ttl=600, show_spinner=False)
 def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     prompt = f"""
     Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
@@ -167,6 +169,7 @@ def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini tanpa membocorkan jawaban akhir.
     - Adaptasikan penjelasan sesuai jenis mata pelajaran {mapel} (baik yang berbasis analisis konsep, teori, narasi keislaman, data, maupun perhitungan numerik).
     - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains pada penjelasan.
+    - Gunakan format Markdown standar untuk pemisah paragraf/tabel dan jangan menuliskan escape character literal seperti '\\n' secara berlebihan.
     """
     
     hint_text = call_gemini_with_rotation(prompt, is_json=False)
