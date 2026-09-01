@@ -126,7 +126,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     ATURAN KECEPATAN & EFISIENSI:
     - Teks soal harus padat, to-the-point, dan tidak bertele-tele.
-    - Pembahasan (solution) MAKSIMAL 10 kalimat ringkas, tahapan penyelesaian runtut, lengkap, singkat, jelas dan padat (langsung ke rumus/inti jawaban).
+    - Pembahasan (solution) MAKSIMAL 7 kalimat ringkas (langsung ke rumus/inti jawaban).
     - Dilarang menambahkan kalimat pembuka atau penutup yang tidak perlu.
 
     Format keluaran WAJIB berupa objek JSON murni:
