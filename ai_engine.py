@@ -18,7 +18,7 @@ elif os.getenv("GEMINI_API_KEY"):
 if not api_keys:
     raise ValueError("GEMINI_API_KEYS tidak ditemukan. Pastikan Secrets sudah dikonfigurasi.")
 
-MODELS_TO_TRY = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-3.6-flash"]
+MODELS_TO_TRY = ["gemini-3.6-flash", "gemini-1.5-flash", "gemini-2.5-flash"]
 
 def format_latex_options(options):
     formatted = []
