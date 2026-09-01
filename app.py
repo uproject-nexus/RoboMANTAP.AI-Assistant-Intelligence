@@ -39,7 +39,7 @@ st.markdown("""
         margin-bottom: 20px;
         box-shadow: 0 4px 20px rgba(5, 150, 105, 0.15);
     }
-    .school-title { color: #ffffff; font-weight: 800; font-size: 15px; margin: 0; }
+    .school-title { color: #ffffff; font-weight: 800; font-size: 13px; margin: 0; }
     .school-subtitle { color: #6ee7b7; font-size: 11px; margin-top: 4px; font-weight: 500; }
     .stButton>button { width: 100%; min-height: 48px; font-size: 16px !important; border-radius: 8px !important; }
     /* Paksa Warna Tombol Utama Menjadi Hijau Emerald MANTAP */
