@@ -115,14 +115,15 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     Format keluaran WAJIB berupa objek JSON murni:
     {{
-      "quiz": [
-        {{
-          "id": 1,
-          "question": "Teks soal 1 singkat & padat",
-          "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-          "correct_answer": "Pilihan jawaban tepat"
-        }}
-      ]
+    "quiz": [
+    {{
+    "id": 1,
+    "question": "Teks soal 1 lengkap dengan konteks OMI 2026",
+    "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+    "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi di atas)",
+    "solution": "Pembahasan runtut dan analitis step-by-step"
+    }}
+    ]
     }}
     """
     
