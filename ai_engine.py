@@ -124,6 +124,11 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     - PENTING: Semua backslash LaTeX dalam JSON wajib ditulis ganda '\\\\' agar format JSON valid.
     - Gunakan format Markdown standar untuk pemisah paragraf/tabel dan jangan menuliskan escape character literal seperti '\\n' secara berlebihan.
 
+    ATURAN KECEPATAN & EFISIENSI:
+    - Teks soal harus padat, to-the-point, dan tidak bertele-tele.
+    - Pembahasan (solution) MAKSIMAL 10 kalimat ringkas, tahapan penyelesaian runtut lengkap (langsung ke rumus/inti jawaban).
+    - Dilarang menambahkan kalimat pembuka atau penutup yang tidak perlu.
+
     Format keluaran WAJIB berupa objek JSON murni:
     {{
         "quiz": [
