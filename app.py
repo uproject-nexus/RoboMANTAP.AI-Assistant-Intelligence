@@ -1,6 +1,7 @@
-import base64
 import os
+import base64
 import streamlit as st
+import streamlit.components.v1 as components
 from ai_engine import generate_quiz_batch, get_ai_hint
 
 st.set_page_config(
@@ -8,6 +9,30 @@ st.set_page_config(
     page_icon="logo.png",
     layout="wide",
     initial_sidebar_state="auto"
+)
+
+components.html(
+    """
+    <script>
+    if ('wakeLock' in navigator) {
+        let wakeLock = null;
+        const requestWakeLock = async () => {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+            } catch (err) {
+                console.log(`${err.name}, ${err.message}`);
+            }
+        };
+        requestWakeLock();
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
+    }
+    </script>
+    """,
+    height=0,
 )
 
 # Custom Styling
@@ -68,6 +93,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Helper Base64 Image
+@st.cache_data
 def get_image_base64(path):
     if os.path.exists(path):
         with open(path, "rb") as img_file:
