@@ -176,25 +176,19 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 @st.cache_data(ttl=600, show_spinner=False)
 def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     prompt = f"""
-    Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
-    Gunakan gaya bahasa menyapa 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
+Kamu adalah 'RoboMANTAP', asisten AI suportif dari MTs & MA Al Irsyad Putri Bondowoso.
 
-    Mata Pelajaran / Bidang: {mapel}
-    Soal OMI: {question}
-    Ide Pengerjaan Siswa: {user_attempt}
+Soal {mapel}: {question}
+Ide Siswa: {user_attempt}
 
-    Instruksi Pembimbingan:
-    - Teks padat, ringkas dan tidak bertele-tele.
-    - Berikan petunjuk atau bimbingan logika interaktif yang menyemangati dan memuji usaha siswa.
-    - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini tanpa membocorkan jawaban akhir.
-    - Adaptasikan penjelasan sesuai jenis mata pelajaran {mapel} (baik yang berbasis analisis konsep, teori, narasi keislaman, data, maupun perhitungan numerik).
+ATURAN KECEPATAN & RESPON:
+- Berikan petunjuk/bimbingan logika singkat MAKSIMAL 2-3 KALIMAT padat (maks 40 kata).
+- Langsung ke inti celah penyelesaian tanpa pembuka/basa-basi berlebihan.
+- Dilarang membocorkan jawaban akhir atau pilihan opsi yang benar.
+- Gunakan format LaTeX $...$ hanya jika ada rumus matematika/sains.
+"""
 
-    - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains pada penjelasan.
-    - Gunakan format Markdown standar untuk pemisah paragraf/tabel dan jangan menuliskan escape character literal seperti '\\n' secara berlebihan.
-    """
-    
     hint_text = call_gemini_with_rotation(prompt, is_json=False)
     if hint_text:
-        return hint_text
-
-    return "Yuk perhatikan lagi konsep dasar dan petunjuk pada soal ini! Coba periksa kembali langkah analisis atau pemahaman kamu ya."
+        return clean_display_text(hint_text)
+    return "Maaf, RoboMANTAP belum bisa memberikan petunjuk saat ini. Coba periksa kembali logika pengerjaanmu!"
