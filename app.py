@@ -5,7 +5,7 @@ from ai_engine import generate_quiz_batch, get_ai_hint
 
 st.set_page_config(
     page_title="RoboMANTAP-AI (Assistant Intelligence)",
-    page_icon="🎓",
+    page_icon="logo.png",
     layout="wide",
     initial_sidebar_state="auto"
 )
