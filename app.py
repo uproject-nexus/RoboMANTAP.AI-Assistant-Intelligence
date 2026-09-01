@@ -112,7 +112,7 @@ st.markdown(f"""
     <div style="text-align: center;">
         {img_mantap_html}
     </div>
-    <div class="school-title">MA'HAD AL IRSYAD AL ISLAMIYYAH BONDOWOSO</div>
+    <div class="school-title">MA DAN MTs AL IRSYAD AL ISLAMIYYAH BONDOWOSO</div>
     <div class="school-subtitle">
         Madrasah Aliyah dan Tsanawiyah Al Irsyad Putri Bondowoso (MANTAP) &nbsp;•&nbsp; 
         <span style="color: #6ee7b7; font-weight: 600;">Powered by RoboMANTAP-AI (Assistant Intelligence)</span>
