@@ -40,15 +40,15 @@ def clean_json_text(text: str) -> str:
     """
     if not text:
         return ""
-    
+
     # Hapus pemungkus markdown ```json ... ``` jika ada
     text = text.strip()
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\n?", "", text, flags=re.IGNORECASE)
         text = re.sub(r"\n?```$", "", text)
 
-    # Ubah backslash tunggal LaTeX (seperti \sqrt, \frac, \alpha, \{, \}) menjadi double backslash \\
-    text = re.sub(r'(?<!\\)\\([a-zA-Z\{\}\!\,;:_%\$\&\+\-\=])', r'\\\\\1', text)
+    # Ubah backslash tunggal LaTeX (seperti \rho, \frac, \Delta, \{) menjadi double backslash \\
+    text = re.sub(r'\\(?![\\"/bfnrt]|u[0-9a-fA-F]{4})', r'\\\\', text)
     return text
 
 def call_gemini_with_rotation(prompt: str, is_json: bool = False):
@@ -145,7 +145,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     try:
         cleaned_response = clean_json_text(raw_response)
-        data = json.loads(cleaned_response)
+        data = json.loads(cleaned_response, strict=False)
         quiz_list = data.get("quiz", [])
         for q in quiz_list:
             # 1. Bersihkan Teks Soal
@@ -176,17 +176,19 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 @st.cache_data(ttl=600, show_spinner=False)
 def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     prompt = f"""
-Kamu adalah 'RoboMANTAP', asisten AI suportif dari MTs & MA Al Irsyad Putri Bondowoso.
+    Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
+    Gunakan gaya bahasa menyapa 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
 
-Soal {mapel}: {question}
-Ide Siswa: {user_attempt}
-
-ATURAN KECEPATAN & RESPON:
-- Berikan petunjuk/bimbingan logika singkat MAKSIMAL 2-3 KALIMAT padat (maks 40 kata).
-- Langsung ke inti celah penyelesaian tanpa pembuka/basa-basi berlebihan.
-- Dilarang membocorkan jawaban akhir atau pilihan opsi yang benar.
-- Gunakan format LaTeX $...$ hanya jika ada rumus matematika/sains.
-"""
+    Mata Pelajaran / Bidang: {mapel}
+    Soal OMI: {question}
+    Ide Pengerjaan Siswa: {user_attempt}
+    
+    ATURAN KECEPATAN & RESPON:
+    - Berikan petunjuk/bimbingan logika singkat MAKSIMAL 7 KALIMAT padat (maks 100 kata).
+    - Langsung ke inti celah penyelesaian tanpa pembuka/basa-basi berlebihan.
+    - Dilarang membocorkan jawaban akhir atau pilihan opsi yang benar.
+    - Gunakan format LaTeX $...$ hanya jika ada rumus matematika/sains.
+    """
 
     hint_text = call_gemini_with_rotation(prompt, is_json=False)
     if hint_text:
