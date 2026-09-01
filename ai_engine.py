@@ -88,7 +88,7 @@ def clean_display_text(text: str) -> str:
 @st.cache_data(ttl=600, show_spinner=False)
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
-    Menghasilkan 1 paket latihan CBT 5 soal berbasis Kisi-Kisi Operasional OMI 2026.
+    Menghasilkan 1 paket latihan CBT 3 soal berbasis Kisi-Kisi Operasional OMI 2026.
     """
     submateri_text = ", ".join(selected_submateri) if selected_submateri else "Semua Submateri Terintegrasi"
 
@@ -102,7 +102,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     system_prompt = f"""
     Anda adalah Pelatih Utama Bina Prestasi OMI 2026 (Olimpiade Sains & Matematika Al Irsyad) untuk tingkat {jenjang}.
-    Rancanglah 1 paket latihan CBT berisi TEPAT 5 SOAL PILIHAN GANDA yang orisinal, presisi, dan tematik OMI.
+    Rancanglah 1 paket latihan CBT berisi TEPAT 3 SOAL PILIHAN GANDA yang orisinal, presisi, dan tematik OMI.
     
     Spesifikasi Soal OMI 2026:
     - Jenjang: {jenjang}
@@ -126,7 +126,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     ATURAN KECEPATAN & EFISIENSI:
     - Teks soal harus padat, to-the-point, dan tidak bertele-tele.
-    - Pembahasan (solution) MAKSIMAL 10 kalimat ringkas, tahapan penyelesaian runtut lengkap (langsung ke rumus/inti jawaban).
+    - Pembahasan (solution) MAKSIMAL 10 kalimat ringkas, tahapan penyelesaian runtut, lengkap, singkat, jelas dan padat (langsung ke rumus/inti jawaban).
     - Dilarang menambahkan kalimat pembuka atau penutup yang tidak perlu.
 
     Format keluaran WAJIB berupa objek JSON murni:
