@@ -138,6 +138,8 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
         data = json.loads(cleaned_response)
         quiz_list = data.get("quiz", [])
         for q in quiz_list:
+            if "question" in q:
+                q["question"] = q["question"].replace("\\n", "\n")
             if "options" in q:
                 q["options"] = format_latex_options(q["options"])
             if "correct_answer" in q:
