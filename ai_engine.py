@@ -115,16 +115,16 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     - PENTING: Semua backslash LaTeX dalam JSON wajib ditulis ganda '\\\\' agar format JSON valid.
 
     Format keluaran WAJIB berupa objek JSON murni:
-    {
+    {{
       "quiz": [
-        {
+        {{
           "id": 1,
           "question": "Teks soal 1 singkat & padat",
           "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
           "correct_answer": "Pilihan jawaban tepat"
-        }
+        }}
       ]
-    }
+    }}
     """
     
     raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
