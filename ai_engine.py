@@ -18,7 +18,7 @@ elif os.getenv("GEMINI_API_KEY"):
 if not api_keys:
     raise ValueError("GEMINI_API_KEYS tidak ditemukan. Pastikan Secrets sudah dikonfigurasi.")
 
-MODELS_TO_TRY = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-1.5-flash"]
+MODELS_TO_TRY = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
 
 def format_latex_options(options):
     formatted = []
@@ -75,7 +75,6 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
 
     return None
 
-@st.cache_data(ttl=600, show_spinner=False)
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
     Menghasilkan 1 paket latihan CBT 5 soal berbasis Kisi-Kisi Operasional OMI 2026.
@@ -92,22 +91,15 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     system_prompt = f"""
     Anda adalah Pelatih Utama Bina Prestasi OMI 2026 (Olimpiade Sains & Matematika Al Irsyad) untuk tingkat {jenjang}.
-    Rancanglah 1 paket latihan CBT berisi TEPAT 5 SOAL PILIHAN GANDA yang orisinal, presisi, dan tematik OMI.
-    
+    Rancanglah 1 paket latihan CBT berisi TEPAT 5 SOAL PILIHAN GANDA yang orisinal, presisi, dan terintegrasi.
+
     Spesifikasi Soal OMI 2026:
     - Jenjang: {jenjang}
     - Bidang / Mata Pelajaran: {mapel}
     - Tahap Pembinaan: {stage} ({stage_description})
     - Cakupan Submateri: {submateri_text}
-    
-    INTEGRASI TEMATIK & BAHASA ARAB OMI:
-    1. Konteks Tematik: Wajib mengintegrasikan materi dengan tema Lingkungan, Teknologi, Kehidupan Sehari-hari, atau Nilai-Nilai Keislaman (seperti Zakat, Waktu Shalat, Penanggalan Hijriyah, Arah Kiblat, Waris, atau Sejarah Islam).
-    2. Variasi Bahasa Arab & Indonesia:
-       - Jika submateri berisi "Semua Submateri" (ALL) atau secara acak: UTAMAKAN karakteristik khusus OMI! Buat variasi campuran acak:
-         * Variasi 1: Teks Soal ditulis dalam BAHASA ARAB (fasih & ber-harakat/standar), sedangkan Pilihan Jawaban (A, B, C, D) & Pembahasan dalam BAHASA INDONESIA.
-         * Variasi 2: Teks Soal dalam BAHASA INDONESIA, tetapi Pilihan Jawaban (A, B, C, D) / Istilah Kunci ditulis dalam BAHASA ARAB.
-         * Variasi 3: Soal Tematik OMI Standar (Full Bahasa Indonesia berkonteks Keislaman/Lingkungan/Teknologi).
-         
+    - Karakteristik Soal: Mengintegrasikan konsep sains/matematika murni dengan literasi data, teknologi, lingkungan, serta nilai-nilai keislaman secara kontekstual.
+
     ATURAN KHUSUS FORMATTING:
     - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
     - Jangan pernah menulis perintah LaTeX (seperti \\frac, \\sqrt) tanpa diapit '$'.
@@ -115,18 +107,19 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     Format keluaran WAJIB berupa objek JSON murni:
     {{
-    "quiz": [
-    {{
-    "id": 1,
-    "question": "Teks soal 1 lengkap dengan konteks OMI 2026",
-    "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-    "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi di atas)",
-    "solution": "Pembahasan runtut dan analitis step-by-step"
-    }}
-    ]
+        "quiz": [
+            {{
+                "id": 1,
+                "question": "Teks soal 1 lengkap dengan konteks OMI 2026",
+                "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+                "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi di atas)",
+                "hint": "Petunjuk logika awal RoboMANTAP tanpa membocorkan jawaban akhir",
+                "solution": "Pembahasan runtut dan analitis step-by-step"
+            }}
+        ]
     }}
     """
-    
+
     raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
 
     if not raw_response:
@@ -138,11 +131,6 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
         data = json.loads(cleaned_response)
         quiz_list = data.get("quiz", [])
         for q in quiz_list:
-            # --- TAMBAHKAN 2 BARIS INI (Pembersihan \n pada teks soal) ---
-            if "question" in q:
-                q["question"] = q["question"].replace("\\n", "\n")
-            # -------------------------------------------------------------
-
             if "options" in q:
                 q["options"] = format_latex_options(q["options"])
             if "correct_answer" in q:
@@ -155,7 +143,6 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
         st.error(f"Gagal memproses format soal: {e}")
         return []
 
-@st.cache_data(ttl=600, show_spinner=False)
 def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     prompt = f"""
     Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
