@@ -150,15 +150,21 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
         data = json.loads(cleaned_response)
         quiz_list = data.get("quiz", [])
         for q in quiz_list:
+            # 1. Bersihkan Teks Soal
             if "question" in q:
-                # Gunakan fungsi regex baru ini
-                q["question"] = clean_display_text(q["question"])     
+                q["question"] = clean_display_text(q["question"])    
+            # 2. Bersihkan Pembahasan (INI YANG BIKIN EROR DI GAMBAR)
+            if "solution" in q:
+                q["solution"] = clean_display_text(q["solution"])
+
+            # 3. Bersihkan Opsi Jawaban
             if "options" in q:
                 cleaned_opts = []
                 for opt in q["options"]:
                     clean_opt = clean_display_text(opt.replace("\\'", "").replace("'", ""))
                     cleaned_opts.append(clean_opt)
                 q["options"] = format_latex_options(cleaned_opts)
+            
             if "correct_answer" in q:
                 for opt in q["options"]:
                     if opt.startswith(q["correct_answer"][:2]):
