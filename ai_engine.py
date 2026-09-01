@@ -18,7 +18,7 @@ elif os.getenv("GEMINI_API_KEY"):
 if not api_keys:
     raise ValueError("GEMINI_API_KEYS tidak ditemukan. Pastikan Secrets sudah dikonfigurasi.")
 
-MODELS_TO_TRY = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-3.6-flash"]
+MODELS_TO_TRY = ["gemini-3.6-flash", "gemini-2.5-flash","gemini-1.5-flash" ]
 
 def format_latex_options(options):
     formatted = []
@@ -111,39 +111,31 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     - Tahap Pembinaan: {stage} ({stage_description})
     - Cakupan Submateri: {submateri_text}
     
-    INTEGRASI TEMATIK & BAHASA ARAB OMI:
-    1. Konteks Tematik: Wajib mengintegrasikan materi dengan tema Lingkungan, Teknologi, Kehidupan Sehari-hari, atau Nilai-Nilai Keislaman (seperti Zakat, Waktu Shalat, Penanggalan Hijriyah, Arah Kiblat, Waris, atau Sejarah Islam).
-    2. Variasi Bahasa Arab & Indonesia:
-       - Jika submateri berisi "Semua Submateri" (ALL) atau secara acak: UTAMAKAN karakteristik khusus OMI! Buat variasi campuran acak:
-         * Variasi 1: Teks Soal ditulis dalam BAHASA ARAB (fasih & ber-harakat/standar), sedangkan Pilihan Jawaban (A, B, C, D) & Pembahasan dalam BAHASA INDONESIA.
-         * Variasi 2: Teks Soal dalam BAHASA INDONESIA, tetapi Pilihan Jawaban (A, B, C, D) / Istilah Kunci ditulis dalam BAHASA ARAB.
-         * Variasi 3: Soal Tematik OMI Standar (Full Bahasa Indonesia berkonteks Keislaman/Lingkungan/Teknologi).
-        
-    ATURAN KHUSUS FORMATTING:
-    - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
-    - Jangan pernah menulis perintah LaTeX (seperti \\frac, \\sqrt) tanpa diapit '$'.
+    INTEGRASI TEMATIK OMI:
+    - Integrasikan materi dengan tema Lingkungan, Teknologi, atau Nilai Keislaman.
+    - Penggunaan istilah Bahasa Arab bersifat opsional/secara alami jika relevan (Gunakan Bahasa Arab standar TANPA harakat berlebihan agar pemrosesan cepat).
+    
+    ATURAN KECEPATAN & FORMATTING:
+    - Teks soal padat, efektif, dan langsung pada inti masalah.
+    - Pembahasan (solution) MAKSIMAL 2-3 kalimat ringkas (langsung ke rumus atau langkah kunci).
+    - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$'.
     - PENTING: Semua backslash LaTeX dalam JSON wajib ditulis ganda '\\\\' agar format JSON valid.
-    - Gunakan format Markdown standar untuk pemisah paragraf/tabel dan jangan menuliskan escape character literal seperti '\\n' secara berlebihan.
-
-    ATURAN KECEPATAN & EFISIENSI:
-    - Teks soal harus padat, to-the-point, dan tidak bertele-tele.
-    - Pembahasan (solution) MAKSIMAL 5 kalimat ringkas (langsung ke rumus/inti jawaban).
-    - Dilarang menambahkan kalimat pembuka atau penutup yang tidak perlu.
-
+    
     Format keluaran WAJIB berupa objek JSON murni:
     {{
-        "quiz": [
-            {{
-                "id": 1,
-                "question": "Teks soal 1 lengkap dengan konteks OMI 2026",
-                "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-                "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi di atas)",
-                "hint": "Petunjuk logika awal RoboMANTAP tanpa membocorkan jawaban akhir",
-                "solution": "Pembahasan runtut dan analitis step-by-step"
-            }}
-        ]
+      "quiz": [
+        {{
+          "id": 1,
+          "question": "Teks soal 1 singkat & padat",
+          "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+          "correct_answer": "Pilihan jawaban tepat",
+          "solution": "Pembahasan singkat 2-3 kalimat."
+        }}
+      ]
     }}
     """
+
+
 
     raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
 
