@@ -419,7 +419,7 @@ elif st.session_state.page == "result":
         feedback_msg = f"👍 **Kerja Bagus! (Skor: {total_skor}/12)**\n\nUsaha yang mantap! Kamu sudah paham sebagian besar konsepnya. Coba cek pembahasan di bawah untuk memperbaiki sedikit kekeliruan tadi ya! 💪😊"
         feedback_type = "info"
     else:
-        feedback_msg = f"🌱 **Tetap Semangat! (Skor: {total_skor}/12)**\n\nJangan berkecil hati ya! Setiap kesalahan adalah proses belajar. Yuk pelajari pembahasan rinci di bawah dan coba latihan 5 soal lagi bersama RoboMANTAP! 🤖❤️"
+        feedback_msg = f"🌱 **Tetap Semangat! (Skor: {total_skor}/12)**\n\nJangan berkecil hati ya! Setiap kesalahan adalah proses belajar. Yuk pelajari pembahasan rinci di bawah dan coba latihan 3 soal lagi bersama RoboMANTAP! 🤖❤️"
         feedback_type = "warning"
 
     k1, k2, k3, k4 = st.columns(4)
@@ -440,6 +440,8 @@ elif st.session_state.page == "result":
     col_act1, col_act2 = st.columns(2)
     with col_act1:
         if st.button("🔄 LATIHAN SOAL LAGI DONG! (SESI BARU)", type="primary", use_container_width=True):
+            
+            @st.cache_data
             with st.spinner("Sabar ya 😊 RoboMANTAP sedang Menyiapkan soal baru Kamu.."):
                 new_quiz = generate_quiz_batch(st.session_state.jenjang, st.session_state.mapel, st.session_state.stage, st.session_state.selected_submateri)
                 if new_quiz and len(new_quiz) == 3:
