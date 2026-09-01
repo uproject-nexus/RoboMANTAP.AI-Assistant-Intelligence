@@ -272,7 +272,7 @@ elif st.session_state.page == "setup":
         """)
         st.write("")
         if st.button("🚀 MARI MULAI SESI TEST SEKARANG!", type="primary", use_container_width=True):
-            with st.spinner(f"RoboMANTAP sedang merancang soal Kamu... {st.session_state.mapel}..."):
+            with st.spinner(f"RoboMANTAP sedang merancang soal {st.session_state.mapel} Kamu..."):
                 quiz = generate_quiz_batch(
                     st.session_state.jenjang,
                     st.session_state.mapel,
