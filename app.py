@@ -440,8 +440,7 @@ elif st.session_state.page == "result":
     col_act1, col_act2 = st.columns(2)
     with col_act1:
         if st.button("🔄 LATIHAN SOAL LAGI DONG! (SESI BARU)", type="primary", use_container_width=True):
-            
-            @st.cache_data
+            st.cache_data.clear()
             with st.spinner("Sabar ya 😊 RoboMANTAP sedang Menyiapkan soal baru Kamu.."):
                 new_quiz = generate_quiz_batch(st.session_state.jenjang, st.session_state.mapel, st.session_state.stage, st.session_state.selected_submateri)
                 if new_quiz and len(new_quiz) == 3:
