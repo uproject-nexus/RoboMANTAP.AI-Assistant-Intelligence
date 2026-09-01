@@ -437,4 +437,5 @@ elif st.session_state.page == "result":
         with st.expander(f"Soal No. {idx + 1} [{status_icon}] - Jawaban Anda: {u_ans}"):
             st.markdown(f"**Soal:**\n{q['question']}")
             st.markdown(f"**Kunci Jawaban:** {q['correct_answer']}")
-            st.markdown(f"**Pembahasan:**\n{q['solution']}")
+            sol_text = q.get('solution', 'Pembahasan belum tersedia.').replace("\\n", "\n")
+            st.markdown(f"**Pembahasan:**\n{sol_text}")
