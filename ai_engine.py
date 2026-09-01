@@ -187,6 +187,7 @@ def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     - Berikan petunjuk atau bimbingan logika interaktif yang menyemangati dan memuji usaha siswa.
     - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini tanpa membocorkan jawaban akhir.
     - Adaptasikan penjelasan sesuai jenis mata pelajaran {mapel} (baik yang berbasis analisis konsep, teori, narasi keislaman, data, maupun perhitungan numerik).
+    - Teks padat, efektif dan langsung pada inti masalah.
     - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains pada penjelasan.
     - Gunakan format Markdown standar untuk pemisah paragraf/tabel dan jangan menuliskan escape character literal seperti '\\n' secara berlebihan.
     """
