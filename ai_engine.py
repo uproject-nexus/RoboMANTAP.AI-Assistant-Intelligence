@@ -111,6 +111,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
     - Jangan pernah menulis perintah LaTeX (seperti \\frac, \\sqrt) tanpa diapit '$'.
     - PENTING: Semua backslash LaTeX dalam JSON wajib ditulis ganda '\\\\' agar format JSON valid.
+    - Gunakan format Markdown standar untuk pemisah paragraf/tabel dan jangan menuliskan escape character literal seperti '\\n' secara berlebihan.
 
     Format keluaran WAJIB berupa objek JSON murni:
     {{
