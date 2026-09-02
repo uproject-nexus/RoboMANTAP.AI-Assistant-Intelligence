@@ -19,7 +19,7 @@ if not api_keys:
     raise ValueError("GEMINI_API_KEYS tidak ditemukan. Pastikan Secrets sudah dikonfigurasi.")
 
 # Fokus ke model paling kencang agar tidak ada jeda retry yang bikin lemot
-MODELS_TO_TRY = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+MODELS_TO_TRY = ["gemini-2.5-flash", "gemini-1.5-flash"]
 
 def format_latex_options(options):
     formatted = []
@@ -65,7 +65,7 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
     for key in api_keys:
         try:
             # Ditambahkan timeout agar tidak hanging saat koneksi lelet
-            client = genai.Client(api_key=key)
+            client = genai.Client(api_key=key, http_options={'timeout': 15000})
             for model_name in MODELS_TO_TRY:
                 try:
                     config = types.GenerateContentConfig(response_mime_type="application/json") if is_json else None
@@ -89,7 +89,7 @@ def stream_ai_text(prompt: str):
     """
     for key in api_keys:
         try:
-            client = genai.Client(api_key=key)
+            client = genai.Client(api_key=key, http_options={'timeout': 15000})
             for model_name in MODELS_TO_TRY:
                 try:
                     response = client.models.generate_content_stream(
@@ -105,7 +105,7 @@ def stream_ai_text(prompt: str):
         except Exception:
             continue
     
-    yield "⚠️ Waduh, koneksi terputus nih. Coba kamu langsung klik lagi ya.."
+    yield "⚠️ Maaf, koneksi API sedang penuh atau terputus. Silakan coba klik kembali."
 
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
@@ -123,45 +123,45 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     stage_description = stage_descriptions.get(stage, "Fokus pada penguatan konsep OMI.")
 
     system_prompt = f"""
-    Anda adalah Pelatih Utama Bina Prestasi OMI 2026 (Olimpiade Sains & Matematika Al Irsyad) untuk tingkat {jenjang}.
-    Rancanglah 1 paket latihan CBT berisi TEPAT 5 SOAL PILIHAN GANDA yang orisinal, presisi, dan tematik OMI.
-    
-    Spesifikasi Soal OMI 2026:
-    - Jenjang: {jenjang}
-    - Bidang / Mata Pelajaran: {mapel}
-    - Tahap Pembinaan: {stage} ({stage_description})
-    - Cakupan Submateri: {submateri_text}
-    
-    INTEGRASI TEMATIK & BAHASA ARAB OMI (BIARKAN PANJANG DAN NATURAL):
-    1. Konteks Tematik: Wajib mengintegrasikan materi dengan tema Lingkungan, Teknologi, Kehidupan Sehari-hari, atau Nilai-Nilai Keislaman (seperti Zakat, Waktu Shalat, Penanggalan Hijriyah, Arah Kiblat, Waris, atau Sejarah Islam).
-    2. Variasi Bahasa Arab & Indonesia:
-       - Jika submateri berisi "Semua Submateri" (ALL) atau secara acak: UTAMAKAN karakteristik khusus OMI! Buat variasi campuran acak:
-         * Variasi 1: Teks Soal ditulis dalam BAHASA ARAB (fasih & tanpa harakat), sedangkan Pilihan Jawaban (A, B, C, D) dalam BAHASA INDONESIA.
-         * Variasi 2: Teks Soal dalam BAHASA INDONESIA, tetapi Pilihan Jawaban (A, B, C, D) / Istilah Kunci ditulis dalam BAHASA ARAB (fasih & tanpa harakat).
-         * Variasi 3: Soal Tematik OMI Standar (Full Bahasa Indonesia berkonteks Keislaman/Lingkungan/Teknologi).
-    
-    ATURAN KHUSUS FORMATTING & KECEPATAN:
-    - JANGAN sertakan field `hint` atau `solution` di sini. Fokus saja merancang 5 teks soal cerita dan jawaban agar proses AI kencang.
-    - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
-    - Semua backslash LaTeX wajib ditulis ganda '\\\\'.
-    
-    Format keluaran WAJIB berupa objek JSON murni:
-    {{
-        "quiz": [
-            {{
-                "id": 1,
-                "question": "Teks soal cerita nomor 1 lengkap dan mendalam",
-                "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-                "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi)"
-            }}
-        ]
-    }}
-    """
+Anda adalah Pelatih Utama Bina Prestasi OMI 2026 (Olimpiade Sains & Matematika Al Irsyad) untuk tingkat {jenjang}.
+Rancanglah 1 paket latihan CBT berisi TEPAT 5 SOAL PILIHAN GANDA yang orisinal, presisi, dan tematik OMI.
+
+Spesifikasi Soal OMI 2026:
+- Jenjang: {jenjang}
+- Bidang / Mata Pelajaran: {mapel}
+- Tahap Pembinaan: {stage} ({stage_description})
+- Cakupan Submateri: {submateri_text}
+
+INTEGRASI TEMATIK & BAHASA ARAB OMI (BIARKAN PANJANG DAN NATURAL):
+1. Konteks Tematik: Wajib mengintegrasikan materi dengan tema Lingkungan, Teknologi, Kehidupan Sehari-hari, atau Nilai-Nilai Keislaman (seperti Zakat, Waktu Shalat, Penanggalan Hijriyah, Arah Kiblat, Waris, atau Sejarah Islam).
+2. Variasi Bahasa Arab & Indonesia:
+   - Jika submateri berisi "Semua Submateri" (ALL) atau secara acak: UTAMAKAN karakteristik khusus OMI! Buat variasi campuran acak:
+     * Variasi 1: Teks Soal ditulis dalam BAHASA ARAB (fasih & ber-harakat/standar), sedangkan Pilihan Jawaban (A, B, C, D) dalam BAHASA INDONESIA.
+     * Variasi 2: Teks Soal dalam BAHASA INDONESIA, tetapi Pilihan Jawaban (A, B, C, D) / Istilah Kunci ditulis dalam BAHASA ARAB.
+     * Variasi 3: Soal Tematik OMI Standar (Full Bahasa Indonesia berkonteks Keislaman/Lingkungan/Teknologi).
+
+ATURAN KHUSUS FORMATTING & KECEPATAN:
+- JANGAN sertakan field `hint` atau `solution` di sini. Fokus saja merancang 5 teks soal cerita dan jawaban agar proses AI kencang.
+- Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
+- Semua backslash LaTeX wajib ditulis ganda '\\\\'.
+
+Format keluaran WAJIB berupa objek JSON murni:
+{{
+    "quiz": [
+        {{
+            "id": 1,
+            "question": "Teks soal cerita nomor 1 lengkap dan mendalam",
+            "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+            "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi)"
+        }}
+    ]
+}}
+"""
 
     raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
 
     if not raw_response:
-        st.error("⚠️ Waduh kuota sedang penuh nih. Silakan coba klik lagi ya...")
+        st.error("⚠️ Semua kuota cadangan API sedang penuh. Silakan coba beberapa saat lagi.")
         return []
 
     try:
@@ -187,19 +187,18 @@ def get_ai_hint_stream(question: str, user_attempt: str, mapel: str = "Umum"):
     Menyusun prompt petunjuk dan langsung melemparnya ke generator stream.
     """
     prompt = f"""
-    Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
-    Gunakan gaya bahasa menyapa 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
-    
-    Mata Pelajaran: {mapel}
-    Soal OMI: {question}
-    Ide Pengerjaan Siswa: {user_attempt}
-    
-    Instruksi:
-    - TEKS MAKSIMAL 150 KATA
-    - Berikan petunjuk atau bimbingan logika interaktif yang menyemangati dan memuji usaha siswa.
-    - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini secara natural tanpa membocorkan jawaban akhir.
-    - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains.
-    """
+Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
+Gunakan gaya bahasa menyapa 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
+
+Mata Pelajaran: {mapel}
+Soal OMI: {question}
+Ide Pengerjaan Siswa: {user_attempt}
+
+Instruksi:
+- Berikan petunjuk atau bimbingan logika interaktif yang menyemangati dan memuji usaha siswa.
+- Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini secara natural tanpa membocorkan jawaban akhir.
+- Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains.
+"""
     return stream_ai_text(prompt)
 
 def get_ai_solution_stream(question: str, correct_answer: str, mapel: str = "Umum"):
@@ -207,20 +206,18 @@ def get_ai_solution_stream(question: str, correct_answer: str, mapel: str = "Umu
     Menyusun prompt pembahasan rinci dan langsung melemparnya ke generator stream.
     """
     prompt = f"""
-    Kamu adalah Pembina OMI 2026. Berikan pembahasan komprehensif, runtut, dan analitis step-by-step untuk soal berikut.
-    
-    Bidang: {mapel}
-    Soal:
-    {question}
-    
-    Kunci Jawaban yang Benar: {correct_answer}
-    
-    Instruksi Pembahasan:
-    - TEKS MAKSIMAL 50 KATA
-    - Kurangi kalimat pembuka yg terlalu panjang lebar, langsung bahas soal setelah melakukan salam awal singkat padat.
-    - Jelaskan secara natural, tajam, dan edukatif mengapa jawaban tersebut benar.
-    - Jika ada unsur Bahasa Arab, terjemahkan atau kupas secara singkat.
-    - Jika ada hitungan, tunjukkan proses rumusnya dengan jelas.
-    - WAJIB gunakan format LaTeX $...$ untuk semua notasi matematika/simbol fisika-kimia.
-    """
+Kamu adalah Pembina OMI 2026. Berikan pembahasan komprehensif, runtut, dan analitis step-by-step untuk soal berikut.
+
+Bidang: {mapel}
+Soal:
+{question}
+
+Kunci Jawaban yang Benar: {correct_answer}
+
+Instruksi Pembahasan:
+- Jelaskan secara natural, tajam, dan edukatif mengapa jawaban tersebut benar.
+- Jika ada unsur Bahasa Arab, terjemahkan atau kupas secara singkat.
+- Jika ada hitungan, tunjukkan proses rumusnya dengan jelas.
+- WAJIB gunakan format LaTeX $...$ untuk semua notasi matematika/simbol fisika-kimia.
+"""
     return stream_ai_text(prompt)
