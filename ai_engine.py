@@ -65,7 +65,7 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
     for key in api_keys:
         try:
             # Ditambahkan timeout agar tidak hanging saat koneksi lelet
-            client = genai.Client(api_key=key, http_options={'timeout': 50000})
+            client = genai.Client(api_key=key)
             for model_name in MODELS_TO_TRY:
                 try:
                     config = types.GenerateContentConfig(response_mime_type="application/json") if is_json else None
@@ -89,7 +89,7 @@ def stream_ai_text(prompt: str):
     """
     for key in api_keys:
         try:
-            client = genai.Client(api_key=key, http_options={'timeout': 50000})
+            client = genai.Client(api_key=key)
             for model_name in MODELS_TO_TRY:
                 try:
                     response = client.models.generate_content_stream(
