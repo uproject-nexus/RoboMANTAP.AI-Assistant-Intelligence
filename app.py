@@ -147,6 +147,7 @@ st.markdown(f"""
 
 # Sidebar Control
 with st.sidebar:
+    # 1. Header Widget Persona AI + Engineered by Banner
     st.markdown("""
     <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 16px; border-radius: 12px; border: 1px solid #059669; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
         <div style="font-size: 26px; margin-bottom: 4px;">🤖</div>
@@ -156,6 +157,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    # 2. AI Engine Live Telemetry Status
     st.markdown("""
     <div style="background: var(--secondary-background-color); border: 1px solid rgba(5, 150, 105, 0.3); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
@@ -170,6 +172,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    # 3. Dynamic Active Session Monitor
     if st.session_state.jenjang and st.session_state.mapel:
         st.markdown(f"""
         <div style="background: rgba(5, 150, 105, 0.08); border-left: 4px solid #059669; padding: 10px 12px; border-radius: 6px; margin-bottom: 15px;">
@@ -179,6 +182,7 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
+    # 4. Interactive CBT Rules Badge Card
     st.markdown("""
     <div style="background: var(--secondary-background-color); border: 1px solid rgba(128,128,128,0.2); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
         <div style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 8px;">📋 ATURAN SKORING CBT</div>
@@ -197,12 +201,14 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    # 5. Quick Navigation Button
     if st.button("🏠 Kembali ke Beranda Utama", use_container_width=True):
         st.session_state.page = "landing"
         st.session_state.jenjang = None
         st.session_state.mapel = None
         st.rerun()
 
+    # 6. Developer & Provider Badge
     sidebar_nexus_html = f'<div style="background: #ffffff; padding: 6px 14px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); display: inline-block; margin-bottom: 8px; border: 1px solid rgba(0,0,0,0.05);"><img src="data:image/png;base64,{logo_nexus_b64}" style="height: 42px; max-width: 100%; display: block; margin: 0 auto;"></div>' if logo_nexus_b64 else ''
     
     st.markdown(f"""
