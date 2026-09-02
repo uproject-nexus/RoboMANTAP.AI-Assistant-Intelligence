@@ -285,7 +285,7 @@ elif st.session_state.page == "setup":
         """)
         st.write("")
         if st.button("🚀 MARI MULAI SESI TEST SEKARANG!", type="primary", use_container_width=True):
-            with st.spinner(f"RoboMANTAP sedang merancang 5 soal {st.session_state.mapel} Kamu. Tunggu sebentar ya..."):
+            with st.spinner(f"RoboMANTAP sedang merancang soal {st.session_state.mapel} Kamu. Tunggu sebentar ya..."):
                 quiz = generate_quiz_batch(
                     st.session_state.jenjang,
                     st.session_state.mapel,
@@ -332,8 +332,7 @@ elif st.session_state.page == "quiz":
     st.write("---")
     
     col_nav1, col_nav2, col_nav3 = st.columns([3, 6, 3])
-    # Swap posisi Next/Submit ke atas untuk aksesibilitas HP
-    with col_nav3:
+    with col_nav1:
         if curr_idx < 4:
             if st.button("Berikutnya ➡️", type="primary", use_container_width=True):
                 st.session_state.current_index += 1
@@ -342,7 +341,7 @@ elif st.session_state.page == "quiz":
             if st.button("🏁 SUBMIT & SELESAIKAN", type="primary", use_container_width=True):
                 st.session_state.page = "result"
                 st.rerun()
-    with col_nav1:
+    with col_nav3:
         if curr_idx > 0:
             if st.button("⬅️ Sebelumnya", use_container_width=True):
                 st.session_state.current_index -= 1
@@ -354,14 +353,15 @@ elif st.session_state.page == "quiz":
         
         attempt_input = st.text_input(
             "Gagasan / Ide Logika Kamu apa coba?:",
-            placeholder="Contoh: Aku pikir ini pakai rumus debit air, tapi bingung konversinya...",
+            placeholder="Contoh: Aku bingung nih harus mulai dari mana... 🤔",
             key=f"hint_in_{curr_idx}"
         )
         
         if st.button("Dapatkan Petunjuk Live! 🚀", key=f"btn_hint_{curr_idx}"):
             if attempt_input.strip():
-                st.markdown("🤖 **RoboMANTAP:**")
-                st.write_stream(get_ai_hint_stream(q['question'], attempt_input, st.session_state.mapel))
+                with st.chat_message("assistant", avatar="🤖"):
+                     st.write("**RoboMANTAP:**")
+                     st.write_stream(get_ai_hint_stream(q['question'], attempt_input, state.mapel))
             else:
                 st.info("💡 Tolong ketik sedikit ide kamu dulu ya, biar RoboMANTAP bisa kasih petunjuk yang pas!")
 
@@ -408,7 +408,7 @@ elif st.session_state.page == "result":
     with col_act1:
         if st.button("🔄 LATIHAN SOAL LAGI DONG! (SESI BARU)", type="primary", use_container_width=True):
             st.cache_data.clear()
-            with st.spinner("Sabar ya 😊 RoboMANTAP sedang menyiapkan 5 soal OMI baru.."):
+            with st.spinner("Sabar ya 😊 RoboMANTAP sedang menyiapkan soal baru untuk Kamu..."):
                 new_quiz = generate_quiz_batch(st.session_state.jenjang, st.session_state.mapel, st.session_state.stage, st.session_state.selected_submateri)
                 if new_quiz and len(new_quiz) == 5:
                     st.session_state.quiz_data = new_quiz
@@ -424,7 +424,7 @@ elif st.session_state.page == "result":
 
     st.write("---")
     st.markdown("### 📖 Pembahasan Rinci Pembina (On-Demand)")
-    st.caption("💡 *Klik pada masing-masing soal di bawah ini untuk meminta AI mengetikkan pembahasan secara live!*")
+    st.caption("💡 *Klik pada masing-masing soal di bawah ini untuk meminta RoboMANTAP mengetikkan pembahasan secara live!*")
     
     for idx, q in enumerate(quiz_data):
         u_ans = user_answers.get(idx, "Tidak Dijawab")
@@ -437,6 +437,6 @@ elif st.session_state.page == "result":
             st.write("---")
             
             # Tombol untuk memicu streaming pembahasan per soal (On-Demand)
-            if st.button(f"Tampilkan Pembahasan AI (Soal {idx + 1})", key=f"btn_sol_{idx}"):
-                st.markdown("**🧠 Pembahasan AI (Live Streaming):**")
+            if st.button(f"Tampilkan Pembahasannya dong! (Soal {idx + 1})", key=f"btn_sol_{idx}"):
+                st.markdown("**🧠 RoboMANTAP akan menampilkan Pembahasannya untuk Kamu... :**")
                 st.write_stream(get_ai_solution_stream(q['question'], q['correct_answer'], st.session_state.mapel))
