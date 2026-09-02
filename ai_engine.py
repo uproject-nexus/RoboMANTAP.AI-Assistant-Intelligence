@@ -19,7 +19,140 @@ if not api_keys:
     raise ValueError("GEMINI_API_KEYS tidak ditemukan. Pastikan Secrets sudah dikonfigurasi.")
 
 # Fokus ke model paling kencang agar tidak ada jeda retry yang bikin lemot
-MODELS_TO_TRY = ["gemini-3.6-flash", "gemini-2.5-flash"]
+# Model untuk pembuatan soal
+QUIZ_MODELS = ("gemini-3.5-flash-lite", "gemini-2.5-flash")
+
+# Model khusus interaksi LIVE: prioritaskan latency rendah.
+STREAM_MODELS = ("gemini-3.5-flash-lite", "gemini-2.5-flash-lite")
+
+STREAM_HINT_MAX_TOKENS = 320
+STREAM_SOLUTION_MAX_TOKENS = 900
+STREAM_TIMEOUT_MS = 90_000
+
+
+@st.cache_resource(show_spinner=False)
+def get_gemini_clients():
+    """
+    Reuse koneksi Gemini antar rerun Streamlit.
+    Client tidak dibuat ulang setiap kali tombol AI diklik.
+    """
+    clients = []
+
+    for key in api_keys:
+        try:
+            clients.append(
+                genai.Client(
+                    api_key=key,
+                    http_options=types.HttpOptions(
+                        timeout=STREAM_TIMEOUT_MS,
+                        retry_options=types.HttpRetryOptions(attempts=1),
+                    ),
+                )
+            )
+        except Exception:
+            continue
+
+    return clients
+
+
+def _stream_config(model_name: str, max_output_tokens: int):
+    """
+    Konfigurasi live untuk meminimalkan time-to-first-token.
+    Gemini 3.x: thinking minimal.
+    Gemini 2.5 Flash-Lite: thinking dimatikan.
+    """
+    if model_name.startswith("gemini-3."):
+        return types.GenerateContentConfig(
+            max_output_tokens=max_output_tokens,
+            thinking_config=types.ThinkingConfig(
+                thinking_level="minimal"
+            ),
+        )
+
+    return types.GenerateContentConfig(
+        max_output_tokens=max_output_tokens,
+        thinking_config=types.ThinkingConfig(
+            thinking_budget=0,
+            include_thoughts=False,
+        ),
+    )
+
+
+def _buffer_stream_text(source, min_chars: int = 28, flush_seconds: float = 0.06):
+    """
+    Menggabungkan chunk API yang sangat kecil sebelum dikirim ke Streamlit.
+    Tujuannya mengurangi frekuensi update UI, bukan mengubah token API.
+    """
+    import time
+
+    buffer = []
+    size = 0
+    last_flush = time.monotonic()
+
+    for chunk in source:
+        if not chunk:
+            continue
+
+        buffer.append(chunk)
+        size += len(chunk)
+
+        now = time.monotonic()
+        if size >= min_chars or (now - last_flush) >= flush_seconds:
+            yield "".join(buffer)
+            buffer.clear()
+            size = 0
+            last_flush = now
+
+    if buffer:
+        yield "".join(buffer)
+
+
+def _stream_from_clients(prompt: str, max_output_tokens: int):
+    """
+    Streaming:
+    - client reuse
+    - retry internal SDK = 1 attempt
+    - fallback hanya saat request/model benar-benar gagal
+    - chunk dibuffer agar rendering lebih smooth
+    """
+    clients = get_gemini_clients()
+
+    if not clients:
+        yield "⚠️ Tidak ada koneksi Gemini yang aktif. Periksa GEMINI_API_KEYS."
+        return
+
+    for client in clients:
+        for model_name in STREAM_MODELS:
+            try:
+                response = client.models.generate_content_stream(
+                    model=model_name,
+                    contents=prompt,
+                    config=_stream_config(model_name, max_output_tokens),
+                )
+
+                emitted = False
+
+                def raw_stream():
+                    for chunk in response:
+                        chunk_text = getattr(chunk, "text", None)
+                        if chunk_text:
+                            yield chunk_text
+
+                for piece in _buffer_stream_text(raw_stream()):
+                    emitted = True
+                    yield piece
+
+                if emitted:
+                    return
+
+            except Exception:
+                continue
+
+    yield (
+        "⚠️ Maaf, koneksi AI sedang bermasalah atau kuota sedang penuh. "
+        "Silakan coba kembali beberapa saat lagi."
+    )
+
 
 def format_latex_options(options):
     formatted = []
@@ -60,52 +193,51 @@ def clean_json_text(text: str) -> str:
 
 def call_gemini_with_rotation(prompt: str, is_json: bool = False):
     """
-    Memanggil API Gemini untuk format teks/JSON biasa.
+    Non-stream request dengan client yang sudah di-cache.
+    Retry internal dimatikan supaya fallback tidak menambah jeda tersembunyi.
     """
-    for key in api_keys:
-        try:
-            # Ditambahkan timeout agar tidak hanging saat koneksi lelet
-            client = genai.Client(api_key=key)
-            for model_name in MODELS_TO_TRY:
-                try:
-                    config = types.GenerateContentConfig(response_mime_type="application/json") if is_json else None
-                    response = client.models.generate_content(
-                        model=model_name,
-                        contents=prompt,
-                        config=config
+    clients = get_gemini_clients()
+    if not clients:
+        return None
+
+    for client in clients:
+        for model_name in QUIZ_MODELS:
+            try:
+                config_kwargs = {}
+
+                if is_json:
+                    config_kwargs["response_mime_type"] = "application/json"
+
+                if model_name.startswith("gemini-3."):
+                    config_kwargs["thinking_config"] = types.ThinkingConfig(
+                        thinking_level="minimal"
                     )
-                    if response.text:
-                        return response.text
-                except Exception:
-                    continue
-        except Exception:
-            continue
+                elif model_name == "gemini-2.5-flash":
+                    config_kwargs["thinking_config"] = types.ThinkingConfig(
+                        thinking_budget=0,
+                        include_thoughts=False,
+                    )
+
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(**config_kwargs),
+                )
+
+                if response.text:
+                    return response.text
+
+            except Exception:
+                continue
+
     return None
 
-def stream_ai_text(prompt: str):
-    """
-    Fitur baru untuk Streaming API.
-    Menghasilkan teks (typing effect) kata demi kata secara real-time.
-    """
-    for key in api_keys:
-        try:
-            client = genai.Client(api_key=key)
-            for model_name in MODELS_TO_TRY:
-                try:
-                    response = client.models.generate_content_stream(
-                        model=model_name,
-                        contents=prompt
-                    )
-                    for chunk in response:
-                        if chunk.text:
-                            yield chunk.text
-                    return  # Sukses stream, keluar dari fungsi
-                except Exception:
-                    continue
-        except Exception:
-            continue
-    
-    yield "⚠️ Maaf, koneksi API sedang penuh atau terputus. Silakan coba klik kembali."
+def stream_ai_text(prompt: str, max_output_tokens: int = STREAM_HINT_MAX_TOKENS):
+    """Generator sinkron yang kompatibel langsung dengan st.write_stream()."""
+    yield from _stream_from_clients(
+        prompt,
+        max_output_tokens=max_output_tokens,
+    )
 
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
@@ -123,45 +255,45 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     stage_description = stage_descriptions.get(stage, "Fokus pada penguatan konsep OMI.")
 
     system_prompt = f"""
-Anda adalah Pelatih Utama Bina Prestasi OMI 2026 (Olimpiade Sains & Matematika Al Irsyad) untuk tingkat {jenjang}.
-Rancanglah 1 paket latihan CBT berisi TEPAT 5 SOAL PILIHAN GANDA yang orisinal, presisi, dan tematik OMI.
+    Anda adalah Pelatih Utama Bina Prestasi OMI 2026 (Olimpiade Sains & Matematika Al Irsyad) untuk tingkat {jenjang}.
+    Rancanglah 1 paket latihan CBT berisi TEPAT 5 SOAL PILIHAN GANDA yang orisinal, presisi, dan tematik OMI.
 
-Spesifikasi Soal OMI 2026:
-- Jenjang: {jenjang}
-- Bidang / Mata Pelajaran: {mapel}
-- Tahap Pembinaan: {stage} ({stage_description})
-- Cakupan Submateri: {submateri_text}
+    Spesifikasi Soal OMI 2026:
+    - Jenjang: {jenjang}
+    - Bidang / Mata Pelajaran: {mapel}
+    - Tahap Pembinaan: {stage} ({stage_description})
+    - Cakupan Submateri: {submateri_text}
 
-INTEGRASI TEMATIK & BAHASA ARAB OMI (BIARKAN PANJANG DAN NATURAL):
-1. Konteks Tematik: Wajib mengintegrasikan materi dengan tema Lingkungan, Teknologi, Kehidupan Sehari-hari, atau Nilai-Nilai Keislaman (seperti Zakat, Waktu Shalat, Penanggalan Hijriyah, Arah Kiblat, Waris, atau Sejarah Islam).
-2. Variasi Bahasa Arab & Indonesia:
-   - Jika submateri berisi "Semua Submateri" (ALL) atau secara acak: UTAMAKAN karakteristik khusus OMI! Buat variasi campuran acak:
-     * Variasi 1: Teks Soal ditulis dalam BAHASA ARAB (fasih & ber-harakat/standar), sedangkan Pilihan Jawaban (A, B, C, D) dalam BAHASA INDONESIA.
-     * Variasi 2: Teks Soal dalam BAHASA INDONESIA, tetapi Pilihan Jawaban (A, B, C, D) / Istilah Kunci ditulis dalam BAHASA ARAB.
-     * Variasi 3: Soal Tematik OMI Standar (Full Bahasa Indonesia berkonteks Keislaman/Lingkungan/Teknologi).
+    INTEGRASI TEMATIK & BAHASA ARAB OMI (BIARKAN PANJANG DAN NATURAL):
+    1. Konteks Tematik: Wajib mengintegrasikan materi dengan tema Lingkungan, Teknologi, Kehidupan Sehari-hari, atau Nilai-Nilai Keislaman (seperti Zakat, Waktu Shalat, Penanggalan Hijriyah, Arah Kiblat, Waris, atau Sejarah Islam).
+    2. Variasi Bahasa Arab & Indonesia:
+    - Jika submateri berisi "Semua Submateri" (ALL) atau secara acak: UTAMAKAN karakteristik khusus OMI! Buat variasi campuran acak:
+        * Variasi 1: Teks Soal ditulis dalam BAHASA ARAB (fasih & tanpa harakat), sedangkan Pilihan Jawaban (A, B, C, D) dalam BAHASA INDONESIA.
+        * Variasi 2: Teks Soal dalam BAHASA INDONESIA, tetapi Pilihan Jawaban (A, B, C, D) / Istilah Kunci ditulis dalam BAHASA ARAB (fasih & tanpa harakat).
+        * Variasi 3: Soal Tematik OMI Standar (Full Bahasa Indonesia berkonteks Keislaman/Lingkungan/Teknologi).
 
-ATURAN KHUSUS FORMATTING & KECEPATAN:
-- JANGAN sertakan field `hint` atau `solution` di sini. Fokus saja merancang 5 teks soal cerita dan jawaban agar proses AI kencang.
-- Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
-- Semua backslash LaTeX wajib ditulis ganda '\\\\'.
+    ATURAN KHUSUS FORMATTING & KECEPATAN:
+    - JANGAN sertakan field `hint` atau `solution` di sini. Fokus saja merancang 5 teks soal cerita dan jawaban agar proses AI kencang.
+    - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
+    - Semua backslash LaTeX wajib ditulis ganda '\\\\'.
 
-Format keluaran WAJIB berupa objek JSON murni:
-{{
-    "quiz": [
-        {{
-            "id": 1,
-            "question": "Teks soal cerita nomor 1 lengkap dan mendalam",
-            "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-            "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi)"
-        }}
-    ]
-}}
-"""
+    Format keluaran WAJIB berupa objek JSON murni:
+    {{
+        "quiz": [
+            {{
+                "id": 1,
+                "question": "Teks soal cerita nomor 1 lengkap dan mendalam",
+                "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+                "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi)"
+            }}
+        ]
+    }}
+    """
 
     raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
 
     if not raw_response:
-        st.error("⚠️ Waduh kuota sedang penuh nih. Coba Klik lagi ya...")
+        st.error("⚠️ Waduh kuota sedang penuh nih. Silakan coba beberapa saat lagi ya...")
         return []
 
     try:
@@ -187,37 +319,37 @@ def get_ai_hint_stream(question: str, user_attempt: str, mapel: str = "Umum"):
     Menyusun prompt petunjuk dan langsung melemparnya ke generator stream.
     """
     prompt = f"""
-Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
-Gunakan gaya bahasa menyapa 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
+    Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
+    Gunakan gaya bahasa menyapa 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
 
-Mata Pelajaran: {mapel}
-Soal OMI: {question}
-Ide Pengerjaan Siswa: {user_attempt}
+    Mata Pelajaran: {mapel}
+    Soal OMI: {question}
+    Ide Pengerjaan Siswa: {user_attempt}
 
-Instruksi:
-- Berikan petunjuk atau bimbingan logika interaktif yang menyemangati dan memuji usaha siswa.
-- Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini secara natural tanpa membocorkan jawaban akhir.
-- Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains.
-"""
-    return stream_ai_text(prompt)
+    Instruksi:
+    - Berikan petunjuk atau bimbingan logika interaktif yang menyemangati dan memuji usaha siswa.
+    - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini secara natural tanpa membocorkan jawaban akhir.
+    - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains.
+    """
+    return stream_ai_text(prompt, max_output_tokens=STREAM_HINT_MAX_TOKENS)
 
 def get_ai_solution_stream(question: str, correct_answer: str, mapel: str = "Umum"):
     """
     Menyusun prompt pembahasan rinci dan langsung melemparnya ke generator stream.
     """
     prompt = f"""
-Kamu adalah Pembina OMI 2026. Berikan pembahasan komprehensif, runtut, dan analitis step-by-step untuk soal berikut.
+    Kamu adalah Pembina OMI 2026. Berikan pembahasan komprehensif, runtut, dan analitis step-by-step untuk soal berikut.
 
-Bidang: {mapel}
-Soal:
-{question}
+    Bidang: {mapel}
+    Soal:
+    {question}
 
-Kunci Jawaban yang Benar: {correct_answer}
+    Kunci Jawaban yang Benar: {correct_answer}
 
-Instruksi Pembahasan:
-- Jelaskan secara natural, tajam, dan edukatif mengapa jawaban tersebut benar.
-- Jika ada unsur Bahasa Arab, terjemahkan atau kupas secara singkat.
-- Jika ada hitungan, tunjukkan proses rumusnya dengan jelas.
-- WAJIB gunakan format LaTeX $...$ untuk semua notasi matematika/simbol fisika-kimia.
-"""
-    return stream_ai_text(prompt)
+    Instruksi Pembahasan:
+    - Jelaskan secara natural, tajam, dan edukatif mengapa jawaban tersebut benar.
+    - Jika ada unsur Bahasa Arab, terjemahkan atau kupas secara singkat.
+    - Jika ada hitungan, tunjukkan proses rumusnya dengan jelas.
+    - WAJIB gunakan format LaTeX $...$ untuk semua notasi matematika/simbol fisika-kimia.
+    """
+    return stream_ai_text(prompt, max_output_tokens=STREAM_SOLUTION_MAX_TOKENS)
