@@ -382,12 +382,12 @@ elif st.session_state.page == "quiz":
                 st.rerun()
 
     # Expander Hint dengan Live Streaming Text
-    with st.expander("Kamu bingung? Konsultasi di sini sama aku, RoboMANTAP! 😊"):
+    with st.expander("Kamu bingung? Konsultasi di sini sama aku, RoboMANTAP!"):
         st.caption("Tulis ide atau pemahaman awal kamu, dan RoboMANTAP akan membalas dengan mengetik petunjuk secara real-time!")
         
         attempt_input = st.text_input(
             "Gagasan / Ide Logika Kamu apa coba?:",
-            placeholder="Contoh: Aku pikir ini pakai rumus debit air, tapi bingung konversinya...",
+            placeholder="Contoh: Aku bingung nih harus mulai dari mana... 🤔",
             key=f"hint_in_{curr_idx}"
         )
         
@@ -404,7 +404,7 @@ elif st.session_state.page == "quiz":
             st.markdown("🧕🏼 **RoboMANTAP:**")
             st.markdown(st.session_state.ai_hint_cache[hint_key])
 
-        if st.button("Dapatkan Petunjuk Live! 🚀", key=f"btn_hint_{curr_idx}"):
+        if st.button("Diskusikan Yuk!", key=f"btn_hint_{curr_idx}"):
             if attempt_input.strip():
                 if hint_key in st.session_state.ai_hint_cache:
                     # Sudah pernah dibuat -> tampilkan instan, TANPA request Gemini baru.
@@ -471,7 +471,7 @@ elif st.session_state.page == "result":
     with col_act1:
         if st.button("🔄 LATIHAN SOAL LAGI DONG! (SESI BARU)", type="primary", use_container_width=True):
             st.cache_data.clear()
-            with st.spinner("Sabar ya 😊 RoboMANTAP sedang menyiapkan 5 soal OMI baru.."):
+            with st.spinner("Sabar ya 😊 RoboMANTAP sedang menyiapkan soal baru Kamu.."):
                 new_quiz = generate_quiz_batch(st.session_state.jenjang, st.session_state.mapel, st.session_state.stage, st.session_state.selected_submateri)
                 if new_quiz and len(new_quiz) == 5:
                     st.session_state.quiz_data = new_quiz
@@ -488,7 +488,7 @@ elif st.session_state.page == "result":
             st.rerun()
 
     st.write("---")
-    st.markdown("### 📖 Pembahasan Rinci Pembina (On-Demand)")
+    st.markdown("### 📖 Pembahasan Rinci dari Pembina RoboMANTAP ")
     st.caption("💡 *Klik pada masing-masing soal di bawah ini untuk meminta AI mengetikkan pembahasan secara live!*")
     
     for idx, q in enumerate(quiz_data):
@@ -513,7 +513,7 @@ elif st.session_state.page == "result":
                 st.markdown("**🧕🏼 Pembahasan dari RoboMANTAP:**")
                 st.markdown(st.session_state.ai_solution_cache[solution_key])
 
-            if st.button(f"Tampilkan Pembahasan AI (Soal {idx + 1})", key=f"btn_sol_{idx}"):
+            if st.button(f"Tampilkan Pembahasannya dong! (Soal {idx + 1})", key=f"btn_sol_{idx}"):
                 if solution_key in st.session_state.ai_solution_cache:
                     # Sudah ada -> tidak panggil Gemini lagi.
                     st.markdown("**🧕🏼 Pembahasan dari RoboMANTAP:**")
