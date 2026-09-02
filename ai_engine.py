@@ -48,7 +48,7 @@ def clean_json_text(text: str) -> str:
         text = re.sub(r"\n?```$", "", text)
 
     # Ubah backslash tunggal LaTeX (seperti \sqrt, \frac, \alpha, \{, \}) menjadi double backslash \\
-    text = re.sub(r'(?<!\\)\\([a-zA-Z\{\}\!\,;:_%\$\&\+\-\=])', r'\\\\\1', text)
+    text = re.sub(r'(?<!\\)\\([a-zA-Z0-9\{\}\!\,;:_%\$\&\+\-\=\(\)\[\]\.\/\|\~\^\<\>])', r'\\\\\1', text)
     return text
 
 def call_gemini_with_rotation(prompt: str, is_json: bool = False):
@@ -103,7 +103,7 @@ Spesifikasi Soal OMI 2026:
 
 ATURAN KECEPATAN & FORMATTING:
 - Teks soal padat, efektif, langsung pada inti masalah (MAKSIMAL 30 kata per soal).
-- Pembahasan (solution) MAKSIMAL 35 kata atau 2-3 kalimat ringkas (langsung ke rumus utama/langkah kunci).
+- Pembahasan (solution) MAKSIMAL 75 kata atau 2-3 kalimat ringkas step by step (langsung ke rumus utama/langkah kunci).
 - Setiap opsi jawaban (options) dibuat singkat dan padat (MAKSIMAL 7 kata per opsi).
 - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
 - PENTING: Semua backslash LaTeX dalam JSON wajib ditulis ganda '\\\\' agar format JSON valid.
@@ -150,13 +150,14 @@ Format keluaran WAJIB berupa objek JSON murni:
 def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     prompt = f"""
 Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
+Gunakan gaya bahasa menyapa 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
 
 Mata Pelajaran: {mapel}
 Soal OMI: {question}
 Ide Siswa: {user_attempt}
 
 ATURAN KECEPATAN & RESPON:
-- Berikan petunjuk/bimbingan logika singkat MAKSIMAL 2-3 KALIMAT padat (maks 40 kata).
+- Berikan petunjuk/bimbingan logika singkat secara step by step secara jelas dan runtut MAKSIMAL 3-5 KALIMAT padat (maks 120 kata).
 - Langsung ke inti celah penyelesaian tanpa pembuka/basa-basi berlebihan.
 - Dilarang membocorkan jawaban akhir atau pilihan opsi yang benar.
 - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains pada penjelasan.
