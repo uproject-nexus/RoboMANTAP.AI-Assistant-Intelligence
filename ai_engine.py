@@ -18,7 +18,7 @@ elif os.getenv("GEMINI_API_KEY"):
 if not api_keys:
     raise ValueError("GEMINI_API_KEYS tidak ditemukan. Pastikan Secrets sudah dikonfigurasi.")
 
-MODELS_TO_TRY = ["gemini-3.6-flash", "gemini-2.5-flash","gemini-1.5-flash" ]
+MODELS_TO_TRY = ["gemini-2.5-flash", "gemini-1.5-flash"]
 
 def format_latex_options(options):
     formatted = []
@@ -40,16 +40,16 @@ def clean_json_text(text: str) -> str:
     """
     if not text:
         return ""
-
-    # 1. Hapus pemungkus markdown ```json ... ``` jika ada
+    
+    # Hapus pemungkus markdown ```json ... ``` jika ada
     text = text.strip()
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\n?", "", text, flags=re.IGNORECASE)
         text = re.sub(r"\n?```$", "", text)
         text = text.strip()
 
-    # 2. Ubah SEMUA backslash LaTeX (\rho, \frac, \alpha, dll) menjadi double backslash \\
-    # Kecuali backslash yang memang bawaan escape JSON valid (seperti \" dan \\)
+    # Ubah SEMUA backslash LaTeX (\rho, \frac, \alpha, dll) menjadi double backslash \\
+    # Kecuali backslash bawaan escape JSON valid (seperti \" dan \\)
     text = re.sub(r'\\(?!["\\/])', r'\\\\', text)
     return text
 
@@ -59,8 +59,8 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
     """
     for key in api_keys:
         try:
-            # Tambahkan http_options dengan timeout 15000 ms (15 detik)
-            client = genai.Client(api_key=key)
+            # Ditambahkan timeout 15 detik agar koneksi Streamlit tidak timed out
+            client = genai.Client(api_key=key, http_options={'timeout': 15000})
             for model_name in MODELS_TO_TRY:
                 try:
                     config = types.GenerateContentConfig(response_mime_type="application/json") if is_json else None
@@ -78,17 +78,6 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
 
     return None
 
-def clean_display_text(text: str) -> str:
-    if not text:
-        return text
-    # 1. Ubah semua variasi \n berlapis (\\n, \\\n, dll) jadi newline nyata
-    text = re.sub(r'\\+n', '\n', text)
-    # 2. Hapus backslash liar yang menggantung di akhir/awal baris (\n\ atau \\\n)
-    text = re.sub(r'\n\\+', '\n', text)
-    text = re.sub(r'\\+\n', '\n', text)
-    return text
-
-@st.cache_data(ttl=600, show_spinner=False)
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
     Menghasilkan 1 paket latihan CBT 3 soal berbasis Kisi-Kisi Operasional OMI 2026.
@@ -97,53 +86,49 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     stage_descriptions = {
         "Internal": "Internal: Fokus pada diagnostik, pemetaan bidang, dan penguatan konsep dasar.",
-        "Kab/Kota": "Kab/Kota: Fokus pada 25 pilihan ganda terstandar CBT, HOTS, dan analisis data.",
+        "Kab/Kota": "Kab/Kota: Fokus pada pilihan ganda terstandar CBT, HOTS, dan analisis data.",
         "Provinsi": "Provinsi: Fokus pada analisis lintas konsep, pilihan ganda kompleks, serta keterkaitan sains, teknologi, dan nilai keislaman.",
         "Nasional": "Nasional: Fokus pada tingkat lanjutan (High-Level HOTS), eksplorasi problem solving, analisis eksperimen, dan penalaran ilmiah mendalam."
     }
     stage_description = stage_descriptions.get(stage, "Fokus pada penguatan konsep OMI.")
 
     system_prompt = f"""
-    Anda adalah Pelatih Utama Bina Prestasi OMI 2026 (Olimpiade Sains & Matematika Al Irsyad) untuk tingkat {jenjang}.
-    Rancanglah 1 paket latihan CBT berisi TEPAT 3 SOAL PILIHAN GANDA yang orisinal, presisi, dan tematik OMI.
-    
-    Spesifikasi Soal OMI 2026:
-    - Jenjang: {jenjang}
-    - Bidang / Mata Pelajaran: {mapel}
-    - Tahap Pembinaan: {stage} ({stage_description})
-    - Cakupan Submateri: {submateri_text}
-    
-    INTEGRASI TEMATIK OMI:
-    - Integrasikan materi dengan tema Lingkungan, Teknologi, atau Nilai Keislaman.
-    - Penggunaan istilah Bahasa Arab bersifat opsional/secara alami jika relevan (Gunakan Bahasa Arab standar TANPA harakat berlebihan agar pemrosesan cepat).
-    
-    ATURAN KECEPATAN & FORMATTING:
-    - Teks soal padat, efektif dan langsung pada inti masalah (MAKSIMAL 30 kata).
-    - Pembahasan (solution) MAKSIMAL 50 kata atau 2-3 kalimat ringkas (langsung ke rumus utama atau langkah kunci).
-    - Setiap opsi jawaban (options) dibuat singkat dan padat (MAKSIMAL 7 kata per opsi).
-    - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$'.
-    - PENTING: Semua backslash LaTeX dalam JSON wajib ditulis ganda '\\\\' agar format JSON valid.
-        
-    Format keluaran WAJIB berupa objek JSON murni:
-    {{
-      "quiz": [
+Anda adalah Pelatih Utama Bina Prestasi OMI 2026 (Olimpiade Sains & Matematika Al Irsyad) untuk tingkat {jenjang}.
+Rancanglah 1 paket latihan CBT berisi TEPAT 3 SOAL PILIHAN GANDA yang orisinal, presisi, dan terintegrasi.
+
+Spesifikasi Soal OMI 2026:
+- Jenjang: {jenjang}
+- Bidang / Mata Pelajaran: {mapel}
+- Tahap Pembinaan: {stage} ({stage_description})
+- Cakupan Submateri: {submateri_text}
+- Karakteristik Soal: Mengintegrasikan konsep sains/matematika murni dengan literasi data, teknologi, lingkungan, serta nilai-nilai keislaman secara kontekstual. Penggunaan istilah/karakter Bahasa Arab dilakukan TANPA harakat berlebihan agar pemrosesan cepat.
+
+ATURAN KECEPATAN & FORMATTING:
+- Teks soal padat, efektif, langsung pada inti masalah (MAKSIMAL 30 kata per soal).
+- Pembahasan (solution) MAKSIMAL 50 kata atau 2-3 kalimat ringkas (langsung ke rumus utama/langkah kunci).
+- Setiap opsi jawaban (options) dibuat singkat dan padat (MAKSIMAL 7 kata per opsi).
+- Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
+- PENTING: Semua backslash LaTeX dalam JSON wajib ditulis ganda '\\\\' agar format JSON valid.
+
+Format keluaran WAJIB berupa objek JSON murni:
+{{
+    "quiz": [
         {{
-          "id": 1,
-          "question": "Teks soal 1 singkat & padat",
-          "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-          "correct_answer": "Pilihan jawaban tepat",
-          "solution": "Pembahasan singkat 2-3 kalimat."
+            "id": 1,
+            "question": "Teks soal 1 lengkap dengan konteks OMI 2026",
+            "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+            "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi di atas)",
+            "hint": "Petunjuk logika awal RoboMANTAP tanpa membocorkan jawaban akhir",
+            "solution": "Pembahasan singkat 2-3 kalimat."
         }}
-      ]
-    }}
-    """
-
-
+    ]
+}}
+"""
 
     raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
 
     if not raw_response:
-        st.error("⚠️ Kuota sedang penuh nih. Silakan coba beberapa saat lagi ya!")
+        st.error("⚠️ Semua kuota cadangan API sedang penuh. Silakan coba beberapa saat lagi.")
         return []
 
     try:
@@ -151,21 +136,8 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
         data = json.loads(cleaned_response, strict=False)
         quiz_list = data.get("quiz", [])
         for q in quiz_list:
-            # 1. Bersihkan Teks Soal
-            if "question" in q:
-                q["question"] = clean_display_text(q["question"])    
-            # 2. Bersihkan Pembahasan (INI YANG BIKIN EROR DI GAMBAR)
-            if "solution" in q:
-                q["solution"] = clean_display_text(q["solution"])
-
-            # 3. Bersihkan Opsi Jawaban
             if "options" in q:
-                cleaned_opts = []
-                for opt in q["options"]:
-                    clean_opt = clean_display_text(opt.replace("\\'", "").replace("'", ""))
-                    cleaned_opts.append(clean_opt)
-                q["options"] = format_latex_options(cleaned_opts)
-            
+                q["options"] = format_latex_options(q["options"])
             if "correct_answer" in q:
                 for opt in q["options"]:
                     if opt.startswith(q["correct_answer"][:2]):
@@ -179,21 +151,21 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 @st.cache_data(ttl=600, show_spinner=False)
 def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     prompt = f"""
-    Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
-    Gunakan gaya bahasa menyapa 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
+Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
 
-    Mata Pelajaran / Bidang: {mapel}
-    Soal OMI: {question}
-    Ide Pengerjaan Siswa: {user_attempt}
+Mata Pelajaran: {mapel}
+Soal OMI: {question}
+Ide Siswa: {user_attempt}
+
+ATURAN KECEPATAN & RESPON:
+- Berikan petunjuk/bimbingan logika singkat MAKSIMAL 250.
+- Langsung ke inti celah penyelesaian tanpa pembuka/basa-basi berlebihan.
+- Dilarang membocorkan jawaban akhir atau pilihan opsi yang benar.
+- Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains pada penjelasan.
+"""
     
-    ATURAN KECEPATAN & RESPON:
-    - Berikan petunjuk/bimbingan logika singkat namun step by step MAKSIMAL 250 kata.
-    - Langsung ke inti celah penyelesaian tanpa pembuka/basa-basi berlebihan.
-    - Dilarang membocorkan jawaban akhir atau pilihan opsi yang benar.
-    - Gunakan format LaTeX $...$ hanya jika ada rumus matematika/sains.
-    """
-
     hint_text = call_gemini_with_rotation(prompt, is_json=False)
     if hint_text:
-        return clean_display_text(hint_text)
-    return "Maaf, RoboMANTAP belum bisa memberikan petunjuk saat ini. Coba periksa kembali logika pengerjaanmu!"
+        return hint_text
+
+    return "Yuk perhatikan lagi konsep dasar dan petunjuk pada soal ini! Coba periksa kembali langkah analisis atau pemahaman kamu ya."
