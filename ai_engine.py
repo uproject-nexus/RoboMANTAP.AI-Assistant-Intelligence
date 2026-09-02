@@ -149,7 +149,7 @@ def _stream_from_clients(prompt: str, max_output_tokens: int):
                 continue
 
     yield (
-        "⚠️ Maaf ya, koneksi sedang bermasalah atau kuota sedang penuh. "
+        "⚠️ Maaf ya, koneksi sedang bermasalah atau kuota sedang penuh nih. "
         "Silakan coba kembali beberapa saat lagi."
     )
 
@@ -266,11 +266,11 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     INTEGRASI TEMATIK & BAHASA ARAB OMI (BIARKAN PANJANG DAN NATURAL):
     1. Konteks Tematik: Wajib mengintegrasikan materi dengan tema Lingkungan, Teknologi, Kehidupan Sehari-hari, atau Nilai-Nilai Keislaman (seperti Zakat, Waktu Shalat, Penanggalan Hijriyah, Arah Kiblat, Waris, atau Sejarah Islam).
-    2. Variasi Bahasa Arab & Indonesia:
-    - Jika submateri berisi "Semua Submateri" (ALL) atau secara acak: UTAMAKAN karakteristik khusus OMI! Buat variasi campuran acak:
-        * Variasi 1: Teks Soal ditulis dalam BAHASA ARAB (fasih & tanpa harakat), sedangkan Pilihan Jawaban (A, B, C, D) dalam BAHASA INDONESIA.
-        * Variasi 2: Teks Soal dalam BAHASA INDONESIA, tetapi Pilihan Jawaban (A, B, C, D) / Istilah Kunci ditulis dalam BAHASA ARAB (fasih & tanpa harakat).
-        * Variasi 3: Soal Tematik OMI Standar (Full Bahasa Indonesia berkonteks Keislaman/Lingkungan/Teknologi).
+    2. Aturan Porsi & Variasi Bahasa (SANGAT PENTING):
+    - Jika submateri berisi "Semua Submateri" (ALL) atau secara acak: UTAMAKAN karakteristik khusus OMI!
+    - Dari total 5 soal yang dibuat, 3 soal WAJIB menggunakan Full Bahasa Indonesia berkonteks Keislaman, Lingkungan, Teknologi atau Umum.
+    - HANYA MAKSIMAL 2 SOAL SAJA yang diperbolehkan menggunakan Variasi Bahasa Arab (Teks Soal ditulis dalam Bahasa Arab fasih tanpa harakat, sedangkan Pilihan Jawaban A, B, C, D dalam Bahasa Indonesia atau Teks Soal dalam BAHASA INDONESIA, sedangkan Pilihan Jawaban A, B, C, D dalam BAHASA ARAB fasih tanpa harakat). 
+    - Jangan pernah membuat lebih dari 2 soal berbahasa Arab dalam satu paket kuis.
 
     ATURAN KHUSUS FORMATTING & KECEPATAN:
     - JANGAN sertakan field `hint` atau `solution` di sini. Fokus saja merancang 5 teks soal cerita dan jawaban agar proses AI kencang.
@@ -327,6 +327,7 @@ def get_ai_hint_stream(question: str, user_attempt: str, mapel: str = "Umum"):
     Ide Pengerjaan Siswa: {user_attempt}
 
     Instruksi:
+    - Jangan berikan salam pembuka yang berlebihan.
     - Berikan petunjuk atau bimbingan logika interaktif yang menyemangati dan memuji usaha siswa.
     - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini secara natural tanpa membocorkan jawaban akhir.
     - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains.
