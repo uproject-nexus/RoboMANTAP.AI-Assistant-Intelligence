@@ -47,8 +47,8 @@ def clean_json_text(text: str) -> str:
         text = re.sub(r"\n?```$", "", text)
         text = text.strip()
 
-    # PERBAIKAN UTAMA: Ubah SEMUA backslash LaTeX (\rho, \frac, \(, \], dll) menjadi \\
-    # KECUALI backslash bawaan quote JSON (\") dan backslash ganda (\\)
+    # PERBAIKAN TOTAL: Ubah SEMUA backslash LaTeX tunggal menjadi double backslash \\
+    # Kecuali yang memang bawaan JSON valid seperti \" dan \\
     text = re.sub(r'\\(?!["\\])', r'\\\\', text)
     return text
 
