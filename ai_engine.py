@@ -327,8 +327,6 @@ def get_ai_hint_stream(question: str, user_attempt: str, mapel: str = "Umum"):
     Ide Pengerjaan Siswa: {user_attempt}
 
     Instruksi:
-    - MAKSIMAL 350 KATA.
-    - Jangan berikan salam pembuka yang terlalu berlebihan.
     - Berikan petunjuk atau bimbingan logika interaktif yang menyemangati dan memuji usaha siswa.
     - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini secara natural tanpa membocorkan jawaban akhir.
     - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains.
@@ -349,9 +347,7 @@ def get_ai_solution_stream(question: str, correct_answer: str, mapel: str = "Umu
     Kunci Jawaban yang Benar: {correct_answer}
 
     Instruksi Pembahasan:
-    - MAKSIMAL 250 KATA.
     - Jangan berikan salam pembuka yang berlebihan.
-    - Sampaikan dahulu soal nomor berapa yg akan di bahas kemudian Langsung menuju langkah langkah penyelesaiannya.
     - Jelaskan secara natural, tajam, dan edukatif mengapa jawaban tersebut benar.
     - Jika ada unsur Bahasa Arab, terjemahkan atau kupas secara singkat.
     - Jika ada hitungan, tunjukkan proses rumusnya dengan jelas.
