@@ -41,14 +41,16 @@ def clean_json_text(text: str) -> str:
     if not text:
         return ""
 
-    # Hapus pemungkus markdown ```json ... ``` jika ada
+    # 1. Hapus pemungkus markdown ```json ... ``` jika ada
     text = text.strip()
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\n?", "", text, flags=re.IGNORECASE)
         text = re.sub(r"\n?```$", "", text)
+        text = text.strip()
 
-    # Ubah backslash tunggal LaTeX (seperti \rho, \frac, \Delta, \{) menjadi double backslash \\
-    text = re.sub(r'\\(?![\\"/bfnrt]|u[0-9a-fA-F]{4})', r'\\\\', text)
+    # 2. Ubah SEMUA backslash LaTeX (\rho, \frac, \alpha, dll) menjadi double backslash \\
+    # Kecuali backslash yang memang bawaan escape JSON valid (seperti \" dan \\)
+    text = re.sub(r'\\(?!["\\/])', r'\\\\', text)
     return text
 
 def call_gemini_with_rotation(prompt: str, is_json: bool = False):
