@@ -118,7 +118,7 @@ def _stream_from_clients(prompt: str, max_output_tokens: int):
     clients = get_gemini_clients()
 
     if not clients:
-        yield "⚠️ Tidak ada koneksi Gemini yang aktif. Periksa GEMINI_API_KEYS."
+        yield "⚠️ Tidak ada koneksi yang aktif nih. Aku periksa server dulu ya.."
         return
 
     for client in clients:
@@ -149,7 +149,7 @@ def _stream_from_clients(prompt: str, max_output_tokens: int):
                 continue
 
     yield (
-        "⚠️ Maaf, koneksi AI sedang bermasalah atau kuota sedang penuh. "
+        "⚠️ Maaf ya, koneksi sedang bermasalah atau kuota sedang penuh. "
         "Silakan coba kembali beberapa saat lagi."
     )
 
@@ -327,6 +327,7 @@ def get_ai_hint_stream(question: str, user_attempt: str, mapel: str = "Umum"):
     Ide Pengerjaan Siswa: {user_attempt}
 
     Instruksi:
+    - MAKSIMAL 250 KATA
     - Berikan petunjuk atau bimbingan logika interaktif yang menyemangati dan memuji usaha siswa.
     - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini secara natural tanpa membocorkan jawaban akhir.
     - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains.
@@ -347,6 +348,8 @@ def get_ai_solution_stream(question: str, correct_answer: str, mapel: str = "Umu
     Kunci Jawaban yang Benar: {correct_answer}
 
     Instruksi Pembahasan:
+    - MAKSIMAL 300 KATA
+    - Sampaikan dahulu soal nomor berapa yg akan di bahas kemudian Langsung menuju langkah langkah penyelesaiannya tanpa salam pembuka.
     - Jelaskan secara natural, tajam, dan edukatif mengapa jawaban tersebut benar.
     - Jika ada unsur Bahasa Arab, terjemahkan atau kupas secara singkat.
     - Jika ada hitungan, tunjukkan proses rumusnya dengan jelas.
