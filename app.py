@@ -366,7 +366,7 @@ elif st.session_state.page == "quiz":
     
     col_nav1, col_nav2, col_nav3 = st.columns([3, 6, 3])
     # Swap posisi Next/Submit ke atas untuk aksesibilitas HP
-    with col_nav3:
+    with col_nav1:
         if curr_idx < 4:
             if st.button("Berikutnya ➡️", type="primary", use_container_width=True):
                 st.session_state.current_index += 1
@@ -375,7 +375,7 @@ elif st.session_state.page == "quiz":
             if st.button("🏁 SUBMIT & SELESAIKAN", type="primary", use_container_width=True):
                 st.session_state.page = "result"
                 st.rerun()
-    with col_nav1:
+    with col_nav3:
         if curr_idx > 0:
             if st.button("⬅️ Sebelumnya", use_container_width=True):
                 st.session_state.current_index -= 1
