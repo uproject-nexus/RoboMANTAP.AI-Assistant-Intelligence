@@ -41,16 +41,15 @@ def clean_json_text(text: str) -> str:
     if not text:
         return ""
     
-    # Hapus pemungkus markdown ```json ... ``` jika ada
     text = text.strip()
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\n?", "", text, flags=re.IGNORECASE)
         text = re.sub(r"\n?```$", "", text)
         text = text.strip()
 
-    # Ubah SEMUA backslash LaTeX (\rho, \frac, \alpha, dll) menjadi double backslash \\
-    # Kecuali backslash bawaan escape JSON valid (seperti \" dan \\)
-    text = re.sub(r'\\(?!["\\/])', r'\\\\', text)
+    # PERBAIKAN UTAMA: Ubah SEMUA backslash LaTeX (\rho, \frac, \(, \], dll) menjadi \\
+    # KECUALI backslash bawaan quote JSON (\") dan backslash ganda (\\)
+    text = re.sub(r'\\(?!["\\])', r'\\\\', text)
     return text
 
 def call_gemini_with_rotation(prompt: str, is_json: bool = False):
@@ -59,7 +58,7 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
     """
     for key in api_keys:
         try:
-            # Ditambahkan timeout 15 detik agar koneksi Streamlit tidak timed out
+            # Timeout 15 detik untuk mencegah koneksi diputus Streamlit
             client = genai.Client(api_key=key)
             for model_name in MODELS_TO_TRY:
                 try:
@@ -105,7 +104,7 @@ Spesifikasi Soal OMI 2026:
 
 ATURAN KECEPATAN & FORMATTING:
 - Teks soal padat, efektif, langsung pada inti masalah (MAKSIMAL 30 kata per soal).
-- Pembahasan (solution) MAKSIMAL 50 kata atau 2-3 kalimat ringkas (langsung ke rumus utama/langkah kunci).
+- Pembahasan (solution) MAKSIMAL 35 kata atau 2-3 kalimat ringkas (langsung ke rumus utama/langkah kunci).
 - Setiap opsi jawaban (options) dibuat singkat dan padat (MAKSIMAL 7 kata per opsi).
 - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
 - PENTING: Semua backslash LaTeX dalam JSON wajib ditulis ganda '\\\\' agar format JSON valid.
@@ -158,7 +157,7 @@ Soal OMI: {question}
 Ide Siswa: {user_attempt}
 
 ATURAN KECEPATAN & RESPON:
-- Berikan petunjuk/bimbingan logika singkat MAKSIMAL 250.
+- Berikan petunjuk/bimbingan logika singkat MAKSIMAL 2-3 KALIMAT padat (maks 40 kata).
 - Langsung ke inti celah penyelesaian tanpa pembuka/basa-basi berlebihan.
 - Dilarang membocorkan jawaban akhir atau pilihan opsi yang benar.
 - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains pada penjelasan.
