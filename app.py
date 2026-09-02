@@ -270,7 +270,7 @@ elif st.session_state.page == "setup":
         
         available_submateri = KISI_KISI_OMI[st.session_state.jenjang][st.session_state.mapel]
         st.session_state.selected_submateri = st.multiselect(
-            "Pilih Submateri (Kosongkan saja ya kalau  Kamu Mau pilih Semua Submateri 😊✨):",
+            "Pilih Submateri (Kosongkan saja ya kalau  Kamu Mau pilih Semua Submateri!):",
             available_submateri,
             default=[],
             placeholder="Pilih submateri di sini..."
@@ -285,7 +285,7 @@ elif st.session_state.page == "setup":
         """)
         st.write("")
         if st.button("🚀 MARI MULAI SESI TEST SEKARANG!", type="primary", use_container_width=True):
-            with st.spinner(f"RoboMANTAP sedang merancang soal {st.session_state.mapel} Kamu. Tunggu sebentar ya..."):
+            with st.spinner(f"RoboMANTAP sedang merancang soal {st.session_state.mapel} Kamu. Tunggu sebentar ya 😊"):
                 quiz = generate_quiz_batch(
                     st.session_state.jenjang,
                     st.session_state.mapel,
