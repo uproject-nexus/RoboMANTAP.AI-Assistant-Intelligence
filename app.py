@@ -358,9 +358,8 @@ elif st.session_state.page == "quiz":
         
         if st.button("Dapatkan Petunjuk Live! 🚀", key=f"btn_hint_{curr_idx}"):
             if attempt_input.strip():
-                with st.chat_message("assistant", avatar="🤖"):
-                     st.write("**RoboMANTAP:**")
-                     st.write_stream(get_ai_hint_stream(q['question'], attempt_input, state.mapel))
+                st.markdown("🤖 **RoboMANTAP:**")
+                st.write_stream(get_ai_hint_stream(q['question'], attempt_input, st.session_state.mapel))
             else:
                 st.info("💡 Tolong ketik sedikit ide kamu dulu ya, biar RoboMANTAP bisa kasih petunjuk yang pas!")
 
