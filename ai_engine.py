@@ -19,7 +19,7 @@ if not api_keys:
     raise ValueError("GEMINI_API_KEYS tidak ditemukan. Pastikan Secrets sudah dikonfigurasi.")
 
 # Fokus ke model paling kencang agar tidak ada jeda retry yang bikin lemot
-MODELS_TO_TRY = ["gemini-2.5-flash", "gemini-1.5-flash"]
+MODELS_TO_TRY = ["gemini-3.6-flash", "gemini-2.5-flash"]
 
 def format_latex_options(options):
     formatted = []
