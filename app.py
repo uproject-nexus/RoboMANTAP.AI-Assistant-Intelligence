@@ -150,7 +150,7 @@ with st.sidebar:
     # 1. Header Widget Persona AI + Engineered by Banner
     st.markdown("""
     <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 16px; border-radius: 12px; border: 1px solid #059669; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-        <div style="font-size: 26px; margin-bottom: 4px;">🤖</div>
+        <div style="font-size: 26px; margin-bottom: 4px;">🧕🏼</div>
         <div style="color: #ffffff; font-weight: 700; font-size: 16px; letter-spacing: 0.5px;">RoboMANTAP-AI</div>
         <div style="color: #6ee7b7; font-size: 11px; font-weight: 500; margin-bottom: 6px;">Assistant Intelligence System</div>
         <div style="font-size: 10px; color: #a7f3d0; opacity: 0.85; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 4px; font-style: italic;">Engineered by U.Project Nexus</div>
@@ -388,7 +388,7 @@ elif st.session_state.page == "quiz":
         
         if st.button("Dapatkan Petunjuk Live! 🚀", key=f"btn_hint_{curr_idx}"):
             if attempt_input.strip():
-                st.markdown("🤖 **RoboMANTAP:**")
+                st.markdown("🧕🏼 **RoboMANTAP:**")
                 st.write_stream(get_ai_hint_stream(q['question'], attempt_input, st.session_state.mapel))
             else:
                 st.info("💡 Tolong ketik sedikit ide kamu dulu ya, biar RoboMANTAP bisa kasih petunjuk yang pas!")
@@ -425,11 +425,11 @@ elif st.session_state.page == "result":
     k4.metric("Kosong (0)", f"{kosong}")
 
     if feedback_type == "success":
-        st.success(f"🤖 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
+        st.success(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
     elif feedback_type == "info":
-        st.info(f"🤖 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
+        st.info(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
     else:
-        st.warning(f"🤖 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
+        st.warning(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
 
     st.write("---")
     col_act1, col_act2 = st.columns(2)
@@ -466,5 +466,5 @@ elif st.session_state.page == "result":
             
             # Tombol untuk memicu streaming pembahasan per soal (On-Demand)
             if st.button(f"Tampilkan Pembahasannya dong! (Soal {idx + 1})", key=f"btn_sol_{idx}"):
-                st.markdown("**🧠 RoboMANTAP akan menampilkan Pembahasannya untuk Kamu... :**")
+                st.markdown("**🧕🏼 RoboMANTAP akan menampilkan Pembahasannya untuk Kamu... :**")
                 st.write_stream(get_ai_solution_stream(q['question'], q['correct_answer'], st.session_state.mapel))
