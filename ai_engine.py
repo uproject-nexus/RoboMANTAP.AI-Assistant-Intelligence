@@ -116,11 +116,12 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     - Penggunaan istilah Bahasa Arab bersifat opsional/secara alami jika relevan (Gunakan Bahasa Arab standar TANPA harakat berlebihan agar pemrosesan cepat).
     
     ATURAN KECEPATAN & FORMATTING:
-    - Teks soal padat, efektif, dan langsung pada inti masalah.
-    - Pembahasan (solution) MAKSIMAL 2-3 kalimat ringkas (langsung ke rumus atau langkah kunci).
+    - Teks soal padat, efektif dan langsung pada inti masalah (MAKSIMAL 30 kata).
+    - Pembahasan (solution) MAKSIMAL 50 kata atau 2-3 kalimat ringkas (langsung ke rumus utama atau langkah kunci).
+    - Setiap opsi jawaban (options) dibuat singkat dan padat (MAKSIMAL 7 kata per opsi).
     - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$'.
     - PENTING: Semua backslash LaTeX dalam JSON wajib ditulis ganda '\\\\' agar format JSON valid.
-    
+        
     Format keluaran WAJIB berupa objek JSON murni:
     {{
       "quiz": [
@@ -184,7 +185,7 @@ def get_ai_hint(question: str, user_attempt: str, mapel: str = "Umum"):
     Ide Pengerjaan Siswa: {user_attempt}
     
     ATURAN KECEPATAN & RESPON:
-    - Berikan petunjuk/bimbingan logika singkat namun step by step MAKSIMAL 10 KALIMAT padat (maks 500 kata).
+    - Berikan petunjuk/bimbingan logika singkat namun step by step MAKSIMAL 250 kata.
     - Langsung ke inti celah penyelesaian tanpa pembuka/basa-basi berlebihan.
     - Dilarang membocorkan jawaban akhir atau pilihan opsi yang benar.
     - Gunakan format LaTeX $...$ hanya jika ada rumus matematika/sains.
