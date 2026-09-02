@@ -105,7 +105,7 @@ def stream_ai_text(prompt: str):
         except Exception:
             continue
     
-    yield "⚠️ Maaf, koneksi API sedang penuh atau terputus. Silakan coba klik kembali."
+    yield "⚠️ Waduh, koneksi terputus nih. Coba kamu langsung klik lagi ya.."
 
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
@@ -161,7 +161,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
 
     if not raw_response:
-        st.error("⚠️ Waduh kuota sedang penuh nih. Silakan coba beberapa saat lagi ya...")
+        st.error("⚠️ Waduh kuota sedang penuh nih. Silakan coba klik lagi ya...")
         return []
 
     try:
