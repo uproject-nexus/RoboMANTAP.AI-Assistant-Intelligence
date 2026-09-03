@@ -489,7 +489,7 @@ elif st.session_state.page == "result":
 
     st.write("---")
     st.markdown("### 📖 Pembahasan Rinci dari Pembina RoboMANTAP ")
-    st.caption("💡 *Klik pada masing-masing soal di bawah ini untuk meminta AI mengetikkan pembahasan secara live!*")
+    st.caption("💡 *untuk meminta RoboMANTAP membahas nya, Klik pada masing-masing soal di bawah ini ya!* 😊")
     
     for idx, q in enumerate(quiz_data):
         u_ans = user_answers.get(idx, "Tidak Dijawab")
