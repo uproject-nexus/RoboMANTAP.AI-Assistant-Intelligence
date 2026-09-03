@@ -505,7 +505,7 @@ ATURAN MUTLAK:
 - Jangan membuat metode baru yang mengubah hasil solution basis.
 - Jelaskan langkah demi langkah secara pedagogis dan analitis.
 - Jika ada hitungan, tampilkan rumus dan substitusinya dengan jelas.
-- Jika ada Bahasa Arab, jelaskan arti/unsur bahasanya secara singkat.
+- Jika ada unsur Bahasa Arab, terjemahkan dalam bahasa indonesia kemudian kupas secara singkat.
 - Gunakan LaTeX $...$ untuk notasi matematika/sains.
 - Jika menemukan ketidakkonsistenan pada solution basis, jangan mengarang; nyatakan bahwa
   solusi perlu diverifikasi ulang.
