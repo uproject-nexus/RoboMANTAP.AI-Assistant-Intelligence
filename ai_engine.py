@@ -25,7 +25,7 @@ QUIZ_MODELS = ("gemini-3.5-flash-lite", "gemini-2.5-flash")
 # Model khusus interaksi LIVE: prioritaskan latency rendah.
 STREAM_MODELS = ("gemini-3.5-flash-lite", "gemini-2.5-flash-lite")
 
-STREAM_HINT_MAX_TOKENS = 500
+STREAM_HINT_MAX_TOKENS = 900
 STREAM_SOLUTION_MAX_TOKENS = 900
 STREAM_TIMEOUT_MS = 90_000
 
