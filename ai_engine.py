@@ -118,7 +118,7 @@ def _stream_from_clients(prompt: str, max_output_tokens: int):
     clients = get_gemini_clients()
 
     if not clients:
-        yield "⚠️ Tidak ada koneksi yang aktif nih. Aku periksa server dulu ya.."
+        yield "⚠️ Tidak ada koneksi yang aktif nih. Coba Kamu klik lagi.."
         return
 
     for client in clients:
@@ -150,7 +150,7 @@ def _stream_from_clients(prompt: str, max_output_tokens: int):
 
     yield (
         "⚠️ Maaf ya, koneksi sedang bermasalah atau kuota sedang penuh nih. "
-        "Silakan coba kembali beberapa saat lagi."
+        "Silakan coba klik lagi ya!"
     )
 
 
@@ -293,7 +293,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
 
     if not raw_response:
-        st.error("⚠️ Waduh kuota sedang penuh nih. Silakan coba beberapa saat lagi ya...")
+        st.error("⚠️ Waduh kuota sedang penuh nih. Silakan coba klik lagi ya...")
         return []
 
     try:
