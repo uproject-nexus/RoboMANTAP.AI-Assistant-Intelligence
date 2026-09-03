@@ -25,7 +25,7 @@ QUIZ_MODELS = ("gemini-3.5-flash-lite", "gemini-2.5-flash")
 # Model khusus interaksi LIVE: prioritaskan latency rendah.
 STREAM_MODELS = ("gemini-3.5-flash-lite", "gemini-2.5-flash-lite")
 
-STREAM_HINT_MAX_TOKENS = 320
+STREAM_HINT_MAX_TOKENS = 500
 STREAM_SOLUTION_MAX_TOKENS = 900
 STREAM_TIMEOUT_MS = 90_000
 
@@ -78,7 +78,7 @@ def _stream_config(model_name: str, max_output_tokens: int):
     )
 
 
-def _buffer_stream_text(source, min_chars: int = 28, flush_seconds: float = 0.06):
+def _buffer_stream_text(source, min_chars: int = 12, flush_seconds: float = 0.04):
     """
     Menggabungkan chunk API yang sangat kecil sebelum dikirim ke Streamlit.
     Tujuannya mengurangi frekuensi update UI, bukan mengubah token API.
