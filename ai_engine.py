@@ -18,15 +18,31 @@ elif os.getenv("GEMINI_API_KEY"):
 if not api_keys:
     raise ValueError("GEMINI_API_KEYS tidak ditemukan. Pastikan Secrets sudah dikonfigurasi.")
 
-# Fokus ke model paling kencang agar tidak ada jeda retry yang bikin lemot
-# Model untuk pembuatan soal
-QUIZ_MODELS = ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
+# ============================================================================
+# MODEL ROUTING
+# ============================================================================
+QUIZ_PRIMARY_MODEL = "gemini-3.5-flash-lite"
+QUIZ_FALLBACK_MODEL = "gemini-3.1-flash-lite"
 
-# Model khusus interaksi LIVE: prioritaskan latency rendah.
-STREAM_MODELS = ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
+VERIFIER_PRIMARY_MODEL = "gemini-3.5-flash-lite"
+VERIFIER_FALLBACK_MODEL = "gemini-3.1-flash-lite"
 
-STREAM_HINT_MAX_TOKENS = 1200
-STREAM_SOLUTION_MAX_TOKENS = 2500
+HINT_PRIMARY_MODEL = "gemini-3.1-flash-lite"
+HINT_FALLBACK_MODEL = "gemini-3.5-flash-lite"
+
+SOLUTION_PRIMARY_MODEL = "gemini-3.5-flash-lite"
+SOLUTION_FALLBACK_MODEL = "gemini-3.1-flash-lite"
+
+# Thinking disesuaikan berdasarkan fungsi.
+QUIZ_THINKING_LEVEL = "medium"
+VERIFIER_THINKING_LEVEL = "high"
+HINT_THINKING_LEVEL = "minimal"
+SOLUTION_THINKING_LEVEL = "medium"
+
+STREAM_HINT_MAX_TOKENS = 500
+STREAM_SOLUTION_MAX_TOKENS = 1400
+QUIZ_MAX_OUTPUT_TOKENS = 7000
+VERIFIER_MAX_OUTPUT_TOKENS = 3500
 STREAM_TIMEOUT_MS = 90_000
 
 
@@ -55,34 +71,23 @@ def get_gemini_clients():
     return clients
 
 
-def _stream_config(model_name: str, max_output_tokens: int):
-    """
-    Konfigurasi live untuk meminimalkan time-to-first-token.
-    Gemini 3.x: thinking minimal.
-    Gemini 2.5 Flash-Lite: thinking dimatikan.
-    """
-    if model_name.startswith("gemini-3."):
-        return types.GenerateContentConfig(
-            max_output_tokens=max_output_tokens,
-            thinking_config=types.ThinkingConfig(
-                thinking_level="minimal"
-            ),
+def _make_generation_config(
+    *,
+    max_output_tokens: int,
+    thinking_level: str | None = None,
+    response_mime_type: str | None = None,
+):
+    kwargs = {"max_output_tokens": max_output_tokens}
+    if response_mime_type:
+        kwargs["response_mime_type"] = response_mime_type
+    if thinking_level:
+        kwargs["thinking_config"] = types.ThinkingConfig(
+            thinking_level=thinking_level
         )
-
-    return types.GenerateContentConfig(
-        max_output_tokens=max_output_tokens,
-        thinking_config=types.ThinkingConfig(
-            thinking_budget=0,
-            include_thoughts=False,
-        ),
-    )
+    return types.GenerateContentConfig(**kwargs)
 
 
 def _buffer_stream_text(source, min_chars: int = 12, flush_seconds: float = 0.04):
-    """
-    Menggabungkan chunk API yang sangat kecil sebelum dikirim ke Streamlit.
-    Tujuannya mengurangi frekuensi update UI, bukan mengubah token API.
-    """
     import time
 
     buffer = []
@@ -107,52 +112,73 @@ def _buffer_stream_text(source, min_chars: int = 12, flush_seconds: float = 0.04
         yield "".join(buffer)
 
 
-def _stream_from_clients(prompt: str, max_output_tokens: int):
+def _stream_from_clients(
+    prompt: str,
+    max_output_tokens: int,
+    primary_model: str,
+    fallback_model: str,
+    thinking_level: str,
+):
     """
-    Streaming:
-    - client reuse
+    Streaming aman:
+    - client di-cache
     - retry internal SDK = 1 attempt
-    - fallback hanya saat request/model benar-benar gagal
-    - chunk dibuffer agar rendering lebih smooth
+    - fallback hanya SEBELUM token pertama benar-benar diterima
+    - setelah token pertama diterima, error tidak boleh pindah model
     """
     clients = get_gemini_clients()
 
     if not clients:
-        yield "⚠️ Tidak ada koneksi yang aktif nih. Aku periksa server dulu ya.."
+        yield "⚠️ Tidak ada koneksi AI yang aktif. Periksa API key/server."
         return
 
+    models = (primary_model, fallback_model)
+
     for client in clients:
-        for model_name in STREAM_MODELS:
+        for model_name in models:
+            emitted_any_text = False
+
             try:
                 response = client.models.generate_content_stream(
                     model=model_name,
                     contents=prompt,
-                    config=_stream_config(model_name, max_output_tokens),
+                    config=_make_generation_config(
+                        max_output_tokens=max_output_tokens,
+                        thinking_level=thinking_level,
+                    ),
                 )
 
-                emitted = False
-
                 def raw_stream():
+                    nonlocal emitted_any_text
                     for chunk in response:
                         chunk_text = getattr(chunk, "text", None)
                         if chunk_text:
+                            emitted_any_text = True
                             yield chunk_text
 
                 for piece in _buffer_stream_text(raw_stream()):
-                    emitted = True
                     yield piece
 
-                if emitted:
-                    return
+                # Stream selesai normal. Jangan panggil model lain.
+                return
 
             except Exception:
+                # Jika sudah pernah menerima teks, JANGAN mencampur output
+                # dengan model lain. Akhiri stream secara eksplisit.
+                if emitted_any_text:
+                    yield (
+                        "\n\n⚠️ Koneksi AI terputus sebelum jawaban selesai. "
+                        "Silakan klik kembali untuk meminta ulang."
+                    )
+                    return
+
+                # Belum ada output -> aman fallback.
                 continue
 
     yield (
-        "⚠️ Maaf ya, koneksi sedang bermasalah atau kuota sedang penuh nih. "
+        "⚠️ Maaf, AI belum dapat merespons pada percobaan ini. "
         "Silakan coba kembali beberapa saat lagi."
     )
-
 
 def format_latex_options(options):
     formatted = []
@@ -191,53 +217,143 @@ def clean_json_text(text: str) -> str:
 
     return re.sub(r'\\"|\\\\|\\', fix_slash, text)
 
-def call_gemini_with_rotation(prompt: str, is_json: bool = False):
-    """
-    Non-stream request dengan client yang sudah di-cache.
-    Retry internal dimatikan supaya fallback tidak menambah jeda tersembunyi.
-    """
+def _call_json_model(
+    prompt: str,
+    models: tuple[str, ...],
+    thinking_level: str,
+    max_output_tokens: int,
+):
     clients = get_gemini_clients()
     if not clients:
         return None
 
     for client in clients:
-        for model_name in QUIZ_MODELS:
+        for model_name in models:
             try:
-                config_kwargs = {}
-
-                if is_json:
-                    config_kwargs["response_mime_type"] = "application/json"
-
-                if model_name.startswith("gemini-3."):
-                    config_kwargs["thinking_config"] = types.ThinkingConfig(
-                        thinking_level="minimal"
-                    )
-                else:
-                    config_kwargs["thinking_config"] = types.ThinkingConfig(
-                        thinking_budget=0,
-                        include_thoughts=False,
-                    )
-
                 response = client.models.generate_content(
                     model=model_name,
                     contents=prompt,
-                    config=types.GenerateContentConfig(**config_kwargs),
+                    config=_make_generation_config(
+                        max_output_tokens=max_output_tokens,
+                        thinking_level=thinking_level,
+                        response_mime_type="application/json",
+                    ),
                 )
-
                 if response.text:
                     return response.text
-
             except Exception:
                 continue
-
     return None
 
-def stream_ai_text(prompt: str, max_output_tokens: int = STREAM_HINT_MAX_TOKENS):
-    """Generator sinkron yang kompatibel langsung dengan st.write_stream()."""
+
+def call_gemini_with_rotation(prompt: str, is_json: bool = False):
+    if not is_json:
+        return None
+    return _call_json_model(
+        prompt,
+        (QUIZ_PRIMARY_MODEL, QUIZ_FALLBACK_MODEL),
+        QUIZ_THINKING_LEVEL,
+        QUIZ_MAX_OUTPUT_TOKENS,
+    )
+
+
+def _verify_quiz_batch(quiz_list: list, jenjang: str, mapel: str, stage: str) -> list:
+    if len(quiz_list) != 5:
+        return []
+
+    verifier_payload = []
+    for q in quiz_list:
+        verifier_payload.append({
+            "id": q.get("id"),
+            "question": q.get("question", ""),
+            "options": q.get("options", []),
+            "correct_answer": q.get("correct_answer", ""),
+            "solution_basis": q.get("solution_basis", ""),
+        })
+
+    prompt = f"""
+Anda adalah VERIFIER AKADEMIK untuk sistem pembinaan Olimpiade tingkat nasional.
+
+Jenjang: {jenjang}
+Bidang: {mapel}
+Tahap: {stage}
+
+Tugas: verifikasi SEMUA 5 soal berikut. Untuk setiap soal, periksa secara independen:
+1. Apakah soal memiliki hanya satu jawaban yang benar.
+2. Apakah correct_answer benar-benar didukung oleh perhitungan/logika.
+3. Apakah solution_basis konsisten dengan soal dan opsi.
+4. Tidak boleh menganggap kunci generator benar hanya karena diberi label 'correct_answer'.
+5. Jika salah, tandai invalid. JANGAN memperbaiki soal; hanya verifikasi.
+
+Kembalikan JSON murni:
+{{
+  "results": [
+    {{
+      "id": 1,
+      "valid": true,
+      "verified_answer": "C. ...",
+      "reason": "alasan verifikasi singkat"
+    }}
+  ],
+  "batch_valid": true
+}}
+
+DATA SOAL:
+{json.dumps(verifier_payload, ensure_ascii=False)}
+"""
+
+    raw = _call_json_model(
+        prompt,
+        (VERIFIER_PRIMARY_MODEL, VERIFIER_FALLBACK_MODEL),
+        VERIFIER_THINKING_LEVEL,
+        VERIFIER_MAX_OUTPUT_TOKENS,
+    )
+    if not raw:
+        return []
+
+    try:
+        data = json.loads(clean_json_text(raw), strict=False)
+        results = {str(x.get("id")): x for x in data.get("results", [])}
+
+        if not data.get("batch_valid", False):
+            return []
+
+        verified = []
+        for q in quiz_list:
+            r = results.get(str(q.get("id")))
+            if not r or not r.get("valid"):
+                return []
+
+            # Kunci yang terverifikasi harus sama dengan kunci generator.
+            if r.get("verified_answer") != q.get("correct_answer"):
+                return []
+
+            q["verification"] = {
+                "valid": True,
+                "reason": r.get("reason", "Terverifikasi oleh verifier."),
+            }
+            verified.append(q)
+
+        return verified
+    except Exception:
+        return []
+
+
+def stream_ai_text(
+    prompt: str,
+    max_output_tokens: int = STREAM_HINT_MAX_TOKENS,
+    primary_model: str = HINT_PRIMARY_MODEL,
+    fallback_model: str = HINT_FALLBACK_MODEL,
+    thinking_level: str = HINT_THINKING_LEVEL,
+):
     yield from _stream_from_clients(
         prompt,
         max_output_tokens=max_output_tokens,
+        primary_model=primary_model,
+        fallback_model=fallback_model,
+        thinking_level=thinking_level,
     )
+
 
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
@@ -273,7 +389,9 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     - Jangan pernah membuat lebih dari 2 soal berbahasa Arab dalam satu paket kuis.
 
     ATURAN KHUSUS FORMATTING & KECEPATAN:
-    - JANGAN sertakan field `hint` atau `solution` di sini. Fokus saja merancang 5 teks soal cerita dan jawaban agar proses AI kencang.
+    - WAJIB sertakan field `solution_basis` untuk setiap soal.
+- `solution_basis` adalah penyelesaian ringkas yang mendukung kunci jawaban, termasuk perhitungan inti bila ada.
+- Jangan sertakan `hint` siswa di sini.
     - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
     - Semua backslash LaTeX wajib ditulis ganda '\\\\'.
 
@@ -284,7 +402,8 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
                 "id": 1,
                 "question": "Teks soal cerita nomor 1 lengkap dan mendalam",
                 "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-                "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi)"
+                "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi)",
+                "solution_basis": "Dasar penyelesaian terverifikasi, ringkas tetapi cukup untuk memeriksa kunci."
             }}
         ]
     }}
@@ -298,9 +417,12 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     try:
         cleaned_response = clean_json_text(raw_response)
-        # WAJIB strict=False untuk keamanan maksimal dari karakter escape
         data = json.loads(cleaned_response, strict=False)
         quiz_list = data.get("quiz", [])
+
+        if len(quiz_list) != 5:
+            return []
+
         for q in quiz_list:
             if "options" in q:
                 q["options"] = format_latex_options(q["options"])
@@ -309,9 +431,19 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
                     if opt.startswith(q["correct_answer"][:2]):
                         q["correct_answer"] = opt
                         break
-        return quiz_list
+            if not q.get("solution_basis"):
+                return []
+
+        # Jangan kirim soal yang belum lolos verifier ke siswa.
+        verified_quiz = _verify_quiz_batch(
+            quiz_list,
+            jenjang,
+            mapel,
+            stage,
+        )
+        return verified_quiz
     except Exception as e:
-        st.error(f"Gagal memproses format soal: {e}")
+        st.error(f"Gagal memproses / memverifikasi soal: {e}")
         return []
 
 def get_ai_hint_stream(question: str, user_attempt: str, mapel: str = "Umum"):
@@ -332,29 +464,58 @@ def get_ai_hint_stream(question: str, user_attempt: str, mapel: str = "Umum"):
     - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini secara natural, runtut, dan analitis step-by-step tanpa membocorkan jawaban akhir.
     - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains.
     """
-    return stream_ai_text(prompt, max_output_tokens=STREAM_HINT_MAX_TOKENS)
+    return stream_ai_text(
+        prompt,
+        max_output_tokens=STREAM_HINT_MAX_TOKENS,
+        primary_model=HINT_PRIMARY_MODEL,
+        fallback_model=HINT_FALLBACK_MODEL,
+        thinking_level=HINT_THINKING_LEVEL,
+    )
 
-def get_ai_solution_stream(question: str, correct_answer: str, mapel: str = "Umum"):
+def get_ai_solution_stream(
+    question: str,
+    correct_answer: str,
+    solution_basis: str,
+    mapel: str = "Umum",
+):
     """
-    Menyusun prompt pembahasan rinci dan langsung melemparnya ke generator stream.
+    Pembahasan menjelaskan SOLUSI YANG SUDAH DIVERIFIKASI.
+    AI tidak diberi kewenangan untuk mengganti kunci.
     """
     prompt = f"""
-    Kamu adalah Pembina OMI 2026. Berikan pembahasan komprehensif, runtut, dan analitis step-by-step untuk soal berikut.
+Kamu adalah Pembina OMI 2026 untuk tingkat Olimpiade Nasional.
 
-    Bidang: {mapel}
-    Soal:
-    {question}
+Tugasmu adalah menjelaskan solusi yang SUDAH DIVERIFIKASI, bukan menyelesaikan ulang
+soal dengan jawaban baru.
 
-    Kunci Jawaban yang Benar: {correct_answer}
+Bidang: {mapel}
 
-    Instruksi Pembahasan:
-    - Jangan berikan salam pembuka yang berlebihan.
-    - Jelaskan secara natural, tajam, dan edukatif mengapa jawaban tersebut benar.
-    - Jika ada unsur Bahasa Arab, terjemahkan atau kupas secara singkat.
-    - Jika ada hitungan, tunjukkan proses rumusnya dengan jelas.
-    - WAJIB gunakan format LaTeX $...$ untuk semua notasi matematika/simbol fisika-kimia.
-    """
-    return stream_ai_text(prompt, max_output_tokens=STREAM_SOLUTION_MAX_TOKENS)
+SOAL:
+{question}
 
-#baru ini yg terakhir baru
-#baru ini yg terakhir baru
+KUNCI YANG SUDAH DIVERIFIKASI:
+{correct_answer}
+
+SOLUTION BASIS YANG SUDAH DIVERIFIKASI:
+{solution_basis}
+
+ATURAN MUTLAK:
+- Kunci jawaban harus tetap persis: {correct_answer}
+- Jangan memilih opsi lain.
+- Jangan membuat metode baru yang mengubah hasil solution basis.
+- Jelaskan langkah demi langkah secara pedagogis dan analitis.
+- Jika ada hitungan, tampilkan rumus dan substitusinya dengan jelas.
+- Jika ada Bahasa Arab, jelaskan arti/unsur bahasanya secara singkat.
+- Gunakan LaTeX $...$ untuk notasi matematika/sains.
+- Jika menemukan ketidakkonsistenan pada solution basis, jangan mengarang; nyatakan bahwa
+  solusi perlu diverifikasi ulang.
+- Jangan berikan salam pembuka panjang.
+"""
+
+    return stream_ai_text(
+        prompt,
+        max_output_tokens=STREAM_SOLUTION_MAX_TOKENS,
+        primary_model=SOLUTION_PRIMARY_MODEL,
+        fallback_model=SOLUTION_FALLBACK_MODEL,
+        thinking_level=SOLUTION_THINKING_LEVEL,
+    )
