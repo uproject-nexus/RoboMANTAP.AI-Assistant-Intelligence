@@ -65,7 +65,7 @@ def _stream_config(model_name: str, max_output_tokens: int):
         return types.GenerateContentConfig(
             max_output_tokens=max_output_tokens,
             thinking_config=types.ThinkingConfig(
-                thinking_level="medium"
+                thinking_level="high"
             ),
         )
 
@@ -210,7 +210,7 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
 
                 if model_name.startswith("gemini-3."):
                     config_kwargs["thinking_config"] = types.ThinkingConfig(
-                        thinking_level="medium"
+                        thinking_level="high"
                     )
                 else:
                     config_kwargs["thinking_config"] = types.ThinkingConfig(
