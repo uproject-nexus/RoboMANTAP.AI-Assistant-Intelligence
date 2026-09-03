@@ -320,7 +320,7 @@ def get_ai_hint_stream(question: str, user_attempt: str, mapel: str = "Umum"):
     """
     prompt = f"""
     Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
-    Gunakan gaya bahasa menyapa 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
+    Gunakan gaya bahasa memberi sapaan 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
 
     Mata Pelajaran: {mapel}
     Soal OMI: {question}
