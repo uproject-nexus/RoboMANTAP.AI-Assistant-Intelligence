@@ -20,10 +20,10 @@ if not api_keys:
 
 # Fokus ke model paling kencang agar tidak ada jeda retry yang bikin lemot
 # Model untuk pembuatan soal
-QUIZ_MODELS = ("gemini-3.5-flash-lite", "gemini-2.5-flash")
+QUIZ_MODELS = ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
 
 # Model khusus interaksi LIVE: prioritaskan latency rendah.
-STREAM_MODELS = ("gemini-3.5-flash-lite", "gemini-2.5-flash-lite")
+STREAM_MODELS = ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
 
 STREAM_HINT_MAX_TOKENS = 1200
 STREAM_SOLUTION_MAX_TOKENS = 2500
@@ -212,7 +212,7 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
                     config_kwargs["thinking_config"] = types.ThinkingConfig(
                         thinking_level="minimal"
                     )
-                elif model_name == "gemini-2.5-flash":
+                else:
                     config_kwargs["thinking_config"] = types.ThinkingConfig(
                         thinking_budget=0,
                         include_thoughts=False,
