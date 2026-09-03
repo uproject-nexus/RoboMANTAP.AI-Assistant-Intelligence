@@ -329,7 +329,7 @@ def get_ai_hint_stream(question: str, user_attempt: str, mapel: str = "Umum"):
     Instruksi:
     - Jangan berikan salam pembuka yang berlebihan.
     - Berikan petunjuk atau bimbingan logika interaktif yang menyemangati dan memuji usaha siswa.
-    - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini secara natural tanpa membocorkan jawaban akhir.
+    - Bantu siswa menemukan celah penyelesaian soal bidang {mapel} ini secara natural, runtut, dan analitis step-by-step tanpa membocorkan jawaban akhir.
     - Gunakan format LaTeX $...$ HANYA jika terdapat notasi matematika/sains.
     """
     return stream_ai_text(prompt, max_output_tokens=STREAM_HINT_MAX_TOKENS)
