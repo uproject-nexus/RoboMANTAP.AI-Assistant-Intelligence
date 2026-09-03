@@ -78,7 +78,7 @@ def _stream_config(model_name: str, max_output_tokens: int):
     )
 
 
-def _buffer_stream_text(source, min_chars: int = 12, flush_seconds: float = 0.04):
+def _buffer_stream_text(source, min_chars: int = 2, flush_seconds: float = 0.01):
     """
     Menggabungkan chunk API yang sangat kecil sebelum dikirim ke Streamlit.
     Tujuannya mengurangi frekuensi update UI, bukan mengubah token API.
