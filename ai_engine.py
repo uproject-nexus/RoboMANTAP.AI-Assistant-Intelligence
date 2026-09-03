@@ -355,3 +355,6 @@ def get_ai_solution_stream(question: str, correct_answer: str, mapel: str = "Umu
     - WAJIB gunakan format LaTeX $...$ untuk semua notasi matematika/simbol fisika-kimia.
     """
     return stream_ai_text(prompt, max_output_tokens=STREAM_SOLUTION_MAX_TOKENS)
+
+#baru ini yg terakhir baru
+#baru ini yg terakhir baru
