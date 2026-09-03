@@ -529,8 +529,8 @@ elif st.session_state.page == "result":
                         get_ai_solution_stream(
                             q["question"],
                             q["correct_answer"],
-                            solution_basis,
-                            st.session_state.mapel,
+                            mapel=st.session_state.mapel,
+                            solution_basis=solution_basis,
                         ),
                         cursor="▌",
                     )
