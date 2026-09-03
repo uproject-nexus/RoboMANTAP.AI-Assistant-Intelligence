@@ -329,9 +329,6 @@ elif st.session_state.page == "setup":
                     st.session_state.quiz_data = quiz
                     st.session_state.user_answers = {}
                     st.session_state.current_index = 0
-                    # Cache AI harus selalu bersih untuk paket soal baru.
-                    st.session_state.ai_hint_cache = {}
-                    st.session_state.ai_solution_cache = {}
                     st.session_state.page = "quiz"
                     st.rerun()
                 else:
@@ -505,13 +502,11 @@ elif st.session_state.page == "result":
             st.write("---")
             
             # Cache pembahasan per soal. Sekali sukses dibuat, tampilkan instan pada rerun berikutnya.
-            solution_basis = q.get("solution_basis", "")
             solution_key = (
                 st.session_state.mapel,
                 idx,
                 q["question"],
                 q["correct_answer"],
-                solution_basis,
             )
 
             if solution_key in st.session_state.ai_solution_cache:
@@ -529,11 +524,13 @@ elif st.session_state.page == "result":
                         get_ai_solution_stream(
                             q["question"],
                             q["correct_answer"],
-                            mapel=st.session_state.mapel,
-                            solution_basis=solution_basis,
+                            st.session_state.mapel,
                         ),
                         cursor="▌",
                     )
 
                     if streamed_solution and "⚠️" not in str(streamed_solution):
                         st.session_state.ai_solution_cache[solution_key] = str(streamed_solution)
+
+#baru ini yg terakhir baru app.py
+#baru ini yg terakhir baru
