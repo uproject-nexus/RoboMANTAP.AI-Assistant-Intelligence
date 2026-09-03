@@ -382,8 +382,8 @@ elif st.session_state.page == "quiz":
                 st.rerun()
 
     # Expander Hint dengan Live Streaming Text
-    with st.expander("Kamu bingung? Konsultasi di sini sama aku, RoboMANTAP!"):
-        st.caption("Tulis ide atau pemahaman awal kamu, dan RoboMANTAP akan membalas dengan mengetik petunjuk secara real-time!")
+    with st.expander("Kamu bingung? Konsultasi di sini sama aku, RoboMANTAP! 🧕🏼"):
+        st.caption("Fungsi kolom ini: Tulis ide awal atau rumus yang mau kamu coba, nanti RoboMANTAP bakal kasih petunjuk jalan keluarnya tanpa langsung bocorin jawaban!")
         
         attempt_input = st.text_input(
             "Gagasan / Ide Logika Kamu apa coba?:",
