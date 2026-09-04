@@ -161,15 +161,19 @@ def format_latex_options(options):
     return formatted
 
 def clean_json_text(text: str) -> str:
-    """Membersihkan string JSON murni dari pemungkus markdown."""
+    """Membersihkan string JSON dari pemungkus markdown dan mengamankan backslash LaTeX."""
     if not text:
         return ""
     
     text = text.strip()
+    # Hapus pemungkus markdown ```json jika ada
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\n?", "", text, flags=re.IGNORECASE)
         text = re.sub(r"\n?```$", "", text)
         text = text.strip()
+
+    # Ubah backslash LaTeX tunggal menjadi double backslash \\ agar json.loads tidak error
+    text = re.sub(r'\\(?![\\"])', r'\\\\', text)
 
     return text
 
