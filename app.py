@@ -332,7 +332,7 @@ def create_lkpd_docx_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png
     p_meta.add_run(f"• Mata Pelajaran\t: {mapel}\n").bold = True
     p_meta.add_run(f"• Kelas / Jenjang\t: {kelas}\n").bold = True
     p_meta.add_run(f"• Topik Utama\t: {topik}\n").bold = True
-    p_meta.add_run(f"• Nama/Kelompok : ...........................................................")
+    p_meta.add_run(f"• Nama/Kelompok : ............................../.............................")
 
     doc.add_paragraph() # Spacing
 
@@ -630,11 +630,11 @@ elif st.session_state.page == "guru_dashboard":
                         # Buat File Word berlogo di Memory
                         docx_buffer = create_lkpd_docx_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
                         
-                        st.success("✅ Dokumen LKPD (.docx) Berhasil Dibuat!")
+                        st.success("✅ Dokumen LKPD Berhasil Dibuat!")
                         
                         # Tombol Unduh Dokumen Word (.docx)
                         st.download_button(
-                            label="📥 Download Dokumen LKPD (.docx)",
+                            label="📥 Download LKPD",
                             data=docx_buffer,
                             file_name=f"LKPD_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}_RoboMANTAP.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
