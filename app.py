@@ -267,45 +267,48 @@ def create_lkpd_docx_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png
     Membuat file Word (.docx) Interaktif, Berwarna, Elegan khas Al-Irsyad Bondowoso.
     """
     doc = Document()
-
-    # Set Margin Halaman
+    # Margin Halaman (0.8 Inci)
     for section in doc.sections:
-        section.top_margin = Inches(0.6)
-        section.bottom_margin = Inches(0.6)
-        section.left_margin = Inches(0.6)
-        section.right_margin = Inches(0.6)
+        section.top_margin = Inches(0.8)
+        section.bottom_margin = Inches(0.8)
+        section.left_margin = Inches(0.8)
+        section.right_margin = Inches(0.8)
 
-    # --------------------------------------------------------------------------
-    # 1. KOP SURAT BERLOGO (ELEGAN)
-    # --------------------------------------------------------------------------
-    table_kop = doc.add_table(rows=1, cols=2)
-    table_kop.alignment = WD_TABLE_ALIGNMENT.CENTER
-    table_kop.columns[0].width = Inches(1.1)
-    table_kop.columns[1].width = Inches(5.4)
-
-    # Logo Sekolah
-    if os.path.exists(logo_path):
-        p_logo = table_kop.cell(0, 0).paragraphs[0]
-        p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p_logo.add_run().add_picture(logo_path, width=Inches(0.95))
-
-    # Teks Kop
-    p_text = table_kop.cell(0, 1).paragraphs[0]
-    p_text.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # Tabel Kop Surat (2 Kolom: Logo di Kiri, Teks di Kanan)
+    table = doc.add_table(rows=1, cols=2)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
     
-    r1 = p_text.add_run("LEMBAR KERJA PESERTA DIDIK (LKPD) INTERAKTIF\n")
+    table.columns[0].width = Inches(1.2)
+    table.columns[1].width = Inches(5.3)
+
+    cell_logo = table.cell(0, 0)
+    cell_text = table.cell(0, 1)
+
+    # 1. Sisipkan Logo
+    if os.path.exists(logo_path):
+        p_logo = cell_logo.paragraphs[0]
+        p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run_logo = p_logo.add_run()
+        run_logo.add_picture(logo_path, width=Inches(1.0))
+
+    # 2. Sisipkan Teks Kop
+    p_text = cell_text.paragraphs[0]
+    p_text.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    r1 = p_text.add_run("LEMBAR KERJA PESERTA DIDIK (LKPD)\n")
     r1.bold = True
     r1.font.size = Pt(13)
     r1.font.color.rgb = RGBColor(5, 150, 105) # Emerald Green
 
     r2 = p_text.add_run("Madrasah Aliyah dan Tsanawiyah Al-Irsyad Al-Islamiyah Putri Bondowoso\n")
     r2.bold = True
-    r2.font.size = Pt(10)
-    
-    r3 = p_text.add_run("Model Pembelajaran HOTS & Integrasi Nilai Keislaman")
+    r2.font.size = Pt(11)
+
+    r3 = p_text.add_run("Tahun Ajaran:...../.....")
     r3.italic = True
-    r3.font.size = Pt(8.5)
-    r3.font.color.rgb = RGBColor(100, 100, 100)
+    r3.font.size = Pt(9)
+    r3.font.color.rgb = RGBColor(120, 120, 120)
 
     doc.add_paragraph("―" * 58)
 
