@@ -298,7 +298,7 @@ elif st.session_state.page == "guru_login":
     st.subheader("🔒 Akses Portal GuruMANTAP")
 
     st.markdown("""
-    <div style="background-color: rgba(28, 131, 225, 0.1); border-left: 4px solid #1c83e1; padding: 10px 12px; border-radius: 6px; font-size: 12px; color: var(--text-color); margin-bottom: 15px;">
+    <div style="background-color: rgba(28, 131, 225, 0.1); border-left: 4px solid #1c83e1; padding: 10px 12px; border-radius: 6px; font-size: 11px; color: var(--text-color); margin-bottom: 15px;">
         Fitur ini dilindungi PIN untuk menjaga kerahasiaan nilai siswa dan soal CBT.
     </div>
     """, unsafe_allow_html=True)
