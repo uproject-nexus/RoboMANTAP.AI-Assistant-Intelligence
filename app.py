@@ -605,7 +605,7 @@ elif st.session_state.page == "guru_dashboard":
         st.markdown("""
         <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 12px; border-radius: 10px; border: 1px solid #059669; color: white; margin-bottom: 12px;">
             <div style="font-size: 14px; font-weight: 700;">📄 Generator LKPD</div>
-            <div style="font-size: 11px; opacity: 0.85; margin-top: 2px;">Terintegrasi AI By U.Project Nexus & Format menyesuaikan Madrasah Al-Irsyad Al-Islamiyah Putri Bondowoso</div>
+            <div style="font-size: 11px; opacity: 0.85; margin-top: 2px;">Terintegrasi AI By U.Project Nexus dengan format menyesuaikan sekolah</div>
         </div>
         """, unsafe_allow_html=True)
 
