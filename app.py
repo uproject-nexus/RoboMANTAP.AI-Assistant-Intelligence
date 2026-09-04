@@ -498,7 +498,7 @@ elif st.session_state.page == "result":
         
         with st.expander(f"Soal No. {idx + 1} [{status_icon}] - Jawaban Anda: {u_ans}"):
             st.markdown(f"**Soal:**\n{q['question']}")
-            st.markdown(f"**Kunci Jawaban:** `{q['correct_answer']}`")
+            st.markdown(f"**Kunci Jawaban:** {q['correct_answer']}")
             st.write("---")
             
             # Cache pembahasan per soal. Sekali sukses dibuat, tampilkan instan pada rerun berikutnya.
