@@ -317,7 +317,7 @@ elif st.session_state.page == "guru_dashboard":
         st.warning("Akses Ditolak.")
         st.stop()
 
-    st.markdown("## 🖥️ Dashboard GuruMANTAP")
+    st.markdown("<p style='font-size: 22px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
     tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕🏼 Bank Soal", "📲 WA Automation"])
 
     with tab1:
