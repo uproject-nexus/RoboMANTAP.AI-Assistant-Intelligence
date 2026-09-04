@@ -430,9 +430,9 @@ elif st.session_state.page == "select_mapel":
 # ==============================================================================
 elif st.session_state.page == "setup":
     st.markdown(f"""
-    <div style="font-size: 25px; font-weight: bold; line-height: 1.4; margin-bottom: 10px;">
-        ⚙️ Setup CBT:<br>
-        <span style="font-size: 18px; color: #059669; font-weight: 600;">
+    <div style="font-size: 22px; font-weight: bold; line-height: 1.4; margin-bottom: 10px;">
+        ⚙️ Persiapan CBT:<br>
+        <span style="font-size: 16px; color: #059669; font-weight: 600;">
             {st.session_state.mapel} ({st.session_state.jenjang})
         </span>
     </div>
