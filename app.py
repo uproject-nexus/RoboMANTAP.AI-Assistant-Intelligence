@@ -43,7 +43,7 @@ components.html(
     height=0,
 )
 
-# Custom Styling
+# Custom Styling (Dari Kode Awal - Dipertahankan 100%)
 st.markdown("""
     <style>
     .mode-card {
@@ -75,18 +75,30 @@ st.markdown("""
     .school-title { color: #ffffff; font-weight: 800; font-size: 13px; margin: 0; }
     .school-subtitle { color: #6ee7b7; font-size: 11px; margin-top: 4px; font-weight: 500; }
     .stButton>button { width: 100%; min-height: 48px; font-size: 16px !important; border-radius: 8px !important; }
-    div.stButton > button[kind="primary"] {
+    
+    /* Paksa Warna Tombol Utama Menjadi Hijau Emerald MANTAP */
+    div.stButton > button[kind="primary"],
+    div.stButton > button {
         background-color: #059669 !important;
         background-image: none !important;
         color: #ffffff !important;
         border: 1px solid #047857 !important;
+        width: 100%;
+        min-height: 48px;
+        font-size: 16px !important;
         font-weight: 600 !important;
+        border-radius: 8px !important;
         transition: all 0.3s ease;
     }
-    div.stButton > button[kind="primary"]:hover {
+    
+    /* Efek Hover Tombol saat Diarahkan Kursor */
+    div.stButton > button[kind="primary"]:hover,
+    div.stButton > button:hover {
         background-color: #047857 !important;
+        border-color: #065f46 !important;
         box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4) !important;
     }
+
     .guru-card {
         background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%);
         color: white;
@@ -128,6 +140,7 @@ if "guru_auth" not in st.session_state: st.session_state.guru_auth = False
 if "ai_hint_cache" not in st.session_state: st.session_state.ai_hint_cache = {}
 if "ai_solution_cache" not in st.session_state: st.session_state.ai_solution_cache = {}
 
+# Database Kisi-Kisi Operasional OMI 2026
 KISI_KISI_OMI = {
     "MTs (Sederajat SMP)": {
         "Matematika": ["Bilangan", "Aljabar", "Aritmetika Sosial", "Geometri", "Peluang", "Statistika", "Perbandingan & Proporsi", "Problem Solving", "Konteks OMI (Keislaman & Sains)"],
@@ -144,7 +157,7 @@ KISI_KISI_OMI = {
     }
 }
 
-# Header Utama (Ditampilkan di semua page kecuali dashboard guru fullscreen jika diperlukan, tapi kita biarkan untuk branding)
+# Header Utama
 st.markdown(f"""
 <div class="school-header">
     <div style="text-align: center;">
@@ -184,6 +197,33 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
+        if st.session_state.jenjang and st.session_state.mapel:
+            st.markdown(f"""
+            <div style="background: rgba(5, 150, 105, 0.08); border-left: 4px solid #059669; padding: 10px 12px; border-radius: 6px; margin-bottom: 15px;">
+                <div style="font-size: 10px; opacity: 0.6; text-transform: uppercase; font-weight: 700;">Sesi Aktif</div>
+                <div style="font-size: 12px; font-weight: 700; color: var(--text-color);">{st.session_state.mapel}</div>
+                <div style="font-size: 11px; opacity: 0.8;">{st.session_state.jenjang} • {st.session_state.stage}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div style="background: var(--secondary-background-color); border: 1px solid rgba(128,128,128,0.2); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
+            <div style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 8px;">📋 ATURAN SKORING CBT</div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                <span>✅ Jawaban Benar</span>
+                <b style="color: #059669;">+4 Poin</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                <span>❌ Jawaban Salah</span>
+                <b style="color: #ef4444;">-1 Poin</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                <span>⚪ Tidak Dijawab</span>
+                <b style="opacity: 0.6;">0 Poin</b>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     if st.button("🏠 Kembali ke Beranda Utama", use_container_width=True):
         st.session_state.page = "landing"
         st.session_state.jenjang = None
@@ -192,6 +232,7 @@ with st.sidebar:
         st.rerun()
 
     sidebar_nexus_html = f'<div style="background: #ffffff; padding: 6px 14px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); display: inline-block; margin-bottom: 8px; border: 1px solid rgba(0,0,0,0.05);"><img src="data:image/png;base64,{logo_nexus_b64}" style="height: 42px; max-width: 100%; display: block; margin: 0 auto;"></div>' if logo_nexus_b64 else ''
+    
     st.markdown(f"""
     <div style="text-align: center; margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(128,128,128,0.2);">
         <div style="font-size: 10px; opacity: 0.7; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Engineered by</div>
@@ -204,12 +245,12 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-
 # ==============================================================================
 # 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
 # ==============================================================================
 if st.session_state.page == "landing":
     st.markdown("<h2 style='font-size: 25px; text-align: center;'>🏆 BINA PRESTASI OMI 2026</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
     st.write("---")
 
     st.markdown("#### 🎓 Sesi Siswa (Mulai Latihan CBT)")
@@ -225,6 +266,7 @@ if st.session_state.page == "landing":
             st.session_state.jenjang = "MTs (Sederajat SMP)"
             st.session_state.page = "select_mapel"
             st.rerun()
+
     with col2:
         st.markdown("""
         <div class="mode-card">
@@ -250,7 +292,7 @@ if st.session_state.page == "landing":
         st.rerun()
 
 # ==============================================================================
-# 2. LOGIN GURU
+# 2. LOGIN GURU & DASHBOARD
 # ==============================================================================
 elif st.session_state.page == "guru_login":
     st.subheader("🔒 Akses Portal Guru")
@@ -258,16 +300,13 @@ elif st.session_state.page == "guru_login":
     
     pin_input = st.text_input("Masukkan PIN Akses:", type="password")
     if st.button("Login", type="primary"):
-        if pin_input == "MANTAP2026":  # Password bisa diganti sesuai kebutuhan
+        if pin_input == "MANTAP2026":
             st.session_state.guru_auth = True
             st.session_state.page = "guru_dashboard"
             st.rerun()
         else:
             st.error("PIN Salah. Silakan coba lagi.")
 
-# ==============================================================================
-# 3. PORTAL GURU (DASHBOARD U.PROJECT NEXUS) - Menggunakan st.fragment
-# ==============================================================================
 elif st.session_state.page == "guru_dashboard":
     if not st.session_state.guru_auth:
         st.warning("Akses Ditolak.")
@@ -277,11 +316,11 @@ elif st.session_state.page == "guru_dashboard":
     tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring Sesi Latihan Siswa", "🧕🏼 Bank Soal RoboMANTAP", "📲 WA Automation"])
 
     with tab1:
-        # Fungsi HTML untuk visual bar ala Quizizz
+        # Fungsi HTML untuk visual bar ala Quizizz (Disesuaikan jadi 10 Soal)
         def render_progress_bar_html(detail_list):
             if not isinstance(detail_list, list): return ""
             html = '<div style="display: flex; gap: 4px; align-items: center;">'
-            for i in range(5): # Total soal per kuis = 5
+            for i in range(10): # Total soal per kuis = 10
                 if i < len(detail_list):
                     val = detail_list[i]
                     color = "#10b981" if val is True else ("#ef4444" if val is False else "#d1d5db")
@@ -291,7 +330,7 @@ elif st.session_state.page == "guru_dashboard":
             html += '</div>'
             return html
 
-        # FITUR CANGGIH: Auto-refresh khusus bagian ini setiap 3 detik tanpa refresh satu halaman penuh
+        # Auto-refresh setiap 3 detik
         @st.fragment(run_every="3s")
         def render_live_monitoring():
             conn = init_db_connection()
@@ -327,7 +366,6 @@ elif st.session_state.page == "guru_dashboard":
                         # Render Kotak Hijau/Merah
                         try:
                             detail_list = row['detail_jawaban']
-                            # Tangani konversi string json ke list jika perlu
                             if isinstance(detail_list, str):
                                 import json
                                 detail_list = json.loads(detail_list)
@@ -349,9 +387,8 @@ elif st.session_state.page == "guru_dashboard":
         st.subheader("📲 WhatsApp Integration Engine")
         st.info("Fitur U.Project Nexus untuk Broadcast Hasil Ujian ke Orang Tua dan pembuatan Auto-LKPD via WhatsApp (Tahap Pengembangan Selanjutnya).")
 
-
 # ==============================================================================
-# 4. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
+# 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
 # ==============================================================================
 elif st.session_state.page == "select_mapel":
     st.markdown(f"### 📚 Pilih Bidang OMI 2026 - <span style='color: #059669;'>{st.session_state.jenjang}</span>", unsafe_allow_html=True)
@@ -377,25 +414,26 @@ elif st.session_state.page == "select_mapel":
                 st.rerun()
 
 # ==============================================================================
-# 5. SETUP CBT & BIODATA SISWA
+# 4. SETUP CBT & BIODATA SISWA
 # ==============================================================================
 elif st.session_state.page == "setup":
-    st.markdown(f"### ⚙️ Persiapan CBT: {st.session_state.mapel} ({st.session_state.jenjang})", unsafe_allow_html=True)
+    st.markdown(f"### ⚙️ Setup CBT: {st.session_state.mapel} ({st.session_state.jenjang})", unsafe_allow_html=True)
     if st.button("⬅️ Ganti Mata Pelajaran"):
         st.session_state.page = "select_mapel"
         st.rerun()
 
     st.write("---")
-    
     # Input Biodata Siswa Wajib
     st.markdown("#### 📝 Masukkan Data Diri Kamu")
     st.session_state.nama_siswa = st.text_input("Nama Lengkap:", value=st.session_state.nama_siswa, placeholder="Contoh: Fatimah Az-Zahra")
     st.write("---")
 
     c1, c2 = st.columns([5, 7])
+
     with c1:
         st.subheader("1. Konfigurasi Ujian")
         st.session_state.stage = st.radio("Pilih Tahap Pembinaan:", ["Internal", "Kab/Kota", "Provinsi", "Nasional"])
+        
         available_submateri = KISI_KISI_OMI[st.session_state.jenjang][st.session_state.mapel]
         st.session_state.selected_submateri = st.multiselect(
             "Pilih Submateri (Kosongkan saja ya kalau Kamu Mau pilih Semua Submateri!):",
@@ -407,8 +445,8 @@ elif st.session_state.page == "setup":
     with c2:
         st.subheader("2. Petunjuk CBT RoboMANTAP")
         st.markdown("""
-        * **Jumlah Soal:** TEPAT 5 Soal Pilihan Ganda Terintegrasi per Sesi.
-        * **Standar Pembinaan:** Mengacu Juknis OMI 2026.
+        * **Jumlah Soal:** TEPAT 10 Soal Pilihan Ganda Terintegrasi per Sesi.
+        * **Standar Pembinaan:** Mengacu Juknis OMI 2026 (Sains, Keislaman, & Literasi Data).
         * **Skoring:** Benar (+4), Salah (-1), Kosong (0).
         """)
         st.write("")
@@ -416,16 +454,15 @@ elif st.session_state.page == "setup":
             if not st.session_state.nama_siswa.strip():
                 st.error("⚠️ Isi nama lengkap kamu dulu ya sebelum mulai!")
             else:
-                # Generate Session ID baru setiap kali mulai kuis
                 st.session_state.session_id = str(uuid.uuid4())
-                with st.spinner(f"RoboMANTAP sedang merancang 5 soal {st.session_state.mapel} Kamu. Tunggu sebentar ya 😊"):
+                with st.spinner(f"RoboMANTAP sedang merancang 10 soal {st.session_state.mapel} Kamu. Tunggu sebentar ya... (nggak lama kok, hanya butuh waktu sekitar 15 detik saja! 😊)"):
                     quiz = generate_quiz_batch(
                         st.session_state.jenjang,
                         st.session_state.mapel,
                         st.session_state.stage,
                         st.session_state.selected_submateri
                     )
-                    if quiz and len(quiz) == 5:
+                    if quiz and len(quiz) == 10:
                         st.session_state.quiz_data = quiz
                         st.session_state.user_answers = {}
                         st.session_state.current_index = 0
@@ -440,7 +477,7 @@ elif st.session_state.page == "setup":
                         st.error("Gagal membuat paket soal. Silakan klik tombol sekali lagi.")
 
 # ==============================================================================
-# 6. ENGINE TEST INTERAKTIF (SISWA) + LIVE SYNC DATABASE
+# 5. ENGINE TEST INTERAKTIF (10 SOAL CBT) + LIVE SYNC DATABASE
 # ==============================================================================
 elif st.session_state.page == "quiz":
     quiz_data = st.session_state.quiz_data
@@ -452,8 +489,8 @@ elif st.session_state.page == "quiz":
         st.subheader(f"📝 CBT OMI: {st.session_state.mapel} ({st.session_state.stage})")
         st.caption(f"👤 Siswa: **{st.session_state.nama_siswa}**")
     with col_h2:
-        st.progress((curr_idx + 1) / 5)
-        st.caption(f"Soal **{curr_idx + 1}** dari **5**")
+        st.progress((curr_idx + 1) / 10)
+        st.caption(f"Soal **{curr_idx + 1}** dari **10**")
 
     st.write("---")
     st.markdown(f"#### **Soal No. {curr_idx + 1}**")
@@ -470,9 +507,9 @@ elif st.session_state.page == "quiz":
     if selected_option and selected_option != saved_ans:
         st.session_state.user_answers[curr_idx] = selected_option
         
-        # Hitung Array Status Jawaban (True/False/None) untuk DB
+        # Hitung Array Status Jawaban (True/False/None) untuk DB (10 soal)
         detail = []
-        for i in range(5):
+        for i in range(10):
             u_ans = st.session_state.user_answers.get(i, None)
             if u_ans is None:
                 detail.append(None)
@@ -487,9 +524,11 @@ elif st.session_state.page == "quiz":
         )
 
     st.write("---")
+    
     col_nav1, col_nav2, col_nav3 = st.columns([3, 6, 3])
+    # Swap posisi Next/Submit ke atas untuk aksesibilitas HP
     with col_nav1:
-        if curr_idx < 4:
+        if curr_idx < 9:
             if st.button("Berikutnya ➡️", type="primary", use_container_width=True):
                 st.session_state.current_index += 1
                 st.rerun()
@@ -503,11 +542,23 @@ elif st.session_state.page == "quiz":
                 st.session_state.current_index -= 1
                 st.rerun()
 
+    # Expander Hint dengan Live Streaming Text
     with st.expander("Kamu bingung? Konsultasi di sini sama aku, RoboMANTAP! 🧕🏼"):
         st.caption("Fungsi kolom ini: Tulis ide awal atau rumus yang mau kamu coba, nanti RoboMANTAP bakal kasih petunjuk jalan keluarnya tanpa langsung bocorin jawaban!")
         
-        attempt_input = st.text_input("Gagasan / Ide Logika Kamu apa coba?:", placeholder="Contoh: Aku bingung nih harus mulai dari mana... 🤔", key=f"hint_in_{curr_idx}")
-        hint_key = (st.session_state.mapel, curr_idx, q["question"], attempt_input.strip())
+        attempt_input = st.text_input(
+            "Gagasan / Ide Logika Kamu apa coba?:",
+            placeholder="Contoh: Aku bingung nih harus mulai dari mana... 🤔",
+            key=f"hint_in_{curr_idx}"
+        )
+        
+        # Cache hint berdasarkan soal + ide siswa + mata pelajaran.
+        hint_key = (
+            st.session_state.mapel,
+            curr_idx,
+            q["question"],
+            attempt_input.strip(),
+        )
 
         if attempt_input.strip() and hint_key in st.session_state.ai_hint_cache:
             st.markdown("🧕🏼 **RoboMANTAP:**")
@@ -515,16 +566,29 @@ elif st.session_state.page == "quiz":
 
         if st.button("Diskusikan Yuk!", key=f"btn_hint_{curr_idx}"):
             if attempt_input.strip():
-                if hint_key not in st.session_state.ai_hint_cache:
+                if hint_key in st.session_state.ai_hint_cache:
                     st.markdown("🧕🏼 **RoboMANTAP:**")
-                    streamed_hint = st.write_stream(get_ai_hint_stream(q["question"], attempt_input, st.session_state.mapel), cursor="▌")
+                    st.markdown(st.session_state.ai_hint_cache[hint_key])
+                else:
+                    st.markdown("🧕🏼 **RoboMANTAP:**")
+                    streamed_hint = st.write_stream(
+                        get_ai_hint_stream(
+                            q["question"],
+                            attempt_input,
+                            st.session_state.mapel,
+                        ),
+                        cursor="▌",
+                    )
+
+                    # Simpan hanya respons yang berhasil selesai tanpa pesan error.
                     if streamed_hint and "⚠️" not in str(streamed_hint):
                         st.session_state.ai_hint_cache[hint_key] = str(streamed_hint)
             else:
                 st.info("💡 Tolong ketik sedikit ide kamu dulu ya, biar RoboMANTAP bisa kasih petunjuk yang pas!")
 
+
 # ==============================================================================
-# 7. SCORECARD & EVALUASI SESI (SISWA)
+# 6. SCORECARD & EVALUASI SESI
 # ==============================================================================
 elif st.session_state.page == "result":
     st.subheader(f"📊 Evaluasi CBT: {st.session_state.mapel} ({st.session_state.jenjang})")
@@ -535,48 +599,68 @@ elif st.session_state.page == "result":
     detail = []
     for idx, q in enumerate(quiz_data):
         u_ans = user_answers.get(idx, None)
-        if u_ans is None: 
+        if u_ans is None:
             kosong += 1
             detail.append(None)
-        elif u_ans == q["correct_answer"]: 
+        elif u_ans == q["correct_answer"]:
             benar += 1; total_skor += 4
             detail.append(True)
-        else: 
+        else:
             salah += 1; total_skor -= 1
             detail.append(False)
 
     # Sinkronisasi Final Status SELESAI ke DB Guru
     update_progress_siswa(
         st.session_state.session_id, st.session_state.nama_siswa,
-        st.session_state.jenjang, st.session_state.mapel, 5, detail, "SELESAI"
+        st.session_state.jenjang, st.session_state.mapel, 10, detail, "SELESAI"
     )
 
-    if total_skor >= 16:
-        feedback_msg = f"🌟 **Luar Biasa! (Skor: {total_skor}/20)**\n\nRoboMANTAP bangga banget sama kamu! Pemahaman kamu di materi {st.session_state.mapel} sudah sangat tajam. Pertahankan fokus kamu untuk tahap OMI selanjutnya ya! 🚀✨"
+    if total_skor >= 32:
+        feedback_msg = f"🌟 **Luar Biasa! (Skor: {total_skor}/40)**\n\nRoboMANTAP bangga banget sama kamu! Pemahaman kamu di materi {st.session_state.mapel} sudah sangat tajam. Pertahankan fokus kamu untuk tahap OMI selanjutnya ya! 🚀✨"
         feedback_type = "success"
-    elif total_skor >= 8:
-        feedback_msg = f"👍 **Kerja Bagus! (Skor: {total_skor}/20)**\n\nUsaha yang mantap! Kamu sudah paham sebagian besar konsepnya. Coba cek pembahasan di bawah untuk memperbaiki sedikit kekeliruan tadi ya! 💪😊"
+    elif total_skor >= 16:
+        feedback_msg = f"👍 **Kerja Bagus! (Skor: {total_skor}/40)**\n\nUsaha yang mantap! Kamu sudah paham sebagian besar konsepnya. Coba cek pembahasan di bawah untuk memperbaiki sedikit kekeliruan tadi ya! 💪😊"
         feedback_type = "info"
     else:
-        feedback_msg = f"🌱 **Tetap Semangat! (Skor: {total_skor}/20)**\n\nJangan berkecil hati ya! Setiap kesalahan adalah proses belajar. Yuk pelajari pembahasan rinci di bawah dan coba latihan 5 soal lagi bersama RoboMANTAP! 🤖❤️"
+        feedback_msg = f"🌱 **Tetap Semangat! (Skor: {total_skor}/40)**\n\nJangan berkecil hati ya! Setiap kesalahan adalah proses belajar. Yuk pelajari pembahasan rinci di bawah dan coba latihan 10 soal lagi bersama RoboMANTAP! 🤖❤️"
         feedback_type = "warning"
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Total Skor CBT", f"{total_skor} / 20")
+    k1.metric("Total Skor CBT", f"{total_skor} / 40")
     k2.metric("Benar (+4)", f"{benar}")
     k3.metric("Salah (-1)", f"{salah}")
     k4.metric("Kosong (0)", f"{kosong}")
 
-    if feedback_type == "success": st.success(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
-    elif feedback_type == "info": st.info(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
-    else: st.warning(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
+    if feedback_type == "success":
+        st.success(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
+    elif feedback_type == "info":
+        st.info(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
+    else:
+        st.warning(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
 
     st.write("---")
     col_act1, col_act2 = st.columns(2)
     with col_act1:
         if st.button("🔄 LATIHAN SOAL LAGI DONG! (SESI BARU)", type="primary", use_container_width=True):
-            st.session_state.page = "setup" # Kembali ke setup agar tidak capek isi nama lagi
-            st.rerun()
+            st.cache_data.clear()
+            with st.spinner("Sabar ya, RoboMANTAP sedang menyiapkan soal baru Kamu.. (nggak lama kok, hanya butuh waktu sekitar 15 detik saja! 😊)"):
+                new_quiz = generate_quiz_batch(st.session_state.jenjang, st.session_state.mapel, st.session_state.stage, st.session_state.selected_submateri)
+                if new_quiz and len(new_quiz) == 10:
+                    st.session_state.quiz_data = new_quiz
+                    st.session_state.user_answers = {}
+                    st.session_state.current_index = 0
+                    st.session_state.ai_hint_cache = {}
+                    st.session_state.ai_solution_cache = {}
+                    
+                    # Sinkronisasi Sesi Baru ke Database Real-time
+                    st.session_state.session_id = str(uuid.uuid4())
+                    update_progress_siswa(
+                        st.session_state.session_id, st.session_state.nama_siswa,
+                        st.session_state.jenjang, st.session_state.mapel, 1, [], "BERJALAN"
+                    )
+                    
+                    st.session_state.page = "quiz"
+                    st.rerun()
 
     with col_act2:
         if st.button("⚙️ Pilih Mata Pelajaran Lain", use_container_width=True):
@@ -585,6 +669,7 @@ elif st.session_state.page == "result":
 
     st.write("---")
     st.markdown("### 📖 Pembahasan Rinci dari Pembina RoboMANTAP ")
+    st.caption("💡 *untuk meminta RoboMANTAP membahas nya, Klik pada masing-masing soal di bawah ini ya!* 😊")
     
     for idx, q in enumerate(quiz_data):
         u_ans = user_answers.get(idx, "Tidak Dijawab")
@@ -593,18 +678,35 @@ elif st.session_state.page == "result":
         
         with st.expander(f"Soal No. {idx + 1} [{status_icon}] - Jawaban Anda: {u_ans}"):
             st.markdown(f"**Soal:**\n{q['question']}")
-            st.markdown(f"**Kunci Jawaban:** `{q['correct_answer']}`")
+            st.markdown(f"**Kunci Jawaban:** {q['correct_answer']}")
             st.write("---")
             
-            solution_key = (st.session_state.mapel, idx, q["question"], q["correct_answer"])
+            # Cache pembahasan per soal.
+            solution_key = (
+                st.session_state.mapel,
+                idx,
+                q["question"],
+                q["correct_answer"],
+            )
 
             if solution_key in st.session_state.ai_solution_cache:
                 st.markdown("**🧕🏼 Pembahasan dari RoboMANTAP:**")
                 st.markdown(st.session_state.ai_solution_cache[solution_key])
 
             if st.button(f"Tampilkan Pembahasannya dong! (Soal {idx + 1})", key=f"btn_sol_{idx}"):
-                if solution_key not in st.session_state.ai_solution_cache:
+                if solution_key in st.session_state.ai_solution_cache:
                     st.markdown("**🧕🏼 Pembahasan dari RoboMANTAP:**")
-                    streamed_solution = st.write_stream(get_ai_solution_stream(q["question"], q["correct_answer"], st.session_state.mapel), cursor="▌")
+                    st.markdown(st.session_state.ai_solution_cache[solution_key])
+                else:
+                    st.markdown("**🧕🏼 Pembahasan dari RoboMANTAP:**")
+                    streamed_solution = st.write_stream(
+                        get_ai_solution_stream(
+                            q["question"],
+                            q["correct_answer"],
+                            st.session_state.mapel,
+                        ),
+                        cursor="▌",
+                    )
+
                     if streamed_solution and "⚠️" not in str(streamed_solution):
                         st.session_state.ai_solution_cache[solution_key] = str(streamed_solution)
