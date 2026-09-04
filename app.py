@@ -429,7 +429,14 @@ elif st.session_state.page == "select_mapel":
 # 4. SETUP CBT & BIODATA SISWA
 # ==============================================================================
 elif st.session_state.page == "setup":
-    st.markdown(f"### ⚙️ Setup CBT: {st.session_state.mapel} ({st.session_state.jenjang})", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div style="font-size: 16px; font-weight: bold; line-height: 1.4; margin-bottom: 10px;">
+        ⚙️ Setup CBT:<br>
+        <span style="font-size: 14px; color: #059669; font-weight: 600;">
+            {st.session_state.mapel} ({st.session_state.jenjang})
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
     if st.button("⬅️ Ganti Mata Pelajaran"):
         st.session_state.page = "select_mapel"
         st.rerun()
