@@ -445,3 +445,44 @@ def update_progress_siswa(session_id: str, nama: str, jenjang: str, mapel: str,
             s.commit()
     except Exception:
         pass
+
+#generate LKPD
+def generate_lkpd_content(mapel: str, kelas: str, topik: str):
+    """
+    Menghasilkan isi materi LKPD HOTS khas Al-Irsyad Bondowoso menggunakan Gemini 3.x.
+    """
+    prompt = f"""
+    Anda adalah Tim Ahli Kurikulum Lembaga Pendidikan Al-Irsyad Al-Islamiyah Putri Bondowoso.
+    Rancanglah isi Lembar Kerja Peserta Didik (LKPD) berbasis HOTS dan Terintegrasi Keislaman.
+
+    Spesifikasi LKPD:
+    - Mata Pelajaran: {mapel}
+    - Kelas / Jenjang: {kelas}
+    - Topik / Materi Utama: {topik}
+
+    Instruksi Penyusunan Konten:
+    1. Tujuan Pembelajaran: Buatkan 2 poin tujuan berbasis indikator HOTS.
+    2. Apersepsi & Ringkasan Konsep: Sajikan materi singkat, tajam, dan korelasikan dengan nilai-nilai Keislaman/Tadabbur Sains.
+    3. Tugas Eksplorasi Mandiri: Buat 2 soal studi kasus/problem solving HOTS yang melatih logika nalar santri/siswi.
+    4. Refleksi Keislaman: Tuliskan 1 kalimat hikmah/perenungan dari mempelajari materi {topik}.
+
+    Format keluaran WAJIB objek JSON murni:
+    {{
+        "tujuan": ["Poin tujuan 1", "Poin tujuan 2"],
+        "ringkasan": "Teks ringkasan konsep dan keislaman...",
+        "soal_1": "Pertanyaan eksplorasi HOTS nomor 1",
+        "soal_2": "Pertanyaan eksplorasi HOTS nomor 2",
+        "refleksi": "Kalimat hikmah/refleksi..."
+    }}
+    """
+
+    raw_response = call_gemini_with_rotation(prompt, is_json=True)
+    if not raw_response:
+        return None
+
+    try:
+        cleaned_response = clean_json_text(raw_response)
+        data = json.loads(cleaned_response, strict=False)
+        return data
+    except Exception:
+        return None
