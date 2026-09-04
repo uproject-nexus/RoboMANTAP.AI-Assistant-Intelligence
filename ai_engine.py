@@ -276,8 +276,8 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     ATURAN KHUSUS FORMATTING & KECEPATAN:
     - JANGAN sertakan field `hint` atau `solution` di sini. Fokus saja merancang 5 teks soal cerita dan jawaban agar proses AI kencang.
-    - Jika ada formula/notasi matematika/simbol fisika-kimia, WAJIB diapit tanda dollar '$' (Contoh: "$x^2 + 2x = 0$", "$\\tfrac{{1}}{{2}}$").
-    - Semua backslash LaTeX wajib ditulis ganda '\\\\'.
+    - Semua angka ber-notasi, sudut, akar, rumus, pecahan, dan variabel WAJIB diapit tanda dollar '$' (Contoh: "$30^\circ$", "$\sqrt{3}$", "$x^2 + 2x = 0$").
+    - Tuliskan notasi LaTeX secara standar tanpa melipatgandakan backslash.
 
     Format keluaran WAJIB berupa objek JSON murni:
     {{
