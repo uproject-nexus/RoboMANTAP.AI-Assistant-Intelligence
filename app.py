@@ -259,11 +259,11 @@ if st.session_state.page == "landing":
         st.markdown("""
         <div class="mode-card">
             <h2>🏫 TINGKAT MTs</h2>
-            <p style="opacity: 0.7; font-size: 14px;">Madrasah Tsanawiyah Al Irsyad Putri</p>
+            <p style="opacity: 0.7; font-size: 14px;">Madrasah Tsanawiyah Al-Irsyad Putri</p>
         </div>
         """, unsafe_allow_html=True)
         if st.button("Masuk Modul MTs ➔", key="btn_mts", use_container_width=True, type="primary"):
-            st.session_state.jenjang = "MTs (Sederajat SMP)"
+            st.session_state.jenjang = "MTs (SMP Sederajat )"
             st.session_state.page = "select_mapel"
             st.rerun()
 
@@ -271,16 +271,16 @@ if st.session_state.page == "landing":
         st.markdown("""
         <div class="mode-card">
             <h2>🏛️ TINGKAT MA</h2>
-            <p style="opacity: 0.7; font-size: 14px;">Madrasah Aliyah Al Irsyad Putri</p>
+            <p style="opacity: 0.7; font-size: 14px;">Madrasah Aliyah Al-Irsyad Putri</p>
         </div>
         """, unsafe_allow_html=True)
         if st.button("Masuk Modul MA ➔", key="btn_ma", use_container_width=True, type="primary"):
-            st.session_state.jenjang = "MA (Sederajat SMA)"
+            st.session_state.jenjang = "MA (SMA Sederajat )"
             st.session_state.page = "select_mapel"
             st.rerun()
 
     st.write("---")
-    st.markdown("#### 🧕🏼 Portal Pengajar")
+    st.markdown("#### 🧕🏼 Portal GuruMANTAP")
     st.markdown("""
     <div class="guru-card">
         <h2 style="margin:0; font-size: 19px;">🔴 Live Monitoring & AI Generator</h2>
@@ -296,7 +296,7 @@ if st.session_state.page == "landing":
 # ==============================================================================
 elif st.session_state.page == "guru_login":
     st.subheader("🔒 Akses Portal Guru")
-    st.info("Fitur Enterprise ini dilindungi PIN untuk menjaga kerahasiaan nilai siswa dan soal CBT.")
+    st.info("Fitur ini dilindungi PIN untuk menjaga kerahasiaan nilai siswa dan soal CBT.")
     
     pin_input = st.text_input("Masukkan PIN Akses:", type="password", placeholder="Masukkan PIN GuruMANTAP")
     if st.button("Login", type="primary"):
@@ -335,7 +335,7 @@ elif st.session_state.page == "guru_dashboard":
         def render_live_monitoring():
             conn = init_db_connection()
             if not conn:
-                st.warning("Menunggu koneksi Database PostgreSQL terhubung untuk Live Monitoring...")
+                st.warning("Menunggu koneksi Database terhubung untuk Live Monitoring...")
                 return
 
             try:
@@ -380,12 +380,12 @@ elif st.session_state.page == "guru_dashboard":
         render_live_monitoring()
 
     with tab2:
-        st.subheader("🤖 AI Quiz Generator & Analisis")
-        st.info("Fitur pembuatan paket soal baru secara massal, export ke PDF, dan analisis butir soal menggunakan Gemini 3.5 Flash-Lite akan terhubung di sini (Tahap Pengembangan Selanjutnya).")
+        st.subheader("🧕🏼 AI Quiz Generator & Analisis")
+        st.info("Fitur Pembuatan Paket Soal baru secara massal, export ke PDF, dan analisis butir soal menggunakan kecanggihan terbaru U.Project Nexus Inteliigence v3.6 akan terhubung di sini (Tahap Pengembangan Selanjutnya).")
     
     with tab3:
         st.subheader("📲 WhatsApp Integration Engine")
-        st.info("Fitur U.Project Nexus untuk Broadcast Hasil Ujian ke Orang Tua dan pembuatan Auto-LKPD via WhatsApp (Tahap Pengembangan Selanjutnya).")
+        st.info("Fitur One Click Automation dari U.Project Nexus yang mengirim secara langsung dan cepat Broadcast Hasil Ujian ke Siswa dan Orang Tua Siswa, menghadirkan ChatBot RoboMANTAP yang membantu siswa belajar di rumah 24/7 serta membantu pembuatan Auto-LKPD bagi guru dengan One Template Ekslusif Sekolah via WhatsApp (Tahap Pengembangan Selanjutnya).")
 
 # ==============================================================================
 # 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
