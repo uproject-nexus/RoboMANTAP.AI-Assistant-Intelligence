@@ -385,22 +385,25 @@ elif st.session_state.page == "guru_dashboard":
         render_live_monitoring()
 
     with tab2:
-        st.title("🧕🏼 AI Quiz Generator & Analisis")
-        st.info(
-            "🚀 **Fitur Mendatang (U.Project Nexus Intelligence v3.6):**\n\n"
-            "• **Generator Massal:** Buat puluhan paket soal HOTS & tematik secara instan.\n"
-            "• **Export Cetak & PDF:** Siap cetak dengan tata letak rapi khas madrasah.\n"
-            "• **Analisis Butir Soal:** Evaluasi otomatis daya pembeda & tingkat kesukaran soal."
-        )
-    
+        st.markdown("<p style='font-size: 16px; font-weight: bold; margin-bottom: 8px;'>🧕🏼 AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
+        st.info("""
+        🚀 **Fitur Mendatang (U.Project Nexus Intelligence v3.6):**
+        
+        * **Server Eksklusif:** Terhubung langsung ke engine U.Project Nexus.
+        * **Generator Massal:** Buat puluhan paket soal HOTS & tematik secara instan.
+        * **Export Cetak & PDF:** Siap cetak dengan tata letak rapi khas madrasah.
+        * **Analisis Butir Soal:** Evaluasi otomatis daya pembeda & tingkat kesukaran soal.
+        """)
+
     with tab3:
-        st.subheader("📲 WhatsApp Integration")
-        st.info(
-            "⚡ **One-Click Automation (U.Project Nexus):**\n\n"
-            "• **Broadcast Hasil Ujian:** Kirim laporan skor otomatis ke WhatsApp siswa & orang tua.\n"
-            "• **ChatBot RoboMANTAP 24/7:** Asisten tutor pribadi siswa untuk belajar di rumah.\n"
-            "• **Auto-LKPD Guru:** Buat Lembar Kerja Siswa otomatis sesuai template eksklusif sekolah."
-        )
+        st.markdown("<p style='font-size: 16px; font-weight: bold; margin-bottom: 8px;'>📲 WhatsApp Integration Engine</p>", unsafe_allow_html=True)
+        st.info("""
+        ⚡ **One-Click Automation (U.Project Nexus):**
+        
+        * **Broadcast Hasil Ujian:** Kirim laporan skor otomatis ke WhatsApp siswa & orang tua.
+        * **ChatBot RoboMANTAP 24/7:** Asisten tutor pribadi siswa untuk belajar di rumah.
+        * **Auto-LKPD Guru:** Buat Lembar Kerja Siswa otomatis sesuai template eksklusif sekolah.
+        """)
 
 
 
