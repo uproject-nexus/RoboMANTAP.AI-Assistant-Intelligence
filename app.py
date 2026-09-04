@@ -273,7 +273,7 @@ elif st.session_state.page == "guru_dashboard":
         st.warning("Akses Ditolak.")
         st.stop()
 
-    st.markdown("## 📊 Dashboard Enterprise Guru - U.Project Nexus")
+    st.markdown("## 📊 Dashboard Guru")
     tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🤖 Bank Soal AI", "📲 WA Automation"])
 
     with tab1:
