@@ -238,7 +238,7 @@ if st.session_state.page == "landing":
             st.rerun()
 
     st.write("---")
-    st.markdown("#### 👨‍🏫 Portal Pengajar (U.Project Nexus Enterprise)")
+    st.markdown("#### 👨‍🏫 Portal Pengajar")
     st.markdown("""
     <div class="guru-card">
         <h2 style="margin:0;">🔴 Live Monitoring & AI Generator</h2>
@@ -273,8 +273,8 @@ elif st.session_state.page == "guru_dashboard":
         st.warning("Akses Ditolak.")
         st.stop()
 
-    st.markdown("## 📊 Dashboard Guru")
-    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🤖 Bank Soal AI", "📲 WA Automation"])
+    st.markdown("## 🖥️ Dashboard Guru")
+    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕🏼 Bank Soal RoboMANTAP", "📲 WA Automation"])
 
     with tab1:
         # Fungsi HTML untuk visual bar ala Quizizz
