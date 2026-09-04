@@ -305,7 +305,7 @@ def create_lkpd_docx_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png
     r2.bold = True
     r2.font.size = Pt(11)
 
-    r3 = p_text.add_run("Tahun Ajaran:...../.....")
+    r3 = p_text.add_run("Tahun Ajaran:......../........")
     r3.italic = True
     r3.font.size = Pt(9)
     r3.font.color.rgb = RGBColor(120, 120, 120)
@@ -332,7 +332,7 @@ def create_lkpd_docx_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png
     p_meta.add_run(f"• Mata Pelajaran\t: {mapel}\n").bold = True
     p_meta.add_run(f"• Kelas / Jenjang\t: {kelas}\n").bold = True
     p_meta.add_run(f"• Topik Utama\t: {topik}\n").bold = True
-    p_meta.add_run(f"• Nama Santri/Kelompok : ...........................................................")
+    p_meta.add_run(f"• Nama/Kelompok : ...........................................................")
 
     doc.add_paragraph() # Spacing
 
@@ -386,7 +386,7 @@ def create_lkpd_docx_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png
     cell_ans1 = t_ans1.cell(0, 0)
     set_cell_background(cell_ans1, "F9FAFB") # Soft Gray Answer Box
     p_ans1 = cell_ans1.paragraphs[0]
-    p_ans1.add_run("Lembar Jawaban / Analisis Santri:\n\n\n\n").italic = True
+    p_ans1.add_run("Lembar Jawaban :\n\n\n\n").italic = True
     p_ans1.runs[0].font.color.rgb = RGBColor(150, 150, 150)
 
     # Soal 2 + Kotak Lembar Jawab
@@ -397,7 +397,7 @@ def create_lkpd_docx_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png
     cell_ans2 = t_ans2.cell(0, 0)
     set_cell_background(cell_ans2, "F9FAFB")
     p_ans2 = cell_ans2.paragraphs[0]
-    p_ans2.add_run("Lembar Jawaban / Analisis Santri:\n\n\n\n").italic = True
+    p_ans2.add_run("Lembar Jawaban :\n\n\n\n").italic = True
     p_ans2.runs[0].font.color.rgb = RGBColor(150, 150, 150)
 
     doc.add_paragraph()
@@ -407,7 +407,7 @@ def create_lkpd_docx_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png
     # --------------------------------------------------------------------------
     t_d_head = doc.add_table(rows=1, cols=1)
     set_cell_background(t_d_head.cell(0, 0), "D97706") # Amber/Gold Banner
-    r_d_head = t_d_head.cell(0, 0).paragraphs[0].add_run("🌿 [D] REFLEKSI KEISLAMAN & HIKMAH SANTRI")
+    r_d_head = t_d_head.cell(0, 0).paragraphs[0].add_run("🌿 [D] REFLEKSI KEISLAMAN & HIKMAH")
     r_d_head.bold = True
     r_d_head.font.color.rgb = RGBColor(255, 255, 255)
 
