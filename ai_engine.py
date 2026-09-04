@@ -241,7 +241,7 @@ def stream_ai_text(prompt: str, max_output_tokens: int = STREAM_HINT_MAX_TOKENS)
 
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     """
-    Menghasilkan 1 paket latihan CBT 5 soal berkualitas tinggi dan natural.
+    Menghasilkan 1 paket latihan CBT 10 soal berkualitas tinggi dan natural.
     Output HANYA soal dan opsi (tanpa pembahasan) agar generasi sangat cepat.
     """
     submateri_text = ", ".join(selected_submateri) if selected_submateri else "Semua Submateri Terintegrasi"
@@ -256,7 +256,7 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
 
     system_prompt = f"""
     Anda adalah Pelatih Utama Bina Prestasi OMI 2026 (Olimpiade Sains & Matematika Al Irsyad) untuk tingkat {jenjang}.
-    Rancanglah 1 paket latihan CBT berisi TEPAT 5 SOAL PILIHAN GANDA yang orisinal, presisi, dan tematik OMI.
+    Rancanglah 1 paket latihan CBT berisi TEPAT 10 SOAL PILIHAN GANDA yang orisinal, presisi, dan tematik OMI.
 
     Spesifikasi Soal OMI 2026:
     - Jenjang: {jenjang}
@@ -268,14 +268,14 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     1. Konteks Tematik: Wajib mengintegrasikan materi dengan tema Lingkungan, Teknologi, Kehidupan Sehari-hari, atau Nilai-Nilai Keislaman (seperti Zakat, Waktu Shalat, Penanggalan Hijriyah, Arah Kiblat, Waris, atau Sejarah Islam).
     2. Aturan Porsi & Variasi Bahasa (SANGAT PENTING):
     - Jika submateri berisi "Semua Submateri" (ALL) atau secara acak: UTAMAKAN karakteristik khusus OMI!
-    - Dari total 5 soal yang dibuat, 3 soal WAJIB menggunakan Full Bahasa Indonesia berkonteks Keislaman, Lingkungan, Teknologi atau Umum.
-    - HANYA MAKSIMAL 2 SOAL SAJA yang diperbolehkan menggunakan Variasi Bahasa Arab.
+    - Dari total 10 soal yang dibuat, 7 soal WAJIB menggunakan Full Bahasa Indonesia berkonteks Keislaman, Lingkungan, Teknologi atau Umum.
+    - HANYA MAKSIMAL 3 SOAL SAJA yang diperbolehkan menggunakan Variasi Bahasa Arab.
     - WAJIB AKSARA ARAB ASLI: Semua teks Bahasa Arab WAJIB ditulis menggunakan Abjad/Aksara Arab asli (contoh: "خَمْسُونَ مِتْرًا" atau "خمسون مترا"). DILARANG KERAS menggunakan transliterasi/Ejaan Arab Latin (SEPERTI: "khamsuna mitran", "miatun", "uqtiridhat", dll).
     - Variasi Bahasa Arab yang diperbolehkan: Teks Soal ditulis dalam Aksara Arab asli tanpa harakat (atau harakat minimal), sedangkan Pilihan Jawaban A, B, C, D dalam Bahasa Indonesia (atau sebaliknya).
-    - Jangan pernah membuat lebih dari 2 soal berbahasa Arab dalam satu paket kuis.
+    - Jangan pernah membuat lebih dari 3 soal berbahasa Arab dalam satu paket kuis.
 
     ATURAN KHUSUS FORMATTING & KECEPATAN:
-    - JANGAN sertakan field `hint` atau `solution` di sini. Fokus saja merancang 5 teks soal cerita dan jawaban agar proses AI kencang.
+    - JANGAN sertakan field `hint` atau `solution` di sini. Fokus saja merancang 10 teks soal cerita dan jawaban agar proses AI kencang.
     - Semua angka ber-notasi, sudut, akar, rumus, pecahan, dan variabel WAJIB diapit tanda dollar '$' (Contoh: "$30^\circ$", "$\sqrt{3}$", "$x^2 + 2x = 0$").
     - Tuliskan notasi LaTeX secara standar tanpa melipatgandakan backslash.
 
