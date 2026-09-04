@@ -297,6 +297,7 @@ if st.session_state.page == "landing":
 elif st.session_state.page == "guru_login":
     st.subheader("🔒 Akses Portal Guru")
     st.info("Fitur Enterprise ini dilindungi PIN untuk menjaga kerahasiaan nilai siswa dan soal CBT.")
+    placeholder="Pilih submateri di sini..."
     
     pin_input = st.text_input("Masukkan PIN Akses:", type="password")
     if st.button("Login", type="primary"):
