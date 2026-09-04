@@ -275,7 +275,7 @@ if st.session_state.page == "landing":
         </div>
         """, unsafe_allow_html=True)
         if st.button("Masuk Modul MA ➔", key="btn_ma", use_container_width=True, type="primary"):
-            st.session_state.jenjang = "MA (SMA Sederajat )"
+            st.session_state.jenjang = "MA (Sederajat SMA)"
             st.session_state.page = "select_mapel"
             st.rerun()
 
