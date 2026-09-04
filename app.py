@@ -104,7 +104,7 @@ st.markdown("""
         color: white;
         border: 1px solid #3b82f6;
         padding: 24px;
-        border-radius: 12px;
+        border-radius: 9px;
         text-align: center;
         margin-bottom: 15px;
     }
