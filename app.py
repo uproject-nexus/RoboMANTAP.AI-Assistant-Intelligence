@@ -601,8 +601,8 @@ elif st.session_state.page == "guru_dashboard":
         # ==============================================================================
         st.markdown("""
         <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 12px; border-radius: 10px; border: 1px solid #059669; color: white; margin-bottom: 12px;">
-            <div style="font-size: 14px; font-weight: 700;">📄 Generator LKPD Word Berlogo Resmi</div>
-            <div style="font-size: 11px; opacity: 0.85; margin-top: 2px;">Terintegrasi Gemini AI & Format Madrasah Al-Irsyad Al-Islamiyah Putri Bondowoso</div>
+            <div style="font-size: 14px; font-weight: 700;">📄 Generator LKPD</div>
+            <div style="font-size: 11px; opacity: 0.85; margin-top: 2px;">Terintegrasi AI By U.Project Nexus & Format menyesuaikan Madrasah Al-Irsyad Al-Islamiyah Putri Bondowoso</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -614,11 +614,11 @@ elif st.session_state.page == "guru_dashboard":
         with col_lkpd2:
             mapel_lkpd = st.selectbox("Mata Pelajaran:", ["Matematika", "IPA Terintegrasi", "IPS Terintegrasi", "PAI & Bahasa Arab", "Fisika", "Biologi", "Kimia"], key="lkpd_mapel")
 
-        if st.button("📄 Generate LKPD Word (.docx) Berlogo", type="primary", use_container_width=True):
+        if st.button("Generate LKPD (.docx)", type="primary", use_container_width=True):
             if not topic_lkpd.strip():
                 st.warning("⚠️ Ketik topik/materi pembelajarannya dulu ya!")
             else:
-                with st.spinner("U.Project Nexus sedang menyusun dokumen Word berlogo resmi..."):
+                with st.spinner("RoboMANTAP sedang menyusun dokumen..."):
                     ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, topic_lkpd)
                     
                     if not ai_content:
@@ -627,13 +627,13 @@ elif st.session_state.page == "guru_dashboard":
                         # Buat File Word berlogo di Memory
                         docx_buffer = create_lkpd_docx_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
                         
-                        st.success("✅ Dokumen LKPD Word (.docx) Berlogo Berhasil Diproduksi!")
+                        st.success("✅ Dokumen LKPD (.docx) Berhasil Dibuat!")
                         
                         # Tombol Unduh Dokumen Word (.docx)
                         st.download_button(
                             label="📥 Download Dokumen LKPD (.docx)",
                             data=docx_buffer,
-                            file_name=f"LKPD_AlIrsyad_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}.docx",
+                            file_name=f"LKPD_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}_RoboMANTAP.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             use_container_width=True
                         )
