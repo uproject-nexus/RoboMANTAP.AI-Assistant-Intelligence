@@ -1,12 +1,21 @@
-import base64
+import io
 import os
 import uuid
+import base64
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+
+# Import python-docx untuk generate Word berlogo
+from docx import Document
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT
+
 from ai_engine import (
     generate_quiz_batch, get_ai_hint_stream, get_ai_solution_stream,
-    create_table_if_not_exists, update_progress_siswa, init_db_connection
+    create_table_if_not_exists, update_progress_siswa, init_db_connection,
+    generate_lkpd_content
 )
 
 st.set_page_config(
@@ -245,6 +254,117 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+#helper LKPD
+def create_lkpd_docx_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"):
+    """
+    Membuat file Microsoft Word (.docx) berlogo resmi Al-Irsyad dalam memory buffer.
+    """
+    doc = Document()
+
+    # Margin Halaman (0.8 Inci)
+    for section in doc.sections:
+        section.top_margin = Inches(0.8)
+        section.bottom_margin = Inches(0.8)
+        section.left_margin = Inches(0.8)
+        section.right_margin = Inches(0.8)
+
+    # Tabel Kop Surat (2 Kolom: Logo di Kiri, Teks di Kanan)
+    table = doc.add_table(rows=1, cols=2)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    
+    table.columns[0].width = Inches(1.2)
+    table.columns[1].width = Inches(5.3)
+
+    cell_logo = table.cell(0, 0)
+    cell_text = table.cell(0, 1)
+
+    # 1. Sisipkan Logo
+    if os.path.exists(logo_path):
+        p_logo = cell_logo.paragraphs[0]
+        p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run_logo = p_logo.add_run()
+        run_logo.add_picture(logo_path, width=Inches(1.0))
+
+    # 2. Sisipkan Teks Kop
+    p_text = cell_text.paragraphs[0]
+    p_text.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    r1 = p_text.add_run("LEMBAR KERJA PESERTA DIDIK (LKPD)\n")
+    r1.bold = True
+    r1.font.size = Pt(13)
+    r1.font.color.rgb = RGBColor(5, 150, 105) # Emerald Green
+
+    r2 = p_text.add_run("Madrasah Aliyah dan Tsanawiyah Al-Irsyad Al-Islamiyah Putri Bondowoso\n")
+    r2.bold = True
+    r2.font.size = Pt(11)
+
+    r3 = p_text.add_run("Powered by RoboMANTAP-AI • U.Project Nexus")
+    r3.italic = True
+    r3.font.size = Pt(9)
+    r3.font.color.rgb = RGBColor(120, 120, 120)
+
+    # Garis Pembatas Kop Surat
+    doc.add_paragraph("―" * 58)
+
+    # Metadata LKPD
+    p_meta = doc.add_paragraph()
+    p_meta.add_run(f"Mata Pelajaran\t: ").bold = True
+    p_meta.add_run(f"{mapel}\n")
+    p_meta.add_run(f"Kelas / Jenjang\t: ").bold = True
+    p_meta.add_run(f"{kelas}\n")
+    p_meta.add_run(f"Materi Utama\t: ").bold = True
+    p_meta.add_run(f"{topik}\n")
+
+    doc.add_paragraph("―" * 58)
+
+    # [A] Tujuan Pembelajaran
+    p_a = doc.add_paragraph()
+    r_a = p_a.add_run("[A] TUJUAN PEMBELAJARAN (HOTS)")
+    r_a.bold = True
+    r_a.font.size = Pt(11)
+    r_a.font.color.rgb = RGBColor(5, 150, 105)
+
+    tujuan_list = ai_content.get("tujuan", [])
+    for idx, t in enumerate(tujuan_list, 1):
+        doc.add_paragraph(f"{idx}. {t}")
+
+    # [B] Apersepsi & Ringkasan Konsep
+    p_b = doc.add_paragraph()
+    r_b = p_b.add_run("\n[B] APERSEPSI & RINGKASAN KONSEP TERINTEGRASI")
+    r_b.bold = True
+    r_b.font.size = Pt(11)
+    r_b.font.color.rgb = RGBColor(5, 150, 105)
+
+    doc.add_paragraph(ai_content.get("ringkasan", ""))
+
+    # [C] Tugas Eksplorasi
+    p_c = doc.add_paragraph()
+    r_c = p_c.add_run("\n[C] TUGAS EKSPLORASI & STUDI KASUS MANDIRI")
+    r_c.bold = True
+    r_c.font.size = Pt(11)
+    r_c.font.color.rgb = RGBColor(5, 150, 105)
+
+    doc.add_paragraph(f"1. {ai_content.get('soal_1', '')}")
+    doc.add_paragraph(f"2. {ai_content.get('soal_2', '')}")
+
+    # [D] Refleksi Keislaman
+    p_d = doc.add_paragraph()
+    r_d = p_d.add_run("\n[D] REFLEKSI KEISLAMAN & HIKMAH SANTRI")
+    r_d.bold = True
+    r_d.font.size = Pt(11)
+    r_d.font.color.rgb = RGBColor(5, 150, 105)
+
+    p_ref = doc.add_paragraph()
+    r_ref = p_ref.add_run(f'"{ai_content.get("refleksi", "")}"')
+    r_ref.italic = True
+
+    # Simpan ke Memory Buffer (Tanpa simpan file sementara di disk)
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
 # ==============================================================================
 # 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
 # ==============================================================================
@@ -420,66 +540,46 @@ elif st.session_state.page == "guru_dashboard":
         st.divider()
 
         # ==============================================================================
-        # DEMO / SANDBOX GENERATE LKPD PDF TEMPLATE AL-IRSYAD
+        # GENERATOR LKPD WORD (.DOCX) EKSKLUSIF BERLOGO
         # ==============================================================================
         st.markdown("""
         <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 12px; border-radius: 10px; border: 1px solid #059669; color: white; margin-bottom: 12px;">
-            <div style="font-size: 14px; font-weight: 700;">🧪 Demo Generator LKPD PDF Eksklusif</div>
-            <div style="font-size: 11px; opacity: 0.85; margin-top: 2px;">Format standar Lembaga Pendidikan Al-Irsyad Al-Islamiyyah Bondowoso</div>
+            <div style="font-size: 14px; font-weight: 700;">📄 Generator LKPD Word Berlogo Resmi</div>
+            <div style="font-size: 11px; opacity: 0.85; margin-top: 2px;">Terintegrasi Gemini AI & Format Madrasah Al-Irsyad Al-Islamiyah Putri Bondowoso</div>
         </div>
         """, unsafe_allow_html=True)
 
-        # Form Input Uji Coba LKPD
-        topic_lkpd = st.text_input("Topik / Materi Pembelajaran:", placeholder="Contoh: Hukum Nun Mati & Tanwin / Persamaan Kuadrat", key="lkpd_topic")
+        topic_lkpd = st.text_input("Topik / Materi Pembelajaran:", placeholder="Contoh: Persamaan Kuadrat / Tajwid Hukum Nun Mati", key="lkpd_topic")
         
         col_lkpd1, col_lkpd2 = st.columns(2)
         with col_lkpd1:
             kelas_lkpd = st.selectbox("Kelas / Jenjang:", ["VII MTs", "VIII MTs", "IX MTs", "X MA", "XI MA", "XII MA"], key="lkpd_kelas")
         with col_lkpd2:
-            mapel_lkpd = st.selectbox("Mata Pelajaran:", ["Matematika", "IPA Terintegrasi", "IPS Terintegrasi", "PAI & Bahasa Arab"], key="lkpd_mapel")
+            mapel_lkpd = st.selectbox("Mata Pelajaran:", ["Matematika", "IPA Terintegrasi", "IPS Terintegrasi", "PAI & Bahasa Arab", "Fisika", "Biologi", "Kimia"], key="lkpd_mapel")
 
-        if st.button("📄 Generate Sampel LKPD (PDF)", type="primary", use_container_width=True):
+        if st.button("📄 Generate LKPD Word (.docx) Berlogo", type="primary", use_container_width=True):
             if not topic_lkpd.strip():
                 st.warning("⚠️ Ketik topik/materi pembelajarannya dulu ya!")
             else:
-                with st.spinner("U.Project Nexus sedang menyusun dokumen LKPD resmi..."):
-                    # Simulasi pembuatan PDF/Word kustom khas Al-Irsyad
-                    sample_lkpd_text = f"""
-                    ================================================================================
-                              LEMBAR KERJA PESERTA DIDIK (LKPD) DIGITAL
-                           MA & MTs AL IRSYAD AL ISLAMIYYAH BONDOWOSO (MANTAP)
-                    ================================================================================
-                    Mata Pelajaran  : {mapel_lkpd}
-                    Kelas / Jenjang : {kelas_lkpd}
-                    Materi Utama    : {topic_lkpd}
-                    Engine Generator: U.Project Nexus Intelligence v3.6
-                    --------------------------------------------------------------------------------
+                with st.spinner("U.Project Nexus sedang menyusun dokumen Word berlogo resmi..."):
+                    ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, topic_lkpd)
                     
-                    [A] TUJUAN PEMBELAJARAN:
-                    1. Siswa mampu memahami konsep dasar {topic_lkpd} secara mendalam.
-                    2. Siswa dapat mengorelasikan materi {topic_lkpd} dengan nilai Keislaman & Sains.
-                    
-                    [B] RINGKASAN MATERI (GENERATED BY AI):
-                    Materi {topic_lkpd} merupakan salah satu pondasi penting dalam pembelajaran {mapel_lkpd}.
-                    Penguasaan konsep ini melatih ketajaman berpikir analitis serta pemecahan masalah.
-                    
-                    [C] TUGAS & EKSPLORASI MANDIRI:
-                    1. Jelaskan definisi dan prinsip utama dari {topic_lkpd} menggunakan bahasamu sendiri!
-                    2. Berikan 2 contoh penerapan {topic_lkpd} dalam kehidupan sehari-hari atau fenomena alam!
-                    
-                    --------------------------------------------------------------------------------
-                    Dokumen ini dibuat otomatis oleh U.Project Nexus System untuk MANTAP Bondowoso.
-                    ================================================================================
-                    """
-                    
-                    st.success("✅ LKPD Berhasil Dibuat!")
-                    st.download_button(
-                        label="📥 Download File LKPD (.txt / .pdf)",
-                        data=sample_lkpd_text,
-                        file_name=f"LKPD_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}.txt",
-                        mime="text/plain",
-                        use_container_width=True
-                    )
+                    if not ai_content:
+                        st.error("Gagal menyusun LKPD. Silakan klik tombol sekali lagi.")
+                    else:
+                        # Buat File Word berlogo di Memory
+                        docx_buffer = create_lkpd_docx_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
+                        
+                        st.success("✅ Dokumen LKPD Word (.docx) Berlogo Berhasil Diproduksi!")
+                        
+                        # Tombol Unduh Dokumen Word (.docx)
+                        st.download_button(
+                            label="📥 Download Dokumen LKPD (.docx)",
+                            data=docx_buffer,
+                            file_name=f"LKPD_AlIrsyad_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True
+                        )
 
 
 
