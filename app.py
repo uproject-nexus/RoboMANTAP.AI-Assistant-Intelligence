@@ -318,7 +318,7 @@ elif st.session_state.page == "guru_dashboard":
         st.stop()
 
     st.markdown("## 🖥️ Dashboard GuruMANTAP")
-    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕🏼 Bank Soal RoboMANTAP", "📲 WA Automation"])
+    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕🏼 Bank Soal", "📲 WA Automation"])
 
     with tab1:
         # Fungsi HTML untuk visual bar ala Quizizz (Disesuaikan jadi 10 Soal)
@@ -385,7 +385,7 @@ elif st.session_state.page == "guru_dashboard":
         render_live_monitoring()
 
     with tab2:
-        st.subheader("🧕🏼 AI Quiz Generator & Analisis")
+        st.title("🧕🏼 AI Quiz Generator & Analisis")
         st.info(
             "🚀 **Fitur Mendatang (U.Project Nexus Intelligence v3.6):**\n\n"
             "• **Generator Massal:** Buat puluhan paket soal HOTS & tematik secara instan.\n"
