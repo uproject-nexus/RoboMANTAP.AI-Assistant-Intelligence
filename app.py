@@ -313,7 +313,7 @@ elif st.session_state.page == "guru_dashboard":
         st.stop()
 
     st.markdown("## 🖥️ Dashboard GuruMANTAP")
-    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring Sesi Latihan Siswa", "🧕🏼 Bank Soal RoboMANTAP", "📲 WA Automation"])
+    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕🏼 Bank Soal RoboMANTAP", "📲 WA Automation"])
 
     with tab1:
         # Fungsi HTML untuk visual bar ala Quizizz (Disesuaikan jadi 10 Soal)
@@ -425,7 +425,7 @@ elif st.session_state.page == "setup":
     st.write("---")
     # Input Biodata Siswa Wajib
     st.markdown("#### 📝 Masukkan Data Diri Kamu")
-    st.session_state.nama_siswa = st.text_input("Nama Lengkap:", value=st.session_state.nama_siswa, placeholder="Contoh: Fatimah Az-Zahra")
+    st.session_state.nama_siswa = st.text_input("Nama Lengkap:", value=st.session_state.nama_siswa, placeholder="Contoh: Fulanah binti Fulan")
     st.write("---")
 
     c1, c2 = st.columns([5, 7])
@@ -548,7 +548,7 @@ elif st.session_state.page == "quiz":
         
         attempt_input = st.text_input(
             "Gagasan / Ide Logika Kamu apa coba?:",
-            placeholder="Contoh: Aku bingung nih harus mulai dari mana... 🤔",
+            placeholder="Contoh: Aku masih belum bisa mengartikan Bahasa Arab. 😟",
             key=f"hint_in_{curr_idx}"
         )
         
@@ -616,13 +616,13 @@ elif st.session_state.page == "result":
     )
 
     if total_skor >= 32:
-        feedback_msg = f"🌟 **Luar Biasa! (Skor: {total_skor}/40)**\n\nRoboMANTAP bangga banget sama kamu! Pemahaman kamu di materi {st.session_state.mapel} sudah sangat tajam. Pertahankan fokus kamu untuk tahap OMI selanjutnya ya! 🚀✨"
+        feedback_msg = f"🌟 **Luar Biasa! (Skor: {total_skor}/40)**\n\nRoboMANTAP bangga banget sama kamu! Pemahaman kamu di materi {st.session_state.mapel} sudah sangat tajam. Pertahankan fokus kamu untuk Persiapan OMI 2026 ya! 🚀✨"
         feedback_type = "success"
     elif total_skor >= 16:
         feedback_msg = f"👍 **Kerja Bagus! (Skor: {total_skor}/40)**\n\nUsaha yang mantap! Kamu sudah paham sebagian besar konsepnya. Coba cek pembahasan di bawah untuk memperbaiki sedikit kekeliruan tadi ya! 💪😊"
         feedback_type = "info"
     else:
-        feedback_msg = f"🌱 **Tetap Semangat! (Skor: {total_skor}/40)**\n\nJangan berkecil hati ya! Setiap kesalahan adalah proses belajar. Yuk pelajari pembahasan rinci di bawah dan coba latihan 10 soal lagi bersama RoboMANTAP! 🤖❤️"
+        feedback_msg = f"🌱 **Tetap Semangat! (Skor: {total_skor}/40)**\n\nJangan berkecil hati ya! Setiap kesalahan adalah proses belajar. Yuk pelajari pembahasan rinci di bawah dan coba latihan 10 soal lagi bersama RoboMANTAP! 🧕🏼❤️"
         feedback_type = "warning"
 
     k1, k2, k3, k4 = st.columns(4)
@@ -669,7 +669,7 @@ elif st.session_state.page == "result":
 
     st.write("---")
     st.markdown("### 📖 Pembahasan Rinci dari Pembina RoboMANTAP ")
-    st.caption("💡 *untuk meminta RoboMANTAP membahas nya, Klik pada masing-masing soal di bawah ini ya!* 😊")
+    st.caption("💡 *Untuk meminta RoboMANTAP membahas nya, Klik pada masing-masing soal di bawah ini ya!* 😊")
     
     for idx, q in enumerate(quiz_data):
         u_ans = user_answers.get(idx, "Tidak Dijawab")
