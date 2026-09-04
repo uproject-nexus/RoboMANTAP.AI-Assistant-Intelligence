@@ -263,7 +263,7 @@ if st.session_state.page == "landing":
         </div>
         """, unsafe_allow_html=True)
         if st.button("Masuk Modul MTs ➔", key="btn_mts", use_container_width=True, type="primary"):
-            st.session_state.jenjang = "MTs (Sederajat SMP)"
+            st.session_state.jenjang = "MTs (SMP Sederajat )"
             st.session_state.page = "select_mapel"
             st.rerun()
 
@@ -275,7 +275,7 @@ if st.session_state.page == "landing":
         </div>
         """, unsafe_allow_html=True)
         if st.button("Masuk Modul MA ➔", key="btn_ma", use_container_width=True, type="primary"):
-            st.session_state.jenjang = "MA (Sederajat SMA)"
+            st.session_state.jenjang = "MA (SMA Sederajat )"
             st.session_state.page = "select_mapel"
             st.rerun()
 
@@ -296,7 +296,7 @@ if st.session_state.page == "landing":
 # ==============================================================================
 elif st.session_state.page == "guru_login":
     st.subheader("🔒 Akses Portal Guru")
-    st.info("Fitur Enterprise ini dilindungi PIN untuk menjaga kerahasiaan nilai siswa dan soal CBT.")
+    st.info("Fitur ini dilindungi PIN untuk menjaga kerahasiaan nilai siswa dan soal CBT.")
     
     pin_input = st.text_input("Masukkan PIN Akses:", type="password")
     if st.button("Login", type="primary"):
@@ -335,7 +335,7 @@ elif st.session_state.page == "guru_dashboard":
         def render_live_monitoring():
             conn = init_db_connection()
             if not conn:
-                st.warning("Menunggu koneksi Database PostgreSQL terhubung untuk Live Monitoring...")
+                st.warning("Menunggu koneksi Database terhubung untuk Live Monitoring...")
                 return
 
             try:
@@ -380,12 +380,24 @@ elif st.session_state.page == "guru_dashboard":
         render_live_monitoring()
 
     with tab2:
-        st.subheader("🤖 AI Quiz Generator & Analisis")
-        st.info("Fitur pembuatan paket soal baru secara massal, export ke PDF, dan analisis butir soal menggunakan Gemini 3.5 Flash-Lite akan terhubung di sini (Tahap Pengembangan Selanjutnya).")
+        st.subheader("🧕🏼 AI Quiz Generator & Analisis")
+        st.info(
+            "🚀 **Fitur Mendatang (U.Project Nexus Intelligence v3.6):**\n\n"
+            "• **Generator Massal:** Buat puluhan paket soal HOTS & tematik secara instan.\n"
+            "• **Export Cetak & PDF:** Siap cetak dengan tata letak rapi khas madrasah.\n"
+            "• **Analisis Butir Soal:** Evaluasi otomatis daya pembeda & tingkat kesukaran soal."
+        )
     
     with tab3:
-        st.subheader("📲 WhatsApp Integration Engine")
-        st.info("Fitur U.Project Nexus untuk Broadcast Hasil Ujian ke Orang Tua dan pembuatan Auto-LKPD via WhatsApp (Tahap Pengembangan Selanjutnya).")
+        st.subheader("📲 WhatsApp Integration")
+        st.info(
+            "⚡ **One-Click Automation (U.Project Nexus):**\n\n"
+            "• **Broadcast Hasil Ujian:** Kirim laporan skor otomatis ke WhatsApp siswa & orang tua.\n"
+            "• **ChatBot RoboMANTAP 24/7:** Asisten tutor pribadi siswa untuk belajar di rumah.\n"
+            "• **Auto-LKPD Guru:** Buat Lembar Kerja Siswa otomatis sesuai template eksklusif sekolah."
+        )
+
+
 
 # ==============================================================================
 # 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
