@@ -253,13 +253,13 @@ if st.session_state.page == "landing":
     st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
     st.write("---")
 
-    st.markdown("#### 🎓 Sesi Siswa (Mulai Latihan CBT)")
+    st.markdown("#### 📝 Mulai Latihan CBT")
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("""
         <div class="mode-card">
             <h2>🏫 TINGKAT MTs</h2>
-            <p style="opacity: 0.7; font-size: 14px;">Madrasah Tsanawiyah Al Irsyad Putri</p>
+            <p style="opacity: 0.7; font-size: 14px;">Madrasah Tsanawiyah Al-Irsyad Putri</p>
         </div>
         """, unsafe_allow_html=True)
         if st.button("Masuk Modul MTs ➔", key="btn_mts", use_container_width=True, type="primary"):
@@ -271,7 +271,7 @@ if st.session_state.page == "landing":
         st.markdown("""
         <div class="mode-card">
             <h2>🏛️ TINGKAT MA</h2>
-            <p style="opacity: 0.7; font-size: 14px;">Madrasah Aliyah Al Irsyad Putri</p>
+            <p style="opacity: 0.7; font-size: 14px;">Madrasah Aliyah Al-Irsyad Putri</p>
         </div>
         """, unsafe_allow_html=True)
         if st.button("Masuk Modul MA ➔", key="btn_ma", use_container_width=True, type="primary"):
@@ -280,11 +280,11 @@ if st.session_state.page == "landing":
             st.rerun()
 
     st.write("---")
-    st.markdown("#### 👨‍🏫 Portal Pengajar")
+    st.markdown("#### 🧕🏼 Portal GuruMANTAP")
     st.markdown("""
     <div class="guru-card">
-        <h2 style="margin:0;">🔴 Live Monitoring & AI Generator</h2>
-        <p style="font-size: 14px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp.</p>
+        <h2 style="margin:0; font-size: 18px;">🔴 Live Monitoring & AI Generator</h2>
+        <p style="font-size: 9px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp.</p>
     </div>
     """, unsafe_allow_html=True)
     if st.button("🔒 Masuk Portal Guru ➔", use_container_width=True):
