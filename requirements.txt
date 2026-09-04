@@ -6,3 +6,4 @@ python-dotenv
 google-genai
 SQLAlchemy
 psycopg2-binary
+python-docx
