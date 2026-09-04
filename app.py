@@ -283,7 +283,7 @@ if st.session_state.page == "landing":
     st.markdown("#### 🧕🏼 Portal GuruMANTAP")
     st.markdown("""
     <div class="guru-card">
-        <h2 style="margin:0; font-size: 20px; text-align: center;">🔴 Live Monitoring & AI Generator</h2>
+        <h2 style="margin:0; font-size: 20px;">🔴 Live Monitoring & AI Generator</h2>
         <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp</p>
     </div>
     """, unsafe_allow_html=True)
