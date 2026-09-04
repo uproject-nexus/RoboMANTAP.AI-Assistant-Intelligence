@@ -303,7 +303,7 @@ elif st.session_state.page == "guru_login":
     </div>
     """, unsafe_allow_html=True)
     
-    pin_input = st.text_input("Masukkan PIN Akses:", type="password", placeholder="Masukkan PIN GuruMANTAP")
+    pin_input = st.text_input("Masukkan PIN Akses:", type="password", placeholder="******")
     if st.button("Login", type="primary"):
         if pin_input == "MANTAP2026":
             st.session_state.guru_auth = True
