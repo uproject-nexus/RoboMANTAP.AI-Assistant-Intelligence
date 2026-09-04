@@ -410,7 +410,7 @@ elif st.session_state.page == "guru_dashboard":
         <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; color: #1e3a8a; margin-bottom: 15px;">
             <b style="font-size: 13px;">⚡ One-Click Automation By U.Project Nexus:</b>
             <ul style="margin: 6px 0 0 0; padding-left: 18px;">
-                <li><b>Broadcast Hasil Ujian:</b> Laporan nilai otomatis ke WA ortu & siswa</li>
+                <li><b>Broadcast Hasil Ujian:</b> Laporan nilai otomatis ke WA orang tua & siswa</li>
                 <li><b>ChatBot RoboMANTAP 24/7:</b> Asisten tutor pribadi siswa di rumah</li>
                 <li><b>Auto-LKPD Guru:</b> Buat LKPD otomatis sesuai template khas sekolah</li>
             </ul>
