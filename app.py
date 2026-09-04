@@ -318,7 +318,7 @@ elif st.session_state.page == "guru_dashboard":
         st.stop()
 
     st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
-    tab1, tab2, tab3 = st.tabs(["Live Monitoring", "🧕Bank Soal", "WA Automation"])
+    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕Bank Soal", "📲 WA Automation"])
 
     with tab1:
         # Fungsi HTML untuk visual bar ala Quizizz (Disesuaikan jadi 10 Soal)
