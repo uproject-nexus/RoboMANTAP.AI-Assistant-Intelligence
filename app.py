@@ -300,7 +300,7 @@ elif st.session_state.page == "guru_dashboard":
                 return
 
             try:
-                df = pd.read_sql("SELECT nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, status FROM sesi_ujian ORDER BY updated_at DESC", conn)
+                df = conn.query("SELECT nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, status FROM sesi_ujian ORDER BY updated_at DESC", ttl=0)
                 
                 if df.empty:
                     st.info("Belum ada siswa yang sedang mengerjakan ujian saat ini.")
