@@ -295,10 +295,10 @@ if st.session_state.page == "landing":
 # 2. LOGIN GURU & DASHBOARD
 # ==============================================================================
 elif st.session_state.page == "guru_login":
-    st.subheader("🔒 Akses Portal Guru")
-    st.info("Fitur ini dilindungi PIN untuk menjaga kerahasiaan nilai siswa dan soal CBT.")
+    st.subheader("🔒 Akses Portal GuruMANTAP")
+    st.info("<span style='font-size: 12px;'>Fitur ini dilindungi PIN untuk menjaga kerahasiaan nilai siswa dan soal CBT.</span>")
     
-    pin_input = st.text_input("Masukkan PIN Akses:", type="password")
+    pin_input = st.text_input("Masukkan PIN Akses:", type="password", placeholder="Masukkan PIN GuruMANTAP")
     if st.button("Login", type="primary"):
         if pin_input == "MANTAP2026":
             st.session_state.guru_auth = True
