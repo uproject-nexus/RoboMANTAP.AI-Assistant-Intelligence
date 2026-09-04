@@ -448,7 +448,7 @@ elif st.session_state.page == "setup":
         
         available_submateri = KISI_KISI_OMI[st.session_state.jenjang][st.session_state.mapel]
         st.session_state.selected_submateri = st.multiselect(
-            "Pilih Submateri (Kosongkan saja ya kalau Kamu Mau pilih Semua Submateri!):",
+            "Pilih Submateri:",
             available_submateri,
             default=[],
             placeholder="Pilih submateri di sini..."
