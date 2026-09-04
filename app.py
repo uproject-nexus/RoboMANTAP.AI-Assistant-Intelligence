@@ -284,7 +284,7 @@ if st.session_state.page == "landing":
     st.markdown("""
     <div class="guru-card">
         <h2 style="margin:0; font-size: 19px;">🔴 Live Monitoring & AI Generator</h2>
-        <p style="font-size: 12px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp.</p>
+        <p style="font-size: 11px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp.</p>
     </div>
     """, unsafe_allow_html=True)
     if st.button("🔒 Masuk Portal Guru ➔", use_container_width=True):
