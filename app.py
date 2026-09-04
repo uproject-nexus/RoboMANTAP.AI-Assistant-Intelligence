@@ -403,7 +403,7 @@ elif st.session_state.page == "guru_dashboard":
 # 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
 # ==============================================================================
 elif st.session_state.page == "select_mapel":
-    st.markdown(f"### 📚 Pilih Bidang OMI 2026 - <span style='color: #059669;'>{st.session_state.jenjang}</span>", unsafe_allow_html=True)
+    st.markdown(f"### 📚 Pilih Bidang OMI 2026 -<br><span style='color: #059669; display: inline-block;'>{st.session_state.jenjang}</span>", unsafe_allow_html=True)
     if st.button("⬅️ Kembali Pilih Jenjang"):
         st.session_state.page = "landing"
         st.rerun()
