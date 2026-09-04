@@ -318,7 +318,7 @@ elif st.session_state.page == "setup":
         """)
         st.write("")
         if st.button("🚀 MARI MULAI SESI TEST SEKARANG!", type="primary", use_container_width=True):
-            with st.spinner(f"RoboMANTAP sedang merancang 10 soal {st.session_state.mapel} Kamu. Tunggu sebentar ya 😊"):
+            with st.spinner(f"RoboMANTAP sedang merancang 10 soal {st.session_state.mapel} Kamu. Tunggu sebentar ya... (nggak lama kok, hanya butuh waktu sekitar 15 detik saja! 😊)"):
                 quiz = generate_quiz_batch(
                     st.session_state.jenjang,
                     st.session_state.mapel,
@@ -471,7 +471,7 @@ elif st.session_state.page == "result":
     with col_act1:
         if st.button("🔄 LATIHAN SOAL LAGI DONG! (SESI BARU)", type="primary", use_container_width=True):
             st.cache_data.clear()
-            with st.spinner("Sabar ya 😊 RoboMANTAP sedang menyiapkan soal baru Kamu.."):
+            with st.spinner("Sabar ya, RoboMANTAP sedang menyiapkan soal baru Kamu.. (nggak lama kok, hanya butuh waktu sekitar 15 detik saja! 😊)"):
                 new_quiz = generate_quiz_batch(st.session_state.jenjang, st.session_state.mapel, st.session_state.stage, st.session_state.selected_submateri)
                 if new_quiz and len(new_quiz) == 10:
                     st.session_state.quiz_data = new_quiz
