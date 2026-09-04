@@ -172,10 +172,15 @@ def clean_json_text(text: str) -> str:
         text = re.sub(r"\n?```$", "", text)
         text = text.strip()
 
-    # Ubah backslash LaTeX tunggal menjadi double backslash \\ agar json.loads tidak error
-    text = re.sub(r'\\(?![\\"])', r'\\\\', text)
+    # Fungsi pengganti otomatis untuk menjaga validitas JSON
+    def replace_slash(match):
+        g = match.group(0)
+        if g in (r'\\', r'\"'):
+            return g  # Biarkan \\ dan \" yang sudah valid
+        return r'\\'  # Ubah \ tunggal menjadi \\
 
-    return text
+    # Amankan backslash tanpa merusak struktur JSON
+    return re.sub(r'\\\\|\\"|\\', replace_slash, text)
 
 def call_gemini_with_rotation(prompt: str, is_json: bool = False):
     """
