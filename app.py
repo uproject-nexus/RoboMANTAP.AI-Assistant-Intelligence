@@ -312,8 +312,8 @@ elif st.session_state.page == "guru_dashboard":
         st.warning("Akses Ditolak.")
         st.stop()
 
-    st.markdown("## 🖥️ Dashboard GuruMANTAP")
-    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring Sesi Latihan Siswa", "🧕🏼 Bank Soal RoboMANTAP", "📲 WA Automation"])
+    st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
+    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕🏼 Bank Soal RoboMANTAP", "📲 WA Automation"])
 
     with tab1:
         # Fungsi HTML untuk visual bar ala Quizizz (Disesuaikan jadi 10 Soal)
