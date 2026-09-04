@@ -385,24 +385,24 @@ elif st.session_state.page == "guru_dashboard":
         render_live_monitoring()
 
     with tab2:
-        st.markdown("<p style='font-size: 16px; font-weight: bold; margin-bottom: 8px;'>🧕🏼 AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 8px;'>🧕🏼 AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
         st.info("""
-        🚀 **Fitur Mendatang (U.Project Nexus Intelligence v3.6):**
+        🚀 **Fitur Mendatang:**
         
-        * **Server Eksklusif:** Terhubung langsung ke engine U.Project Nexus.
-        * **Generator Massal:** Buat puluhan paket soal HOTS & tematik secara instan.
-        * **Export Cetak & PDF:** Siap cetak dengan tata letak rapi khas madrasah.
-        * **Analisis Butir Soal:** Evaluasi otomatis daya pembeda & tingkat kesukaran soal.
+        * **Server Eksklusif:** Terhubung langsung ke System Terbaru U.Project Nexus Intelligence v3.6
+        * **Generator Massal:** Buat puluhan/ratusan paket soal HOTS & tematik secara instan
+        * **Export Cetak & PDF:** Siap cetak dengan tata letak rapi ber-template eksklusif khas sekolah
+        * **Analisis Butir Soal:** Evaluasi otomatis daya pembeda & tingkat kesukaran soal
         """)
 
     with tab3:
-        st.markdown("<p style='font-size: 16px; font-weight: bold; margin-bottom: 8px;'>📲 WhatsApp Integration Engine</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 8px;'>📲 WhatsApp Integration Engine</p>", unsafe_allow_html=True)
         st.info("""
-        ⚡ **One-Click Automation (U.Project Nexus):**
+        ⚡ **One-Click Automation U.Project Nexus:**
         
-        * **Broadcast Hasil Ujian:** Kirim laporan skor otomatis ke WhatsApp siswa & orang tua.
-        * **ChatBot RoboMANTAP 24/7:** Asisten tutor pribadi siswa untuk belajar di rumah.
-        * **Auto-LKPD Guru:** Buat Lembar Kerja Siswa otomatis sesuai template eksklusif sekolah.
+        * **Broadcast Hasil Ujian:** Kirim laporan skor otomatis ke WhatsApp siswa & orang tua
+        * **ChatBot RoboMANTAP 24/7:** Asisten tutor pribadi siswa untuk belajar di rumah
+        * **Auto-LKPD Guru:** Buat Lembar Kerja Siswa otomatis sesuai template eksklusif khas sekolah
         """)
 
 
