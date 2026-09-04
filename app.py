@@ -385,25 +385,101 @@ elif st.session_state.page == "guru_dashboard":
         render_live_monitoring()
 
     with tab2:
-        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 8px;'>🧕🏼 AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
-        st.info("""
-        🚀 **Fitur Mendatang:**
+        # Header Ringkas HP
+        st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>🧕🏼 AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
         
-        * **Server Eksklusif:** Terhubung langsung ke System Terbaru U.Project Nexus Intelligence v3.6
-        * **Generator Massal:** Buat puluhan/ratusan paket soal HOTS & tematik secara instan
-        * **Export Cetak & PDF:** Siap cetak dengan tata letak rapi ber-template eksklusif khas sekolah
-        * **Analisis Butir Soal:** Evaluasi otomatis daya pembeda & tingkat kesukaran soal
-        """)
+        # Kotak Info Kustom Ringkas (12px)
+        st.markdown("""
+        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; color: #1e3a8a; margin-bottom: 15px;">
+            <b style="font-size: 13px;">🚀 Fitur Mendatang (U.Project Nexus Intelligence v3.6):</b>
+            <ul style="margin: 6px 0 0 0; padding-left: 18px;">
+                <li><b>Server Eksklusif:</b> Engine khusus pemrosesan soal tingkat lanjut.</li>
+                <li><b>Generator Massal:</b> Buat puluhan paket soal HOTS & tematik instan.</li>
+                <li><b>Export Cetak & PDF:</b> Siap cetak ber-template eksklusif sekolah.</li>
+                <li><b>Analisis Butir Soal:</b> Evaluasi daya pembeda & tingkat kesukaran.</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
 
     with tab3:
-        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 8px;'>📲 WhatsApp Integration Engine</p>", unsafe_allow_html=True)
-        st.info("""
-        ⚡ **One-Click Automation U.Project Nexus:**
+        # Header Ringkas HP
+        st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>📲 WhatsApp Integration Engine</p>", unsafe_allow_html=True)
         
-        * **Broadcast Hasil Ujian:** Kirim laporan skor otomatis ke WhatsApp siswa & orang tua
-        * **ChatBot RoboMANTAP 24/7:** Asisten tutor pribadi siswa untuk belajar di rumah
-        * **Auto-LKPD Guru:** Buat Lembar Kerja Siswa otomatis sesuai template eksklusif khas sekolah
-        """)
+        # Kotak Info Kustom Ringkas (12px)
+        st.markdown("""
+        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; color: #1e3a8a; margin-bottom: 15px;">
+            <b style="font-size: 13px;">⚡ One-Click Automation (U.Project Nexus):</b>
+            <ul style="margin: 6px 0 0 0; padding-left: 18px;">
+                <li><b>Broadcast Hasil Ujian:</b> Laporan nilai otomatis ke WA ortu & siswa.</li>
+                <li><b>ChatBot RoboMANTAP 24/7:</b> Asisten tutor pribadi siswa di rumah.</li>
+                <li><b>Auto-LKPD Guru:</b> Buat LKPD otomatis sesuai template Al-Irsyad.</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.divider()
+
+        # ==============================================================================
+        # DEMO / SANDBOX GENERATE LKPD PDF TEMPLATE AL-IRSYAD
+        # ==============================================================================
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 12px; border-radius: 10px; border: 1px solid #059669; color: white; margin-bottom: 12px;">
+            <div style="font-size: 14px; font-weight: 700;">🧪 Demo Generator LKPD PDF Eksklusif</div>
+            <div style="font-size: 11px; opacity: 0.85; margin-top: 2px;">Format standar Lembaga Pendidikan Al-Irsyad Al-Islamiyyah Bondowoso</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Form Input Uji Coba LKPD
+        topic_lkpd = st.text_input("Topik / Materi Pembelajaran:", placeholder="Contoh: Hukum Nun Mati & Tanwin / Persamaan Kuadrat", key="lkpd_topic")
+        
+        col_lkpd1, col_lkpd2 = st.columns(2)
+        with col_lkpd1:
+            kelas_lkpd = st.selectbox("Kelas / Jenjang:", ["VII MTs", "VIII MTs", "IX MTs", "X MA", "XI MA", "XII MA"], key="lkpd_kelas")
+        with col_lkpd2:
+            mapel_lkpd = st.selectbox("Mata Pelajaran:", ["Matematika", "IPA Terintegrasi", "IPS Terintegrasi", "PAI & Bahasa Arab"], key="lkpd_mapel")
+
+        if st.button("📄 Generate Sampel LKPD (PDF)", type="primary", use_container_width=True):
+            if not topic_lkpd.strip():
+                st.warning("⚠️ Ketik topik/materi pembelajarannya dulu ya!")
+            else:
+                with st.spinner("U.Project Nexus sedang menyusun dokumen LKPD resmi..."):
+                    # Simulasi pembuatan PDF/Word kustom khas Al-Irsyad
+                    sample_lkpd_text = f"""
+                    ================================================================================
+                              LEMBAR KERJA PESERTA DIDIK (LKPD) DIGITAL
+                           MA & MTs AL IRSYAD AL ISLAMIYYAH BONDOWOSO (MANTAP)
+                    ================================================================================
+                    Mata Pelajaran  : {mapel_lkpd}
+                    Kelas / Jenjang : {kelas_lkpd}
+                    Materi Utama    : {topic_lkpd}
+                    Engine Generator: U.Project Nexus Intelligence v3.6
+                    --------------------------------------------------------------------------------
+                    
+                    [A] TUJUAN PEMBELAJARAN:
+                    1. Siswa mampu memahami konsep dasar {topic_lkpd} secara mendalam.
+                    2. Siswa dapat mengorelasikan materi {topic_lkpd} dengan nilai Keislaman & Sains.
+                    
+                    [B] RINGKASAN MATERI (GENERATED BY AI):
+                    Materi {topic_lkpd} merupakan salah satu pondasi penting dalam pembelajaran {mapel_lkpd}.
+                    Penguasaan konsep ini melatih ketajaman berpikir analitis serta pemecahan masalah.
+                    
+                    [C] TUGAS & EKSPLORASI MANDIRI:
+                    1. Jelaskan definisi dan prinsip utama dari {topic_lkpd} menggunakan bahasamu sendiri!
+                    2. Berikan 2 contoh penerapan {topic_lkpd} dalam kehidupan sehari-hari atau fenomena alam!
+                    
+                    --------------------------------------------------------------------------------
+                    Dokumen ini dibuat otomatis oleh U.Project Nexus System untuk MANTAP Bondowoso.
+                    ================================================================================
+                    """
+                    
+                    st.success("✅ LKPD Berhasil Dibuat!")
+                    st.download_button(
+                        label="📥 Download File LKPD (.txt / .pdf)",
+                        data=sample_lkpd_text,
+                        file_name=f"LKPD_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}.txt",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
 
 
 
