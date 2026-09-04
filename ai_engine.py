@@ -153,43 +153,25 @@ def _stream_from_clients(prompt: str, max_output_tokens: int):
         "Silakan coba klik lagi ya!"
     )
 
-
 def format_latex_options(options):
     formatted = []
     for opt in options:
         opt = opt.replace(r"\frac", r"\tfrac")
-        if "\\" in opt and "$" not in opt:
-            parts = opt.split(" ", 1)
-            if len(parts) == 2 and parts[0].endswith("."):
-                opt = f"{parts[0]} ${parts[1]}$"
-            else:
-                opt = f"${opt}$"
         formatted.append(opt)
     return formatted
 
 def clean_json_text(text: str) -> str:
-    """
-    Membersihkan string JSON secara permanen dari balikan AI yang mengandung 
-    notasi LaTeX atau Bahasa Arab agar tidak memicu error 'Invalid \\escape'.
-    """
+    """Membersihkan string JSON murni dari pemungkus markdown."""
     if not text:
         return ""
     
     text = text.strip()
-    # Hapus pemungkus markdown ```json ... ``` jika ada
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\n?", "", text, flags=re.IGNORECASE)
         text = re.sub(r"\n?```$", "", text)
         text = text.strip()
 
-    # Perbaikan Anti-Error: Pertahankan \" dan \\ yang valid, ubah sisa \ tunggal menjadi \\
-    def fix_slash(m):
-        g = m.group(0)
-        if g in (r'\"', r'\\'):
-            return g
-        return r'\\'
-
-    return re.sub(r'\\"|\\\\|\\', fix_slash, text)
+    return text
 
 def call_gemini_with_rotation(prompt: str, is_json: bool = False):
     """
@@ -274,10 +256,12 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     - Variasi Bahasa Arab yang diperbolehkan: Teks Soal ditulis dalam Aksara Arab asli tanpa harakat (atau harakat minimal), sedangkan Pilihan Jawaban A, B, C, D dalam Bahasa Indonesia (atau sebaliknya).
     - Jangan pernah membuat lebih dari 3 soal berbahasa Arab dalam satu paket kuis.
 
-    ATURAN KHUSUS FORMATTING & KECEPATAN:
+    ATURAN KHUSUS FORMATTING & KECEPATAN (SANGAT PENTING):
     - JANGAN sertakan field `hint` atau `solution` di sini. Fokus saja merancang 10 teks soal cerita dan jawaban agar proses AI kencang.
-    - Semua angka ber-notasi, sudut, akar, rumus, pecahan, dan variabel WAJIB diapit tanda dollar '$' (Contoh: "$30^\circ$", "$\sqrt{3}$", "$x^2 + 2x = 0$").
-    - Tuliskan notasi LaTeX secara standar tanpa melipatgandakan backslash.
+    - Angka biasa, nominal uang (Contoh: "Rp 60.000.000"), satuan (Contoh: "14 meter", "12 detik", "50 kg"), dan jam (Contoh: "19.00 WIB") WAJIB ditulis sebagai TEKS BIASA TANPA simbol '$' dan TANPA backslash '\'.
+    - DILARANG KERAS membuat perintah LaTeX ilegal seperti '\60.000.000' atau '\14'.
+    - Gunakan format LaTeX $...$ HANYA untuk rumus matematika asli, pecahan, akar, dan variabel (Contoh: "$\\pi = \\tfrac{22}{7}$", "$\\sqrt{3}$", "$x^2 = 16$").
+    - DILARANG KERAS memasukkan kata/kalimat Bahasa Indonesia ke dalam format $...$.
 
     Format keluaran WAJIB berupa objek JSON murni:
     {{
