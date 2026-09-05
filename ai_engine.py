@@ -449,7 +449,8 @@ def update_progress_siswa(session_id: str, nama: str, jenjang: str, mapel: str,
 #generate LKPD
 def generate_lkpd_content(mapel: str, kelas: str, topik: str):
     """
-    Menghasilkan isi materi LKPD HOTS khas Al-Irsyad Bondowoso menggunakan Gemini 3.x.
+    Menghasilkan isi materi LKPD HOTS khas Al-Irsyad Bondowoso menggunakan Gemini 3.x
+    dengan aturan format matematika & LaTeX yang aman.
     """
     prompt = f"""
     Anda adalah Tim Ahli Kurikulum Lembaga Pendidikan Al-Irsyad Al-Islamiyah Putri Bondowoso.
@@ -459,6 +460,13 @@ def generate_lkpd_content(mapel: str, kelas: str, topik: str):
     - Mata Pelajaran: {mapel}
     - Kelas / Jenjang: {kelas}
     - Topik / Materi Utama: {topik}
+
+    ATURAN KHUSUS NOTASI MATEMATIKA & LATEX (SANGAT PENTING):
+    1. DILARANG KERAS membuat perintah LaTeX ilegal seperti '\\60.000.000' atau '\\14'.
+    2. Gunakan format LaTeX $...$ HANYA untuk rumus matematika asli, pecahan, akar, pangkat, dan variabel.
+       (Contoh benar: "$\\pi = \\tfrac{{22}}{{7}}$", "$\\sqrt{{3}}$", "$x^2 = 16$", "$-t^2 + 6t$").
+    3. DILARANG KERAS memasukkan kata/kalimat Bahasa Indonesia ke dalam format $...$.
+    4. Jangan menuliskan tanda pangkat polos seperti 'x^2' di luar tag $...$. Gunakan selalu '$x^2$'.
 
     Instruksi Penyusunan Konten:
     1. Tujuan Pembelajaran: Buatkan 2 poin tujuan berbasis indikator HOTS.
