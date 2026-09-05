@@ -645,7 +645,7 @@ elif st.session_state.page == "guru_dashboard":
         with col_lkpd1:
             kelas_lkpd = st.selectbox("Kelas / Jenjang:", ["VII MTs", "VIII MTs", "IX MTs", "X MA", "XI MA", "XII MA"], key="lkpd_kelas")
         with col_lkpd2:
-            mapel_lkpd = st.selectbox("Mata Pelajaran:", ["Matematika", "IPA Terintegrasi", "IPS Terintegrasi", "PAI & Bahasa Arab", "Fisika", "Biologi", "Kimia"], key="lkpd_mapel")
+            mapel_lkpd = st.selectbox("Mata Pelajaran:", ["Matematika", "IPA", "IPS", "PAI & Bahasa Arab", "Fisika", "Biologi", "Kimia"], key="lkpd_mapel")
 
         st.caption("💡*Modul cetak PDF ini adalah versi demo. Tampilan cover, logo, dan struktur LKPD dapat ditingkatkan atau disesuaikan penuh berdasarkan permintaan pihak sekolah*")
         if st.button("📄 Generate LKPD (.pdf)", type="primary", use_container_width=True):
@@ -833,7 +833,7 @@ elif st.session_state.page == "quiz":
         
         attempt_input = st.text_input(
             "Gagasan / Ide Logika Kamu apa coba?:",
-            placeholder="Contoh: Aku masih belum bisa mengartikan Bahasa Arab. 😟",
+            placeholder="Contoh: Arti Bahasa Arab-nya apa?😟",
             key=f"hint_in_{curr_idx}"
         )
         
