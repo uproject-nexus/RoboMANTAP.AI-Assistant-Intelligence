@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Import python-docx untuk generate Word berlogo
+# Import python-docx untuk generate Word berlogo (ReportLab PDF)
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.units import cm
@@ -18,7 +18,7 @@ from reportlab.platypus import (
 from ai_engine import (
     generate_quiz_batch, get_ai_hint_stream, get_ai_solution_stream,
     create_table_if_not_exists, update_progress_siswa, init_db_connection,
-    generate_lkpd_content
+    generate_lkpd_content, stream_ai_text
 )
 
 st.set_page_config(
@@ -55,7 +55,7 @@ components.html(
     height=0,
 )
 
-# Custom Styling (Dari Kode Awal - Dipertahankan 100%)
+# Custom Styling 
 st.markdown("""
     <style>
     .mode-card {
@@ -257,148 +257,65 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-#helper LKPD
+# Helper LKPD PDF
 def draw_cover_background(canvas_obj, doc):
-    """
-    Menggambar cover.png sebagai latar belakang penuh di Halaman 1.
-    """
     canvas_obj.saveState()
     cover_path = "cover.png"
     if os.path.exists(cover_path):
-        # A4 size dalam points: width=595.27, height=841.89
         canvas_obj.drawImage(cover_path, 0, 0, width=A4[0], height=A4[1])
     canvas_obj.restoreState()
 
-
 def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"):
-    """
-    Membuat file PDF LKPD Interaktif dengan Cover berbingkai khas Al-Irsyad.
-    """
     buffer = io.BytesIO()
-    
-    # Margin halaman
     doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        leftMargin=2.0 * cm,
-        rightMargin=2.0 * cm,
-        topMargin=2.2 * cm,
-        bottomMargin=2.2 * cm
+        buffer, pagesize=A4, leftMargin=2.0 * cm, rightMargin=2.0 * cm,
+        topMargin=2.2 * cm, bottomMargin=2.2 * cm
     )
-
     styles = getSampleStyleSheet()
     
-    # Style Kustom
-    style_cover_school = ParagraphStyle(
-        'CoverSchool',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=11,
-        leading=14,
-        textColor=colors.HexColor('#064E3B'),
-        alignment=1 # Center
-    )
-    
-    style_cover_title = ParagraphStyle(
-        'CoverTitle',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=18,
-        leading=22,
-        textColor=colors.HexColor('#059669'),
-        alignment=1
-    )
-
-    style_cover_sub = ParagraphStyle(
-        'CoverSub',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=10,
-        leading=13,
-        textColor=colors.HexColor('#374151'),
-        alignment=1
-    )
-
-    style_section_heading = ParagraphStyle(
-        'SecHeading',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=11,
-        leading=14,
-        textColor=colors.white
-    )
-
-    style_body = ParagraphStyle(
-        'BodyTextCustom',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=9.5,
-        leading=13,
-        textColor=colors.HexColor('#1F2937')
-    )
+    style_cover_school = ParagraphStyle('CoverSchool', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor('#064E3B'), alignment=1)
+    style_cover_title = ParagraphStyle('CoverTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=18, leading=22, textColor=colors.HexColor('#059669'), alignment=1)
+    style_cover_sub = ParagraphStyle('CoverSub', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=13, textColor=colors.HexColor('#374151'), alignment=1)
+    style_section_heading = ParagraphStyle('SecHeading', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.white)
+    style_body = ParagraphStyle('BodyTextCustom', parent=styles['Normal'], fontName='Helvetica', fontSize=9.5, leading=13, textColor=colors.HexColor('#1F2937'))
 
     story = []
+    story.append(Spacer(1, 2.2 * cm))
 
-    # =========================================================================
-    # HALAMAN 1: COVER BER-BG "cover.png"
-    # =========================================================================
-    story.append(Spacer(1, 2.2 * cm)) # Jarak dari bingkai atas
-
-    # Logo Sekolah
     if os.path.exists(logo_path):
         img_logo = Image(logo_path, width=3.8 * cm, height=2.2 * cm)
         img_logo.hAlign = 'CENTER'
         story.append(img_logo)
         story.append(Spacer(1, 0.4 * cm))
 
-    # Nama Sekolah
     school_html = "Madrasah Aliyah dan Tsanawiyah<br/><b>Al-Irsyad Al-Islamiyah Putri Bondowoso</b>"
     story.append(Paragraph(school_html, style_cover_school))
     story.append(Spacer(1, 0.8 * cm))
-
-    # Judul Dokumen
     story.append(Paragraph("LEMBAR KERJA PESERTA DIDIK", style_cover_title))
     story.append(Paragraph("(LKPD)", style_cover_title))
     story.append(Spacer(1, 0.2 * cm))
     story.append(Paragraph("Model Pembelajaran HOTS & Integrasi Nilai Keislaman", style_cover_sub))
     story.append(Spacer(1, 1.0 * cm))
 
-    # Card Informasi Identitas Pembelajaran
-    meta_text = f"""
-    <b>Mata Pelajaran:</b> {mapel}<br/>
-    <b>Kelas / Jenjang:</b> {kelas}<br/>
-    <b>Topik Utama:</b> {topik}<br/><br/>
-    <b>Nama / Kelompok:</b> ............................../.............................
-    """
+    meta_text = f"<b>Mata Pelajaran:</b> {mapel}<br/><b>Kelas / Jenjang:</b> {kelas}<br/><b>Topik Utama:</b> {topik}<br/><br/><b>Nama / Kelompok:</b> ............................../............................."
     p_meta = Paragraph(meta_text, style_body)
     
     table_meta = Table([[p_meta]], colWidths=[14 * cm])
     table_meta.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#ECFDF5')), # Soft Mint
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#ECFDF5')),
         ('BOX', (0,0), (-1,-1), 1.5, colors.HexColor('#059669')),
-        ('PADDING', (0,0), (-1,-1), 12),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('PADDING', (0,0), (-1,-1), 12), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
     ]))
     table_meta.hAlign = 'CENTER'
     story.append(table_meta)
-
     story.append(Spacer(1, 2.5 * cm))
     story.append(Paragraph("<i>Tahun Ajaran:......../........</i>", style_cover_sub))
-
-    # Pindah ke Halaman 2 untuk Isi Materi
     story.append(PageBreak())
 
-    # =========================================================================
-    # HALAMAN 2: ISI LKPD INTERAKTIF
-    # =========================================================================
-    
-    # [A] TUJUAN PEMBELAJARAN
+    # Halaman 2
     head_a = Paragraph("🎯 [A] TUJUAN PEMBELAJARAN (HOTS)", style_section_heading)
     t_head_a = Table([[head_a]], colWidths=[16.5 * cm])
-    t_head_a.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')),
-        ('PADDING', (0,0), (-1,-1), 6),
-    ]))
+    t_head_a.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')), ('PADDING', (0,0), (-1,-1), 6)]))
     story.append(t_head_a)
     story.append(Spacer(1, 0.2 * cm))
 
@@ -407,82 +324,44 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     story.append(Paragraph(tujuan_text, style_body))
     story.append(Spacer(1, 0.5 * cm))
 
-    # [B] APERSEPSI & KONSEP
     head_b = Paragraph("📖 [B] APERSEPSI & EKSPLORASI KONSEP", style_section_heading)
     t_head_b = Table([[head_b]], colWidths=[16.5 * cm])
-    t_head_b.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')),
-        ('PADDING', (0,0), (-1,-1), 6),
-    ]))
+    t_head_b.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')), ('PADDING', (0,0), (-1,-1), 6)]))
     story.append(t_head_b)
     story.append(Spacer(1, 0.2 * cm))
 
     p_ringkasan = Paragraph(ai_content.get("ringkasan", ""), style_body)
     t_box_b = Table([[p_ringkasan]], colWidths=[16.5 * cm])
-    t_box_b.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F0F9FF')), # Soft Sky Blue
-        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#BAE6FD')),
-        ('PADDING', (0,0), (-1,-1), 8),
-    ]))
+    t_box_b.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F0F9FF')), ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#BAE6FD')), ('PADDING', (0,0), (-1,-1), 8)]))
     story.append(t_box_b)
     story.append(Spacer(1, 0.5 * cm))
 
-    # [C] TUGAS EKSPLORASI MANDIRI
     head_c = Paragraph("✍️ [C] TUGAS EKSPLORASI MANDIRI", style_section_heading)
     t_head_c = Table([[head_c]], colWidths=[16.5 * cm])
-    t_head_c.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')),
-        ('PADDING', (0,0), (-1,-1), 6),
-    ]))
+    t_head_c.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')), ('PADDING', (0,0), (-1,-1), 6)]))
     story.append(t_head_c)
     story.append(Spacer(1, 0.3 * cm))
 
-    # Soal 1 + Kotak Jawab
-    story.append(Paragraph(f"<b>Soal 1:</b> {ai_content.get('soal_1', '')}", style_body))
-    story.append(Spacer(1, 0.1 * cm))
-    p_ans1 = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban:</i></font><br/><br/><br/><br/>", style_body)
-    t_ans1 = Table([[p_ans1]], colWidths=[16.5 * cm])
-    t_ans1.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F9FAFB')),
-        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#E5E7EB')),
-        ('PADDING', (0,0), (-1,-1), 6),
-    ]))
-    story.append(t_ans1)
-    story.append(Spacer(1, 0.4 * cm))
+    for i in range(1, 3):
+        story.append(Paragraph(f"<b>Soal {i}:</b> {ai_content.get(f'soal_{i}', '')}", style_body))
+        story.append(Spacer(1, 0.1 * cm))
+        p_ans = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban:</i></font><br/><br/><br/><br/>", style_body)
+        t_ans = Table([[p_ans]], colWidths=[16.5 * cm])
+        t_ans.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F9FAFB')), ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#E5E7EB')), ('PADDING', (0,0), (-1,-1), 6)]))
+        story.append(t_ans)
+        story.append(Spacer(1, 0.4 * cm))
 
-    # Soal 2 + Kotak Jawab
-    story.append(Paragraph(f"<b>Soal 2:</b> {ai_content.get('soal_2', '')}", style_body))
-    story.append(Spacer(1, 0.1 * cm))
-    p_ans2 = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban:</i></font><br/><br/><br/><br/>", style_body)
-    t_ans2 = Table([[p_ans2]], colWidths=[16.5 * cm])
-    t_ans2.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F9FAFB')),
-        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#E5E7EB')),
-        ('PADDING', (0,0), (-1,-1), 6),
-    ]))
-    story.append(t_ans2)
-    story.append(Spacer(1, 0.5 * cm))
-
-    # [D] REFLEKSI KEISLAMAN
     head_d = Paragraph("🌿 [D] REFLEKSI KEISLAMAN & HIKMAH", style_section_heading)
     t_head_d = Table([[head_d]], colWidths=[16.5 * cm])
-    t_head_d.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#D97706')), # Gold Banner
-        ('PADDING', (0,0), (-1,-1), 6),
-    ]))
+    t_head_d.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#D97706')), ('PADDING', (0,0), (-1,-1), 6)]))
     story.append(t_head_d)
     story.append(Spacer(1, 0.2 * cm))
 
     p_refleksi = Paragraph(f'<i>"{ai_content.get("refleksi", "")}"</i>', style_body)
     t_box_d = Table([[p_refleksi]], colWidths=[16.5 * cm])
-    t_box_d.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#FEF3C7')), # Soft Amber
-        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#FDE68A')),
-        ('PADDING', (0,0), (-1,-1), 8),
-    ]))
+    t_box_d.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#FEF3C7')), ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#FDE68A')), ('PADDING', (0,0), (-1,-1), 8)]))
     story.append(t_box_d)
 
-    # Build PDF dengan Callback Cover di Halaman
     doc.build(story, onFirstPage=draw_cover_background, onLaterPages=draw_cover_background)
     buffer.seek(0)
     return buffer
@@ -534,8 +413,9 @@ if st.session_state.page == "landing":
         st.session_state.page = "guru_login"
         st.rerun()
 
+
 # ==============================================================================
-# 2. LOGIN GURU & DASHBOARD
+# 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
 # ==============================================================================
 elif st.session_state.page == "guru_login":
     st.subheader("🔒 Akses Portal GuruMANTAP")
@@ -546,7 +426,7 @@ elif st.session_state.page == "guru_login":
     </div>
     """, unsafe_allow_html=True)
     
-    pin_input = st.text_input("Masukkan PIN Akses:", type="password", placeholder="**********")
+    pin_input = st.text_input("Masukkan PIN Akses:", type="password", placeholder="Masukkan PIN GuruMANTAP...")
     if st.button("Login", type="primary"):
         if pin_input == "MANTAP2026":
             st.session_state.guru_auth = True
@@ -564,11 +444,21 @@ elif st.session_state.page == "guru_dashboard":
     tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕Bank Soal", "📲 WA Automation"])
 
     with tab1:
-        # Fungsi HTML untuk visual bar ala Quizizz (Disesuaikan jadi 10 Soal)
+        # Pilihan Filter Waktu
+        time_filter = st.radio("⏳ Filter Riwayat Pengerjaan:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], horizontal=True)
+        
+        # Logika Kondisi Tanggal SQL (PostgreSQL Standard)
+        if time_filter == "Hari Ini":
+            date_condition = "DATE(updated_at) = CURRENT_DATE"
+        elif time_filter == "Kemarin":
+            date_condition = "DATE(updated_at) = CURRENT_DATE - INTERVAL '1 day'"
+        else:
+            date_condition = "DATE(updated_at) >= CURRENT_DATE - INTERVAL '2 days'"
+
         def render_progress_bar_html(detail_list):
             if not isinstance(detail_list, list): return ""
             html = '<div style="display: flex; gap: 4px; align-items: center;">'
-            for i in range(10): # Total soal per kuis = 10
+            for i in range(10): 
                 if i < len(detail_list):
                     val = detail_list[i]
                     color = "#10b981" if val is True else ("#ef4444" if val is False else "#d1d5db")
@@ -578,7 +468,6 @@ elif st.session_state.page == "guru_dashboard":
             html += '</div>'
             return html
 
-        # Auto-refresh setiap 3 detik
         @st.fragment(run_every="3s")
         def render_live_monitoring():
             conn = init_db_connection()
@@ -587,37 +476,102 @@ elif st.session_state.page == "guru_dashboard":
                 return
 
             try:
-                df = conn.query("SELECT nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, status FROM sesi_ujian ORDER BY updated_at DESC", ttl=0)
+                # Query SQL Canggih: Handle Filter Waktu & Auto-Expired Sesi (15 Menit Anti-Curang)
+                query = f"""
+                SELECT 
+                    nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, 
+                    CASE 
+                        WHEN status = 'BERJALAN' AND updated_at < NOW() - INTERVAL '15 minutes' THEN 'EXPIRED'
+                        ELSE status
+                    END as status_real,
+                    updated_at
+                FROM sesi_ujian
+                WHERE {date_condition}
+                ORDER BY updated_at DESC
+                """
+                df = conn.query(query, ttl=0)
                 
                 if df.empty:
-                    st.info("Belum ada siswa yang sedang mengerjakan ujian saat ini.")
+                    st.info(f"Belum ada data pengerjaan siswa untuk filter '{time_filter}'.")
                     return
 
-                # KPI Metrics
+                # KPI Metrics menggunakan kolom status_real (yang sudah di-filter timeout-nya)
                 c1, c2, c3 = st.columns(3)
-                c1.metric("Siswa Aktif", len(df[df['status'] == 'BERJALAN']))
-                c2.metric("Sesi Selesai", len(df[df['status'] == 'SELESAI']))
+                c1.metric("Siswa Aktif", len(df[df['status_real'] == 'BERJALAN']))
+                c2.metric("Sesi Selesai", len(df[df['status_real'] == 'SELESAI']))
                 c3.metric("Rata-Rata Nilai", f"{df['nilai_akhir'].mean():.1f}")
 
                 st.write("---")
+                
+                # Fitur Laporan AI Kelas (Executive Summary)
+                if st.button("🤖 Generate Laporan Diagnosis AI Kelas", type="primary", use_container_width=True):
+                    with st.spinner("RoboMANTAP sedang menyusun laporan kelas profesional..."):
+                        total_siswa = len(df)
+                        rata_rata = df['nilai_akhir'].mean()
+                        tertinggi = df['nilai_akhir'].max()
+                        terendah = df['nilai_akhir'].min()
+                        
+                        prompt = f"""
+                        Anda adalah Ahli Pedagogik dan Evaluasi Pembelajaran Pendidikan Islam.
+                        Buatkan laporan diagnosis kelas yang komprehensif, singkat, dan profesional berdasarkan rekap CBT {time_filter} berikut:
+                        - Total Sesi/Siswa: {total_siswa}
+                        - Rata-rata Kelas: {rata_rata:.1f}/40
+                        - Nilai Tertinggi: {tertinggi}/40
+                        - Nilai Terendah: {terendah}/40
+                        
+                        Susun laporan ke dalam 3 poin menggunakan formatting Markdown rapi:
+                        1. **Ringkasan Performa Kelas**
+                        2. **Peta Kekuatan & Kelemahan Umum**
+                        3. **Rekomendasi Tindak Lanjut untuk Guru di Al-Irsyad Bondowoso**
+                        """
+                        st.markdown("### 📊 Laporan Diagnosis Kelas (AI Generated)")
+                        st.write_stream(stream_ai_text(prompt, max_output_tokens=2500))
+                        st.write("---")
+
                 st.markdown("#### 🟢 Live Tracking Pengerjaan")
                 
                 # Render UI Tabel Kustom
                 for index, row in df.iterrows():
                     with st.container():
-                        col_nama, col_mapel, col_skor, col_bar = st.columns([3, 2, 1, 4])
-                        status_badge = "✅" if row['status'] == 'SELESAI' else "🔄"
-                        col_nama.markdown(f"**{row['nama_siswa']}** {status_badge}")
+                        col_nama, col_mapel, col_skor, col_bar, col_act = st.columns([2.5, 2.5, 1, 3.5, 1.5])
+                        
+                        # Ikon Status
+                        if row['status_real'] == 'SELESAI':
+                            status_badge = "✅"
+                        elif row['status_real'] == 'EXPIRED':
+                            status_badge = "⏸️ (Terputus)"
+                        else:
+                            status_badge = "🔄"
+                        
+                        # Pembersihan Markdown Spasi & Nama Cetak Tebal
+                        safe_nama = str(row['nama_siswa']).strip()
+                        safe_nama = safe_nama.replace("*", "") # Hilangkan bintang liar
+                        col_nama.markdown(f"**{safe_nama}** {status_badge}")
                         col_mapel.caption(f"{row['mapel']} ({row['jenjang'][:3]})")
                         col_skor.markdown(f"**Skor: {row['nilai_akhir']}**")
                         
-                        # Render Kotak Hijau/Merah
+                        # Kotak Hijau/Merah & Popover Analisis
                         try:
                             detail_list = row['detail_jawaban']
                             if isinstance(detail_list, str):
                                 import json
                                 detail_list = json.loads(detail_list)
                             col_bar.markdown(render_progress_bar_html(detail_list), unsafe_allow_html=True)
+                            
+                            # Micro-Analytics per Siswa
+                            with col_act:
+                                with st.popover("📊 Analisis"):
+                                    st.markdown(f"**Materi:** {row['mapel']}")
+                                    pct = (sum([1 for x in detail_list if x is True]) / 10) * 100 if detail_list else 0
+                                    if pct >= 70:
+                                        st.success(f"✅ **Materi Dikuasai:** Sangat menguasai {row['mapel']} ({pct}%)")
+                                        st.info("📉 **Materi Kurang:** Minor / Relatif aman.")
+                                    elif pct >= 40:
+                                        st.warning(f"⚠️ **Materi Dikuasai:** Cukup memahami {row['mapel']} ({pct}%)")
+                                        st.info(f"📉 **Materi Kurang:** Perlu review ulang beberapa sub-topik {row['mapel']}.")
+                                    else:
+                                        st.error(f"❌ **Materi Dikuasai:** Belum terlihat ({pct}%)")
+                                        st.error(f"📉 **Materi Kurang:** Sangat membutuhkan bimbingan intensif materi dasar {row['mapel']}.")
                         except:
                             col_bar.write("-")
                         st.divider()
@@ -628,43 +582,35 @@ elif st.session_state.page == "guru_dashboard":
         render_live_monitoring()
 
     with tab2:
-        # Header Ringkas HP
-        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 6px;'>🧕🏼 AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
-        
-        # Kotak Info Kustom Ringkas (12px)
+        st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>🧕🏼 AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
         st.markdown("""
         <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; color: #1e3a8a; margin-bottom: 15px;">
-            <b style="font-size: 13px;">🚀 Fitur Mendatang:</b>
+            <b style="font-size: 13px;">🚀 Fitur Mendatang (U.Project Nexus Intelligence v3.6):</b>
             <ul style="margin: 6px 0 0 0; padding-left: 18px;">
-                <li><b>Server Eksklusif:</b> Menghadirkan Server System terbaru U.Project Nexus Intelligence v3.6</li>
-                <li><b>Generator Massal:</b> Buat puluhan/ratusan paket soal HOTS & tematik secara instan</li>
-                <li><b>Export Cetak & PDF:</b> Siap cetak ber-template eksklusif sekolah</li>
-                <li><b>Analisis Butir Soal:</b> Evaluasi daya pembeda & tingkat kesukaran soal</li>
+                <li><b>Server Eksklusif:</b> Engine khusus pemrosesan soal tingkat lanjut.</li>
+                <li><b>Generator Massal:</b> Buat puluhan paket soal HOTS & tematik instan.</li>
+                <li><b>Export Cetak & PDF:</b> Siap cetak ber-template eksklusif sekolah.</li>
+                <li><b>Analisis Butir Soal:</b> Evaluasi daya pembeda & tingkat kesukaran.</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
 
     with tab3:
-        # Header Ringkas HP
-        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 6px;'>📲 WhatsApp Integration Engine</p>", unsafe_allow_html=True)
-        
-        # Kotak Info Kustom Ringkas (12px)
+        st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>📲 WhatsApp Integration Engine</p>", unsafe_allow_html=True)
         st.markdown("""
         <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; color: #1e3a8a; margin-bottom: 15px;">
-            <b style="font-size: 13px;">⚡ One-Click Automation By U.Project Nexus:</b>
+            <b style="font-size: 13px;">⚡ One-Click Automation (U.Project Nexus):</b>
             <ul style="margin: 6px 0 0 0; padding-left: 18px;">
-                <li><b>Broadcast Hasil Ujian:</b> Laporan nilai otomatis ke WA orang tua & siswa</li>
-                <li><b>ChatBot RoboMANTAP 24/7:</b> Asisten tutor pribadi siswa di rumah</li>
-                <li><b>Auto-LKPD Guru:</b> Buat LKPD otomatis sesuai template khas sekolah</li>
+                <li><b>Broadcast Hasil Ujian:</b> Laporan nilai otomatis ke WA ortu & siswa.</li>
+                <li><b>ChatBot RoboMANTAP 24/7:</b> Asisten tutor pribadi siswa di rumah.</li>
+                <li><b>Auto-LKPD Guru:</b> Buat LKPD otomatis sesuai template Al-Irsyad.</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
 
         st.divider()
 
-        # ==============================================================================
         # GENERATOR LKPD WORD (.DOCX) EKSKLUSIF BERLOGO
-        # ==============================================================================
         st.markdown("""
         <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 12px; border-radius: 10px; border: 1px solid #059669; color: white; margin-bottom: 12px;">
             <div style="font-size: 14px; font-weight: 700;">📄 Generator LKPD</div>
@@ -680,7 +626,7 @@ elif st.session_state.page == "guru_dashboard":
         with col_lkpd2:
             mapel_lkpd = st.selectbox("Mata Pelajaran:", ["Matematika", "IPA Terintegrasi", "IPS Terintegrasi", "PAI & Bahasa Arab", "Fisika", "Biologi", "Kimia"], key="lkpd_mapel")
 
-        st.info("💡**Fitur Percobaan:** Modul cetak PDF ini adalah versi demo. Tampilan cover, logo, dan struktur LKPD dapat ditingkatkan atau disesuaikan penuh berdasarkan permintaan pihak sekolah.")
+        st.caption("⚡ *Fitur demo — dapat ditingkatkan & dikustomisasi sesuai kebutuhan & standar sekolah.*")
         if st.button("📄 Generate LKPD (.pdf)", type="primary", use_container_width=True):
             if not topic_lkpd.strip():
                 st.warning("⚠️ Ketik topik/materi pembelajarannya dulu ya!")
@@ -691,12 +637,9 @@ elif st.session_state.page == "guru_dashboard":
                     if not ai_content:
                         st.error("Gagal menyusun LKPD. Silakan coba klik tombol sekali lagi.")
                     else:
-                        # Buat File PDF
                         pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
-                        
                         st.success("✅ Dokumen LKPD Berhasil Dibuat!")
                         
-                        # Tombol Unduh PDF
                         st.download_button(
                             label="📥 Download LKPD",
                             data=pdf_buffer,
@@ -748,7 +691,6 @@ elif st.session_state.page == "setup":
         st.rerun()
 
     st.write("---")
-    # Input Biodata Siswa Wajib
     st.markdown("#### 📝 Masukkan Data Diri Kamu")
     st.session_state.nama_siswa = st.text_input("Nama Lengkap:", value=st.session_state.nama_siswa, placeholder="Contoh: Fulanah binti Fulan")
     st.write("---")
@@ -791,7 +733,7 @@ elif st.session_state.page == "setup":
                         st.session_state.quiz_data = quiz
                         st.session_state.user_answers = {}
                         st.session_state.current_index = 0
-                        # Sinkronisasi awal ke DB (Semua Kosong)
+                        # Sinkronisasi awal ke DB
                         update_progress_siswa(
                             st.session_state.session_id, st.session_state.nama_siswa,
                             st.session_state.jenjang, st.session_state.mapel, 1, [], "BERJALAN"
@@ -812,7 +754,7 @@ elif st.session_state.page == "quiz":
     col_h1, col_h2 = st.columns([8, 4])
     with col_h1:
         st.subheader(f"📝 CBT OMI: {st.session_state.mapel} ({st.session_state.stage})")
-        st.caption(f"👤 Siswa: **{st.session_state.nama_siswa}**")
+        st.caption(f"👤 Siswa: **{st.session_state.nama_siswa.strip()}**")
     with col_h2:
         st.progress((curr_idx + 1) / 10)
         st.caption(f"Soal **{curr_idx + 1}** dari **10**")
@@ -832,7 +774,6 @@ elif st.session_state.page == "quiz":
     if selected_option and selected_option != saved_ans:
         st.session_state.user_answers[curr_idx] = selected_option
         
-        # Hitung Array Status Jawaban (True/False/None) untuk DB (10 soal)
         detail = []
         for i in range(10):
             u_ans = st.session_state.user_answers.get(i, None)
@@ -842,7 +783,6 @@ elif st.session_state.page == "quiz":
                 is_correct = (u_ans == quiz_data[i]["correct_answer"])
                 detail.append(is_correct)
                 
-        # Update Real-Time ke DB
         update_progress_siswa(
             st.session_state.session_id, st.session_state.nama_siswa,
             st.session_state.jenjang, st.session_state.mapel, curr_idx + 1, detail, "BERJALAN"
@@ -851,7 +791,6 @@ elif st.session_state.page == "quiz":
     st.write("---")
     
     col_nav1, col_nav2, col_nav3 = st.columns([3, 6, 3])
-    # Swap posisi Next/Submit ke atas untuk aksesibilitas HP
     with col_nav1:
         if curr_idx < 9:
             if st.button("Berikutnya ➡️", type="primary", use_container_width=True):
@@ -877,7 +816,6 @@ elif st.session_state.page == "quiz":
             key=f"hint_in_{curr_idx}"
         )
         
-        # Cache hint berdasarkan soal + ide siswa + mata pelajaran.
         hint_key = (
             st.session_state.mapel,
             curr_idx,
@@ -902,10 +840,8 @@ elif st.session_state.page == "quiz":
                             attempt_input,
                             st.session_state.mapel,
                         ),
-                        cursor="▌",
                     )
 
-                    # Simpan hanya respons yang berhasil selesai tanpa pesan error.
                     if streamed_hint and "⚠️" not in str(streamed_hint):
                         st.session_state.ai_hint_cache[hint_key] = str(streamed_hint)
             else:
@@ -939,17 +875,19 @@ elif st.session_state.page == "result":
         st.session_state.session_id, st.session_state.nama_siswa,
         st.session_state.jenjang, st.session_state.mapel, 10, detail, "SELESAI"
     )
+    
+    # Ekstraksi Nama Panggilan
     nama_lengkap = st.session_state.get('nama_siswa', '').strip()
     if nama_lengkap:
-        nama_display = nama_lengkap.split()[0]  # Mengambil kata pertama, misal "Fulanah" dari "Fulanah binti Fulan"
+        nama_display = nama_lengkap.split()[0]
     else:
         nama_display = "Santri MANTAP"
 
     if total_skor >= 32:
-        feedback_msg = f"🌟 **Luar Biasa! (Skor: {total_skor}/40)**\n\nRoboMANTAP bangga banget sama kamu {nama_display}! Pemahaman kamu di materi {st.session_state.mapel} sudah sangat tajam. Pertahankan fokus kamu untuk Persiapan OMI 2026 ya! 🚀✨"
+        feedback_msg = f"🌟 **Luar Biasa! (Skor: {total_skor}/40)**\n\nRoboMANTAP bangga banget sama kamu, **{nama_display}**! Pemahaman kamu di materi {st.session_state.mapel} sudah sangat tajam. Pertahankan fokus kamu untuk Persiapan OMI 2026 ya! 🚀✨"
         feedback_type = "success"
     elif total_skor >= 16:
-        feedback_msg = f"👍 **Kerja Bagus! (Skor: {total_skor}/40)**\n\nUsaha yang mantap, {nama_display}! Kamu sudah paham sebagian besar konsepnya. Coba cek pembahasan di bawah untuk memperbaiki sedikit kekeliruan tadi ya! 💪😊"
+        feedback_msg = f"👍 **Kerja Bagus! (Skor: {total_skor}/40)**\n\nUsaha yang mantap, **{nama_display}**! Kamu sudah paham sebagian besar konsepnya. Coba cek pembahasan di bawah untuk memperbaiki sedikit kekeliruan tadi ya! 💪😊"
         feedback_type = "info"
     else:
         feedback_msg = f"🌱 **Tetap Semangat, {nama_display}! (Skor: {total_skor}/40)**\n\nJangan berkecil hati ya! Setiap kesalahan adalah proses belajar. Yuk pelajari pembahasan rinci di bawah dan coba latihan 10 soal lagi bersama RoboMANTAP! 🧕🏼❤️"
@@ -982,7 +920,6 @@ elif st.session_state.page == "result":
                     st.session_state.ai_hint_cache = {}
                     st.session_state.ai_solution_cache = {}
                     
-                    # Sinkronisasi Sesi Baru ke Database Real-time
                     st.session_state.session_id = str(uuid.uuid4())
                     update_progress_siswa(
                         st.session_state.session_id, st.session_state.nama_siswa,
@@ -1011,7 +948,6 @@ elif st.session_state.page == "result":
             st.markdown(f"**Kunci Jawaban:** {q['correct_answer']}")
             st.write("---")
             
-            # Cache pembahasan per soal.
             solution_key = (
                 st.session_state.mapel,
                 idx,
@@ -1035,7 +971,6 @@ elif st.session_state.page == "result":
                             q["correct_answer"],
                             st.session_state.mapel,
                         ),
-                        cursor="▌",
                     )
 
                     if streamed_solution and "⚠️" not in str(streamed_solution):
