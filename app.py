@@ -280,10 +280,10 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        leftMargin=1.8 * cm,
-        rightMargin=1.8 * cm,
-        topMargin=1.8 * cm,
-        bottomMargin=1.8 * cm
+        leftMargin=2.0 * cm,
+        rightMargin=2.0 * cm,
+        topMargin=2.2 * cm,
+        bottomMargin=2.2 * cm
     )
 
     styles = getSampleStyleSheet()
@@ -346,7 +346,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
 
     # Logo Sekolah
     if os.path.exists(logo_path):
-        img_logo = Image(logo_path, width=2.2 * cm, height=2.2 * cm)
+        img_logo = Image(logo_path, width=3.8 * cm, height=2.2 * cm)
         img_logo.hAlign = 'CENTER'
         story.append(img_logo)
         story.append(Spacer(1, 0.4 * cm))
@@ -358,7 +358,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
 
     # Judul Dokumen
     story.append(Paragraph("LEMBAR KERJA PESERTA DIDIK", style_cover_title))
-    story.append(Paragraph("(LKPD) INTERAKTIF", style_cover_title))
+    story.append(Paragraph("(LKPD)", style_cover_title))
     story.append(Spacer(1, 0.2 * cm))
     story.append(Paragraph("Model Pembelajaran HOTS & Integrasi Nilai Keislaman", style_cover_sub))
     story.append(Spacer(1, 1.0 * cm))
@@ -368,7 +368,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     <b>Mata Pelajaran:</b> {mapel}<br/>
     <b>Kelas / Jenjang:</b> {kelas}<br/>
     <b>Topik Utama:</b> {topik}<br/><br/>
-    <b>Nama Santri / Kelompok:</b> ...........................................................
+    <b>Nama / Kelompok:</b> ............................../.............................
     """
     p_meta = Paragraph(meta_text, style_body)
     
@@ -383,7 +383,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     story.append(table_meta)
 
     story.append(Spacer(1, 2.5 * cm))
-    story.append(Paragraph("<i>Powered by RoboMANTAP-AI • U.Project Nexus</i>", style_cover_sub))
+    story.append(Paragraph("<i>Tahun Ajaran:......../........</i>", style_cover_sub))
 
     # Pindah ke Halaman 2 untuk Isi Materi
     story.append(PageBreak())
@@ -440,7 +440,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     # Soal 1 + Kotak Jawab
     story.append(Paragraph(f"<b>Soal 1:</b> {ai_content.get('soal_1', '')}", style_body))
     story.append(Spacer(1, 0.1 * cm))
-    p_ans1 = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban / Analisis Santri:</i></font><br/><br/><br/><br/>", style_body)
+    p_ans1 = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban:</i></font><br/><br/><br/><br/>", style_body)
     t_ans1 = Table([[p_ans1]], colWidths=[16.5 * cm])
     t_ans1.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F9FAFB')),
@@ -453,7 +453,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     # Soal 2 + Kotak Jawab
     story.append(Paragraph(f"<b>Soal 2:</b> {ai_content.get('soal_2', '')}", style_body))
     story.append(Spacer(1, 0.1 * cm))
-    p_ans2 = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban / Analisis Santri:</i></font><br/><br/><br/><br/>", style_body)
+    p_ans2 = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban:</i></font><br/><br/><br/><br/>", style_body)
     t_ans2 = Table([[p_ans2]], colWidths=[16.5 * cm])
     t_ans2.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F9FAFB')),
@@ -464,7 +464,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     story.append(Spacer(1, 0.5 * cm))
 
     # [D] REFLEKSI KEISLAMAN
-    head_d = Paragraph("🌿 [D] REFLEKSI KEISLAMAN & HIKMAH SANTRI", style_section_heading)
+    head_d = Paragraph("🌿 [D] REFLEKSI KEISLAMAN & HIKMAH", style_section_heading)
     t_head_d = Table([[head_d]], colWidths=[16.5 * cm])
     t_head_d.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#D97706')), # Gold Banner
@@ -482,8 +482,8 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     ]))
     story.append(t_box_d)
 
-    # Build PDF dengan Callback Cover di Halaman Pertama
-    doc.build(story, onFirstPage=draw_cover_background)
+    # Build PDF dengan Callback Cover di Halaman
+    doc.build(story, onFirstPage=draw_cover_background, onLaterPages=draw_cover_background)
     buffer.seek(0)
     return buffer
 
