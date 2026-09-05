@@ -442,11 +442,20 @@ elif st.session_state.page == "guru_dashboard":
 
     st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
     tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕Bank Soal", "📲 WA Automation"])
-
     with tab1:
-        # Pilihan Filter Waktu
-        time_filter = st.radio("⏳ Filter Riwayat Pengerjaan:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], horizontal=True)
-        
+        # Kontrol Filter Waktu & Toggle Auto-Refresh
+        col_f1, col_f2 = st.columns([2, 1])
+        with col_f1:
+            time_filter = st.radio("⏳ Filter Riwayat Pengerjaan:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], horizontal=True, key="time_filter_radio")
+        with col_f2:
+            st.write("") # Spacer alignment
+            auto_refresh = st.toggle("🔄 Live Auto-Refresh (3s)", value=False, help="Nyalakan untuk memantau siswa secara real-time. Matikan untuk membaca laporan AI dengan stabil.")
+
+        if auto_refresh:
+            st.caption("🟢 **Status:** Live tracking aktif memperbarui data setiap 3 detik.")
+        else:
+            st.caption("⏸️ **Status:** Auto-refresh dimatikan (tampilan stabil, aman untuk membaca laporan).")
+
         # Logika Kondisi Tanggal SQL (PostgreSQL Standard)
         if time_filter == "Hari Ini":
             date_condition = "DATE(updated_at) = CURRENT_DATE"
@@ -468,15 +477,13 @@ elif st.session_state.page == "guru_dashboard":
             html += '</div>'
             return html
 
-        @st.fragment(run_every="3s")
-        def render_live_monitoring():
+        def render_monitoring_content():
             conn = init_db_connection()
             if not conn:
                 st.warning("Menunggu koneksi Database terhubung untuk Live Monitoring...")
                 return
 
             try:
-                # Query SQL Canggih: Handle Filter Waktu & Auto-Expired Sesi (15 Menit Anti-Curang)
                 query = f"""
                 SELECT 
                     nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, 
@@ -492,10 +499,10 @@ elif st.session_state.page == "guru_dashboard":
                 df = conn.query(query, ttl=0)
                 
                 if df.empty:
-                    st.info(f"Belum ada data pengerjaan siswa untuk filter '{time_filter}'.")
+                    st.info(f"🚫 Tidak ada pengerjaan siswa untuk filter '{time_filter}'.")
                     return
 
-                # KPI Metrics menggunakan kolom status_real (yang sudah di-filter timeout-nya)
+                # KPI Metrics
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Siswa Aktif", len(df[df['status_real'] == 'BERJALAN']))
                 c2.metric("Sesi Selesai", len(df[df['status_real'] == 'SELESAI']))
@@ -503,7 +510,10 @@ elif st.session_state.page == "guru_dashboard":
 
                 st.write("---")
                 
-                # Fitur Laporan AI Kelas (Executive Summary)
+                # Peringatan & Tombol Generate Laporan AI Kelas
+                if auto_refresh:
+                    st.warning('⚠️ **Perhatian:** Harap matikan toggle **"Live Auto-Refresh (3s)"** di atas sebelum men-generate atau membaca Laporan Diagnosis AI agar layar tidak ter-refresh!')
+                
                 if st.button("🤖 Generate Laporan Diagnosis AI Kelas", type="primary", use_container_width=True):
                     with st.spinner("RoboMANTAP sedang menyusun laporan kelas profesional..."):
                         total_siswa = len(df)
@@ -524,9 +534,18 @@ elif st.session_state.page == "guru_dashboard":
                         2. **Peta Kekuatan & Kelemahan Umum**
                         3. **Rekomendasi Tindak Lanjut untuk Guru di Al-Irsyad Bondowoso**
                         """
-                        st.markdown("### 📊 Laporan Diagnosis Kelas (AI Generated)")
-                        st.write_stream(stream_ai_text(prompt, max_output_tokens=2500))
-                        st.write("---")
+                        report_result = stream_ai_text(prompt, max_output_tokens=2500)
+                        # Simpan ke session_state agar aman dari refresh
+                        st.session_state.cached_ai_report = "".join(list(report_result))
+
+                # Tampilkan cache laporan jika ada
+                if "cached_ai_report" in st.session_state and st.session_state.cached_ai_report:
+                    st.markdown("### 📊 Laporan Diagnosis Kelas (AI Generated)")
+                    st.markdown(st.session_state.cached_ai_report)
+                    if st.button("🗑️ Bersihkan Laporan"):
+                        st.session_state.cached_ai_report = ""
+                        st.rerun()
+                    st.write("---")
 
                 st.markdown("#### 🟢 Live Tracking Pengerjaan")
                 
@@ -535,7 +554,6 @@ elif st.session_state.page == "guru_dashboard":
                     with st.container():
                         col_nama, col_mapel, col_skor, col_bar, col_act = st.columns([2.5, 2.5, 1, 3.5, 1.5])
                         
-                        # Ikon Status
                         if row['status_real'] == 'SELESAI':
                             status_badge = "✅"
                         elif row['status_real'] == 'EXPIRED':
@@ -543,14 +561,11 @@ elif st.session_state.page == "guru_dashboard":
                         else:
                             status_badge = "🔄"
                         
-                        # Pembersihan Markdown Spasi & Nama Cetak Tebal
-                        safe_nama = str(row['nama_siswa']).strip()
-                        safe_nama = safe_nama.replace("*", "") # Hilangkan bintang liar
+                        safe_nama = str(row['nama_siswa']).strip().replace("*", "")
                         col_nama.markdown(f"**{safe_nama}** {status_badge}")
                         col_mapel.caption(f"{row['mapel']} ({row['jenjang'][:3]})")
                         col_skor.markdown(f"**Skor: {row['nilai_akhir']}**")
                         
-                        # Kotak Hijau/Merah & Popover Analisis
                         try:
                             detail_list = row['detail_jawaban']
                             if isinstance(detail_list, str):
@@ -558,20 +573,16 @@ elif st.session_state.page == "guru_dashboard":
                                 detail_list = json.loads(detail_list)
                             col_bar.markdown(render_progress_bar_html(detail_list), unsafe_allow_html=True)
                             
-                            # Micro-Analytics per Siswa
                             with col_act:
                                 with st.popover("📊 Analisis"):
                                     st.markdown(f"**Materi:** {row['mapel']}")
                                     pct = (sum([1 for x in detail_list if x is True]) / 10) * 100 if detail_list else 0
                                     if pct >= 70:
-                                        st.success(f"✅ **Materi Dikuasai:** Sangat menguasai {row['mapel']} ({pct}%)")
-                                        st.info("📉 **Materi Kurang:** Minor / Relatif aman.")
+                                        st.success(f"✅ **Dikuasai:** Sangat menguasai ({pct}%)")
                                     elif pct >= 40:
-                                        st.warning(f"⚠️ **Materi Dikuasai:** Cukup memahami {row['mapel']} ({pct}%)")
-                                        st.info(f"📉 **Materi Kurang:** Perlu review ulang beberapa sub-topik {row['mapel']}.")
+                                        st.warning(f"⚠️ **Cukup:** Cukup memahami ({pct}%)")
                                     else:
-                                        st.error(f"❌ **Materi Dikuasai:** Belum terlihat ({pct}%)")
-                                        st.error(f"📉 **Materi Kurang:** Sangat membutuhkan bimbingan intensif materi dasar {row['mapel']}.")
+                                        st.error(f"❌ **Kurang:** Perlu bimbingan intensif ({pct}%)")
                         except:
                             col_bar.write("-")
                         st.divider()
@@ -579,7 +590,14 @@ elif st.session_state.page == "guru_dashboard":
             except Exception as e:
                 st.error(f"Gagal mengambil data dari database: {e}")
 
-        render_live_monitoring()
+        # Jalankan fragment auto-refresh hanya jika toggle dihidupkan
+        if auto_refresh:
+            @st.fragment(run_every="3s")
+            def active_live_view():
+                render_monitoring_content()
+            active_live_view()
+        else:
+            render_monitoring_content()
 
     with tab2:
         st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>🧕🏼 AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
