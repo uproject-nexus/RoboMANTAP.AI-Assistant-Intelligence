@@ -7,12 +7,13 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # Import python-docx untuk generate Word berlogo
-from docx import Document
-from docx.shared import Inches, Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.oxml import parse_xml
-from docx.oxml.ns import nsdecls
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
+)
 
 from ai_engine import (
     generate_quiz_batch, get_ai_hint_stream, get_ai_solution_stream,
@@ -257,174 +258,236 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 #helper LKPD
-def set_cell_background(cell, hex_color):
-    """Memberikan warna latar belakang pada sel tabel Word."""
-    shading_elm = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{hex_color}"/>')
-    cell._tc.get_or_add_tcPr().append(shading_elm)
-
-def create_lkpd_docx_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"):
+def draw_cover_background(canvas_obj, doc):
     """
-    Membuat file Word (.docx) Interaktif, Berwarna, Elegan khas Al-Irsyad Bondowoso.
+    Menggambar cover.png sebagai latar belakang penuh di Halaman 1.
     """
-    doc = Document()
-    # Margin Halaman (0.8 Inci)
-    for section in doc.sections:
-        section.top_margin = Inches(0.8)
-        section.bottom_margin = Inches(0.8)
-        section.left_margin = Inches(0.8)
-        section.right_margin = Inches(0.8)
+    canvas_obj.saveState()
+    cover_path = "cover.png"
+    if os.path.exists(cover_path):
+        # A4 size dalam points: width=595.27, height=841.89
+        canvas_obj.drawImage(cover_path, 0, 0, width=A4[0], height=A4[1])
+    canvas_obj.restoreState()
 
-    # Tabel Kop Surat (2 Kolom: Logo di Kiri, Teks di Kanan)
-    table = doc.add_table(rows=1, cols=2)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    table.autofit = False
+
+def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"):
+    """
+    Membuat file PDF LKPD Interaktif dengan Cover berbingkai khas Al-Irsyad.
+    """
+    buffer = io.BytesIO()
     
-    table.columns[0].width = Inches(1.2)
-    table.columns[1].width = Inches(5.3)
+    # Margin halaman
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=1.8 * cm,
+        rightMargin=1.8 * cm,
+        topMargin=1.8 * cm,
+        bottomMargin=1.8 * cm
+    )
 
-    cell_logo = table.cell(0, 0)
-    cell_text = table.cell(0, 1)
+    styles = getSampleStyleSheet()
+    
+    # Style Kustom
+    style_cover_school = ParagraphStyle(
+        'CoverSchool',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=11,
+        leading=14,
+        textColor=colors.HexColor('#064E3B'),
+        alignment=1 # Center
+    )
+    
+    style_cover_title = ParagraphStyle(
+        'CoverTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=18,
+        leading=22,
+        textColor=colors.HexColor('#059669'),
+        alignment=1
+    )
 
-    # 1. Sisipkan Logo
+    style_cover_sub = ParagraphStyle(
+        'CoverSub',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=13,
+        textColor=colors.HexColor('#374151'),
+        alignment=1
+    )
+
+    style_section_heading = ParagraphStyle(
+        'SecHeading',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=11,
+        leading=14,
+        textColor=colors.white
+    )
+
+    style_body = ParagraphStyle(
+        'BodyTextCustom',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9.5,
+        leading=13,
+        textColor=colors.HexColor('#1F2937')
+    )
+
+    story = []
+
+    # =========================================================================
+    # HALAMAN 1: COVER BER-BG "cover.png"
+    # =========================================================================
+    story.append(Spacer(1, 2.2 * cm)) # Jarak dari bingkai atas
+
+    # Logo Sekolah
     if os.path.exists(logo_path):
-        p_logo = cell_logo.paragraphs[0]
-        p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run_logo = p_logo.add_run()
-        run_logo.add_picture(logo_path, width=Inches(1.0))
+        img_logo = Image(logo_path, width=2.2 * cm, height=2.2 * cm)
+        img_logo.hAlign = 'CENTER'
+        story.append(img_logo)
+        story.append(Spacer(1, 0.4 * cm))
 
-    # 2. Sisipkan Teks Kop
-    p_text = cell_text.paragraphs[0]
-    p_text.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # Nama Sekolah
+    school_html = "Madrasah Aliyah dan Tsanawiyah<br/><b>Al-Irsyad Al-Islamiyah Putri Bondowoso</b>"
+    story.append(Paragraph(school_html, style_cover_school))
+    story.append(Spacer(1, 0.8 * cm))
 
-    r1 = p_text.add_run("LEMBAR KERJA PESERTA DIDIK (LKPD)\n")
-    r1.bold = True
-    r1.font.size = Pt(13)
-    r1.font.color.rgb = RGBColor(5, 150, 105) # Emerald Green
+    # Judul Dokumen
+    story.append(Paragraph("LEMBAR KERJA PESERTA DIDIK", style_cover_title))
+    story.append(Paragraph("(LKPD) INTERAKTIF", style_cover_title))
+    story.append(Spacer(1, 0.2 * cm))
+    story.append(Paragraph("Model Pembelajaran HOTS & Integrasi Nilai Keislaman", style_cover_sub))
+    story.append(Spacer(1, 1.0 * cm))
 
-    r2 = p_text.add_run("Madrasah Aliyah dan Tsanawiyah Al-Irsyad Al-Islamiyah Putri Bondowoso\n")
-    r2.bold = True
-    r2.font.size = Pt(11)
-
-    r3 = p_text.add_run("Tahun Ajaran:......../........")
-    r3.italic = True
-    r3.font.size = Pt(9)
-    r3.font.color.rgb = RGBColor(120, 120, 120)
-
-    doc.add_paragraph("―" * 58)
-
-    # --------------------------------------------------------------------------
-    # 2. KARD IDENTITAS MATERI & SANTRI (CARD SHADED)
-    # --------------------------------------------------------------------------
-    table_meta = doc.add_table(rows=1, cols=1)
-    table_meta.alignment = WD_TABLE_ALIGNMENT.CENTER
-    cell_meta = table_meta.cell(0, 0)
-    set_cell_background(cell_meta, "ECFDF5") # Soft Mint Green Fill
-
-    p_meta = cell_meta.paragraphs[0]
-    p_meta.paragraph_format.space_before = Pt(6)
-    p_meta.paragraph_format.space_after = Pt(6)
+    # Card Informasi Identitas Pembelajaran
+    meta_text = f"""
+    <b>Mata Pelajaran:</b> {mapel}<br/>
+    <b>Kelas / Jenjang:</b> {kelas}<br/>
+    <b>Topik Utama:</b> {topik}<br/><br/>
+    <b>Nama Santri / Kelompok:</b> ...........................................................
+    """
+    p_meta = Paragraph(meta_text, style_body)
     
-    r_meta_title = p_meta.add_run("📌 IDENTITAS PEMBELAJARAN\n")
-    r_meta_title.bold = True
-    r_meta_title.font.size = Pt(10)
-    r_meta_title.font.color.rgb = RGBColor(4, 120, 87)
+    table_meta = Table([[p_meta]], colWidths=[14 * cm])
+    table_meta.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#ECFDF5')), # Soft Mint
+        ('BOX', (0,0), (-1,-1), 1.5, colors.HexColor('#059669')),
+        ('PADDING', (0,0), (-1,-1), 12),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    table_meta.hAlign = 'CENTER'
+    story.append(table_meta)
 
-    p_meta.add_run(f"• Mata Pelajaran\t: {mapel}\n").bold = True
-    p_meta.add_run(f"• Kelas / Jenjang\t: {kelas}\n").bold = True
-    p_meta.add_run(f"• Topik Utama\t: {topik}\n").bold = True
-    p_meta.add_run(f"• Nama/Kelompok : ............................../.............................")
+    story.append(Spacer(1, 2.5 * cm))
+    story.append(Paragraph("<i>Powered by RoboMANTAP-AI • U.Project Nexus</i>", style_cover_sub))
 
-    doc.add_paragraph() # Spacing
+    # Pindah ke Halaman 2 untuk Isi Materi
+    story.append(PageBreak())
 
-    # --------------------------------------------------------------------------
-    # 3. BAGIAN A: TUJUAN PEMBELAJARAN
-    # --------------------------------------------------------------------------
-    t_a = doc.add_table(rows=1, cols=1)
-    cell_a = t_a.cell(0, 0)
-    set_cell_background(cell_a, "059669") # Emerald Banner
-    p_a = cell_a.paragraphs[0]
-    r_a = p_a.add_run("🎯 [A] TUJUAN PEMBELAJARAN")
-    r_a.bold = True
-    r_a.font.color.rgb = RGBColor(255, 255, 255)
+    # =========================================================================
+    # HALAMAN 2: ISI LKPD INTERAKTIF
+    # =========================================================================
+    
+    # [A] TUJUAN PEMBELAJARAN
+    head_a = Paragraph("🎯 [A] TUJUAN PEMBELAJARAN (HOTS)", style_section_heading)
+    t_head_a = Table([[head_a]], colWidths=[16.5 * cm])
+    t_head_a.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')),
+        ('PADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(t_head_a)
+    story.append(Spacer(1, 0.2 * cm))
 
     tujuan_list = ai_content.get("tujuan", [])
-    for idx, t in enumerate(tujuan_list, 1):
-        p_t = doc.add_paragraph()
-        p_t.add_run(f"{idx}. {t}").font.size = Pt(9.5)
+    tujuan_text = "<br/>".join([f"{i+1}. {t}" for i, t in enumerate(tujuan_list)])
+    story.append(Paragraph(tujuan_text, style_body))
+    story.append(Spacer(1, 0.5 * cm))
 
-    # --------------------------------------------------------------------------
-    # 4. BAGIAN B: APERSEPSI & KONSEP (KOTAK BIRU SOFT)
-    # --------------------------------------------------------------------------
-    t_b_head = doc.add_table(rows=1, cols=1)
-    set_cell_background(t_b_head.cell(0, 0), "059669")
-    r_b_head = t_b_head.cell(0, 0).paragraphs[0].add_run("📖 [B] APERSEPSI & EXPLORASI KONSEP")
-    r_b_head.bold = True
-    r_b_head.font.color.rgb = RGBColor(255, 255, 255)
+    # [B] APERSEPSI & KONSEP
+    head_b = Paragraph("📖 [B] APERSEPSI & EKSPLORASI KONSEP", style_section_heading)
+    t_head_b = Table([[head_b]], colWidths=[16.5 * cm])
+    t_head_b.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')),
+        ('PADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(t_head_b)
+    story.append(Spacer(1, 0.2 * cm))
 
-    t_b_box = doc.add_table(rows=1, cols=1)
-    cell_b_box = t_b_box.cell(0, 0)
-    set_cell_background(cell_b_box, "F0F9FF") # Light Sky Blue Fill
-    p_b_content = cell_b_box.paragraphs[0]
-    p_b_content.add_run(ai_content.get("ringkasan", "")).font.size = Pt(9.5)
+    p_ringkasan = Paragraph(ai_content.get("ringkasan", ""), style_body)
+    t_box_b = Table([[p_ringkasan]], colWidths=[16.5 * cm])
+    t_box_b.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F0F9FF')), # Soft Sky Blue
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#BAE6FD')),
+        ('PADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(t_box_b)
+    story.append(Spacer(1, 0.5 * cm))
 
-    doc.add_paragraph()
+    # [C] TUGAS EKSPLORASI MANDIRI
+    head_c = Paragraph("✍️ [C] TUGAS EKSPLORASI MANDIRI", style_section_heading)
+    t_head_c = Table([[head_c]], colWidths=[16.5 * cm])
+    t_head_c.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')),
+        ('PADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(t_head_c)
+    story.append(Spacer(1, 0.3 * cm))
 
-    # --------------------------------------------------------------------------
-    # 5. BAGIAN C: TUGAS EKSPLORASI & KOTAK JAWABAN SANTRI
-    # --------------------------------------------------------------------------
-    t_c_head = doc.add_table(rows=1, cols=1)
-    set_cell_background(t_c_head.cell(0, 0), "059669")
-    r_c_head = t_c_head.cell(0, 0).paragraphs[0].add_run("✍️ [C] TUGAS EKSPLORASI MANDIRI (HOTS)")
-    r_c_head.bold = True
-    r_c_head.font.color.rgb = RGBColor(255, 255, 255)
+    # Soal 1 + Kotak Jawab
+    story.append(Paragraph(f"<b>Soal 1:</b> {ai_content.get('soal_1', '')}", style_body))
+    story.append(Spacer(1, 0.1 * cm))
+    p_ans1 = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban / Analisis Santri:</i></font><br/><br/><br/><br/>", style_body)
+    t_ans1 = Table([[p_ans1]], colWidths=[16.5 * cm])
+    t_ans1.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F9FAFB')),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#E5E7EB')),
+        ('PADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(t_ans1)
+    story.append(Spacer(1, 0.4 * cm))
 
-    # Soal 1 + Kotak Lembar Jawab
-    p_s1 = doc.add_paragraph()
-    p_s1.add_run(f"Soal 1: {ai_content.get('soal_1', '')}").bold = True
-    
-    t_ans1 = doc.add_table(rows=1, cols=1)
-    cell_ans1 = t_ans1.cell(0, 0)
-    set_cell_background(cell_ans1, "F9FAFB") # Soft Gray Answer Box
-    p_ans1 = cell_ans1.paragraphs[0]
-    p_ans1.add_run("Lembar Jawaban :\n\n\n\n").italic = True
-    p_ans1.runs[0].font.color.rgb = RGBColor(150, 150, 150)
+    # Soal 2 + Kotak Jawab
+    story.append(Paragraph(f"<b>Soal 2:</b> {ai_content.get('soal_2', '')}", style_body))
+    story.append(Spacer(1, 0.1 * cm))
+    p_ans2 = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban / Analisis Santri:</i></font><br/><br/><br/><br/>", style_body)
+    t_ans2 = Table([[p_ans2]], colWidths=[16.5 * cm])
+    t_ans2.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F9FAFB')),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#E5E7EB')),
+        ('PADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(t_ans2)
+    story.append(Spacer(1, 0.5 * cm))
 
-    # Soal 2 + Kotak Lembar Jawab
-    p_s2 = doc.add_paragraph()
-    p_s2.add_run(f"Soal 2: {ai_content.get('soal_2', '')}").bold = True
+    # [D] REFLEKSI KEISLAMAN
+    head_d = Paragraph("🌿 [D] REFLEKSI KEISLAMAN & HIKMAH SANTRI", style_section_heading)
+    t_head_d = Table([[head_d]], colWidths=[16.5 * cm])
+    t_head_d.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#D97706')), # Gold Banner
+        ('PADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(t_head_d)
+    story.append(Spacer(1, 0.2 * cm))
 
-    t_ans2 = doc.add_table(rows=1, cols=1)
-    cell_ans2 = t_ans2.cell(0, 0)
-    set_cell_background(cell_ans2, "F9FAFB")
-    p_ans2 = cell_ans2.paragraphs[0]
-    p_ans2.add_run("Lembar Jawaban :\n\n\n\n").italic = True
-    p_ans2.runs[0].font.color.rgb = RGBColor(150, 150, 150)
+    p_refleksi = Paragraph(f'<i>"{ai_content.get("refleksi", "")}"</i>', style_body)
+    t_box_d = Table([[p_refleksi]], colWidths=[16.5 * cm])
+    t_box_d.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#FEF3C7')), # Soft Amber
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#FDE68A')),
+        ('PADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(t_box_d)
 
-    doc.add_paragraph()
-
-    # --------------------------------------------------------------------------
-    # 6. BAGIAN D: REFLEKSI KEISLAMAN (KOTAK EMAS SOFT)
-    # --------------------------------------------------------------------------
-    t_d_head = doc.add_table(rows=1, cols=1)
-    set_cell_background(t_d_head.cell(0, 0), "D97706") # Amber/Gold Banner
-    r_d_head = t_d_head.cell(0, 0).paragraphs[0].add_run("🌿 [D] REFLEKSI KEISLAMAN & HIKMAH")
-    r_d_head.bold = True
-    r_d_head.font.color.rgb = RGBColor(255, 255, 255)
-
-    t_d_box = doc.add_table(rows=1, cols=1)
-    cell_d_box = t_d_box.cell(0, 0)
-    set_cell_background(cell_d_box, "FEF3C7") # Warm Yellow Fill
-    p_d_content = cell_d_box.paragraphs[0]
-    r_d_text = p_d_content.add_run(f'"{ai_content.get("refleksi", "")}"')
-    r_d_text.italic = True
-    r_d_text.font.size = Pt(9.5)
-    r_d_text.font.color.rgb = RGBColor(146, 64, 14)
-
-    # Save to Buffer
-    buffer = io.BytesIO()
-    doc.save(buffer)
+    # Build PDF dengan Callback Cover di Halaman Pertama
+    doc.build(story, onFirstPage=draw_cover_background)
     buffer.seek(0)
     return buffer
+
+
 # ==============================================================================
 # 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
 # ==============================================================================
@@ -617,31 +680,30 @@ elif st.session_state.page == "guru_dashboard":
         with col_lkpd2:
             mapel_lkpd = st.selectbox("Mata Pelajaran:", ["Matematika", "IPA Terintegrasi", "IPS Terintegrasi", "PAI & Bahasa Arab", "Fisika", "Biologi", "Kimia"], key="lkpd_mapel")
 
-        if st.button("Generate LKPD (.docx)", type="primary", use_container_width=True):
+
+        if st.button("📄 Generate LKPD (.pdf)", type="primary", use_container_width=True):
             if not topic_lkpd.strip():
                 st.warning("⚠️ Ketik topik/materi pembelajarannya dulu ya!")
             else:
-                with st.spinner("RoboMANTAP sedang menyusun dokumen..."):
+                with st.spinner("RoboMANTAP sedang merancang PDF LKPD ber-cover..."):
                     ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, topic_lkpd)
                     
                     if not ai_content:
-                        st.error("Gagal menyusun LKPD. Silakan klik tombol sekali lagi.")
+                        st.error("Gagal menyusun LKPD. Silakan coba klik tombol sekali lagi.")
                     else:
-                        # Buat File Word berlogo di Memory
-                        docx_buffer = create_lkpd_docx_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
+                        # Buat File PDF
+                        pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
                         
-                        st.success("✅ Dokumen LKPD Berhasil Dibuat!")
+                        st.success("✅ Dokumen PDF LKPD Ber-Cover Berhasil Diproduksi!")
                         
-                        # Tombol Unduh Dokumen Word (.docx)
+                        # Tombol Unduh PDF
                         st.download_button(
-                            label="📥 Download LKPD",
-                            data=docx_buffer,
-                            file_name=f"LKPD_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}_RoboMANTAP.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            label="📥 Download Dokumen LKPD (.pdf)",
+                            data=pdf_buffer,
+                            file_name=f"LKPD_AlIrsyad_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}.pdf",
+                            mime="application/pdf",
                             use_container_width=True
                         )
-
-
 
 # ==============================================================================
 # 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
