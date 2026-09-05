@@ -450,7 +450,7 @@ def update_progress_siswa(session_id: str, nama: str, jenjang: str, mapel: str,
 def generate_lkpd_content(mapel: str, kelas: str, topik: str):
     """
     Menghasilkan isi materi LKPD HOTS khas Al-Irsyad Bondowoso menggunakan Gemini 3.x
-    dengan aturan format matematika & LaTeX yang aman.
+    dengan aturan format Unicode murni agar kompatibel dengan ReportLab PDF dan Word.
     """
     prompt = f"""
     Anda adalah Tim Ahli Kurikulum Lembaga Pendidikan Al-Irsyad Al-Islamiyah Putri Bondowoso.
@@ -461,12 +461,16 @@ def generate_lkpd_content(mapel: str, kelas: str, topik: str):
     - Kelas / Jenjang: {kelas}
     - Topik / Materi Utama: {topik}
 
-    ATURAN KHUSUS NOTASI MATEMATIKA & LATEX (SANGAT PENTING):
-    1. DILARANG KERAS membuat perintah LaTeX ilegal seperti '\\60.000.000' atau '\\14'.
-    2. Gunakan format LaTeX $...$ HANYA untuk rumus matematika asli, pecahan, akar, pangkat, dan variabel.
-       (Contoh benar: "$\\pi = \\tfrac{{22}}{{7}}$", "$\\sqrt{{3}}$", "$x^2 = 16$", "$-t^2 + 6t$").
-    3. DILARANG KERAS memasukkan kata/kalimat Bahasa Indonesia ke dalam format $...$.
-    4. Jangan menuliskan tanda pangkat polos seperti 'x^2' di luar tag $...$. Gunakan selalu '$x^2$'.
+    ATURAN NOTASI MATEMATIKA, FISIKA, KIMIA & LATEX (SANGAT PENTING):
+    1. DILARANG KERAS menggunakan simbol dollar ($) atau backslash (\\) untuk rumus/variabel!
+    2. Untuk angka pangkat atau indeks, HANYA gunakan simbol Unicode atau HTML sederhana:
+       - Pangkat/Eksponen: Gunakan Unicode (x², x³, t²) atau <sup>2</sup>, <sup>3</sup>.
+       - Indeks/Bawah: Gunakan Unicode (H₂O, CO₂) atau <sub>2</sub>.
+       - Simbol Matematika: Gunakan simbol langsung seperti '≠', 'π', '√', '±', '≤', '≥', '°C'.
+    3. Contoh Penulisan Rumus yang Benar di dalam teks:
+       - "ax² + bx + c = 0 dengan a ≠ 0"
+       - "h(t) = -5t² + 40t"
+       - "Luas kolam adalah x² meter dan panjangnya x + 6 meter"
 
     Instruksi Penyusunan Konten:
     1. Tujuan Pembelajaran: Buatkan 2 poin tujuan berbasis indikator HOTS.
