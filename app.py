@@ -578,11 +578,14 @@ elif st.session_state.page == "guru_dashboard":
                                     st.markdown(f"**Materi:** {row['mapel']}")
                                     pct = (sum([1 for x in detail_list if x is True]) / 10) * 100 if detail_list else 0
                                     if pct >= 70:
-                                        st.success(f"✅ **Dikuasai:** Sangat menguasai ({pct}%)")
+                                        st.success(f"✅ **Materi Dikuasai:** Sangat menguasai {row['mapel']} ({pct}%)")
+                                        st.info("📉 **Materi Kurang:** Minor / Relatif aman.")
                                     elif pct >= 40:
-                                        st.warning(f"⚠️ **Cukup:** Cukup memahami ({pct}%)")
+                                        st.warning(f"⚠️ **Materi Dikuasai:** Cukup memahami {row['mapel']} ({pct}%)")
+                                        st.info(f"📉 **Materi Kurang:** Perlu review ulang beberapa sub-topik {row['mapel']}.")
                                     else:
-                                        st.error(f"❌ **Kurang:** Perlu bimbingan intensif ({pct}%)")
+                                        st.error(f"❌ **Materi Dikuasai:** Belum terlihat ({pct}%)")
+                                        st.error(f"📉 **Materi Kurang:** Sangat membutuhkan bimbingan intensif materi dasar {row['mapel']}.")
                         except:
                             col_bar.write("-")
                         st.divider()
