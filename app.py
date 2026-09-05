@@ -680,12 +680,12 @@ elif st.session_state.page == "guru_dashboard":
         with col_lkpd2:
             mapel_lkpd = st.selectbox("Mata Pelajaran:", ["Matematika", "IPA Terintegrasi", "IPS Terintegrasi", "PAI & Bahasa Arab", "Fisika", "Biologi", "Kimia"], key="lkpd_mapel")
 
-
+        st.info("💡**Fitur Percobaan:** Modul cetak PDF ini adalah versi demo. Tampilan cover, logo, dan struktur LKPD dapat ditingkatkan atau disesuaikan penuh berdasarkan permintaan pihak sekolah.")
         if st.button("📄 Generate LKPD (.pdf)", type="primary", use_container_width=True):
             if not topic_lkpd.strip():
                 st.warning("⚠️ Ketik topik/materi pembelajarannya dulu ya!")
             else:
-                with st.spinner("RoboMANTAP sedang merancang PDF LKPD ber-cover..."):
+                with st.spinner("RoboMANTAP sedang merancang LKPD Anda..."):
                     ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, topic_lkpd)
                     
                     if not ai_content:
@@ -694,13 +694,13 @@ elif st.session_state.page == "guru_dashboard":
                         # Buat File PDF
                         pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
                         
-                        st.success("✅ Dokumen PDF LKPD Ber-Cover Berhasil Diproduksi!")
+                        st.success("✅ Dokumen LKPD Berhasil Dibuat!")
                         
                         # Tombol Unduh PDF
                         st.download_button(
-                            label="📥 Download Dokumen LKPD (.pdf)",
+                            label="📥 Download LKPD",
                             data=pdf_buffer,
-                            file_name=f"LKPD_AlIrsyad_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}.pdf",
+                            file_name=f"LKPD_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}_RoboMANTAP.pdf",
                             mime="application/pdf",
                             use_container_width=True
                         )
