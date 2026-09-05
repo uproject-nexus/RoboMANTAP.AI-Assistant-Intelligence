@@ -443,27 +443,70 @@ elif st.session_state.page == "guru_dashboard":
     st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
     tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕Bank Soal", "📲 WA Automation"])
     with tab1:
-        # Kontrol Filter Waktu & Toggle Auto-Refresh
-        col_f1, col_f2 = st.columns([2, 1])
-        with col_f1:
-            time_filter = st.radio("⏳ Filter Riwayat Pengerjaan:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], horizontal=True, key="time_filter_radio")
-        with col_f2:
-            st.write("") # Spacer alignment
-            auto_refresh = st.toggle("🔄 Live Auto-Refresh (3s)", value=False, help="Nyalakan untuk memantau siswa secara real-time. Matikan untuk membaca laporan AI dengan stabil.")
+        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>📊 Monitoring & Diagnosis Pembinaan OMI</p>", unsafe_allow_html=True)
 
+        # =========================================================================
+        # 1. CONTROL PANEL (FILTER BERTINGKAT & TOGGLE)
+        # =========================================================================
+        # Baris 1: Filter Waktu & Mode Sesi
+        c_ctrl1, c_ctrl2, c_ctrl3 = st.columns([2, 2, 2])
+        with c_ctrl1:
+            time_filter = st.radio("⏳ Rentang Waktu:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], horizontal=True, key="time_filter_radio")
+        with c_ctrl2:
+            only_latest = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Jika ON: Menggabungkan multi-sesi siswa sehingga 1 nama hanya muncul 1 kali (pengerjaan paling baru).")
+        with c_ctrl3:
+            auto_refresh = st.toggle("🔄 Live Auto-Refresh (3s)", value=False, help="Nyalakan untuk memantau siswa secara real-time. Matikan saat membaca laporan AI.")
+
+        # Baris 2: Filter Jenjang & Mapel
+        c_fil1, c_fil2, c_fil3 = st.columns([2, 2, 2])
+        with c_fil1:
+            selected_jenjang_filter = st.selectbox("🏫 Filter Jenjang:", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"])
+        
+        # Pilihan Mapel Dinamis Sesuai Jenjang yang Dipilih
+        with c_fil2:
+            if selected_jenjang_filter == "MTs (Sederajat SMP)":
+                mapel_options = ["Semua Mapel"] + list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys())
+            elif selected_jenjang_filter == "MA (Sederajat SMA)":
+                mapel_options = ["Semua Mapel"] + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
+            else:
+                all_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys()) + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
+                mapel_options = ["Semua Mapel"] + sorted(list(set(all_mapels)))
+            
+            selected_mapel_filter = st.selectbox("📚 Filter Mata Pelajaran:", mapel_options)
+
+        with c_fil3:
+            selected_status_filter = st.selectbox("📌 Filter Status:", ["Semua Status", "BERJALAN", "SELESAI", "EXPIRED"])
+
+        # Indikator Status Auto-Refresh
         if auto_refresh:
             st.caption("🟢 **Status:** Live tracking aktif memperbarui data setiap 3 detik.")
         else:
-            st.caption("⏸️ **Status:** Auto-refresh dimatikan (tampilan stabil, aman untuk membaca laporan).")
+            st.caption("⏸️ **Status:** Auto-refresh dimatikan (tampilan stabil, aman untuk membaca laporan AI).")
 
-        # Logika Kondisi Tanggal SQL (PostgreSQL Standard)
+        st.write("---")
+
+        # =========================================================================
+        # 2. LOGIKA KONDISI SQL (DYNAMIC QUERY BUILDER)
+        # =========================================================================
+        # Kondisi Tanggal
         if time_filter == "Hari Ini":
-            date_condition = "DATE(updated_at) = CURRENT_DATE"
+            where_clauses = ["DATE(updated_at) = CURRENT_DATE"]
         elif time_filter == "Kemarin":
-            date_condition = "DATE(updated_at) = CURRENT_DATE - INTERVAL '1 day'"
+            where_clauses = ["DATE(updated_at) = CURRENT_DATE - INTERVAL '1 day'"]
         else:
-            date_condition = "DATE(updated_at) >= CURRENT_DATE - INTERVAL '2 days'"
+            where_clauses = ["DATE(updated_at) >= CURRENT_DATE - INTERVAL '2 days'"]
 
+        # Kondisi Jenjang
+        if selected_jenjang_filter != "Semua Jenjang":
+            where_clauses.append(f"jenjang = '{selected_jenjang_filter}'")
+
+        # Kondisi Mapel
+        if selected_mapel_filter != "Semua Mapel":
+            where_clauses.append(f"mapel = '{selected_mapel_filter}'")
+
+        where_sql = " AND ".join(where_clauses)
+
+        # Function Progress Bar Visual
         def render_progress_bar_html(detail_list):
             if not isinstance(detail_list, list): return ""
             html = '<div style="display: flex; gap: 4px; align-items: center;">'
@@ -477,6 +520,9 @@ elif st.session_state.page == "guru_dashboard":
             html += '</div>'
             return html
 
+        # =========================================================================
+        # 3. RENDER CONTENT DASHBOARD
+        # =========================================================================
         def render_monitoring_content():
             conn = init_db_connection()
             if not conn:
@@ -484,108 +530,185 @@ elif st.session_state.page == "guru_dashboard":
                 return
 
             try:
-                query = f"""
-                SELECT 
-                    nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, 
-                    CASE 
-                        WHEN status = 'BERJALAN' AND updated_at < NOW() - INTERVAL '15 minutes' THEN 'EXPIRED'
-                        ELSE status
-                    END as status_real,
-                    updated_at
-                FROM sesi_ujian
-                WHERE {date_condition}
-                ORDER BY updated_at DESC
-                """
+                # Penyusunan Query SQL Berdasarkan Toggle Deduplikasi
+                if only_latest:
+                    # Query Deduplikasi: Hanya Ambil Sesi Terbaru per Siswa & Mapel + Hitung Total Percobaan
+                    query = f"""
+                    SELECT DISTINCT ON (LOWER(TRIM(nama_siswa)), mapel)
+                        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, updated_at,
+                        CASE 
+                            WHEN status = 'BERJALAN' AND updated_at < NOW() - INTERVAL '15 minutes' THEN 'EXPIRED'
+                            ELSE status
+                        END as status_real,
+                        COUNT(*) OVER(PARTITION BY LOWER(TRIM(nama_siswa)), mapel) as total_percobaan
+                    FROM sesi_ujian
+                    WHERE {where_sql}
+                    ORDER BY LOWER(TRIM(nama_siswa)), mapel, updated_at DESC
+                    """
+                else:
+                    # Query Standard: Tampilkan Seluruh Riwayat Sesi Tanpa Filter Unik
+                    query = f"""
+                    SELECT 
+                        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, updated_at,
+                        CASE 
+                            WHEN status = 'BERJALAN' AND updated_at < NOW() - INTERVAL '15 minutes' THEN 'EXPIRED'
+                            ELSE status
+                        END as status_real,
+                        1 as total_percobaan
+                    FROM sesi_ujian
+                    WHERE {where_sql}
+                    ORDER BY updated_at DESC
+                    """
+
                 df = conn.query(query, ttl=0)
-                
+
+                # Filter Status di sisi Pandas jika user memilih status tertentu
+                if not df.empty and selected_status_filter != "Semua Status":
+                    df = df[df['status_real'] == selected_status_filter]
+
                 if df.empty:
-                    st.info(f"🚫 Tidak ada pengerjaan siswa untuk filter '{time_filter}'.")
+                    st.info(f"🚫 Tidak ada data pengerjaan siswa yang sesuai dengan kombinasi filter saat ini.")
                     return
 
-                # KPI Metrics
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Siswa Aktif", len(df[df['status_real'] == 'BERJALAN']))
-                c2.metric("Sesi Selesai", len(df[df['status_real'] == 'SELESAI']))
-                c3.metric("Rata-Rata Nilai", f"{df['nilai_akhir'].mean():.1f}")
+                # KPI Metrics (Diukur dari Data Terfilter)
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Total Santri Evaluasi", len(df['nama_siswa'].unique()) if only_latest else len(df))
+                c2.metric("Siswa Aktif", len(df[df['status_real'] == 'BERJALAN']))
+                c3.metric("Sesi Selesai", len(df[df['status_real'] == 'SELESAI']))
+                c4.metric("Rata-Rata Nilai", f"{df['nilai_akhir'].mean():.1f} / 40")
 
                 st.write("---")
-                
-                # Peringatan & Tombol Generate Laporan AI Kelas
+
+                # =========================================================================
+                # 4. DIAGNOSIS AI KONTEKSTUAL (IKUT FILTER)
+                # =========================================================================
                 if auto_refresh:
-                    st.warning('⚠️ **Perhatian:** Harap matikan toggle **"Live Auto-Refresh (3s)"** di atas sebelum men-generate atau membaca Laporan Diagnosis AI agar layar tidak ter-refresh!')
-                
-                if st.button("🤖 Generate Laporan Diagnosis AI Kelas", type="primary", use_container_width=True):
-                    with st.spinner("RoboMANTAP sedang menyusun laporan kelas profesional..."):
+                    st.warning('⚠️ **Perhatian:** Harap matikan toggle **"Live Auto-Refresh (3s)"** sebelum men-generate atau membaca Laporan Diagnosis AI!')
+
+                # Judul Tombol Dinamis Mengikuti Filter
+                label_target = f"{selected_mapel_filter}" if selected_mapel_filter != "Semua Mapel" else selected_jenjang_filter
+                if st.button(f"🤖 Generate Laporan Diagnosis AI ({label_target})", type="primary", use_container_width=True):
+                    with st.spinner(f"RoboMANTAP sedang menganalisis data {label_target}..."):
                         total_siswa = len(df)
                         rata_rata = df['nilai_akhir'].mean()
                         tertinggi = df['nilai_akhir'].max()
                         terendah = df['nilai_akhir'].min()
-                        
+
+                        kelompok_mahir = len(df[df['nilai_akhir'] >= 32])
+                        kelompok_sedang = len(df[(df['nilai_akhir'] >= 16) & (df['nilai_akhir'] < 32)])
+                        kelompok_butuh_bimbingan = len(df[df['nilai_akhir'] < 16])
+
                         prompt = f"""
-                        Anda adalah Ahli Pedagogik dan Evaluasi Pembelajaran Pendidikan Islam.
-                        Buatkan laporan diagnosis kelas yang komprehensif, singkat, dan profesional berdasarkan rekap CBT {time_filter} berikut:
-                        - Total Sesi/Siswa: {total_siswa}
-                        - Rata-rata Kelas: {rata_rata:.1f}/40
-                        - Nilai Tertinggi: {tertinggi}/40
-                        - Nilai Terendah: {terendah}/40
-                        
-                        Susun laporan ke dalam 3 poin menggunakan formatting Markdown rapi:
-                        1. **Ringkasan Performa Kelas**
-                        2. **Peta Kekuatan & Kelemahan Umum**
-                        3. **Rekomendasi Tindak Lanjut untuk Guru di Al-Irsyad Bondowoso**
+                        Anda adalah Konsultan Ahli Pedagogik dan Evaluasi Pembinaan OMI 2026 Lembaga Al-Irsyad Bondowoso.
+                        Buatkan Laporan Diagnosis Eksekutif Spesifik berdasarkan data evaluasi berikut:
+
+                        SCOPE EVALUASI:
+                        - Rentang Waktu: {time_filter}
+                        - Target Jenjang: {selected_jenjang_filter}
+                        - Target Mata Pelajaran: {selected_mapel_filter}
+                        - Mode Sesi: {"Sesi Terbaru Saja (Deduplikasi)" if only_latest else "Seluruh Riwayat Sesi"}
+
+                        STATISTIK KELAS:
+                        - Total Santri/Sesi: {total_siswa}
+                        - Rata-Rata Nilai: {rata_rata:.1f} / 40
+                        - Nilai Tertinggi: {tertinggi} / 40 | Nilai Terendah: {terendah} / 40
+                        - Kelompok Sangat Mahir (Skor >= 32): {kelompok_mahir} santri
+                        - Kelompok Berkembang (Skor 16 - 31): {kelompok_sedang} santri
+                        - Kelompok Perlu Intervensi (Skor < 16): {kelompok_butuh_bimbingan} santri
+
+                        INSTRUKSI STRUKTUR LAPORAN (Format Markdown Rapi & Tajam):
+                        1. 📊 **EXECUTIVE SUMMARY & EVALUASI PERFORMA ({label_target})**
+                           (Evaluasi ketuntasan materi secara mendalam dan tingkat kesenjangan nilai).
+                        2. 👥 **PETA PEMBAGIAN KELOMPOK PEMBINAAN SISTER CLASS**
+                           (Saran pengelompokan santri berdasarkan kesiapan materi).
+                        3. 🚀 **ACTION PLAN STRATEGIS UNTUK GURU PEMBINA**
+                           (3 langkah konkret yang harus dieksekusi guru pembina minggu ini).
                         """
-                        report_result = stream_ai_text(prompt, max_output_tokens=2500)
-                        # Simpan ke session_state agar aman dari refresh
+                        report_result = stream_ai_text(prompt, max_output_tokens=3000)
                         st.session_state.cached_ai_report = "".join(list(report_result))
 
-                # Tampilkan cache laporan jika ada
+                # Display Cache Laporan AI
                 if "cached_ai_report" in st.session_state and st.session_state.cached_ai_report:
-                    st.markdown("### 📊 Laporan Diagnosis Kelas (AI Generated)")
+                    st.markdown(f"### 📊 Laporan Diagnosis AI ({label_target})")
                     st.markdown(st.session_state.cached_ai_report)
-                    if st.button("🗑️ Bersihkan Laporan"):
-                        st.session_state.cached_ai_report = ""
-                        st.rerun()
+
+                    col_rep1, col_rep2 = st.columns(2)
+                    with col_rep1:
+                        st.download_button(
+                            label="📥 Unduh Teks Laporan (.txt)",
+                            data=st.session_state.cached_ai_report,
+                            file_name=f"Laporan_Diagnosis_AI_{label_target.replace(' ', '_')}_{time_filter.replace(' ', '_')}.txt",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+                    with col_rep2:
+                        if st.button("🗑️ Hapus Laporan dari Layar", use_container_width=True):
+                            st.session_state.cached_ai_report = ""
+                            st.rerun()
                     st.write("---")
 
-                st.markdown("#### 🟢 Live Tracking Pengerjaan")
-                
-                # Render UI Tabel Kustom
+                # =========================================================================
+                # 5. LIVE TRACKING TABEL
+                # =========================================================================
+                st.markdown("#### 🟢 Live Tracking Pengerjaan Santri")
+
                 for index, row in df.iterrows():
                     with st.container():
                         col_nama, col_mapel, col_skor, col_bar, col_act = st.columns([2.5, 2.5, 1, 3.5, 1.5])
-                        
+
+                        # Status Badge
                         if row['status_real'] == 'SELESAI':
                             status_badge = "✅"
                         elif row['status_real'] == 'EXPIRED':
                             status_badge = "⏸️ (Terputus)"
                         else:
                             status_badge = "🔄"
-                        
+
+                        # Format Nama & Badge Percobaan
                         safe_nama = str(row['nama_siswa']).strip().replace("*", "")
-                        col_nama.markdown(f"**{safe_nama}** {status_badge}")
-                        col_mapel.caption(f"{row['mapel']} ({row['jenjang'][:3]})")
-                        col_skor.markdown(f"**Skor: {row['nilai_akhir']}**")
+                        percobaan_badge = f"<span style='font-size: 10px; background: rgba(5,150,105,0.15); color: #059669; padding: 2px 6px; border-radius: 4px; font-weight: 600;'>Percobaan ke-{row['total_percobaan']}</span>" if only_latest else ""
                         
+                        col_nama.markdown(f"**{safe_nama}** {status_badge}<br/>{percobaan_badge}", unsafe_allow_html=True)
+                        col_mapel.caption(f"{row['mapel']}<br/><b>{row['jenjang'][:3]}</b>", unsafe_allow_html=True)
+                        col_skor.markdown(f"**Skor: {row['nilai_akhir']}**")
+
+                        # Progress Bar & Micro Analytics
                         try:
                             detail_list = row['detail_jawaban']
                             if isinstance(detail_list, str):
                                 import json
                                 detail_list = json.loads(detail_list)
-                            col_bar.markdown(render_progress_bar_html(detail_list), unsafe_allow_html=True)
                             
+                            col_bar.markdown(render_progress_bar_html(detail_list), unsafe_allow_html=True)
+
                             with col_act:
                                 with st.popover("📊 Analisis"):
-                                    st.markdown(f"**Materi:** {row['mapel']}")
-                                    pct = (sum([1 for x in detail_list if x is True]) / 10) * 100 if detail_list else 0
-                                    if pct >= 70:
-                                        st.success(f"✅ **Materi Dikuasai:** Sangat menguasai {row['mapel']} ({pct}%)")
-                                        st.info("📉 **Materi Kurang:** Minor / Relatif aman.")
-                                    elif pct >= 40:
-                                        st.warning(f"⚠️ **Materi Dikuasai:** Cukup memahami {row['mapel']} ({pct}%)")
-                                        st.info(f"📉 **Materi Kurang:** Perlu review ulang beberapa sub-topik {row['mapel']}.")
+                                    st.markdown(f"**Analisis Santri:** {safe_nama}")
+                                    st.caption(f"Mapel: {row['mapel']} | Sesi Ke-{row['total_percobaan']}")
+
+                                    if isinstance(detail_list, list) and len(detail_list) == 10:
+                                        b_cnt = sum(1 for x in detail_list if x is True)
+                                        s_cnt = sum(1 for x in detail_list if x is False)
+                                        k_cnt = sum(1 for x in detail_list if x is None)
+                                        pct = (b_cnt / 10) * 100
+
+                                        m1, m2, m3 = st.columns(3)
+                                        m1.metric("Benar", f"{b_cnt}")
+                                        m2.metric("Salah", f"{s_cnt}")
+                                        m3.metric("Kosong", f"{k_cnt}")
+                                        st.divider()
+
+                                        if pct >= 80:
+                                            st.success(f"🌟 **Kategori: Siap OMI ({pct:.0f}%)**")
+                                            st.markdown("**Saran:** Berikan pengayaan tingkat lanjutan.")
+                                        elif pct >= 40:
+                                            st.warning(f"⚠️ **Kategori: Berkembang ({pct:.0f}%)**")
+                                            st.markdown("**Saran:** Perkuat pemahaman konsep dasar yang salah.")
+                                        else:
+                                            st.error(f"🌱 **Kategori: Perlu Intervensi ({pct:.0f}%)**")
+                                            st.markdown("**Saran:** Jadwalkan bimbingan klinis privat.")
                                     else:
-                                        st.error(f"❌ **Materi Dikuasai:** Belum terlihat ({pct}%)")
-                                        st.error(f"📉 **Materi Kurang:** Sangat membutuhkan bimbingan intensif materi dasar {row['mapel']}.")
+                                        st.info("Pengerjaan belum selesai.")
                         except:
                             col_bar.write("-")
                         st.divider()
@@ -593,7 +716,7 @@ elif st.session_state.page == "guru_dashboard":
             except Exception as e:
                 st.error(f"Gagal mengambil data dari database: {e}")
 
-        # Jalankan fragment auto-refresh hanya jika toggle dihidupkan
+        # Fragment Execution Logic
         if auto_refresh:
             @st.fragment(run_every="3s")
             def active_live_view():
@@ -601,6 +724,7 @@ elif st.session_state.page == "guru_dashboard":
             active_live_view()
         else:
             render_monitoring_content()
+
 
     with tab2:
         st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>🧕🏼 AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
