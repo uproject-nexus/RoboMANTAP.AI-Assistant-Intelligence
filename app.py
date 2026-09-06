@@ -592,7 +592,9 @@ elif st.session_state.page == "guru_dashboard":
                     """
 
                 df = conn.query(query, ttl=0)
-
+                # Tambahkan 2 baris ini di baris 595 agar kuis terbaru SELALU melompat ke paling atas:
+                if not df.empty:
+                    df = df.sort_values(by='updated_at', ascending=False)         
                 # Filter Status di sisi Pandas jika user memilih status tertentu
                 if not df.empty and selected_status_filter != "Semua Status":
                     df = df[df['status_real'] == selected_status_filter]
@@ -754,13 +756,8 @@ elif st.session_state.page == "guru_dashboard":
                         percobaan_badge = f"<span style='font-size: 10px; background: rgba(5,150,105,0.15); color: #059669; padding: 2px 6px; border-radius: 4px; font-weight: 600;'>Percobaan ke-{row['total_percobaan']}</span>" if only_latest else ""
 
                         # Hitung Waktu Mulai & Durasi Berjalan
-                        # Hitung Waktu & Durasi Menggunakan updated_at
-                        # Hitung Waktu Mulai & Durasi Berjalan secara Presisi
-                        # Hitung Waktu Mulai & Durasi Berjalan secara Presisi
-                        # Hitung Waktu Mulai & Durasi Berjalan (Fail-Safe dari NULL)
-                        # Hitung Waktu Mulai & Durasi Berjalan (Konversi UTC -> WIB +7 Jam)
+                        # Hitung Waktu Mulai & Durasi Berjalan (WIB Presisi)
                         try:
-                            # Ambil timestamp dari DB (UTC)
                             waktu_mulai_raw = row['created_at'] if ('created_at' in row and pd.notna(row['created_at'])) else row['updated_at']
                             
                             if isinstance(waktu_mulai_raw, str):
@@ -768,21 +765,19 @@ elif st.session_state.page == "guru_dashboard":
                             else:
                                 waktu_mulai_dt = pd.to_datetime(waktu_mulai_raw).to_pydatetime()
                 
-                            # TAMBAHKAN 7 JAM UNTUK KONVERSI KE WIB
-                            waktu_mulai_wib = waktu_mulai_dt + timedelta(hours=7)
-                            waktu_mulai_str = waktu_mulai_wib.strftime("%H:%M WIB")
+                            # Langsung format ke string tanpa timedelta +7 (karena DB sudah simpan format WIB)
+                            waktu_mulai_str = waktu_mulai_dt.strftime("%H:%M WIB")
                 
                             if row['status_real'] == 'BERJALAN':
-                                # Hitung durasi realtime berbasis UTC server Streamlit
-                                sekarang_utc = datetime.utcnow()
-                                selisih_detik = int((sekarang_utc - waktu_mulai_dt).total_seconds())
+                                # Hitung selisih waktu dari waktu mulai
+                                waktu_sekarang = datetime.now()
+                                selisih_detik = int((waktu_sekarang - waktu_mulai_dt).total_seconds())
                                 if selisih_detik < 0: 
                                     selisih_detik = 0
                                 menit = selisih_detik // 60
                                 detik = selisih_detik % 60
                                 durasi_str = f"⏱️ {menit}m {detik:02d}s" if menit < 60 else f"⏱️ {menit // 60}j {menit % 60}m"
                             else:
-                                # Jika status SELESAI / EXPIRED
                                 waktu_selesai_raw = row['updated_at']
                                 if isinstance(waktu_selesai_raw, str):
                                     waktu_selesai_dt = datetime.strptime(str(waktu_selesai_raw)[:19], "%Y-%m-%d %H:%M:%S")
@@ -792,23 +787,13 @@ elif st.session_state.page == "guru_dashboard":
                                 selisih_detik = int((waktu_selesai_dt - waktu_mulai_dt).total_seconds())
                                 if selisih_detik < 0: 
                                     selisih_detik = 0
-                
+                                
                                 menit = selisih_detik // 60
-                                detik = selisih_detik % 60
-                
-                                if menit > 0:
-                                    durasi_str = f"🏁 Selesai ({menit}m)"
-                                elif detik > 0:
-                                    durasi_str = f"🏁 Selesai ({detik}s)"
-                                else:
-                                    durasi_str = "🏁 Selesai (< 1m)"
-
+                                durasi_str = f"🏁 Selesai ({menit}m)" if menit > 0 else "🏁 Selesai (< 1m)"
                         except Exception as e:
                             waktu_mulai_str = "--:--"
                             durasi_str = "⏱️ -"
 
-
-                
                         # Render Kolom Tampilan (Menggunakan {waktu_mulai_str})
                         col_nama.markdown(f"**{safe_nama}** {status_badge}<br/>{percobaan_badge}", unsafe_allow_html=True)
                         col_mapel.markdown(f"""
