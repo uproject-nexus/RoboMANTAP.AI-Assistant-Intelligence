@@ -58,38 +58,6 @@ components.html(
 # Custom Styling 
 st.markdown("""
     <style>
-    /* Class Grid Kustom Evaluasi (2x2 di Mobile, 4-Kolom di Desktop) */
-    .eval-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
-        margin: 15px 0 20px 0;
-    }
-    @media (max-width: 640px) {
-        .eval-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-        }
-    }
-    .eval-card {
-        border-radius: 10px;
-        padding: 10px 8px;
-        text-align: center;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-    }
-    .eval-title {
-        font-size: 10px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.3px;
-        margin-bottom: 3px;
-        white-space: nowrap;
-    }
-    .eval-value {
-        font-size: 20px;
-        font-weight: 800;
-        line-height: 1.2;
-    }
 
     @keyframes pulse-red {
     0% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(239, 68, 68, 0.8)); }
