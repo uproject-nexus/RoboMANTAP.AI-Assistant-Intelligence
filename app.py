@@ -184,7 +184,6 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # Sidebar Control
-
 with st.sidebar:
     st.markdown("""
     <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 16px; border-radius: 12px; border: 1px solid #059669; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
@@ -200,18 +199,10 @@ with st.sidebar:
     # -------------------------------------------------------------------------
     if st.session_state.page == "guru_dashboard":
         st.markdown("### ⚙️ Panel Kontrol & Filter")
-        
         # Filter Rentang Waktu
         time_filter = st.radio("⏳ Rentang Waktu:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], key="filter_time")
-        
-        st.divider()
-        
         # Toggle Sesi & Auto-Refresh
         only_latest = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Gabungkan multi-sesi: 1 nama hanya muncul 1 kali (pengerjaan terbaru).", key="filter_latest")
-        auto_refresh = st.toggle("🔄 Live Auto-Refresh (3s)", value=False, help="Matikan jika ingin membaca laporan AI dengan stabil.", key="filter_refresh")
-        
-        st.divider()
-        
         # Filter Jenjang & Mapel
         selected_jenjang_filter = st.selectbox("🏫 Filter Jenjang:", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], key="filter_jenjang")
         
