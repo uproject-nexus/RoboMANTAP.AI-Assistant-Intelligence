@@ -755,7 +755,7 @@ elif st.session_state.page == "guru_dashboard":
                                             </div>
                                             <div style="flex: 1; background: rgba(156, 163, 175, 0.12); border: 1px solid rgba(156, 163, 175, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
                                                 <div style="font-size: 10px; color: #9ca3af; font-weight: 600;">Kosong</div>
-                                                <div style="font-size: 16px; font-weight: 800; color;">{k_cnt}</div>
+                                                <div style="font-size: 16px; font-weight: 800;">{k_cnt}</div>
                                             </div>
                                         </div>
                                         """, unsafe_allow_html=True)
