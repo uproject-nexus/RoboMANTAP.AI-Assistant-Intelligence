@@ -416,17 +416,25 @@ def update_progress_siswa(session_id: str, nama: str, jenjang: str, mapel: str,
     detail_json = json.dumps(detail_jawaban)
 
     query = """
-        INSERT INTO sesi_ujian (id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, jumlah_benar, jumlah_salah, nilai_akhir, status, updated_at)
-        VALUES (:id_sesi, :nama, :jenjang, :mapel, :soal, :detail, :benar, :salah, :nilai, :status, CURRENT_TIMESTAMP)
-        ON CONFLICT (id_sesi) DO UPDATE SET
-            soal_sekarang = EXCLUDED.soal_sekarang,
-            detail_jawaban = EXCLUDED.detail_jawaban,
-            jumlah_benar = EXCLUDED.jumlah_benar,
-            jumlah_salah = EXCLUDED.jumlah_salah,
-            nilai_akhir = EXCLUDED.nilai_akhir,
-            status = EXCLUDED.status,
-            updated_at = CURRENT_TIMESTAMP;
-    """
+    INSERT INTO sesi_ujian (
+        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, 
+        jumlah_benar, jumlah_salah, nilai_akhir, status, created_at, updated_at
+    )
+    VALUES (
+        :id_sesi, :nama, :jenjang, :mapel, :soal, :detail, 
+        :benar, :salah, :nilai, :status, 
+        NOW() AT TIME ZONE 'Asia/Jakarta', 
+        NOW() AT TIME ZONE 'Asia/Jakarta'
+    )
+    ON CONFLICT (id_sesi) DO UPDATE SET
+        soal_sekarang = EXCLUDED.soal_sekarang,
+        detail_jawaban = EXCLUDED.detail_jawaban,
+        jumlah_benar = EXCLUDED.jumlah_benar,
+        jumlah_salah = EXCLUDED.jumlah_salah,
+        nilai_akhir = EXCLUDED.nilai_akhir,
+        status = EXCLUDED.status,
+        updated_at = NOW() AT TIME ZONE 'Asia/Jakarta';
+    """                          
     
     try:
         with conn.session as s:
