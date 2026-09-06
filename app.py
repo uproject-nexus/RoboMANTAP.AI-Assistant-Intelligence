@@ -581,7 +581,7 @@ elif st.session_state.page == "guru_dashboard":
                     SELECT 
                         id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, updated_at,
                         CASE 
-                            WHEN status = 'BERJALAN' AND updated_at < NOW() - INTERVAL '15 minutes' THEN 'EXPIRED'
+                            WHEN status = 'BERJALAN' AND updated_at < NOW() - INTERVAL '60 minutes' THEN 'EXPIRED'
                             ELSE status
                         END as status_real,
                         1 as total_percobaan
