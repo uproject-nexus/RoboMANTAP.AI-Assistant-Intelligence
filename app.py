@@ -767,9 +767,9 @@ elif st.session_state.page == "guru_dashboard":
                                 waktu_mulai_dt = pd.to_datetime(waktu_mulai_raw).to_pydatetime()
                             
                             waktu_mulai_str = waktu_mulai_dt.strftime("%H:%M WIB")
-                
+
                             if row['status_real'] == 'BERJALAN':
-                                # SAMA-KAN ZONA WAKTU: Paksa waktu server UTC menjadi WIB (+7 jam)
+                                # Paksa waktu server UTC menjadi WIB (+7 jam)
                                 waktu_sekarang_wib = datetime.utcnow() + timedelta(hours=7)
                                 
                                 selisih_detik = int((waktu_sekarang_wib - waktu_mulai_dt).total_seconds())
@@ -783,7 +783,24 @@ elif st.session_state.page == "guru_dashboard":
                                     durasi_str = f"⏱️ {menit}m {detik:02d}s"
                                 else:
                                     durasi_str = f"⏱️ {menit // 60}j {menit % 60}m"
+                
+                            elif row['status_real'] == 'EXPIRED':
+                                # Khusus status Terputus/Inaktif
+                                waktu_selesai_raw = row['updated_at']
+                                if isinstance(waktu_selesai_raw, str):
+                                    waktu_selesai_dt = datetime.strptime(str(waktu_selesai_raw)[:19], "%Y-%m-%d %H:%M:%S")
+                                else:
+                                    waktu_selesai_dt = pd.to_datetime(waktu_selesai_raw).to_pydatetime()
+                                    
+                                selisih_detik = int((waktu_selesai_dt - waktu_mulai_dt).total_seconds())
+                                if selisih_detik < 0: 
+                                    selisih_detik = 0
+                                
+                                menit = selisih_detik // 60
+                                durasi_str = f"⏸️ Terputus ({menit}m)" if menit > 0 else "⏸️ Terputus (< 1m)"
+                
                             else:
+                                # Khusus status SELESAI (Siswa menamatkan 10 soal)
                                 waktu_selesai_raw = row['updated_at']
                                 if isinstance(waktu_selesai_raw, str):
                                     waktu_selesai_dt = datetime.strptime(str(waktu_selesai_raw)[:19], "%Y-%m-%d %H:%M:%S")
@@ -796,6 +813,8 @@ elif st.session_state.page == "guru_dashboard":
                                 
                                 menit = selisih_detik // 60
                                 durasi_str = f"🏁 Selesai ({menit}m)" if menit > 0 else "🏁 Selesai (< 1m)"
+                
+
                         except Exception as e:
                             waktu_mulai_str = "--:--"
                             durasi_str = "⏱️ -"
