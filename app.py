@@ -195,8 +195,38 @@ with st.sidebar:
     </div>
 
     """, unsafe_allow_html=True)
+    # -------------------------------------------------------------------------
+    # A. TAMPILAN SIDEBAR JIKA BERADA DI DASHBOARD GURU (PANEL FILTER)
+    # -------------------------------------------------------------------------
+    if st.session_state.page == "guru_dashboard":
+        st.markdown("### ⚙️ Panel Kontrol & Filter")
+        
+        # Filter Rentang Waktu
+        time_filter = st.radio("⏳ Rentang Waktu:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], key="filter_time")
+        
+        st.divider()
+        
+        # Toggle Sesi & Auto-Refresh
+        only_latest = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Gabungkan multi-sesi: 1 nama hanya muncul 1 kali (pengerjaan terbaru).", key="filter_latest")
+        auto_refresh = st.toggle("🔄 Live Auto-Refresh (3s)", value=False, help="Matikan jika ingin membaca laporan AI dengan stabil.", key="filter_refresh")
+        
+        st.divider()
+        
+        # Filter Jenjang & Mapel
+        selected_jenjang_filter = st.selectbox("🏫 Filter Jenjang:", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], key="filter_jenjang")
+        
+        if selected_jenjang_filter == "MTs (Sederajat SMP)":
+            mapel_options = ["Semua Mapel"] + list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys())
+        elif selected_jenjang_filter == "MA (Sederajat SMA)":
+            mapel_options = ["Semua Mapel"] + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
+        else:
+            all_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys()) + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
+            mapel_options = ["Semua Mapel"] + sorted(list(set(all_mapels)))
+            
+        selected_mapel_filter = st.selectbox("📚 Filter Mata Pelajaran:", mapel_options, key="filter_mapel")
+        selected_status_filter = st.selectbox("📌 Filter Status:", ["Semua Status", "BERJALAN", "SELESAI", "EXPIRED"], key="filter_status")
 
-    if st.session_state.page not in ["guru_login", "guru_dashboard"]:
+    else:
         st.markdown("""
         <div style="background: var(--secondary-background-color); border: 1px solid rgba(5, 150, 105, 0.3); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
@@ -260,7 +290,6 @@ with st.sidebar:
 
 
     
-
 # Helper LKPD PDF
 def draw_cover_background(canvas_obj, doc):
     canvas_obj.saveState()
