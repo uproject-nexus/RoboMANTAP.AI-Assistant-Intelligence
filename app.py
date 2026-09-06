@@ -1144,18 +1144,25 @@ elif st.session_state.page == "result":
             kosong += 1
             detail.append(None)
         elif u_ans == q["correct_answer"]:
-            benar += 1; total_skor += 4
+            benar += 1
+            total_skor += 4
             detail.append(True)
         else:
-            salah += 1; total_skor -= 1
+            salah += 1
+            total_skor -= 1
             detail.append(False)
 
     # Sinkronisasi Final Status SELESAI ke DB Guru
     update_progress_siswa(
-        st.session_state.session_id, st.session_state.nama_siswa,
-        st.session_state.jenjang, st.session_state.mapel, 10, detail, "SELESAI"
+        st.session_state.session_id,
+        st.session_state.nama_siswa,
+        st.session_state.jenjang,
+        st.session_state.mapel,
+        10,
+        detail,
+        "SELESAI"
     )
-    
+
     # Ekstraksi Nama Panggilan
     nama_lengkap = st.session_state.get('nama_siswa', '').strip()
     if nama_lengkap:
@@ -1208,7 +1215,6 @@ elif st.session_state.page == "result":
         st.info(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
     else:
         st.warning(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
-
     st.write("---")
     col_act1, col_act2 = st.columns(2)
     with col_act1:
