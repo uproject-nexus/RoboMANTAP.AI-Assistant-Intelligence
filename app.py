@@ -474,13 +474,13 @@ elif st.session_state.page == "guru_dashboard":
         selected_mapel_filter = st.session_state.get("filter_mapel", "Semua Mapel")
         selected_status_filter = st.session_state.get("filter_status", "Semua Status")
  
-        auto_refresh = st.toggle("🔄 Live Auto-Refresh (3s)", value=False, help="Nyalakan untuk memantau siswa secara real-time. Matikan saat membaca laporan AI.")
+        auto_refresh = st.toggle("🔄 Live Now!", value=False, help="Nyalakan untuk memantau siswa secara real-time. Matikan saat membaca laporan")
 
         # Indikator Status Auto-Refresh
         if auto_refresh:
-            st.caption("🟢 **Status:** Live tracking aktif memperbarui data setiap 3 detik")
+            st.caption("🟢 **Status:** Live Aktif! memperbarui data setiap 3 detik")
         else:
-            st.caption("⏸️ **Status:** Auto-refresh dimatikan (tampilan stabil, aman untuk membaca laporan AI)")
+            st.caption("⏸️ **Status:** Live dimatikan (tampilan stabil, aman untuk membaca laporan AI)")
 
         # Kondisi Tanggal
         if time_filter == "Hari Ini":
@@ -577,11 +577,11 @@ elif st.session_state.page == "guru_dashboard":
                 # 4. DIAGNOSIS AI KONTEKSTUAL (IKUT FILTER)
                 # =========================================================================
                 if auto_refresh:
-                    st.warning('⚠️ **Perhatian:** Harap matikan toggle **"Live Auto-Refresh (3s)"** sebelum men-generate atau membaca Laporan Diagnosis AI!')
+                    st.warning('⚠️ **Perhatian:** Harap matikan tombol **"Live"** sebelum men-generate atau membaca Laporan Evaluasi RoboMANTAP!')
 
                 # Judul Tombol Dinamis Mengikuti Filter
                 label_target = f"{selected_mapel_filter}" if selected_mapel_filter != "Semua Mapel" else selected_jenjang_filter
-                if st.button(f"🤖 Generate Laporan Diagnosis AI ({label_target})", type="primary", use_container_width=True):
+                if st.button(f"🧕 Generate Laporan Evaluasi RoboMANTAP ({label_target})", type="primary", use_container_width=True):
                     with st.spinner(f"RoboMANTAP sedang menganalisis data {label_target}..."):
                         total_siswa = len(df)
                         rata_rata = df['nilai_akhir'].mean()
@@ -593,8 +593,7 @@ elif st.session_state.page == "guru_dashboard":
                         kelompok_butuh_bimbingan = len(df[df['nilai_akhir'] < 16])
 
                         prompt = f"""
-                        Anda adalah Konsultan Ahli Pedagogik dan Evaluasi Pembinaan OMI 2026 Lembaga Al-Irsyad Bondowoso.
-                        Buatkan Laporan Diagnosis Eksekutif Spesifik berdasarkan data evaluasi berikut:
+                        Anda cukup buatkan Laporan Evaluasi Eksekutif Spesifik dengan kalimat padat dan ringkas berdasarkan data berikut:
 
                         SCOPE EVALUASI:
                         - Rentang Waktu: {time_filter}
@@ -623,7 +622,7 @@ elif st.session_state.page == "guru_dashboard":
 
                 # Display Cache Laporan AI
                 if "cached_ai_report" in st.session_state and st.session_state.cached_ai_report:
-                    st.markdown(f"### 📊 Laporan Diagnosis AI ({label_target})")
+                    st.markdown(f"### 📊 Laporan Evaluasi RoboMANTAP ({label_target})")
                     st.markdown(st.session_state.cached_ai_report)
 
                     col_rep1, col_rep2 = st.columns(2)
@@ -644,7 +643,7 @@ elif st.session_state.page == "guru_dashboard":
                 # =========================================================================
                 # 5. LIVE TRACKING TABEL
                 # =========================================================================
-                st.markdown("#### 🟢 Live Tracking Pengerjaan Santri")
+                st.markdown("#### 🟢 Live Tracking Pengerjaan")
 
                 for index, row in df.iterrows():
                     with st.container():
@@ -677,7 +676,7 @@ elif st.session_state.page == "guru_dashboard":
 
                             with col_act:
                                 with st.popover("📊 Analisis"):
-                                    st.markdown(f"**Analisis Santri:** {safe_nama}")
+                                    st.markdown(f"**Analisis Siswa:** {safe_nama}")
                                     st.caption(f"Mapel: {row['mapel']} | Sesi Ke-{row['total_percobaan']}")
 
                                     if isinstance(detail_list, list) and len(detail_list) == 10:
@@ -694,15 +693,15 @@ elif st.session_state.page == "guru_dashboard":
 
                                         if pct >= 80:
                                             st.success(f"🌟 **Kategori: Siap OMI ({pct:.0f}%)**")
-                                            st.markdown("**Saran:** Berikan pengayaan tingkat lanjutan.")
+                                            st.markdown("**Saran:** Berikan pengayaan tingkat lanjutan")
                                         elif pct >= 40:
                                             st.warning(f"⚠️ **Kategori: Berkembang ({pct:.0f}%)**")
-                                            st.markdown("**Saran:** Perkuat pemahaman konsep dasar yang salah.")
+                                            st.markdown("**Saran:** Perkuat pemahaman konsep dasar yang salah")
                                         else:
                                             st.error(f"🌱 **Kategori: Perlu Intervensi ({pct:.0f}%)**")
-                                            st.markdown("**Saran:** Jadwalkan bimbingan klinis privat.")
+                                            st.markdown("**Saran:** Jadwalkan bimbingan privat tambahan")
                                     else:
-                                        st.info("Pengerjaan belum selesai.")
+                                        st.info("Pengerjaan belum selesai!")
                         except:
                             col_bar.write("-")
                         st.divider()
