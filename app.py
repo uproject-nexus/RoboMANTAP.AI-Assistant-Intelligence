@@ -634,9 +634,6 @@ elif st.session_state.page == "guru_dashboard":
                 # =========================================================================
                 # 4. DIAGNOSIS AI KONTEKSTUAL (IKUT FILTER)
                 # =========================================================================
-                if auto_refresh:
-                    st.warning('⚠️ **Perhatian:** Harap matikan tombol **"Live"** sebelum men-generate atau membaca Laporan Evaluasi RoboMANTAP!')
-
                 # Judul Tombol Dinamis Mengikuti Filter
                 label_target = f"{selected_mapel_filter}" if selected_mapel_filter != "Semua Mapel" else selected_jenjang_filter
                 if st.button(f"🧕 Buat Laporan RoboMANTAP! ({label_target})", type="primary", use_container_width=True):
