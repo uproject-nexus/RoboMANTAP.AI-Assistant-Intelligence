@@ -732,6 +732,7 @@ elif st.session_state.page == "guru_dashboard":
 
                             with col_act:
                                 with st.popover("📊 Analisis"):
+                                    safe_nama = str(row['nama_siswa']).strip().replace("*", "")
                                     st.markdown(f"**Analisis Siswa:** {safe_nama}")
                                     st.caption(f"Mapel: {row['mapel']} | Sesi Ke-{row['total_percobaan']}")
 
@@ -741,23 +742,41 @@ elif st.session_state.page == "guru_dashboard":
                                         k_cnt = sum(1 for x in detail_list if x is None)
                                         pct = (b_cnt / 10) * 100
 
-                                        m1, m2, m3 = st.columns(3)
-                                        m1.metric("Benar", f"{b_cnt}")
-                                        m2.metric("Salah", f"{s_cnt}")
-                                        m3.metric("Kosong", f"{k_cnt}")
-                                        st.divider()
+                                        # Kartu Mikro Ringkas (Sejajar Horizontal di HP)
+                                        st.markdown(f"""
+                                        <div style="display: flex; gap: 6px; margin: 10px 0;">
+                                            <div style="flex: 1; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
+                                                <div style="font-size: 10px; color: #34d399; font-weight: 600;">Benar</div>
+                                                <div style="font-size: 16px; font-weight: 800; color: #ffffff;">{b_cnt}</div>
+                                            </div>
+                                            <div style="flex: 1; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
+                                                <div style="font-size: 10px; color: #f87171; font-weight: 600;">Salah</div>
+                                                <div style="font-size: 16px; font-weight: 800; color: #ffffff;">{s_cnt}</div>
+                                            </div>
+                                            <div style="flex: 1; background: rgba(156, 163, 175, 0.12); border: 1px solid rgba(156, 163, 175, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
+                                                <div style="font-size: 10px; color: #9ca3af; font-weight: 600;">Kosong</div>
+                                                <div style="font-size: 16px; font-weight: 800; color: #ffffff;">{k_cnt}</div>
+                                            </div>
+                                        </div>
+                                        """, unsafe_allow_html=True)
 
+                                        # Kategori Kesiapan & Rekomendasi Pedagogis
                                         if pct >= 80:
-                                            st.success(f"🌟 **Kategori: Siap OMI ({pct:.0f}%)**")
-                                            st.markdown("**Saran:** Berikan pengayaan tingkat lanjutan")
+                                            st.success(f"🌟 **Kategori: Siap Kompetisi ({pct:.0f}%)**")
+                                            st.markdown("**💡 Rekomendasi Pembinaan:**")
+                                            st.markdown("- Tingkatkan ke materi pengayaan HOTS tingkat Provinsi/Nasional.\n- Siswa direkomendasikan masuk skuat utama pembinaan OMI")
                                         elif pct >= 40:
                                             st.warning(f"⚠️ **Kategori: Berkembang ({pct:.0f}%)**")
-                                            st.markdown("**Saran:** Perkuat pemahaman konsep dasar yang salah")
+                                            st.markdown("**💡 Rekomendasi Pembinaan:**")
+                                            st.markdown("- Lakukan pembahasan (*review*) khusus pada butir soal yang salah/kosong.\n- Penguatan pemahaman konsep dasar masih perlu pematangan")
                                         else:
                                             st.error(f"🌱 **Kategori: Perlu Intervensi ({pct:.0f}%)**")
-                                            st.markdown("**Saran:** Jadwalkan bimbingan privat tambahan")
+                                            st.markdown("**💡 Rekomendasi Pembinaan:**")
+                                            st.markdown("- Jadwalkan bimbingan intensif.\n- Pelajari ulang modul pembahasan sebelum melakukan latihan berikutnya")
                                     else:
                                         st.info("Pengerjaan belum selesai!")
+                                
+                                
                         except:
                             col_bar.write("-")
                         st.divider()
