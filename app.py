@@ -58,6 +58,29 @@ components.html(
 # Custom Styling 
 st.markdown("""
     <style>
+    @keyframes pulse-red {
+    0% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(239, 68, 68, 0.8)); }
+    50% { opacity: 0.35; transform: scale(0.92); filter: drop-shadow(0px 0px 1px rgba(239, 68, 68, 0.1)); }
+    100% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(239, 68, 68, 0.8)); }
+    }
+    
+    @keyframes pulse-green {
+        0% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(16, 185, 129, 0.8)); }
+        50% { opacity: 0.35; transform: scale(0.92); filter: drop-shadow(0px 0px 1px rgba(16, 185, 129, 0.1)); }
+        100% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(16, 185, 129, 0.8)); }
+    }
+    
+    .blinking-dot-red {
+        display: inline-block;
+        animation: pulse-red 1.8s ease-in-out infinite;
+        vertical-align: middle;
+    }
+    
+    .blinking-dot-green {
+        display: inline-block;
+        animation: pulse-green 1.8s ease-in-out infinite;
+        vertical-align: middle;
+    }
     .mode-card {
         background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%);
         border: 1px solid rgba(5, 150, 105, 0.45);
@@ -441,7 +464,7 @@ if st.session_state.page == "landing":
     st.markdown("#### 🧕🏼 Portal GuruMANTAP")
     st.markdown("""
     <div class="guru-card">
-        <h2 style="margin:0; font-size: 20px;">🔴 Live Monitoring & AI Generator</h2>
+        h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
         <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp</p>
     </div>
     """, unsafe_allow_html=True)
@@ -490,7 +513,7 @@ elif st.session_state.page == "guru_dashboard":
 
         # Indikator Status Auto-Refresh
         if auto_refresh:
-            st.caption("🟢 **Status:** Live Aktif! memperbarui data setiap 3 detik")
+            st.markdown('<p style="font-size: 12px; opacity: 0.8;"><span class="blinking-dot-green">🟢</span> <b>Status:</b> Live Aktif! memperbarui data setiap 3 detik</p>', unsafe_allow_html=True)
         else:
             st.caption("⏸️ **Status:** Live dimatikan (tampilan stabil, aman untuk membaca laporan RoboMANTAP)")
 
@@ -705,13 +728,12 @@ elif st.session_state.page == "guru_dashboard":
                         if st.button("🗑️ Hapus Laporan dari Layar", use_container_width=True):
                             st.session_state.cached_ai_report = ""
                             st.rerun()
-                    st.write("---")
 
                 # =========================================================================
                 # 5. LIVE TRACKING TABEL
                 # =========================================================================
                 st.write("---")
-                st.markdown("#### 🟢 Live Tracking Pengerjaan")
+                st.markdown('#### <span class="blinking-dot-green">🟢</span> Live Tracking Pengerjaan', unsafe_allow_html=True)
 
                 for index, row in df.iterrows():
                     with st.container():
