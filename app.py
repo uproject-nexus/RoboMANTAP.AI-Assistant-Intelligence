@@ -1022,8 +1022,11 @@ elif st.session_state.page == "setup":
         """)
         st.write("")
         if st.button("🚀 MARI MULAI SESI TEST SEKARANG!", type="primary", use_container_width=True):
-            if not st.session_state.nama_siswa.strip():
-                st.error("⚠️ Isi nama lengkap kamu dulu ya sebelum mulai!")
+            nama_input = st.session_state.nama_siswa.strip()
+            jumlah_huruf = len([c for c in nama_input if c.isalpha()])
+            
+            if jumlah_huruf < 4:
+                st.error("⚠️ Masukkan nama lengkap yang valid!")
             else:
                 st.session_state.session_id = str(uuid.uuid4())
                 with st.spinner(f"RoboMANTAP sedang merancang 10 soal {st.session_state.mapel} Kamu. Tunggu sebentar ya... (nggak lama kok, hanya butuh waktu sekitar 15 detik saja! 😊)"):
