@@ -476,20 +476,23 @@ elif st.session_state.page == "guru_dashboard":
     st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
     tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕Bank Soal", "📲 WA Automation"])
     with tab1:
-        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>📊 Monitoring & Diagnosis Pembinaan OMI</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Diagnosis Pembinaan OMI</p>", unsafe_allow_html=True)
 
         time_filter = st.session_state.get("filter_time", "Hari Ini")
-        only_latest = st.session_state.get("filter_latest", True)
-        auto_refresh = st.session_state.get("filter_refresh", False)
         selected_jenjang_filter = st.session_state.get("filter_jenjang", "Semua Jenjang")
         selected_mapel_filter = st.session_state.get("filter_mapel", "Semua Mapel")
         selected_status_filter = st.session_state.get("filter_status", "Semua Status")
+        c_ctrl1, c_ctrl2 = st.columns([2, 2])
+        with c_ctrl1:
+            only_latest = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Jika ON: Menggabungkan multi-sesi siswa sehingga 1 nama hanya muncul 1 kali (pengerjaan paling baru).")
+        with c_ctrl2:
+            auto_refresh = st.toggle("🔄 Live Auto-Refresh (3s)", value=False, help="Nyalakan untuk memantau siswa secara real-time. Matikan saat membaca laporan AI.")
 
         # Indikator Status Auto-Refresh
         if auto_refresh:
-            st.caption("🟢 **Status:** Live tracking aktif memperbarui data setiap 3 detik.")
+            st.caption("🟢 **Status:** Live tracking aktif memperbarui data setiap 3 detik")
         else:
-            st.caption("⏸️ **Status:** Auto-refresh dimatikan (tampilan stabil, aman untuk membaca laporan AI).")
+            st.caption("⏸️ **Status:** Auto-refresh dimatikan (tampilan stabil, aman untuk membaca laporan AI)")
 
         # Kondisi Tanggal
         if time_filter == "Hari Ini":
