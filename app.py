@@ -491,11 +491,6 @@ elif st.session_state.page == "guru_dashboard":
         else:
             st.caption("⏸️ **Status:** Auto-refresh dimatikan (tampilan stabil, aman untuk membaca laporan AI).")
 
-        st.write("---")
-
-        # =========================================================================
-        # 2. LOGIKA KONDISI SQL (DYNAMIC QUERY BUILDER)
-        # =========================================================================
         # Kondisi Tanggal
         if time_filter == "Hari Ini":
             where_clauses = ["DATE(updated_at) = CURRENT_DATE"]
