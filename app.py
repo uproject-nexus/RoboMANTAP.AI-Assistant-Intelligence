@@ -58,6 +58,38 @@ components.html(
 # Custom Styling 
 st.markdown("""
     <style>
+    /* Class Grid Kustom (2x2 di Mobile, 4-Kolom di Desktop) */
+    .eval-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin: 15px 0 20px 0;
+    }
+    @media (max-width: 640px) {
+        .eval-grid {
+            grid-template-columns: repeat(2, 1fr); /* 2x2 Grid Simetris di HP */
+            gap: 8px;
+        }
+    }
+    .eval-card {
+        border-radius: 10px;
+        padding: 10px 8px;
+        text-align: center;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    }
+    .eval-title {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        margin-bottom: 3px;
+        white-space: nowrap;
+    }
+    .eval-value {
+        font-size: 20px;
+        font-weight: 800;
+        line-height: 1.2;
+    }
     @keyframes pulse-red {
     0% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(239, 68, 68, 0.8)); }
     50% { opacity: 0.35; transform: scale(0.92); filter: drop-shadow(0px 0px 1px rgba(239, 68, 68, 0.1)); }
@@ -1140,11 +1172,36 @@ elif st.session_state.page == "result":
         feedback_msg = f"🌱 **Tetap Semangat, {nama_display}! (Skor: {total_skor}/40)**\n\nJangan berkecil hati ya! Setiap kesalahan adalah proses belajar. Yuk pelajari pembahasan rinci di bawah dan coba latihan 10 soal lagi bersama RoboMANTAP! 🧕🏼❤️"
         feedback_type = "warning"
 
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Total Skor CBT", f"{total_skor} / 40")
-    k2.metric("Benar (+4)", f"{benar}")
-    k3.metric("Salah (-1)", f"{salah}")
-    k4.metric("Kosong (0)", f"{kosong}")
+    # Render Scorecard Modern Grid 2x2
+    st.markdown(f"""
+    <div class="eval-grid">
+        <!-- Kartu Total Skor -->
+        <div class="eval-card" style="background: linear-gradient(135deg, rgba(120, 53, 15, 0.45) 0%, rgba(69, 26, 3, 0.75) 100%); border: 1px solid rgba(245, 158, 11, 0.5);">
+            <div class="eval-title" style="color: #fde68a;">🏆 Total Skor</div>
+            <div class="eval-value" style="color: #fbbf24;">{total_skor} <span style="font-size: 11px; color: #d1d5db;">/ 40</span></div>
+        </div>
+
+        <!-- Kartu Benar -->
+        <div class="eval-card" style="background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%); border: 1px solid rgba(5, 150, 105, 0.45);">
+            <div class="eval-title" style="color: #a7f3d0;">✅ Benar (+4)</div>
+            <div class="eval-value" style="color: #34d399;">{benar}</div>
+        </div>
+
+        <!-- Kartu Salah -->
+        <div class="eval-card" style="background: linear-gradient(135deg, rgba(127, 29, 29, 0.35) 0%, rgba(69, 10, 10, 0.65) 100%); border: 1px solid rgba(239, 68, 68, 0.4);">
+            <div class="eval-title" style="color: #fca5a5;">❌ Salah (-1)</div>
+            <div class="eval-value" style="color: #f87171;">{salah}</div>
+        </div>
+
+        <!-- Kartu Kosong -->
+        <div class="eval-card" style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.35) 0%, rgba(31, 41, 55, 0.65) 100%); border: 1px solid rgba(156, 163, 175, 0.35);">
+            <div class="eval-title" style="color: #d1d5db;">⚪ Kosong (0)</div>
+            <div class="eval-value" style="color: #9ca3af;">{kosong}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 
     if feedback_type == "success":
         st.success(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
