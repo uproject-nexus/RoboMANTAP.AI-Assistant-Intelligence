@@ -747,15 +747,15 @@ elif st.session_state.page == "guru_dashboard":
                                         <div style="display: flex; gap: 6px; margin: 10px 0;">
                                             <div style="flex: 1; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
                                                 <div style="font-size: 10px; color: #34d399; font-weight: 600;">Benar</div>
-                                                <div style="font-size: 16px; font-weight: 800; color: #ffffff;">{b_cnt}</div>
+                                                <div style="font-size: 16px; font-weight: 800;">{b_cnt}</div>
                                             </div>
                                             <div style="flex: 1; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
                                                 <div style="font-size: 10px; color: #f87171; font-weight: 600;">Salah</div>
-                                                <div style="font-size: 16px; font-weight: 800; color: #ffffff;">{s_cnt}</div>
+                                                <div style="font-size: 16px; font-weight: 800;">{s_cnt}</div>
                                             </div>
                                             <div style="flex: 1; background: rgba(156, 163, 175, 0.12); border: 1px solid rgba(156, 163, 175, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
                                                 <div style="font-size: 10px; color: #9ca3af; font-weight: 600;">Kosong</div>
-                                                <div style="font-size: 16px; font-weight: 800; color: #ffffff;">{k_cnt}</div>
+                                                <div style="font-size: 16px; font-weight: 800; color;">{k_cnt}</div>
                                             </div>
                                         </div>
                                         """, unsafe_allow_html=True)
