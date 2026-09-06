@@ -568,7 +568,7 @@ elif st.session_state.page == "guru_dashboard":
                     SELECT DISTINCT ON (LOWER(TRIM(nama_siswa)), mapel)
                         id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, created_at, updated_at,
                         CASE 
-                            WHEN status = 'BERJALAN' AND updated_at < NOW() - INTERVAL '30 minutes' THEN 'EXPIRED'
+                            WHEN status = 'BERJALAN' AND updated_at < (NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '30 minutes' THEN 'EXPIRED'
                             ELSE status
                         END as status_real,
                         COUNT(*) OVER(PARTITION BY LOWER(TRIM(nama_siswa)), mapel) as total_percobaan
@@ -582,7 +582,7 @@ elif st.session_state.page == "guru_dashboard":
                     SELECT 
                         id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, created_at, updated_at,
                         CASE 
-                            WHEN status = 'BERJALAN' AND updated_at < NOW() - INTERVAL '30 minutes' THEN 'EXPIRED'
+                            WHEN status = 'BERJALAN' AND updated_at < (NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '30 minutes' THEN 'EXPIRED'
                             ELSE status
                         END as status_real,
                         1 as total_percobaan
