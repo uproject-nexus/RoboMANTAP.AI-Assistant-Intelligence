@@ -757,6 +757,7 @@ elif st.session_state.page == "guru_dashboard":
 
                         # Hitung Waktu Mulai & Durasi Berjalan
                         # Hitung Waktu Mulai & Durasi Berjalan (WIB Presisi)
+                        # Hitung Waktu Mulai & Durasi Berjalan (Presisi WIB & Server UTC)
                         try:
                             waktu_mulai_raw = row['created_at'] if ('created_at' in row and pd.notna(row['created_at'])) else row['updated_at']
                             
@@ -764,19 +765,24 @@ elif st.session_state.page == "guru_dashboard":
                                 waktu_mulai_dt = datetime.strptime(str(waktu_mulai_raw)[:19], "%Y-%m-%d %H:%M:%S")
                             else:
                                 waktu_mulai_dt = pd.to_datetime(waktu_mulai_raw).to_pydatetime()
-                
-                            # Langsung format ke string tanpa timedelta +7 (karena DB sudah simpan format WIB)
+                            
                             waktu_mulai_str = waktu_mulai_dt.strftime("%H:%M WIB")
                 
                             if row['status_real'] == 'BERJALAN':
-                                # Hitung selisih waktu dari waktu mulai
-                                waktu_sekarang = datetime.now()
-                                selisih_detik = int((waktu_sekarang - waktu_mulai_dt).total_seconds())
+                                # SAMA-KAN ZONA WAKTU: Paksa waktu server UTC menjadi WIB (+7 jam)
+                                waktu_sekarang_wib = datetime.utcnow() + timedelta(hours=7)
+                                
+                                selisih_detik = int((waktu_sekarang_wib - waktu_mulai_dt).total_seconds())
                                 if selisih_detik < 0: 
                                     selisih_detik = 0
+                                    
                                 menit = selisih_detik // 60
                                 detik = selisih_detik % 60
-                                durasi_str = f"⏱️ {menit}m {detik:02d}s" if menit < 60 else f"⏱️ {menit // 60}j {menit % 60}m"
+                                
+                                if menit < 60:
+                                    durasi_str = f"⏱️ {menit}m {detik:02d}s"
+                                else:
+                                    durasi_str = f"⏱️ {menit // 60}j {menit % 60}m"
                             else:
                                 waktu_selesai_raw = row['updated_at']
                                 if isinstance(waktu_selesai_raw, str):
