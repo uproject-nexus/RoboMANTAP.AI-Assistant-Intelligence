@@ -782,6 +782,7 @@ elif st.session_state.page == "guru_dashboard":
                                 detik = selisih_detik % 60
                                 durasi_str = f"⏱️ {menit}m {detik:02d}s" if menit < 60 else f"⏱️ {menit // 60}j {menit % 60}m"
                             else:
+                                # Jika status SELESAI / EXPIRED
                                 waktu_selesai_raw = row['updated_at']
                                 if isinstance(waktu_selesai_raw, str):
                                     waktu_selesai_dt = datetime.strptime(str(waktu_selesai_raw)[:19], "%Y-%m-%d %H:%M:%S")
@@ -791,7 +792,17 @@ elif st.session_state.page == "guru_dashboard":
                                 selisih_detik = int((waktu_selesai_dt - waktu_mulai_dt).total_seconds())
                                 if selisih_detik < 0: 
                                     selisih_detik = 0
-                                durasi_str = f"🏁 Selesai ({selisih_detik // 60}m)"
+                
+                                menit = selisih_detik // 60
+                                detik = selisih_detik % 60
+                
+                                if menit > 0:
+                                    durasi_str = f"🏁 Selesai ({menit}m)"
+                                elif detik > 0:
+                                    durasi_str = f"🏁 Selesai ({detik}s)"
+                                else:
+                                    durasi_str = "🏁 Selesai (< 1m)"
+
                         except Exception as e:
                             waktu_mulai_str = "--:--"
                             durasi_str = "⏱️ -"
