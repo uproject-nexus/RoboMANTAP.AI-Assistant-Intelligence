@@ -566,7 +566,7 @@ elif st.session_state.page == "guru_dashboard":
                     # Query Deduplikasi: Hanya Ambil Sesi Terbaru per Siswa & Mapel + Hitung Total Percobaan
                     query = f"""
                     SELECT DISTINCT ON (LOWER(TRIM(nama_siswa)), mapel)
-                        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, updated_at,
+                        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, created_at, updated_at,
                         CASE 
                             WHEN status = 'BERJALAN' AND updated_at < NOW() - INTERVAL '60 minutes' THEN 'EXPIRED'
                             ELSE status
@@ -580,7 +580,7 @@ elif st.session_state.page == "guru_dashboard":
                     # Query Standard: Tampilkan Seluruh Riwayat Sesi Tanpa Filter Unik
                     query = f"""
                     SELECT 
-                        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, updated_at,
+                        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, created_at, updated_at,
                         CASE 
                             WHEN status = 'BERJALAN' AND updated_at < NOW() - INTERVAL '60 minutes' THEN 'EXPIRED'
                             ELSE status
