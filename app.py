@@ -1181,7 +1181,42 @@ elif st.session_state.page == "result":
         feedback_type = "warning"
 
     # Render Scorecard Modern Grid 2x2
+    # Render Scorecard Modern Grid 2x2 (Self-Contained)
     st.markdown(f"""
+    <style>
+    .eval-grid {{
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin: 15px 0 20px 0;
+    }}
+    @media (max-width: 640px) {{
+        .eval-grid {{
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }}
+    }}
+    .eval-card {{
+        border-radius: 10px;
+        padding: 10px 8px;
+        text-align: center;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    }}
+    .eval-title {{
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        margin-bottom: 3px;
+        white-space: nowrap;
+    }}
+    .eval-value {{
+        font-size: 20px;
+        font-weight: 800;
+        line-height: 1.2;
+    }}
+    </style>
+
     <div class="eval-grid">
         <!-- Kartu Total Skor -->
         <div class="eval-card" style="background: linear-gradient(135deg, rgba(120, 53, 15, 0.45) 0%, rgba(69, 26, 3, 0.75) 100%); border: 1px solid rgba(245, 158, 11, 0.5);">
@@ -1208,6 +1243,7 @@ elif st.session_state.page == "result":
         </div>
     </div>
     """, unsafe_allow_html=True)
+
 
     if feedback_type == "success":
         st.success(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
