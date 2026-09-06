@@ -59,13 +59,25 @@ components.html(
 st.markdown("""
     <style>
     .mode-card {
-        background-color: var(--secondary-background-color);
-        color: var(--text-color);
-        border: 1px solid rgba(128, 128, 128, 0.2);
-        padding: 24px;
+        background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%);
+        border: 1px solid rgba(5, 150, 105, 0.45);
+        padding: 14px 16px;
         border-radius: 12px;
         text-align: center;
-        margin-bottom: 15px;
+        margin-bottom: 8px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+    .mode-card h2 {
+        font-size: 18px !important;
+        font-weight: 700;
+        color: #ffffff !important;
+        margin-bottom: 4px !important;
+    }
+    .mode-card p {
+        color: #a7f3d0 !important;
+        font-size: 12px !important;
+        margin: 0 !important;
+        opacity: 0.9;
     }
     .mapel-card {
         background-color: var(--secondary-background-color);
@@ -395,17 +407,17 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
 # 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
 # ==============================================================================
 if st.session_state.page == "landing":
-    st.markdown("<h2 style='font-size: 25px; text-align: center;'>🏆 BINA PRESTASI OMI 2026</h2>", unsafe_allow_html=True)
+
+    st.markdown("<h3 style='text-align: center; font-size: 25px;'>🏆 BINA PRESTASI OMI 2026</h3>", unsafe_allow_html=True)
     st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
     st.write("---")
 
-    st.markdown("#### 📝 Mulai Latihan CBT")
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("""
         <div class="mode-card">
             <h2>🏫 TINGKAT MTs</h2>
-            <p style="opacity: 0.7; font-size: 14px;">Madrasah Tsanawiyah Al-Irsyad Putri</p>
+            <p>Madrasah Tsanawiyah Al-Irsyad Putri</p>
         </div>
         """, unsafe_allow_html=True)
         if st.button("Masuk Modul MTs ➔", key="btn_mts", use_container_width=True, type="primary"):
@@ -417,7 +429,7 @@ if st.session_state.page == "landing":
         st.markdown("""
         <div class="mode-card">
             <h2>🏛️ TINGKAT MA</h2>
-            <p style="opacity: 0.7; font-size: 14px;">Madrasah Aliyah Al-Irsyad Putri</p>
+            <p>Madrasah Aliyah Al-Irsyad Putri</p>
         </div>
         """, unsafe_allow_html=True)
         if st.button("Masuk Modul MA ➔", key="btn_ma", use_container_width=True, type="primary"):
