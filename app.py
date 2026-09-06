@@ -755,25 +755,34 @@ elif st.session_state.page == "guru_dashboard":
 
                         # Hitung Waktu Mulai & Durasi Berjalan
                         # Hitung Waktu & Durasi Menggunakan updated_at
+                        # Hitung Waktu Mulai & Durasi Berjalan secara Presisi
                         try:
-                            waktu_dt = row['updated_at']
-                            if isinstance(waktu_dt, str):
-                                waktu_dt = datetime.strptime(waktu_dt, "%Y-%m-%d %H:%M:%S")
+                            # Gunakan created_at sebagai Titik Nol (Start)
+                            waktu_mulai_dt = row['created_at'] 
+                            if isinstance(waktu_mulai_dt, str):
+                                waktu_mulai_dt = datetime.strptime(waktu_mulai_dt[:19], "%Y-%m-%d %H:%M:%S")
                 
-                            waktu_str = waktu_dt.strftime("%H:%M WIB")
+                            waktu_mulai_str = waktu_mulai_dt.strftime("%H:%M WIB")
                 
                             if row['status_real'] == 'BERJALAN':
-                                selisih_detik = int((datetime.now() - waktu_dt).total_seconds())
-                                if selisih_detik < 0: 
-                                    selisih_detik = 0
+                                # Durasi = Waktu Sekarang - Waktu Pertama Kali Ujian Dibuat
+                                selisih_detik = int((datetime.now() - waktu_mulai_dt).total_seconds())
+                                if selisih_detik < 0: selisih_detik = 0
                                 menit = selisih_detik // 60
                                 detik = selisih_detik % 60
                                 durasi_str = f"⏱️ {menit}m {detik:02d}s" if menit < 60 else f"⏱️ {menit // 60}j {menit % 60}m"
                             else:
-                                durasi_str = "🏁 Selesai"
-                        except:
-                            waktu_str = "--:--"
+                                # Jika selesai, Durasi = Waktu Terakhir (updated_at) - Waktu Mulai (created_at)
+                                waktu_selesai_dt = row['updated_at']
+                                if isinstance(waktu_selesai_dt, str):
+                                    waktu_selesai_dt = datetime.strptime(waktu_selesai_dt[:19], "%Y-%m-%d %H:%M:%S")
+                                selisih_detik = int((waktu_selesai_dt - waktu_mulai_dt).total_seconds())
+                                if selisih_detik < 0: selisih_detik = 0
+                                durasi_str = f"🏁 Selesai ({selisih_detik // 60}m)"
+                        except Exception as e:
+                            waktu_mulai_str = "--:--"
                             durasi_str = "⏱️ - "
+
                 
                         # Render Kolom Tampilan
                         col_nama.markdown(f"**{safe_nama}** {status_badge}<br/>{percobaan_badge}", unsafe_allow_html=True)
