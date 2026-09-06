@@ -4,6 +4,7 @@ import uuid
 import base64
 import pandas as pd
 import streamlit as st
+from datetime import datetime
 import streamlit.components.v1 as components
 
 # Import python-docx untuk generate Word berlogo (ReportLab PDF)
@@ -565,7 +566,7 @@ elif st.session_state.page == "guru_dashboard":
                     # Query Deduplikasi: Hanya Ambil Sesi Terbaru per Siswa & Mapel + Hitung Total Percobaan
                     query = f"""
                     SELECT DISTINCT ON (LOWER(TRIM(nama_siswa)), mapel)
-                        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, updated_at,
+                        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, created_at, updated_at,
                         CASE 
                             WHEN status = 'BERJALAN' AND updated_at < NOW() - INTERVAL '15 minutes' THEN 'EXPIRED'
                             ELSE status
@@ -579,7 +580,7 @@ elif st.session_state.page == "guru_dashboard":
                     # Query Standard: Tampilkan Seluruh Riwayat Sesi Tanpa Filter Unik
                     query = f"""
                     SELECT 
-                        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, updated_at,
+                        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, nilai_akhir, created_at, updated_at,
                         CASE 
                             WHEN status = 'BERJALAN' AND updated_at < NOW() - INTERVAL '60 minutes' THEN 'EXPIRED'
                             ELSE status
@@ -751,10 +752,42 @@ elif st.session_state.page == "guru_dashboard":
                         # Format Nama & Badge Percobaan
                         safe_nama = str(row['nama_siswa']).strip().replace("*", "")
                         percobaan_badge = f"<span style='font-size: 10px; background: rgba(5,150,105,0.15); color: #059669; padding: 2px 6px; border-radius: 4px; font-weight: 600;'>Percobaan ke-{row['total_percobaan']}</span>" if only_latest else ""
-                        
+
+                        # Hitung Waktu Mulai & Durasi Berjalan
+                        try:
+                            waktu_mulai_dt = row['created_at']
+                            if isinstance(waktu_mulai_dt, str):
+                                waktu_mulai_dt = datetime.strptime(waktu_mulai_dt, "%Y-%m-%d %H:%M:%S")
+                
+                            waktu_mulai_str = waktu_mulai_dt.strftime("%H:%M WIB")
+                
+                            if row['status_real'] == 'BERJALAN':
+                                selisih_detik = int((datetime.now() - waktu_mulai_dt).total_seconds())
+                                if selisih_detik < 0: selisih_detik = 0
+                                menit = selisih_detik // 60
+                                detik = selisih_detik % 60
+                                durasi_str = f"⏱️ {menit}m {detik:02d}s" if menit < 60 else f"⏱️ {menit // 60}j {menit % 60}m"
+                            else:
+                                waktu_selesai_dt = row['updated_at']
+                                if isinstance(waktu_selesai_dt, str):
+                                    waktu_selesai_dt = datetime.strptime(waktu_selesai_dt, "%Y-%m-%d %H:%M:%S")
+                                selisih_detik = int((waktu_selesai_dt - waktu_mulai_dt).total_seconds())
+                                if selisih_detik < 0: selisih_detik = 0
+                                durasi_str = f"🏁 Selesai ({selisih_detik // 60}m)"
+                        except:
+                            waktu_mulai_str = "--:--"
+                            durasi_str = "⏱️ - "
+                
+                        # Render Kolom Tampilan
                         col_nama.markdown(f"**{safe_nama}** {status_badge}<br/>{percobaan_badge}", unsafe_allow_html=True)
-                        col_mapel.caption(f"{row['mapel']}<br/><b>{row['jenjang'][:3]}</b>", unsafe_allow_html=True)
+                        col_mapel.markdown(f"""
+                        <div style="line-height: 1.3;">
+                            <span style="font-weight: 600; font-size: 13px;">{row['mapel']}</span> <span style="font-size: 11px; opacity: 0.7;">({row['jenjang'][:3]})</span><br/>
+                            <span style="font-size: 10px; color: #9ca3af;">🕒 {waktu_mulai_str} • <b style="color: #34d399;">{durasi_str}</b></span>
+                        </div>
+                        """, unsafe_allow_html=True)
                         col_skor.markdown(f"**Skor: {row['nilai_akhir']}**")
+
 
                         # Progress Bar & Micro Analytics
                         try:
