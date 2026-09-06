@@ -4,7 +4,7 @@ import uuid
 import base64
 import pandas as pd
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 import streamlit.components.v1 as components
 
 # Import python-docx untuk generate Word berlogo (ReportLab PDF)
@@ -758,20 +758,26 @@ elif st.session_state.page == "guru_dashboard":
                         # Hitung Waktu Mulai & Durasi Berjalan secara Presisi
                         # Hitung Waktu Mulai & Durasi Berjalan secara Presisi
                         # Hitung Waktu Mulai & Durasi Berjalan (Fail-Safe dari NULL)
+                        # Hitung Waktu Mulai & Durasi Berjalan (Konversi UTC -> WIB +7 Jam)
                         try:
-                            # Ambil created_at, jika NULL/kosong pakai updated_at (untuk data lama)
+                            # Ambil timestamp dari DB (UTC)
                             waktu_mulai_raw = row['created_at'] if ('created_at' in row and pd.notna(row['created_at'])) else row['updated_at']
                             
                             if isinstance(waktu_mulai_raw, str):
                                 waktu_mulai_dt = datetime.strptime(str(waktu_mulai_raw)[:19], "%Y-%m-%d %H:%M:%S")
                             else:
-                                waktu_mulai_dt = waktu_mulai_raw
+                                waktu_mulai_dt = pd.to_datetime(waktu_mulai_raw).to_pydatetime()
                 
-                            waktu_mulai_str = waktu_mulai_dt.strftime("%H:%M WIB")
+                            # TAMBAHKAN 7 JAM UNTUK KONVERSI KE WIB
+                            waktu_mulai_wib = waktu_mulai_dt + timedelta(hours=7)
+                            waktu_mulai_str = waktu_mulai_wib.strftime("%H:%M WIB")
                 
                             if row['status_real'] == 'BERJALAN':
-                                selisih_detik = int((datetime.now() - waktu_mulai_dt).total_seconds())
-                                if selisih_detik < 0: selisih_detik = 0
+                                # Hitung durasi realtime berbasis UTC server Streamlit
+                                sekarang_utc = datetime.utcnow()
+                                selisih_detik = int((sekarang_utc - waktu_mulai_dt).total_seconds())
+                                if selisih_detik < 0: 
+                                    selisih_detik = 0
                                 menit = selisih_detik // 60
                                 detik = selisih_detik % 60
                                 durasi_str = f"⏱️ {menit}m {detik:02d}s" if menit < 60 else f"⏱️ {menit // 60}j {menit % 60}m"
@@ -780,14 +786,16 @@ elif st.session_state.page == "guru_dashboard":
                                 if isinstance(waktu_selesai_raw, str):
                                     waktu_selesai_dt = datetime.strptime(str(waktu_selesai_raw)[:19], "%Y-%m-%d %H:%M:%S")
                                 else:
-                                    waktu_selesai_dt = waktu_selesai_raw
+                                    waktu_selesai_dt = pd.to_datetime(waktu_selesai_raw).to_pydatetime()
                                     
                                 selisih_detik = int((waktu_selesai_dt - waktu_mulai_dt).total_seconds())
-                                if selisih_detik < 0: selisih_detik = 0
+                                if selisih_detik < 0: 
+                                    selisih_detik = 0
                                 durasi_str = f"🏁 Selesai ({selisih_detik // 60}m)"
                         except Exception as e:
                             waktu_mulai_str = "--:--"
                             durasi_str = "⏱️ -"
+
 
                 
                         # Render Kolom Tampilan (Menggunakan {waktu_mulai_str})
