@@ -245,12 +245,10 @@ with st.sidebar:
         st.session_state.guru_auth = False
         st.rerun()
 
-    sidebar_nexus_html = f'<div style="background: #ffffff; padding: 6px 14px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); display: inline-block; margin-bottom: 8px; border: 1px solid rgba(0,0,0,0.05);"><img src="data:image/png;base64,{logo_nexus_b64}" style="height: 42px; max-width: 100%; display: block; margin: 0 auto;"></div>' if logo_nexus_b64 else
-
+    sidebar_nexus_html = f'<div style="background: #ffffff; padding: 6px 14px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); display: inline-block; margin-bottom: 8px; border: 1px solid rgba(0,0,0,0.05);"><img src="data:image/png;base64,{logo_nexus_b64}" style="height: 42px; max-width: 100%; display: block; margin: 0 auto;"></div>' if logo_nexus_b64 else ''
     st.markdown(f"""
     <div style="text-align: center; margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(128,128,128,0.2);">
         <div style="font-size: 10px; opacity: 0.7; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Engineered by</div>
-
         {sidebar_nexus_html}
         <div style="font-size: 11px; opacity: 0.85; line-height: 1.3;">
             <b style="color: var(--text-color);">U.Project Nexus System</b><br>
@@ -258,7 +256,10 @@ with st.sidebar:
             <span style="font-size: 9px; opacity: 0.5;">&copy; 2026 All Rights Reserved</span>
         </div>
     </div>
-    """, unsafe_allow_html=True) 
+    """, unsafe_allow_html=True)
+
+
+    
 
 # Helper LKPD PDF
 def draw_cover_background(canvas_obj, doc):
