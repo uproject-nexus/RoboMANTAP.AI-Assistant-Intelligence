@@ -467,7 +467,7 @@ elif st.session_state.page == "guru_dashboard":
     st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
     tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕Bank Soal", "📲 WA Automation"])
     with tab1:
-        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Diagnosis Pembinaan OMI</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Evaluasi Pembinaan OMI</p>", unsafe_allow_html=True)
 
         time_filter = st.session_state.get("filter_time", "Hari Ini")
         selected_jenjang_filter = st.session_state.get("filter_jenjang", "Semua Jenjang")
@@ -613,7 +613,7 @@ elif st.session_state.page == "guru_dashboard":
 
                 <div class="kpi-grid">
                     <div class="kpi-card">
-                        <div class="kpi-title">👥 Total Santri</div>
+                        <div class="kpi-title">👥 Total Siswa</div>
                         <div class="kpi-value">{val_total}</div>
                     </div>
                     <div class="kpi-card">
@@ -660,7 +660,7 @@ elif st.session_state.page == "guru_dashboard":
                         - Mode Sesi: {"Sesi Terbaru Saja (Deduplikasi)" if only_latest else "Seluruh Riwayat Sesi"}
 
                         STATISTIK KELAS:
-                        - Total Santri/Sesi: {total_siswa}
+                        - Total Siswa/Sesi: {total_siswa}
                         - Rata-Rata Nilai: {rata_rata:.1f} / 40
                         - Nilai Tertinggi: {tertinggi} / 40 | Nilai Terendah: {terendah} / 40
                         - Kelompok Sangat Mahir (Skor >= 32): {kelompok_mahir} santri
@@ -701,6 +701,7 @@ elif st.session_state.page == "guru_dashboard":
                 # =========================================================================
                 # 5. LIVE TRACKING TABEL
                 # =========================================================================
+                st.write("---")
                 st.markdown("#### 🟢 Live Tracking Pengerjaan")
 
                 for index, row in df.iterrows():
