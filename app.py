@@ -561,7 +561,7 @@ elif st.session_state.page == "guru_dashboard":
                     df = df[df['status_real'] == selected_status_filter]
 
                 if df.empty:
-                    st.info(f"🚫 Tidak ada data pengerjaan siswa yang sesuai dengan kombinasi filter saat ini.")
+                    st.info(f"🚫 Tidak ada data pengerjaan siswa yang sesuai! Silahkan seting Kontrol Panel & Filter di Sidebar (click pojok kiri atas)")
                     return
 
                 # =========================================================================
