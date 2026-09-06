@@ -183,79 +183,61 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Sidebar Control 
+# Sidebar Control
+
 with st.sidebar:
     st.markdown("""
-    <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 14px; border-radius: 12px; border: 1px solid #059669; text-align: center; margin-bottom: 15px;">
-        <div style="font-size: 24px; margin-bottom: 2px;">🧕🏼</div>
-        <div style="color: #ffffff; font-weight: 700; font-size: 15px;">RoboMANTAP-AI</div>
-        <div style="color: #6ee7b7; font-size: 10px; font-weight: 500;">Assistant Intelligence System</div>
+    <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 16px; border-radius: 12px; border: 1px solid #059669; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div style="font-size: 26px; margin-bottom: 4px;">🧕🏼</div>
+        <div style="color: #ffffff; font-weight: 700; font-size: 16px; letter-spacing: 0.5px;">RoboMANTAP-AI</div>
+        <div style="color: #6ee7b7; font-size: 11px; font-weight: 500; margin-bottom: 6px;">Assistant Intelligence System</div>
+        <div style="font-size: 10px; color: #a7f3d0; opacity: 0.85; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 4px; font-style: italic;">Engineered by U.Project Nexus</div>
     </div>
+
     """, unsafe_allow_html=True)
 
-    # -------------------------------------------------------------------------
-    # A. TAMPILAN SIDEBAR JIKA BERADA DI DASHBOARD GURU (PANEL FILTER)
-    # -------------------------------------------------------------------------
-    if st.session_state.page == "guru_dashboard":
-        st.markdown("### ⚙️ Panel Kontrol & Filter")
-        
-        # Filter Rentang Waktu
-        time_filter = st.radio("⏳ Rentang Waktu:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], key="filter_time")
-        
-        st.divider()
-        
-        # Toggle Sesi & Auto-Refresh
-        only_latest = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Gabungkan multi-sesi: 1 nama hanya muncul 1 kali (pengerjaan terbaru).", key="filter_latest")
-        auto_refresh = st.toggle("🔄 Live Auto-Refresh (3s)", value=False, help="Matikan jika ingin membaca laporan AI dengan stabil.", key="filter_refresh")
-        
-        st.divider()
-        
-        # Filter Jenjang & Mapel
-        selected_jenjang_filter = st.selectbox("🏫 Filter Jenjang:", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], key="filter_jenjang")
-        
-        if selected_jenjang_filter == "MTs (Sederajat SMP)":
-            mapel_options = ["Semua Mapel"] + list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys())
-        elif selected_jenjang_filter == "MA (Sederajat SMA)":
-            mapel_options = ["Semua Mapel"] + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
-        else:
-            all_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys()) + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
-            mapel_options = ["Semua Mapel"] + sorted(list(set(all_mapels)))
-            
-        selected_mapel_filter = st.selectbox("📚 Filter Mata Pelajaran:", mapel_options, key="filter_mapel")
-        selected_status_filter = st.selectbox("📌 Filter Status:", ["Semua Status", "BERJALAN", "SELESAI", "EXPIRED"], key="filter_status")
-
-    # -------------------------------------------------------------------------
-    # B. TAMPILAN SIDEBAR JIKA BERADA DI HALAMAN SISWA (ATURAN & STATUS)
-    # -------------------------------------------------------------------------
-    else:
+    if st.session_state.page not in ["guru_login", "guru_dashboard"]:
         st.markdown("""
-        <div style="background: var(--secondary-background-color); border: 1px solid rgba(5, 150, 105, 0.3); padding: 10px; border-radius: 8px; margin-bottom: 12px;">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <span style="font-size: 10px; font-weight: 600; opacity: 0.7;">ENGINE STATUS</span>
-                <span style="font-size: 9px; background: #059669; color: white; padding: 2px 6px; border-radius: 10px; font-weight: 700;">LIVE 🟢</span>
+        <div style="background: var(--secondary-background-color); border: 1px solid rgba(5, 150, 105, 0.3); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <span style="font-size: 11px; font-weight: 600; opacity: 0.7;">ENGINE STATUS</span>
+                <span style="font-size: 10px; background: #059669; color: white; padding: 2px 8px; border-radius: 12px; font-weight: 700;">LIVE 🟢</span>
+            </div>
+            <div style="font-size: 11px; line-height: 1.6; opacity: 0.9;">
+                ⚡ <b>Model:</b> U.Project Nexus Intelligence v3.6<br>
+                🎯 <b>Core:</b> Bina Prestasi OMI 2026<br>
+                ⏱️ <b>Response:</b> Real-time AI
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        if st.session_state.get("jenjang") and st.session_state.get("mapel"):
+        if st.session_state.jenjang and st.session_state.mapel:
             st.markdown(f"""
-            <div style="background: rgba(5, 150, 105, 0.08); border-left: 3px solid #059669; padding: 8px; border-radius: 4px; margin-bottom: 12px;">
-                <div style="font-size: 9px; opacity: 0.6; text-transform: uppercase; font-weight: 700;">Sesi Aktif</div>
-                <div style="font-size: 11px; font-weight: 700;">{st.session_state.mapel}</div>
-                <div style="font-size: 10px; opacity: 0.8;">{st.session_state.jenjang}</div>
+            <div style="background: rgba(5, 150, 105, 0.08); border-left: 4px solid #059669; padding: 10px 12px; border-radius: 6px; margin-bottom: 15px;">
+                <div style="font-size: 10px; opacity: 0.6; text-transform: uppercase; font-weight: 700;">Sesi Aktif</div>
+                <div style="font-size: 12px; font-weight: 700; color: var(--text-color);">{st.session_state.mapel}</div>
+                <div style="font-size: 11px; opacity: 0.8;">{st.session_state.jenjang} • {st.session_state.stage}</div>
             </div>
             """, unsafe_allow_html=True)
 
         st.markdown("""
-        <div style="background: var(--secondary-background-color); border: 1px solid rgba(128,128,128,0.2); padding: 10px; border-radius: 8px; margin-bottom: 12px;">
-            <div style="font-size: 10px; font-weight: 700; opacity: 0.8; margin-bottom: 6px;">📋 ATURAN SKORING CBT</div>
-            <div style="display: flex; justify-content: space-between; font-size: 10px;"><span>✅ Benar</span><b style="color: #059669;">+4</b></div>
-            <div style="display: flex; justify-content: space-between; font-size: 10px;"><span>❌ Salah</span><b style="color: #ef4444;">-1</b></div>
-            <div style="display: flex; justify-content: space-between; font-size: 10px;"><span>⚪ Kosong</span><b style="opacity: 0.6;">0</b></div>
+        <div style="background: var(--secondary-background-color); border: 1px solid rgba(128,128,128,0.2); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
+            <div style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 8px;">📋 ATURAN SKORING CBT</div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                <span>✅ Jawaban Benar</span>
+                <b style="color: #059669;">+4 Poin</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                <span>❌ Jawaban Salah</span>
+                <b style="color: #ef4444;">-1 Poin</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                <span>⚪ Tidak Dijawab</span>
+                <b style="opacity: 0.6;">0 Poin</b>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
-    # Tombol Navigasi Utama
     if st.button("🏠 Kembali ke Beranda Utama", use_container_width=True):
         st.session_state.page = "landing"
         st.session_state.jenjang = None
@@ -263,14 +245,20 @@ with st.sidebar:
         st.session_state.guru_auth = False
         st.rerun()
 
-    # Footer Branding
-    sidebar_nexus_html = f'<img src="data:image/png;base64,{logo_nexus_b64}" style="height: 32px; display: block; margin: 0 auto;">' if logo_nexus_b64 else ''
+    sidebar_nexus_html = f'<div style="background: #ffffff; padding: 6px 14px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); display: inline-block; margin-bottom: 8px; border: 1px solid rgba(0,0,0,0.05);"><img src="data:image/png;base64,{logo_nexus_b64}" style="height: 42px; max-width: 100%; display: block; margin: 0 auto;"></div>' if logo_nexus_b64 else ''
+
     st.markdown(f"""
-    <div style="text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px dashed rgba(128,128,128,0.2);">
+    <div style="text-align: center; margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(128,128,128,0.2);">
+        <div style="font-size: 10px; opacity: 0.7; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Engineered by</div>
+
         {sidebar_nexus_html}
-        <div style="font-size: 9px; opacity: 0.6; margin-top: 4px;">&copy; 2026 U.Project Nexus System</div>
+        <div style="font-size: 11px; opacity: 0.85; line-height: 1.3;">
+            <b style="color: var(--text-color);">U.Project Nexus System</b><br>
+            <span style="font-size: 10px; opacity: 0.7;">AI Integration & B2B Solutions</span><br>
+            <span style="font-size: 9px; opacity: 0.5;">&copy; 2026 All Rights Reserved</span>
+        </div>
     </div>
-    """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True) 
 
 # Helper LKPD PDF
 def draw_cover_background(canvas_obj, doc):
