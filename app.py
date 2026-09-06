@@ -564,14 +564,72 @@ elif st.session_state.page == "guru_dashboard":
                     st.info(f"🚫 Tidak ada data pengerjaan siswa yang sesuai dengan kombinasi filter saat ini.")
                     return
 
-                # KPI Metrics (Diukur dari Data Terfilter)
-                c1, c2, c3, c4 = st.columns(4)
-                c1.metric("Total Santri Evaluasi", len(df['nama_siswa'].unique()) if only_latest else len(df))
-                c2.metric("Siswa Aktif", len(df[df['status_real'] == 'BERJALAN']))
-                c3.metric("Sesi Selesai", len(df[df['status_real'] == 'SELESAI']))
-                c4.metric("Rata-Rata Nilai", f"{df['nilai_akhir'].mean():.1f} / 40")
+                # =========================================================================
+                # MINI KPI CARDS ELEGAN (GRID 2x2 DI HP, 4 KOLOM DI DESKTOP)
+                # =========================================================================
+                val_total = len(df['nama_siswa'].unique()) if only_latest else len(df)
+                val_aktif = len(df[df['status_real'] == 'BERJALAN'])
+                val_selesai = len(df[df['status_real'] == 'SELESAI'])
+                val_rata = f"{df['nilai_akhir'].mean():.1f}" if not df.empty else "0.0"
 
-                st.write("---")
+                st.markdown(f"""
+                <style>
+                .kpi-grid {{
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 10px;
+                    margin-bottom: 15px;
+                }}
+                @media (max-width: 640px) {{
+                    .kpi-grid {{
+                        grid-template-columns: repeat(2, 1fr); /* 2x2 Grid Seimbang di Layar HP */
+                        gap: 8px;
+                    }}
+                }}
+                .kpi-card {{
+                    background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(2, 44, 34, 0.7) 100%);
+                    border: 1px solid rgba(5, 150, 105, 0.35);
+                    border-radius: 10px;
+                    padding: 8px 10px;
+                    text-align: center;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+                }}
+                .kpi-title {{
+                    font-size: 10px;
+                    color: #a7f3d0;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
+                    margin-bottom: 2px;
+                    white-space: nowrap;
+                }}
+                .kpi-value {{
+                    font-size: 18px;
+                    font-weight: 800;
+                    color: #ffffff;
+                    line-height: 1.2;
+                }}
+                </style>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-title">👥 Total Santri</div>
+                        <div class="kpi-value">{val_total}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">⚡ Siswa Aktif</div>
+                        <div class="kpi-value" style="color: #34d399;">{val_aktif}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">✅ Sesi Selesai</div>
+                        <div class="kpi-value" style="color: #60a5fa;">{val_selesai}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">🎯 Rata-Rata Nilai</div>
+                        <div class="kpi-value" style="color: #f59e0b;">{val_rata} <span style="font-size: 11px; color: #9ca3af;">/ 40</span></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
                 # =========================================================================
                 # 4. DIAGNOSIS AI KONTEKSTUAL (IKUT FILTER)
@@ -581,7 +639,7 @@ elif st.session_state.page == "guru_dashboard":
 
                 # Judul Tombol Dinamis Mengikuti Filter
                 label_target = f"{selected_mapel_filter}" if selected_mapel_filter != "Semua Mapel" else selected_jenjang_filter
-                if st.button(f"🧕 Buat Laporan RoboMANTAP ({label_target})", type="primary", use_container_width=True):
+                if st.button(f"🧕 Buat Laporan RoboMANTAP! ({label_target})", type="primary", use_container_width=True):
                     with st.spinner(f"RoboMANTAP sedang menganalisis data {label_target}..."):
                         total_siswa = len(df)
                         rata_rata = df['nilai_akhir'].mean()
