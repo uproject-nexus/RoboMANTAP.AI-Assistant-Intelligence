@@ -480,7 +480,7 @@ elif st.session_state.page == "guru_dashboard":
         if auto_refresh:
             st.caption("🟢 **Status:** Live Aktif! memperbarui data setiap 3 detik")
         else:
-            st.caption("⏸️ **Status:** Live dimatikan (tampilan stabil, aman untuk membaca laporan AI)")
+            st.caption("⏸️ **Status:** Live dimatikan (tampilan stabil, aman untuk membaca laporan RoboMANTAP)")
 
         # Kondisi Tanggal
         if time_filter == "Hari Ini":
@@ -764,15 +764,15 @@ elif st.session_state.page == "guru_dashboard":
                                         if pct >= 80:
                                             st.success(f"🌟 **Kategori: Siap Kompetisi ({pct:.0f}%)**")
                                             st.markdown("**💡 Rekomendasi Pembinaan:**")
-                                            st.markdown("- Tingkatkan ke materi pengayaan HOTS tingkat Provinsi/Nasional.\n- Siswa direkomendasikan masuk skuat utama pembinaan OMI")
+                                            st.markdown("- Tingkatkan ke materi pengayaan HOTS tingkat Provinsi/Nasional\n- Siswa direkomendasikan masuk skuat utama pembinaan OMI")
                                         elif pct >= 40:
                                             st.warning(f"⚠️ **Kategori: Berkembang ({pct:.0f}%)**")
                                             st.markdown("**💡 Rekomendasi Pembinaan:**")
-                                            st.markdown("- Lakukan pembahasan (*review*) khusus pada butir soal yang salah/kosong.\n- Penguatan pemahaman konsep dasar masih perlu pematangan")
+                                            st.markdown("- Lakukan pembahasan (*review*) khusus pada butir soal yang salah/kosong\n- Penguatan pemahaman konsep dasar masih perlu pematangan")
                                         else:
                                             st.error(f"🌱 **Kategori: Perlu Intervensi ({pct:.0f}%)**")
                                             st.markdown("**💡 Rekomendasi Pembinaan:**")
-                                            st.markdown("- Jadwalkan bimbingan intensif.\n- Pelajari ulang modul pembahasan sebelum melakukan latihan berikutnya")
+                                            st.markdown("- Jadwalkan bimbingan intensif\n- Pelajari ulang modul pembahasan sebelum melakukan latihan berikutnya")
                                     else:
                                         st.info("Pengerjaan belum selesai!")
                                 
