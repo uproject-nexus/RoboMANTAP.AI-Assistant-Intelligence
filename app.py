@@ -756,44 +756,43 @@ elif st.session_state.page == "guru_dashboard":
                         # Hitung Waktu Mulai & Durasi Berjalan
                         # Hitung Waktu & Durasi Menggunakan updated_at
                         # Hitung Waktu Mulai & Durasi Berjalan secara Presisi
+                        # Hitung Waktu Mulai & Durasi Berjalan secara Presisi
                         try:
-                            # Gunakan created_at sebagai Titik Nol (Start)
-                            waktu_mulai_dt = row['created_at'] 
+                            waktu_mulai_dt = row['created_at']
                             if isinstance(waktu_mulai_dt, str):
-                                waktu_mulai_dt = datetime.strptime(waktu_mulai_dt[:19], "%Y-%m-%d %H:%M:%S")
+                                waktu_mulai_dt = datetime.strptime(str(waktu_mulai_dt)[:19], "%Y-%m-%d %H:%M:%S")
                 
                             waktu_mulai_str = waktu_mulai_dt.strftime("%H:%M WIB")
                 
                             if row['status_real'] == 'BERJALAN':
-                                # Durasi = Waktu Sekarang - Waktu Pertama Kali Ujian Dibuat
                                 selisih_detik = int((datetime.now() - waktu_mulai_dt).total_seconds())
-                                if selisih_detik < 0: selisih_detik = 0
+                                if selisih_detik < 0: 
+                                    selisih_detik = 0
                                 menit = selisih_detik // 60
                                 detik = selisih_detik % 60
                                 durasi_str = f"⏱️ {menit}m {detik:02d}s" if menit < 60 else f"⏱️ {menit // 60}j {menit % 60}m"
                             else:
-                                # Jika selesai, Durasi = Waktu Terakhir (updated_at) - Waktu Mulai (created_at)
                                 waktu_selesai_dt = row['updated_at']
                                 if isinstance(waktu_selesai_dt, str):
-                                    waktu_selesai_dt = datetime.strptime(waktu_selesai_dt[:19], "%Y-%m-%d %H:%M:%S")
+                                    waktu_selesai_dt = datetime.strptime(str(waktu_selesai_dt)[:19], "%Y-%m-%d %H:%M:%S")
                                 selisih_detik = int((waktu_selesai_dt - waktu_mulai_dt).total_seconds())
-                                if selisih_detik < 0: selisih_detik = 0
+                                if selisih_detik < 0: 
+                                    selisih_detik = 0
                                 durasi_str = f"🏁 Selesai ({selisih_detik // 60}m)"
                         except Exception as e:
                             waktu_mulai_str = "--:--"
-                            durasi_str = "⏱️ - "
-
+                            durasi_str = "⏱️ -"
                 
-                        # Render Kolom Tampilan
+                        # Render Kolom Tampilan (Menggunakan {waktu_mulai_str})
                         col_nama.markdown(f"**{safe_nama}** {status_badge}<br/>{percobaan_badge}", unsafe_allow_html=True)
                         col_mapel.markdown(f"""
                         <div style="line-height: 1.3;">
                             <span style="font-weight: 600; font-size: 13px;">{row['mapel']}</span> <span style="font-size: 11px; opacity: 0.7;">({row['jenjang'][:3]})</span><br/>
-                            <span style="font-size: 10px; color: #9ca3af;">🕒 {waktu_str} • <b style="color: #34d399;">{durasi_str}</b></span>
+                            <span style="font-size: 10px; color: #9ca3af;">🕒 {waktu_mulai_str} • <b style="color: #34d399;">{durasi_str}</b></span>
                         </div>
                         """, unsafe_allow_html=True)
                         col_skor.markdown(f"**Skor: {row['nilai_akhir']}**")
-          
+
 
 
                         # Progress Bar & Micro Analytics
