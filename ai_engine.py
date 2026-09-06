@@ -415,7 +415,6 @@ def update_progress_siswa(session_id: str, nama: str, jenjang: str, mapel: str,
     
     # Konversi list boolean ke JSON string agar terbaca oleh PostgreSQL
     detail_json = json.dumps(detail_jawaban)
-
     query = """
     INSERT INTO sesi_ujian (
         id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, 
@@ -435,8 +434,8 @@ def update_progress_siswa(session_id: str, nama: str, jenjang: str, mapel: str,
         nilai_akhir = EXCLUDED.nilai_akhir,
         status = EXCLUDED.status,
         updated_at = NOW() AT TIME ZONE 'Asia/Jakarta';
-    """                          
-    
+    """
+
     try:
         with conn.session as s:
             s.execute(text(query), {
