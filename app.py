@@ -581,7 +581,7 @@ elif st.session_state.page == "guru_dashboard":
 
                 # Judul Tombol Dinamis Mengikuti Filter
                 label_target = f"{selected_mapel_filter}" if selected_mapel_filter != "Semua Mapel" else selected_jenjang_filter
-                if st.button(f"🧕 Generate Laporan Evaluasi RoboMANTAP ({label_target})", type="primary", use_container_width=True):
+                if st.button(f"🧕 Generate Laporan RoboMANTAP ({label_target})", type="primary", use_container_width=True):
                     with st.spinner(f"RoboMANTAP sedang menganalisis data {label_target}..."):
                         total_siswa = len(df)
                         rata_rata = df['nilai_akhir'].mean()
