@@ -473,10 +473,9 @@ elif st.session_state.page == "guru_dashboard":
         selected_jenjang_filter = st.session_state.get("filter_jenjang", "Semua Jenjang")
         selected_mapel_filter = st.session_state.get("filter_mapel", "Semua Mapel")
         selected_status_filter = st.session_state.get("filter_status", "Semua Status")
-        c_ctrl1, c_ctrl2 = st.columns([2, 2])
+        
+        c_ctrl1= st.columns([2])
         with c_ctrl1:
-            only_latest = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Jika ON: Menggabungkan multi-sesi siswa sehingga 1 nama hanya muncul 1 kali (pengerjaan paling baru).")
-        with c_ctrl2:
             auto_refresh = st.toggle("🔄 Live Auto-Refresh (3s)", value=False, help="Nyalakan untuk memantau siswa secara real-time. Matikan saat membaca laporan AI.")
 
         # Indikator Status Auto-Refresh
