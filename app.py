@@ -1150,6 +1150,7 @@ elif st.session_state.page == "result":
 
     # Render Scorecard Modern Grid 2x2
     # 1. BLOK CSS (String Biasa TANPA 'f' - Kurung kurawal CSS aman 100%)
+    # 1. BLOK CSS (String Biasa)
     eval_css = """
     <style>
     .eval-grid {
@@ -1187,35 +1188,28 @@ elif st.session_state.page == "result":
     """
     st.markdown(eval_css, unsafe_allow_html=True)
 
-    # 2. BLOK HTML (f-string khusus pemanggilan variabel angka)
-    st.markdown(f"""
-    <div class="eval-grid">
-        <!-- Kartu Total Skor -->
-        <div class="eval-card" style="background: linear-gradient(135deg, rgba(120, 53, 15, 0.45) 0%, rgba(69, 26, 3, 0.75) 100%); border: 1px solid rgba(245, 158, 11, 0.5);">
-            <div class="eval-title" style="color: #fde68a;">🏆 Total Skor</div>
-            <div class="eval-value" style="color: #fbbf24;">{total_skor} <span style="font-size: 11px; color: #d1d5db;">/ 40</span></div>
-        </div>
-
-        <!-- Kartu Benar -->
-        <div class="eval-card" style="background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%); border: 1px solid rgba(5, 150, 105, 0.45);">
-            <div class="eval-title" style="color: #a7f3d0;">✅ Benar (+4)</div>
-            <div class="eval-value" style="color: #34d399;">{benar}</div>
-        </div>
-
-        <!-- Kartu Salah -->
-        <div class="eval-card" style="background: linear-gradient(135deg, rgba(127, 29, 29, 0.35) 0%, rgba(69, 10, 10, 0.65) 100%); border: 1px solid rgba(239, 68, 68, 0.4);">
-            <div class="eval-title" style="color: #fca5a5;">❌ Salah (-1)</div>
-            <div class="eval-value" style="color: #f87171;">{salah}</div>
-        </div>
-
-        <!-- Kartu Kosong -->
-        <div class="eval-card" style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.35) 0%, rgba(31, 41, 55, 0.65) 100%); border: 1px solid rgba(156, 163, 175, 0.35);">
-            <div class="eval-title" style="color: #d1d5db;">⚪ Kosong (0)</div>
-            <div class="eval-value" style="color: #9ca3af;">{kosong}</div>
-        </div>
+    # 2. BLOK HTML (Kontigu tanpa baris kosong agar Streamlit membaca 4 kartu sekaligus)
+    eval_html = f"""<div class="eval-grid">
+    <div class="eval-card" style="background: linear-gradient(135deg, rgba(120, 53, 15, 0.45) 0%, rgba(69, 26, 3, 0.75) 100%); border: 1px solid rgba(245, 158, 11, 0.5);">
+        <div class="eval-title" style="color: #fde68a;">🏆 Total Skor</div>
+        <div class="eval-value" style="color: #fbbf24;">{total_skor} <span style="font-size: 11px; color: #d1d5db;">/ 40</span></div>
     </div>
-    """, unsafe_allow_html=True)
+    <div class="eval-card" style="background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%); border: 1px solid rgba(5, 150, 105, 0.45);">
+        <div class="eval-title" style="color: #a7f3d0;">✅ Benar (+4)</div>
+        <div class="eval-value" style="color: #34d399;">{benar}</div>
+    </div>
+    <div class="eval-card" style="background: linear-gradient(135deg, rgba(127, 29, 29, 0.35) 0%, rgba(69, 10, 10, 0.65) 100%); border: 1px solid rgba(239, 68, 68, 0.4);">
+        <div class="eval-title" style="color: #fca5a5;">❌ Salah (-1)</div>
+        <div class="eval-value" style="color: #f87171;">{salah}</div>
+    </div>
+    <div class="eval-card" style="background: linear-gradient(135deg, rgba(55, 65, 81, 0.35) 0%, rgba(31, 41, 55, 0.65) 100%); border: 1px solid rgba(156, 163, 175, 0.35);">
+        <div class="eval-title" style="color: #d1d5db;">⚪ Kosong (0)</div>
+        <div class="eval-value" style="color: #9ca3af;">{kosong}</div>
+    </div>
+</div>"""
 
+    st.markdown(eval_html, unsafe_allow_html=True)
+   
 
     if feedback_type == "success":
         st.success(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
