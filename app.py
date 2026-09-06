@@ -1202,8 +1202,6 @@ elif st.session_state.page == "result":
     </div>
     """, unsafe_allow_html=True)
 
-
-
     if feedback_type == "success":
         st.success(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
     elif feedback_type == "info":
