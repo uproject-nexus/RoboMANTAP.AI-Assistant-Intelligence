@@ -473,10 +473,8 @@ elif st.session_state.page == "guru_dashboard":
         selected_jenjang_filter = st.session_state.get("filter_jenjang", "Semua Jenjang")
         selected_mapel_filter = st.session_state.get("filter_mapel", "Semua Mapel")
         selected_status_filter = st.session_state.get("filter_status", "Semua Status")
-        
-        c_ctrl1= st.columns([2])
-        with c_ctrl1:
-            auto_refresh = st.toggle("🔄 Live Auto-Refresh (3s)", value=False, help="Nyalakan untuk memantau siswa secara real-time. Matikan saat membaca laporan AI.")
+ 
+        auto_refresh = st.toggle("🔄 Live Auto-Refresh (3s)", value=False, help="Nyalakan untuk memantau siswa secara real-time. Matikan saat membaca laporan AI.")
 
         # Indikator Status Auto-Refresh
         if auto_refresh:
