@@ -218,7 +218,7 @@ st.markdown(f"""
     <div class="school-title">MA DAN MTs AL IRSYAD AL ISLAMIYYAH BONDOWOSO</div>
     <div class="school-subtitle">
         Madrasah Aliyah dan Tsanawiyah Al Irsyad Putri Bondowoso (MANTAP) &nbsp;•&nbsp; 
-        <span style="color: #6ee7b7; font-weight: 600;">Powered by RoboMANTAP-Intelligence (Learning Intelligence Platform)</span>
+        <span style="color: #6ee7b7; font-weight: 600;">Powered by RoboMANTAP-Intelligence</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
