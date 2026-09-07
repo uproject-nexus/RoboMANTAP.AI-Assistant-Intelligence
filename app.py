@@ -1538,8 +1538,7 @@ elif st.session_state.page == "result":
         total_soal,
         detail,
         "SELESAI",
-        is_custom=st.session_state.get("is_custom_quiz"), 
-        False
+        is_custom=st.session_state.get("is_custom_quiz", False)
     )
 
     # Ekstraksi Nama Panggilan Siswa
