@@ -429,6 +429,21 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     doc.build(story, onFirstPage=draw_cover_background, onLaterPages=draw_cover_background)
     buffer.seek(0)
     return buffer
+    
+@st.fragment(run_every="1s")
+def render_custom_timer(start_time_wib, timer_seconds):
+    sekarang_wib = datetime.utcnow() + timedelta(hours=7)
+    terpakai_detik = int((sekarang_wib - start_time_wib).total_seconds())
+    sisa_detik = timer_seconds - terpakai_detik
+
+    if sisa_detik <= 0:
+        st.error("⏱️ Waktu Ujian Telah Habis! Menyerahkan jawaban otomatis...")
+        st.session_state.page = "result"
+        st.rerun()
+
+    sisa_m = max(0, sisa_detik // 60)
+    sisa_s = max(0, sisa_detik % 60)
+    st.error(f"⏳ **Sisa Waktu Ujian:** {sisa_m:02d}:{sisa_s:02d}")
 
 # ==============================================================================
 # 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
@@ -1365,20 +1380,6 @@ elif st.session_state.page == "setup_custom":
 # ==============================================================================
 # FRAGMENT TIMER SMOOTH (JALAN OTO DETIKAN TANPA INTERUPSI JAWABAN)
 # ==============================================================================
-@st.fragment(run_every="1s")
-def render_custom_timer(start_time_wib, timer_seconds):
-    sekarang_wib = datetime.utcnow() + timedelta(hours=7)
-    terpakai_detik = int((sekarang_wib - start_time_wib).total_seconds())
-    sisa_detik = timer_seconds - terpakai_detik
-
-    if sisa_detik <= 0:
-        st.error("⏱️ Waktu Ujian Telah Habis! Menyerahkan jawaban otomatis...")
-        st.session_state.page = "result"
-        st.rerun()
-
-    sisa_m = max(0, sisa_detik // 60)
-    sisa_s = max(0, sisa_detik % 60)
-    st.error(f"⏳ **Sisa Waktu Ujian:** {sisa_m:02d}:{sisa_s:02d}")
 
 
 # ==============================================================================
