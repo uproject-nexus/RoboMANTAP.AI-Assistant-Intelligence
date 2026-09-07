@@ -506,3 +506,126 @@ def generate_lkpd_content(mapel: str, kelas: str, topik: str):
         return data
     except Exception:
         return None
+
+
+def generate_custom_quiz_ai(
+    *,
+    mapel: str,
+    jenjang: str,
+    kelas: str,
+    materi: str,
+    submateri: str,
+    jumlah_soal: int,
+    kesulitan: str,
+    tipe_soal: str,
+    bahasa: str,
+    konteks: str,
+    timer_seconds: int,
+):
+    """
+    Generator Kuis Custom untuk guru di ai_engine.py.
+    Memakai call_gemini_with_rotation + clean_json_text bawaan engine.
+    """
+    prompt = f"""
+Anda adalah Question Architect RoboMANTAP untuk guru.
+Buat tepat {jumlah_soal} soal pilihan ganda berkualitas tinggi untuk pembelajaran.
+
+KONFIGURASI:
+- Mata Pelajaran: {mapel}
+- Jenjang: {jenjang}
+- Kelas: {kelas}
+- Materi: {materi}
+- Submateri: {submateri or 'Tidak ditentukan / semua yang relevan'}
+- Tingkat Kesulitan: {kesulitan}
+- Tipe Soal: {tipe_soal}
+- Bahasa: {bahasa}
+- Konteks: {konteks}
+- Batas Waktu Sesi: {timer_seconds} detik
+
+ATURAN KUALITAS:
+1. Tepat {jumlah_soal} soal, jangan kurang dan jangan lebih.
+2. Setiap soal memiliki tepat 4 opsi: A, B, C, D.
+3. Hanya satu opsi yang benar.
+4. correct_answer harus persis sama dengan salah satu opsi lengkap.
+5. Hindari ambiguitas, data yang kurang, dan asumsi yang tidak disebutkan.
+6. Untuk soal numerik, solution_basis harus memuat proses hitungan inti dan hasil akhir.
+7. Untuk HOTS/olimpiade, gunakan penalaran yang benar-benar relevan dengan level.
+8. Jangan memasukkan jawaban atau pembahasan yang saling bertentangan.
+9. Jika menggunakan LaTeX, gunakan $...$ dan escape backslash secara valid untuk JSON.
+10. JANGAN menambahkan markdown atau teks pembuka di luar JSON.
+
+OUTPUT JSON MURNI:
+{{
+  "quiz": [
+    {{
+      "id": 1,
+      "question": "...",
+      "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+      "correct_answer": "C. ...",
+      "solution_basis": "..."
+    }}
+  ],
+  "config": {{
+    "duration_seconds": {timer_seconds}
+  }}
+}}
+"""
+
+    raw_response = call_gemini_with_rotation(prompt, is_json=True)
+    if not raw_response:
+        return []
+
+    try:
+        cleaned = clean_json_text(raw_response)
+        data = json.loads(cleaned, strict=False)
+    except Exception:
+        match = re.search(r"\{.*\}", raw_response, flags=re.DOTALL)
+        if not match:
+            return []
+        try:
+            data = json.loads(match.group(0), strict=False)
+        except Exception:
+            return []
+
+    quiz = data.get("quiz", [])
+    if not isinstance(quiz, list) or len(quiz) != jumlah_soal:
+        return []
+
+    normalized = []
+    expected_prefixes = ("A.", "B.", "C.", "D.")
+
+    for idx, item in enumerate(quiz, start=1):
+        if not isinstance(item, dict):
+            return []
+
+        question = str(item.get("question", "")).strip()
+        options = item.get("options", [])
+        answer = str(item.get("correct_answer", "")).strip()
+        solution_basis = str(item.get("solution_basis", "")).strip()
+
+        if not question or not isinstance(options, list) or len(options) != 4:
+            return []
+        if not solution_basis:
+            return []
+
+        options = format_latex_options([str(x).strip() for x in options])
+        if any(not x for x in options):
+            return []
+        if not all(any(x.startswith(prefix) for prefix in expected_prefixes) for x in options):
+            return []
+        if answer not in options:
+            matching = [x for x in options if x[:1].upper() == answer[:1].upper()]
+            if len(matching) == 1:
+                answer = matching[0]
+            else:
+                return []
+
+        normalized.append({
+            "id": idx,
+            "question": question,
+            "options": options,
+            "correct_answer": answer,
+            "solution_basis": solution_basis,
+        })
+
+    return normalized
