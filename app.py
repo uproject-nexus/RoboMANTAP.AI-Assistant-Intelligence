@@ -996,22 +996,6 @@ elif st.session_state.page == "guru_dashboard":
 
 
     with tab2:
-        st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
-        st.markdown("""
-        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; margin-bottom: 15px;">
-            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
-                🧕 RoboMANTAP QUIZ CUSTOM 
-            </div>
-            <ul style="margin: 6px 0 0 0; padding-left: 18px;">
-                <li><b>✨ Buat kuis sesuai kebutuhan Anda!</b></li>
-                <li><b>⚡ Atur → Klik → Siap Digunakan!</b></li>
-            </ul>
-            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
-                Ingin sistem seperti ini diterapkan secara resmi di sekolah Anda? U.Project Nexus menyediakan implementasi dan kustomisasi sistem sesuai kebutuhan institusi.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
         custom_cfg = st.session_state.get("custom_quiz_config", {})
         custom_quiz = st.session_state.get("custom_quiz_draft", [])
 
@@ -1264,6 +1248,22 @@ elif st.session_state.page == "guru_dashboard":
                         st.success(f"🎉 Kuis Berhasil Diterbitkan! Bagikan Kode ini ke Siswa: **{clean_code}**")
                     else:
                         st.error("❌ Gagal menerbitkan kuis. Periksa koneksi Database.")
+                        
+        st.write("---")
+        st.markdown("""
+        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; margin-bottom: 15px;">
+            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
+                🧕 RoboMANTAP QUIZ CUSTOM 
+            </div>
+            <ul style="margin: 6px 0 0 0; padding-left: 18px;">
+                <li><b>✨ Buat kuis sesuai kebutuhan Anda!</b></li>
+                <li><b>⚡ Atur → Klik → Siap Digunakan!</b></li>
+            </ul>
+            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
+                Ingin sistem seperti ini diterapkan secara resmi di sekolah Anda? U.Project Nexus menyediakan implementasi dan kustomisasi sistem sesuai kebutuhan institusi.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     with tab3:
         # GENERATOR LKPD EKSKLUSIF BERLOGO
