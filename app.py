@@ -26,7 +26,7 @@ from ai_engine import (
 )
 
 st.set_page_config(
-    page_title="RoboMANTAP-AI (Assistant Intelligence)",
+    page_title="RoboMANTAP-Intelligence",
     page_icon="logo.png",
     layout="wide",
     initial_sidebar_state="auto"
