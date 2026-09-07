@@ -1268,19 +1268,17 @@ elif st.session_state.page == "guru_dashboard":
     with tab3:
         st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>📲 WhatsApp Integration Engine</p>", unsafe_allow_html=True)
         st.markdown("""
-        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; margin-bottom: 15px;">
-            <b style="font-size: 13px;">⚡ U.Project Nexus Automation:</b>
-            <div style="font-size: 13px; line-height: 1.5;">
-                Satu ekosistem untuk menghubungkan pembelajaran, komunikasi, dan otomasi sekolah.
+        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; margin-bottom: 15px;">
+            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
+                ⚡ RoboMANTAP AUTOMATION
             </div>
             <ul style="margin: 6px 0 0 0; padding-left: 18px;">
-                <li><b>📊 Broadcast Hasil Ujian:</b> distribusikan hasil dan ringkasan perkembangan siswa melalui WhatsApp</li>
-                <li><b>🧕 RoboMANTAP AI Tutor 24/7:</b> asisten belajar personal yang dapat mendampingi siswa di luar jam pembelajaran</li>
-                <li><b>📄 Auto-LKPD Guru:</b> bantu menyusun LKPD sesuai materi dan format yang dibutuhkan sekolah</li>
-                <li><b>🔗 Connected Learning:</b> menghubungkan aktivitas web, AI, data pembelajaran, dan komunikasi dalam satu ekosistem</li>
+                <li><b>📄 Atur materi dan format → klik → LKPD otomatis siap!</b></li>
+                <li><b>📲 WhatsApp Automation!</b></li>
+                <li><b>🧕🏼 RoboMANTAP AI Tutor 24/7!</b></li>
             </ul>
-            <div style="font-size: 13px; line-height: 1.5;">
-                Teknologi yang dapat dikembangkan sesuai kebutuhan institusi! - Engineered by U.Project Nexus
+            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
+                Ingin sistem seperti ini diterapkan secara resmi di sekolah Anda? U.Project Nexus menyediakan implementasi dan kustomisasi sistem sesuai kebutuhan institusi.
             </div>
         </div>
         """, unsafe_allow_html=True)
