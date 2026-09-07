@@ -480,11 +480,11 @@ if st.session_state.page == "landing":
             st.rerun()
             
     st.write("---")
-    st.markdown("#### ⚙️ Ujian Kelas / Kuis Custom")
+    st.markdown("#### 📝 Sesi Kuis GuruMANTAP")
     
     col_c1, col_c2 = st.columns([3, 1])
     with col_c1:
-        kode_masuk_input = st.text_input("Masukkan Kode Kuis GuruMANTAP:", placeholder="Contoh: MNT-8F2A", label_visibility="collapsed")
+        kode_masuk_input = st.text_input("Masukkan Kode Kuis GuruMANTAP:", placeholder="Masukkan Kode Kuis disini...", label_visibility="collapsed")
     with col_c2:
         if st.button("Masuk Ujian ➔", key="btn_custom_enter", use_container_width=True, type="primary"):
             if not kode_masuk_input.strip():
