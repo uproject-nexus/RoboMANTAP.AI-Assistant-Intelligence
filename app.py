@@ -999,14 +999,14 @@ elif st.session_state.page == "guru_dashboard":
         st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
         st.markdown("""
         <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; margin-bottom: 15px;">
-            <div style="font-size: 15px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
-                🛠️ RoboMANTAP QUIZ CUSTOM <span style="font-size: 11px; background: #059669; color: #fff; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">DEMO B2B</span>
+            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
+                🧕 RoboMANTAP QUIZ CUSTOM 
             </div>
             <div style="font-size: 13px; color: #d1d5db; line-height: 1.5;">
-                Buat kuis instan sesuai kebutuhan guru: bebas menentukan mapel, jenjang, jumlah soal, tingkat kesulitan, gaya soal, bahasa, konteks, dan batas waktu.
+                Buat kuis sesuai kebutuhan pembinaan Anda — tentukan sendiri mata pelajaran, jenjang, materi, jumlah soal, tingkat kesulitan, gaya soal, bahasa, konteks, hingga batas waktu pengerjaan.
             </div>
-            <div style="font-size: 12px; color: #9ca3af; margin-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;">
-                💡 <b>Ingin Diterapkan Resmi di Sekolah Anda?</b> Layanan lisensi lembaga <b>U.Project Nexus</b> menyediakan kustomisasi penuh (logo/branding sekolah, kuota AI unlimited, integrasi WhatsApp orang tua, dan bank soal terisolasi).
+            <div style="font-size: 13px; color: #9ca3af; margin-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;">
+                💡 <b>Ingin Diterapkan Resmi di Sekolah Anda?</b> Layanan lisensi lembaga <b>U.Project Nexus</b> menyediakan implementasi dan kustomisasi khusus institusi, termasuk branding sekolah, konfigurasi AI, bank soal, integrasi komunikasi, serta pengembangan fitur sesuai kebutuhan.
             </div>
         </div>
         """, unsafe_allow_html=True)
