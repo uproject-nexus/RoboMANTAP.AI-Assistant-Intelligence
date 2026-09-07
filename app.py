@@ -1267,7 +1267,7 @@ elif st.session_state.page == "guru_dashboard":
     with tab3:
         st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>📲 WhatsApp Integration Engine</p>", unsafe_allow_html=True)
         st.markdown("""
-        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; color: #1e3a8a; margin-bottom: 15px;">
+        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; color: #1e3a8a; margin-bottom: 15px;">
             <b style="font-size: 13px;">⚡ One-Click Automation U.Project Nexus:</b>
             <div style="font-size: 13px; line-height: 1.5;">
                 Satu ekosistem untuk menghubungkan pembelajaran, komunikasi, dan otomasi sekolah.
