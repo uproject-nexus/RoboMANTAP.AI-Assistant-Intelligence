@@ -372,8 +372,10 @@ def init_db_connection():
         # Gagal silent agar tidak mengganggu aplikasi siswa jika DB belum disetup
         return None
 
+# ------------------------------------------------------------------------------
+# UPDATE CREATETABLE: TAMBAHKAN TABEL KUIS CUSTOM
+# ------------------------------------------------------------------------------
 def create_table_if_not_exists():
-    """Memastikan tabel sesi_ujian tersedia di database sebelum digunakan."""
     conn = init_db_connection()
     if not conn: return
     
@@ -389,7 +391,15 @@ def create_table_if_not_exists():
         jumlah_salah INT DEFAULT 0,
         nilai_akhir INT DEFAULT 0,
         status VARCHAR(20) DEFAULT 'BERJALAN',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS kuis_custom (
+        kode_kuis VARCHAR(20) PRIMARY KEY,
+        config JSONB NOT NULL,
+        quiz_data JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """
     try:
@@ -398,6 +408,52 @@ def create_table_if_not_exists():
             s.commit()
     except Exception:
         pass
+
+
+# ------------------------------------------------------------------------------
+# FUNGSI PUBLISH & GET KUIS CUSTOM KE DATABASE
+# ------------------------------------------------------------------------------
+def publish_custom_quiz_to_db(kode_kuis: str, config: dict, quiz_data: list) -> bool:
+    """Menyimpan paket Kuis Custom yang diterbitkan guru ke database Supabase."""
+    conn = init_db_connection()
+    if not conn: return False
+
+    query = """
+    INSERT INTO kuis_custom (kode_kuis, config, quiz_data, created_at)
+    VALUES (:kode, :cfg, :quiz, NOW() AT TIME ZONE 'Asia/Jakarta')
+    ON CONFLICT (kode_kuis) DO UPDATE SET
+        config = EXCLUDED.config,
+        quiz_data = EXCLUDED.quiz_data;
+    """
+    try:
+        with conn.session as s:
+            s.execute(text(query), {
+                "kode": kode_kuis,
+                "cfg": json.dumps(config),
+                "quiz": json.dumps(quiz_data)
+            })
+            s.commit()
+        return True
+    except Exception:
+        return False
+
+
+def get_custom_quiz_from_db(kode_kuis: str):
+    """Mengambil paket Kuis Custom berdasarkan Kode Kuis yang dimasukkan siswa."""
+    conn = init_db_connection()
+    if not conn: return None
+
+    query = "SELECT config, quiz_data FROM kuis_custom WHERE UPPER(kode_kuis) = UPPER(:kode)"
+    try:
+        with conn.session as s:
+            result = s.execute(text(query), {"kode": kode_kuis.strip()}).fetchone()
+            if result:
+                cfg = result[0] if isinstance(result[0], dict) else json.loads(result[0])
+                quiz = result[1] if isinstance(result[1], list) else json.loads(result[1])
+                return {"config": cfg, "quiz": quiz}
+    except Exception:
+        pass
+    return None
 
 def update_progress_siswa(session_id: str, nama: str, jenjang: str, mapel: str, 
                           soal_sekarang: int, detail_jawaban: list, status: str = "BERJALAN"):
@@ -507,7 +563,7 @@ def generate_lkpd_content(mapel: str, kelas: str, topik: str):
     except Exception:
         return None
 
-
+#generate KUIS CUSTOM
 def generate_custom_quiz_ai(
     *,
     mapel: str,
@@ -527,49 +583,49 @@ def generate_custom_quiz_ai(
     Memakai call_gemini_with_rotation + clean_json_text bawaan engine.
     """
     prompt = f"""
-Anda adalah Question Architect RoboMANTAP untuk guru.
-Buat tepat {jumlah_soal} soal pilihan ganda berkualitas tinggi untuk pembelajaran.
-
-KONFIGURASI:
-- Mata Pelajaran: {mapel}
-- Jenjang: {jenjang}
-- Kelas: {kelas}
-- Materi: {materi}
-- Submateri: {submateri or 'Tidak ditentukan / semua yang relevan'}
-- Tingkat Kesulitan: {kesulitan}
-- Tipe Soal: {tipe_soal}
-- Bahasa: {bahasa}
-- Konteks: {konteks}
-- Batas Waktu Sesi: {timer_seconds} detik
-
-ATURAN KUALITAS:
-1. Tepat {jumlah_soal} soal, jangan kurang dan jangan lebih.
-2. Setiap soal memiliki tepat 4 opsi: A, B, C, D.
-3. Hanya satu opsi yang benar.
-4. correct_answer harus persis sama dengan salah satu opsi lengkap.
-5. Hindari ambiguitas, data yang kurang, dan asumsi yang tidak disebutkan.
-6. Untuk soal numerik, solution_basis harus memuat proses hitungan inti dan hasil akhir.
-7. Untuk HOTS/olimpiade, gunakan penalaran yang benar-benar relevan dengan level.
-8. Jangan memasukkan jawaban atau pembahasan yang saling bertentangan.
-9. Jika menggunakan LaTeX, gunakan $...$ dan escape backslash secara valid untuk JSON.
-10. JANGAN menambahkan markdown atau teks pembuka di luar JSON.
-
-OUTPUT JSON MURNI:
-{{
-  "quiz": [
+    Anda adalah Question Architect RoboMANTAP untuk guru.
+    Buat tepat {jumlah_soal} soal pilihan ganda berkualitas tinggi untuk pembelajaran.
+    
+    KONFIGURASI:
+    - Mata Pelajaran: {mapel}
+    - Jenjang: {jenjang}
+    - Kelas: {kelas}
+    - Materi: {materi}
+    - Submateri: {submateri or 'Tidak ditentukan / semua yang relevan'}
+    - Tingkat Kesulitan: {kesulitan}
+    - Tipe Soal: {tipe_soal}
+    - Bahasa: {bahasa}
+    - Konteks: {konteks}
+    - Batas Waktu Sesi: {timer_seconds} detik
+    
+    ATURAN KUALITAS:
+    1. Tepat {jumlah_soal} soal, jangan kurang dan jangan lebih.
+    2. Setiap soal memiliki tepat 4 opsi: A, B, C, D.
+    3. Hanya satu opsi yang benar.
+    4. correct_answer harus persis sama dengan salah satu opsi lengkap.
+    5. Hindari ambiguitas, data yang kurang, dan asumsi yang tidak disebutkan.
+    6. Untuk soal numerik, solution_basis harus memuat proses hitungan inti dan hasil akhir.
+    7. Untuk HOTS/olimpiade, gunakan penalaran yang benar-benar relevan dengan level.
+    8. Jangan memasukkan jawaban atau pembahasan yang saling bertentangan.
+    9. Jika menggunakan LaTeX, gunakan $...$ dan escape backslash secara valid untuk JSON.
+    10. JANGAN menambahkan markdown atau teks pembuka di luar JSON.
+    
+    OUTPUT JSON MURNI:
     {{
-      "id": 1,
-      "question": "...",
-      "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-      "correct_answer": "C. ...",
-      "solution_basis": "..."
+      "quiz": [
+        {{
+          "id": 1,
+          "question": "...",
+          "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+          "correct_answer": "C. ...",
+          "solution_basis": "..."
+        }}
+      ],
+      "config": {{
+        "duration_seconds": {timer_seconds}
+      }}
     }}
-  ],
-  "config": {{
-    "duration_seconds": {timer_seconds}
-  }}
-}}
-"""
+    """
 
     raw_response = call_gemini_with_rotation(prompt, is_json=True)
     if not raw_response:
