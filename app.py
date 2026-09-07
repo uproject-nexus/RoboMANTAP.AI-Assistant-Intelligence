@@ -1002,11 +1002,12 @@ elif st.session_state.page == "guru_dashboard":
             <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
                 🧕 RoboMANTAP QUIZ CUSTOM 
             </div>
-            <div style="font-size: 13px; line-height: 1.5;">
-                Buat kuis sesuai kebutuhan pembinaan Anda — tentukan sendiri mata pelajaran, jenjang, materi, jumlah soal, tingkat kesulitan, gaya soal, bahasa, konteks, hingga batas waktu pengerjaan.
-            </div>
-            <div style="font-size: 13px; margin-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;">
-                💡 <b>Ingin Diterapkan Resmi di Sekolah Anda?</b> Layanan lisensi lembaga <b>U.Project Nexus</b> menyediakan implementasi dan kustomisasi khusus institusi, termasuk branding sekolah, konfigurasi AI, bank soal, integrasi komunikasi, serta pengembangan fitur sesuai kebutuhan.
+            <ul style="margin: 6px 0 0 0; padding-left: 18px;">
+                <li><b>✨ Buat kuis sesuai kebutuhan Anda!</b></li>
+                <li><b>⚡ Atur → Klik → Siap Digunakan!</b></li>
+            </ul>
+            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
+                Ingin sistem seperti ini diterapkan secara resmi di sekolah Anda? U.Project Nexus menyediakan implementasi dan kustomisasi sistem sesuai kebutuhan institusi.
             </div>
         </div>
         """, unsafe_allow_html=True)
