@@ -843,8 +843,6 @@ elif st.session_state.page == "guru_dashboard":
                         safe_nama = str(row['nama_siswa']).strip().replace("*", "")
                         percobaan_badge = f"<span style='font-size: 10px; background: rgba(5,150,105,0.15); color: #059669; padding: 2px 6px; border-radius: 4px; font-weight: 600;'>Percobaan ke-{row['total_percobaan']}</span>" if only_latest else ""
 
-                        # Hitung Waktu Mulai & Durasi Berjalan
-                        # Hitung Waktu Mulai & Durasi Berjalan (WIB Presisi)
                         # Hitung Waktu Mulai & Durasi Berjalan (Presisi WIB & Server UTC)
                         try:
                             waktu_mulai_raw = row['created_at'] if ('created_at' in row and pd.notna(row['created_at'])) else row['updated_at']
@@ -916,8 +914,6 @@ elif st.session_state.page == "guru_dashboard":
                         </div>
                         """, unsafe_allow_html=True)
                         col_skor.markdown(f"**Skor: {row['nilai_akhir']}**")
-
-
 
                         # Progress Bar & Micro Analytics
                         try:
@@ -1000,12 +996,18 @@ elif st.session_state.page == "guru_dashboard":
 
 
     with tab2:
-        st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>🧕🏼 AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
         st.markdown("""
-        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; color: #1e3a8a; margin-bottom: 15px;">
-            <b style="font-size: 13px;">🛠️ RoboMANTAP QUIZ CUSTOM</b><br>
-            Buat kuis sesuai kebutuhan guru: bebas menentukan mapel, jenjang, jumlah soal,
-            tingkat kesulitan, gaya soal, bahasa, konteks, dan batas waktu.
+        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; margin-bottom: 15px;">
+            <div style="font-size: 15px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
+                🛠️ RoboMANTAP QUIZ CUSTOM <span style="font-size: 11px; background: #059669; color: #fff; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">DEMO B2B</span>
+            </div>
+            <div style="font-size: 13px; color: #d1d5db; line-height: 1.5;">
+                Buat kuis instan sesuai kebutuhan guru: bebas menentukan mapel, jenjang, jumlah soal, tingkat kesulitan, gaya soal, bahasa, konteks, dan batas waktu.
+            </div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;">
+                💡 <b>Ingin Diterapkan Resmi di Sekolah Anda?</b> Layanan lisensi lembaga <b>U.Project Nexus</b> menyediakan kustomisasi penuh (logo/branding sekolah, kuota AI unlimited, integrasi WhatsApp orang tua, dan bank soal terisolasi).
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
