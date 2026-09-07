@@ -21,7 +21,8 @@ from reportlab.platypus import (
 from ai_engine import (
     generate_quiz_batch, get_ai_hint_stream, get_ai_solution_stream,
     create_table_if_not_exists, update_progress_siswa, init_db_connection,
-    generate_lkpd_content, stream_ai_text
+    generate_lkpd_content, stream_ai_text, generate_custom_quiz_ai,
+    publish_custom_quiz_to_db, get_custom_quiz_from_db
 )
 
 st.set_page_config(
@@ -462,6 +463,29 @@ if st.session_state.page == "landing":
             st.session_state.jenjang = "MA (Sederajat SMA)"
             st.session_state.page = "select_mapel"
             st.rerun()
+            
+    st.write("---")
+    st.markdown("#### ⚙️ Ujian Kelas / Kuis Custom")
+    
+    col_c1, col_c2 = st.columns([3, 1])
+    with col_c1:
+        kode_masuk_input = st.text_input("Masukkan Kode Kuis GuruMANTAP:", placeholder="Contoh: MNT-8F2A", label_visibility="collapsed")
+    with col_c2:
+        if st.button("Masuk Ujian ➔", key="btn_custom_enter", use_container_width=True, type="primary"):
+            if not kode_masuk_input.strip():
+                st.warning("⚠️ Masukkan kode kuisnya dulu ya!")
+            else:
+                pkg = get_custom_quiz_from_db(kode_masuk_input.strip())
+                if pkg:
+                    st.session_state.is_custom_quiz = True
+                    st.session_state.custom_pkg = pkg
+                    st.session_state.mapel = pkg['config'].get('mapel', 'Custom Quiz')
+                    st.session_state.jenjang = pkg['config'].get('jenjang', 'Umum')
+                    st.session_state.quiz_data = pkg['quiz']
+                    st.session_state.page = "setup_custom"
+                    st.rerun()
+                else:
+                    st.error("❌ Kode Kuis tidak ditemukan! Periksa kembali kodenya ya")
 
     st.write("---")
     st.markdown("#### 🧕🏼 Portal GuruMANTAP")
@@ -474,7 +498,6 @@ if st.session_state.page == "landing":
     if st.button("🔒 Masuk Portal Guru ➔", use_container_width=True):
         st.session_state.page = "guru_login"
         st.rerun()
-
 
 # ==============================================================================
 # 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
@@ -540,15 +563,15 @@ elif st.session_state.page == "guru_dashboard":
 
         # Function Progress Bar Visual
         def render_progress_bar_html(detail_list):
-            if not isinstance(detail_list, list): return ""
-            html = '<div style="display: flex; gap: 4px; align-items: center;">'
-            for i in range(10): 
-                if i < len(detail_list):
-                    val = detail_list[i]
-                    color = "#10b981" if val is True else ("#ef4444" if val is False else "#d1d5db")
-                else:
-                    color = "#f3f4f6"
-                html += f'<div style="background-color:{color}; height:14px; flex:1; border-radius:3px;"></div>'
+            if not isinstance(detail_list, list) or len(detail_list) == 0: 
+                return ""
+            
+            total_soal = len(detail_list)
+            html = '<div style="display: flex; gap: 3px; align-items: center;">'
+            for i in range(total_soal): 
+                val = detail_list[i]
+                color = "#10b981" if val is True else ("#ef4444" if val is False else "#d1d5db")
+                html += f'<div style="background-color:{color}; height:12px; flex:1; border-radius:2px;" title="Soal {i+1}"></div>'
             html += '</div>'
             return html
 
@@ -930,17 +953,12 @@ elif st.session_state.page == "guru_dashboard":
                 )
                 custom_jenjang = st.selectbox(
                     "🏫 Jenjang",
-                    [
-                        "SD",
-                        "SMP",
-                        "MTs",
-                        "SMA",
-                        "MA",
-                        "SMK",
-                        "Umum",
+                    [                
+                        "MTs",                      
+                        "MA",            
                     ],
                     index=[
-                        "SD", "SMP", "MTs", "SMA", "MA", "SMK", "Umum"
+                        "MTs", "MA"
                     ].index(custom_cfg.get("jenjang", "MA")),
                 )
                 custom_kelas = st.text_input(
@@ -1014,18 +1032,18 @@ elif st.session_state.page == "guru_dashboard":
             st.caption(f"⏳ Durasi sesi: **{timer_label}**")
 
             submitted = st.form_submit_button(
-                "🤖 GENERATE ROBO MANTAP QUIZ CUSTOM",
+                "🤖 GENERATE RoboMANTAP QUIZ CUSTOM",
                 type="primary",
                 use_container_width=True,
             )
 
         if submitted:
             if not custom_mapel.strip():
-                st.error("⚠️ Mata pelajaran wajib diisi.")
+                st.error("⚠️ Mata pelajaran wajib diisi")
             elif not custom_materi.strip():
-                st.error("⚠️ Materi utama wajib diisi agar AI dapat merancang soal secara spesifik.")
+                st.error("⚠️ Materi utama wajib diisi agar RoboMANTAP dapat merancang soal secara spesifik")
             elif timer_total == 0:
-                st.warning("⏱️ Timer 0 berarti sesi dibuat tanpa batas waktu.")
+                st.warning("⏱️ Timer 0 berarti sesi dibuat tanpa batas waktu")
             else:
                 with st.spinner(
                     f"RoboMANTAP sedang merancang {custom_jumlah} soal {custom_mapel} dengan tingkat {custom_kesulitan}..."
@@ -1067,8 +1085,8 @@ elif st.session_state.page == "guru_dashboard":
                     st.success(f"✅ {len(generated)} soal berhasil dibuat dan disimpan sebagai draft.")
                 else:
                     st.error(
-                        "❌ RoboMANTAP belum berhasil menghasilkan paket yang valid. "
-                        "Coba ulangi atau sederhanakan materi/konteks."
+                        "❌ RoboMANTAP belum berhasil menghasilkan paket yang valid"
+                        "Coba ulangi atau sederhanakan materi/konteks"
                     )
 
         if custom_quiz:
@@ -1102,11 +1120,19 @@ elif st.session_state.page == "guru_dashboard":
                 use_container_width=True,
             )
 
-            st.info(
-                "ℹ️ Draft ini sudah siap direview guru. Pada tahap integrasi berikutnya, "
-                "draft yang disetujui dapat diterbitkan menjadi Session Code untuk siswa "
-                "tanpa mengganggu engine CBT OMI yang sekarang."
-            )
+            st.write("---")
+            col_pub1, col_pub2 = st.columns([2, 1])
+            with col_pub1:
+                custom_code_input = st.text_input("🔑 Buat Kode Kuis Unik (opsional):", value=f"MNT-{uuid.uuid4().hex[:4].upper()}", max_chars=12)
+            with col_pub2:
+                st.write("")
+                st.write("")
+                if st.button("🚀 TERBITKAN KUIS CUSTOM", type="primary", use_container_width=True):
+                    clean_code = custom_code_input.strip().upper()
+                    if publish_custom_quiz_to_db(clean_code, custom_cfg, custom_quiz):
+                        st.success(f"🎉 Kuis Berhasil Diterbitkan! Bagikan Kode ini ke Siswa: **{clean_code}**")
+                    else:
+                        st.error("❌ Gagal menerbitkan kuis. Periksa koneksi Database.")
 
     with tab3:
         st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>📲 WhatsApp Integration Engine</p>", unsafe_allow_html=True)
@@ -1285,6 +1311,26 @@ elif st.session_state.page == "quiz":
     default_opt_idx = opts.index(saved_ans) if saved_ans in opts else None
 
     selected_option = st.radio("Pilih Jawaban Anda:", opts, index=default_opt_idx, key=f"radio_q_{curr_idx}")
+
+    # Buka Waktu Mulai Sesi jika belum ada (Presisi Anti-Cheat / Anti-Reset saat Refresh)
+    if "start_time_wib" not in st.session_state:
+        st.session_state.start_time_wib = datetime.utcnow() + timedelta(hours=7)
+
+    # Hitung Sisa Waktu Timer jika Kuis Custom memiliki timer
+    timer_seconds = st.session_state.get("custom_timer_seconds", 0)
+    if timer_seconds > 0:
+        sekarang_wib = datetime.utcnow() + timedelta(hours=7)
+        terpakai_detik = int((sekarang_wib - st.session_state.start_time_wib).total_seconds())
+        sisa_detik = timer_seconds - terpakai_detik
+
+        if sisa_detik <= 0:
+            st.warning("⏱️ Waktu Ujian Telah Habis! Menyerahkan jawaban otomatis...")
+            st.session_state.page = "result"
+            st.rerun()
+
+        sisa_m = sisa_detik // 60
+        sisa_s = sisa_detik % 60
+        st.markdown(f"⏳ **Sisa Waktu:** `<span style='color:#ef4444; font-weight:800;'>{sisa_m:02d}:{sisa_s:02d}</span>`", unsafe_allow_html=True)
     
     # Trigger sinkronisasi jika ada pilihan jawaban yang berubah
     if selected_option and selected_option != saved_ans:
