@@ -645,13 +645,31 @@ elif st.session_state.page == "guru_dashboard":
                 # =========================================================================
                 # MINI KPI CARDS ELEGAN (OMI & CUSTOM SEPARATED)
                 # =========================================================================
+                # =========================================================================
+                # MINI KPI CARDS ELEGAN (DETEKSI PRESISI OMI VS CUSTOM)
+                # =========================================================================
                 val_total = len(df['nama_siswa'].unique()) if only_latest else len(df)
                 val_aktif = len(df[df['status_real'] == 'BERJALAN'])
                 val_selesai = len(df[df['status_real'] == 'SELESAI'])
 
-                # Pemisahan perhitungan Rerata OMI vs Kuis Custom
-                df_omi = df[~df['mapel'].str.contains('Custom|Kuis', case=False, na=False)]
-                df_custom = df[df['mapel'].str.contains('Custom|Kuis', case=False, na=False)]
+                # Logika Pemisah Pintar: Cek kata '(Custom)' ATAU jumlah kotak soal != 10
+                def check_is_custom(row):
+                    mapel_str = str(row['mapel'])
+                    if "custom" in mapel_str.lower() or "kuis" in mapel_str.lower():
+                        return True
+                    try:
+                        detail = row['detail_jawaban']
+                        if isinstance(detail, str):
+                            detail = json.loads(detail)
+                        if isinstance(detail, list) and len(detail) > 0 and len(detail) != 10:
+                            return True
+                    except Exception:
+                        pass
+                    return False
+
+                is_custom_mask = df.apply(check_is_custom, axis=1)
+                df_custom = df[is_custom_mask]
+                df_omi = df[~is_custom_mask]
 
                 val_rata_omi = f"{df_omi['nilai_akhir'].mean():.1f}" if not df_omi.empty else "0.0"
                 val_rata_custom = f"{df_custom['nilai_akhir'].mean():.1f}" if not df_custom.empty else "0.0"
@@ -666,7 +684,7 @@ elif st.session_state.page == "guru_dashboard":
                 }}
                 @media (max-width: 640px) {{
                     .kpi-grid {{
-                        grid-template-columns: repeat(2, 1fr); /* Grid 2 Kolom Rapi di Layar HP */
+                        grid-template-columns: repeat(2, 1fr);
                         gap: 8px;
                     }}
                 }}
