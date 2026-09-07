@@ -162,7 +162,11 @@ def _stream_from_clients(prompt: str, max_output_tokens: int):
 def format_latex_options(options):
     formatted = []
     for opt in options:
-        opt = opt.replace(r"\frac", r"\tfrac")
+        opt = str(opt).replace(r"\frac", r"\tfrac")
+        # Bungkus $ hanya jika ada simbol LaTeX (\) dan belum dibungkus $
+        if "\\" in opt and "$" not in opt:
+            parts = opt.split(". ", 1)
+            opt = f"{parts[0]}. ${parts[1]}$" if len(parts) == 2 else f"${opt}$"
         formatted.append(opt)
     return formatted
 
