@@ -1349,30 +1349,58 @@ elif st.session_state.page == "setup_custom":
         nama_input = st.session_state.nama_siswa.strip()
         jumlah_huruf = len([c for c in nama_input if c.isalpha()])
         
-        if jumlah_huruf < 3:
+        if jumlah_huruf < 4:
             st.error("⚠️ Masukkan nama lengkap yang valid!")
         else:
-            # Inisialisasi Sesi & Timer WIB Presisi
-            st.session_state.session_id = str(uuid.uuid4())
-            st.session_state.user_answers = {}
-            st.session_state.current_index = 0
-            st.session_state.custom_timer_seconds = timer_sec
-            st.session_state.start_time_wib = datetime.utcnow() + timedelta(hours=7)
+            # Cek apakah siswa sudah pernah masuk sesi ini sebelumnya (Auto-Resume)
+            existing_session = check_active_session_from_db(nama_input, st.session_state.mapel)
             
-            # Sinkronisasi Awal Sesi ke Database Live Monitoring Guru
-            update_progress_siswa(
-                st.session_state.session_id, 
-                st.session_state.nama_siswa,
-                st.session_state.jenjang, 
-                st.session_state.mapel, 
-                1, 
-                [], 
-                "BERJALAN"
-            )
+            if existing_session:
+                # RECOVER SESI LAMA
+                st.session_state.session_id = existing_session["id_sesi"]
+                
+                # Format ulang waktu mulai dari DB ke format datetime WIB
+                raw_created = existing_session["created_at"]
+                if isinstance(raw_created, str):
+                    start_dt = datetime.strptime(str(raw_created)[:19], "%Y-%m-%d %H:%M:%S")
+                else:
+                    start_dt = pd.to_datetime(raw_created).to_pydatetime()
+                
+                st.session_state.start_time_wib = start_dt
+                st.session_state.custom_timer_seconds = timer_sec
+                st.session_state.current_index = 0
+                st.session_state.user_answers = {}
+                
+                # Load kembali jawaban yang pernah diisi
+                detail_saved = existing_session["detail_jawaban"]
+                for idx, is_corr in enumerate(detail_saved):
+                    if is_corr is not None:
+                        # Tandai bahwa soal indeks ini sudah ada isinya
+                        st.session_state.user_answers[idx] = st.session_state.quiz_data[idx]["options"][0] # placeholder restore
+                
+                st.toast("🔄 Sesi pengerjaan sebelumnya berhasil dipulihkan!", icon="ℹ️")
+            else:
+                # INSIALISASI SESI BARU
+                st.session_state.session_id = str(uuid.uuid4())
+                st.session_state.user_answers = {}
+                st.session_state.current_index = 0
+                st.session_state.custom_timer_seconds = timer_sec
+                st.session_state.start_time_wib = datetime.utcnow() + timedelta(hours=7)
+                
+                update_progress_siswa(
+                    st.session_state.session_id, 
+                    st.session_state.nama_siswa,
+                    st.session_state.jenjang, 
+                    st.session_state.mapel, 
+                    1, 
+                    [], 
+                    "BERJALAN",
+                    is_custom=True
+                )
             
-            # Pindah Langsung ke Engine CBT
             st.session_state.page = "quiz"
             st.rerun()
+
 
 # ==============================================================================
 # 5. ENGINE TEST INTERAKTIF (CBT OMI & KUIS CUSTOM DINAMIS)
