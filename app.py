@@ -1538,7 +1538,7 @@ elif st.session_state.page == "result":
         total_soal,
         detail,
         "SELESAI",
-        is_custom=st.session_state.get("is_custom_quiz", 
+        is_custom=st.session_state.get("is_custom_quiz"), 
         False
     )
 
