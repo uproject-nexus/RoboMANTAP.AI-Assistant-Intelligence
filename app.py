@@ -643,24 +643,30 @@ elif st.session_state.page == "guru_dashboard":
                     return
 
                 # =========================================================================
-                # MINI KPI CARDS ELEGAN (GRID 2x2 DI HP, 4 KOLOM DI DESKTOP)
+                # MINI KPI CARDS ELEGAN (OMI & CUSTOM SEPARATED)
                 # =========================================================================
                 val_total = len(df['nama_siswa'].unique()) if only_latest else len(df)
                 val_aktif = len(df[df['status_real'] == 'BERJALAN'])
                 val_selesai = len(df[df['status_real'] == 'SELESAI'])
-                val_rata = f"{df['nilai_akhir'].mean():.1f}" if not df.empty else "0.0"
+
+                # Pemisahan perhitungan Rerata OMI vs Kuis Custom
+                df_omi = df[~df['mapel'].str.contains('Custom|Kuis', case=False, na=False)]
+                df_custom = df[df['mapel'].str.contains('Custom|Kuis', case=False, na=False)]
+
+                val_rata_omi = f"{df_omi['nilai_akhir'].mean():.1f}" if not df_omi.empty else "0.0"
+                val_rata_custom = f"{df_custom['nilai_akhir'].mean():.1f}" if not df_custom.empty else "0.0"
 
                 st.markdown(f"""
                 <style>
                 .kpi-grid {{
                     display: grid;
-                    grid-template-columns: repeat(4, 1fr);
+                    grid-template-columns: repeat(5, 1fr);
                     gap: 10px;
                     margin-bottom: 15px;
                 }}
                 @media (max-width: 640px) {{
                     .kpi-grid {{
-                        grid-template-columns: repeat(2, 1fr); /* 2x2 Grid Seimbang di Layar HP */
+                        grid-template-columns: repeat(2, 1fr); /* Grid 2 Kolom Rapi di Layar HP */
                         gap: 8px;
                     }}
                 }}
@@ -703,11 +709,16 @@ elif st.session_state.page == "guru_dashboard":
                         <div class="kpi-value" style="color: #60a5fa;">{val_selesai}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-title">🎯 Rata-Rata Nilai</div>
-                        <div class="kpi-value" style="color: #f59e0b;">{val_rata} <span style="font-size: 11px; color: #9ca3af;">/ 40</span></div>
+                        <div class="kpi-title">🎯 Rerata OMI</div>
+                        <div class="kpi-value" style="color: #f59e0b;">{val_rata_omi} <span style="font-size: 11px; color: #9ca3af;">/ 40</span></div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">🛠️ Rerata Custom</div>
+                        <div class="kpi-value" style="color: #10b981;">{val_rata_custom} <span style="font-size: 11px; color: #9ca3af;">/ 100</span></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
 
                 # =========================================================================
                 # 4. DIAGNOSIS AI KONTEKSTUAL (IKUT FILTER)
