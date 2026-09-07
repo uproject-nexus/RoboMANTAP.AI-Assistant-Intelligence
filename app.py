@@ -561,7 +561,7 @@ elif st.session_state.page == "guru_dashboard":
         st.stop()
 
     st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
-    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🛠️ Quiz Custom", "📲 WA Automation"])
+    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "✨ Quiz Custom", "⚡ Automation"])
     with tab1:
         st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Evaluasi Pembinaan OMI</p>", unsafe_allow_html=True)
 
