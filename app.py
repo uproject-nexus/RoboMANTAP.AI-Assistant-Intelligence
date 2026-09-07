@@ -1266,26 +1266,7 @@ elif st.session_state.page == "guru_dashboard":
                         st.error("❌ Gagal menerbitkan kuis. Periksa koneksi Database.")
 
     with tab3:
-        st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>📲 WhatsApp Integration Engine</p>", unsafe_allow_html=True)
-        st.markdown("""
-        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; margin-bottom: 15px;">
-            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
-                ⚡ RoboMANTAP AUTOMATION
-            </div>
-            <ul style="margin: 6px 0 0 0; padding-left: 18px;">
-                <li><b>📄 Atur materi dan format → klik → LKPD otomatis siap!</b></li>
-                <li><b>📲 WhatsApp Automation!</b></li>
-                <li><b>🧕🏼 RoboMANTAP AI Tutor 24/7!</b></li>
-            </ul>
-            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
-                Ingin sistem seperti ini diterapkan secara resmi di sekolah Anda? U.Project Nexus menyediakan implementasi dan kustomisasi sistem sesuai kebutuhan institusi.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.divider()
-
-        # GENERATOR LKPD WORD (.DOCX) EKSKLUSIF BERLOGO
+        # GENERATOR LKPD EKSKLUSIF BERLOGO
         st.markdown("""
         <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 12px; border-radius: 10px; border: 1px solid #059669; color: white; margin-bottom: 12px;">
             <div style="font-size: 14px; font-weight: 700;">📄 Generator LKPD</div>
@@ -1322,6 +1303,22 @@ elif st.session_state.page == "guru_dashboard":
                             mime="application/pdf",
                             use_container_width=True
                         )
+
+        st.markdown("""
+        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; margin-bottom: 15px;">
+            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
+                ⚡ RoboMANTAP AUTOMATION
+            </div>
+            <ul style="margin: 6px 0 0 0; padding-left: 18px;">
+                <li><b>📄 Atur format → klik → LKPD siap!</b></li>
+                <li><b>📲 WhatsApp Automation!</b></li>
+                <li><b>🧕🏼 RoboMANTAP AI Tutor 24/7!</b></li>
+            </ul>
+            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
+                Ingin sistem seperti ini diterapkan secara resmi di sekolah Anda? U.Project Nexus menyediakan implementasi dan kustomisasi sistem sesuai kebutuhan institusi.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ==============================================================================
 # 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
