@@ -1269,11 +1269,18 @@ elif st.session_state.page == "guru_dashboard":
         st.markdown("""
         <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; color: #1e3a8a; margin-bottom: 15px;">
             <b style="font-size: 13px;">⚡ One-Click Automation U.Project Nexus:</b>
+            <div style="font-size: 13px; line-height: 1.5;">
+                Satu ekosistem untuk menghubungkan pembelajaran, komunikasi, dan otomasi sekolah.
+            </div>
             <ul style="margin: 6px 0 0 0; padding-left: 18px;">
-                <li><b>Broadcast Hasil Ujian:</b> Laporan nilai otomatis ke WA orang tua & siswa</li>
-                <li><b>ChatBot RoboMANTAP 24/7:</b> Asisten tutor pribadi siswa di rumah</li>
-                <li><b>Auto-LKPD Guru:</b> Buat LKPD otomatis sesuai template khas sekolah</li>
+                <li><b>📊 Broadcast Hasil Ujian:</b> distribusikan hasil dan ringkasan perkembangan siswa melalui WhatsApp</li>
+                <li><b>🧕 RoboMANTAP AI Tutor 24/7:</b> asisten belajar personal yang dapat mendampingi siswa di luar jam pembelajaran</li>
+                <li><b>📄 Auto-LKPD Guru:</b> bantu menyusun LKPD sesuai materi dan format yang dibutuhkan sekolah</li>
+                <li><b>🔗 Connected Learning:</b> menghubungkan aktivitas web, AI, data pembelajaran, dan komunikasi dalam satu ekosistem</li>
             </ul>
+            <div style="font-size: 13px; line-height: 1.5;">
+                Teknologi yang dapat dikembangkan sesuai kebutuhan institusi! - Engineered by U.Project Nexus
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
