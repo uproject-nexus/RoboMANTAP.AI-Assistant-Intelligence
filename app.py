@@ -2,6 +2,8 @@ import io
 import os
 import uuid
 import base64
+import json
+import re
 import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
@@ -426,6 +428,154 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     doc.build(story, onFirstPage=draw_cover_background, onLaterPages=draw_cover_background)
     buffer.seek(0)
     return buffer
+
+
+# ============================================================================
+# ROBO MANTAP QUIZ CUSTOM - GENERATOR LAYER
+# Catatan: hanya fitur baru. Engine AI/DB yang sudah ada tidak diubah.
+# ============================================================================
+def _clean_custom_quiz_json(text: str) -> str:
+    """Membersihkan wrapper markdown dan karakter JSON sederhana."""
+    if not text:
+        return ""
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s*```$", "", text)
+    return text.strip()
+
+
+def generate_custom_quiz_ai(
+    *,
+    mapel: str,
+    jenjang: str,
+    kelas: str,
+    materi: str,
+    submateri: str,
+    jumlah_soal: int,
+    kesulitan: str,
+    tipe_soal: str,
+    bahasa: str,
+    konteks: str,
+    timer_seconds: int,
+):
+    """
+    Generator Quiz Custom untuk guru.
+
+    Menggunakan stream_ai_text sebagai jalur AI yang sudah ada.
+    Output dipaksa JSON kemudian divalidasi di sisi aplikasi.
+    """
+    prompt = f"""
+Anda adalah Question Architect RoboMANTAP untuk guru.
+Buat tepat {jumlah_soal} soal pilihan ganda berkualitas tinggi untuk pembelajaran.
+
+KONFIGURASI:
+- Mata Pelajaran: {mapel}
+- Jenjang: {jenjang}
+- Kelas: {kelas}
+- Materi: {materi}
+- Submateri: {submateri or 'Tidak ditentukan / semua yang relevan'}
+- Tingkat Kesulitan: {kesulitan}
+- Tipe Soal: {tipe_soal}
+- Bahasa: {bahasa}
+- Konteks: {konteks}
+- Batas Waktu Sesi: {timer_seconds} detik
+
+ATURAN KUALITAS:
+1. Tepat {jumlah_soal} soal, jangan kurang dan jangan lebih.
+2. Setiap soal memiliki tepat 4 opsi: A, B, C, D.
+3. Hanya satu opsi yang benar.
+4. correct_answer harus persis sama dengan salah satu opsi lengkap.
+5. Hindari ambiguitas, data yang kurang, dan asumsi yang tidak disebutkan.
+6. Untuk soal numerik, solution_basis harus memuat proses hitungan inti dan hasil akhir.
+7. Untuk HOTS/olimpiade, gunakan penalaran yang benar-benar relevan dengan level.
+8. Jangan memasukkan jawaban atau pembahasan yang saling bertentangan.
+9. Jika menggunakan LaTeX, gunakan $...$ dan escape backslash secara valid untuk JSON.
+10. Jangan menambahkan markdown di luar JSON.
+
+OUTPUT JSON MURNI:
+{{
+  "quiz": [
+    {{
+      "id": 1,
+      "question": "...",
+      "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+      "correct_answer": "C. ...",
+      "solution_basis": "..."
+    }}
+  ],
+  "config": {{
+    "duration_seconds": {timer_seconds}
+  }}
+}}
+"""
+
+    stream_result = stream_ai_text(
+        prompt,
+        max_output_tokens=max(3500, jumlah_soal * 420),
+        primary_model="gemini-3.5-flash-lite",
+        fallback_model="gemini-3.1-flash-lite",
+        thinking_level="medium",
+    )
+    raw = "".join(list(stream_result))
+    cleaned = _clean_custom_quiz_json(raw)
+
+    try:
+        data = json.loads(cleaned, strict=False)
+    except Exception:
+        # Fallback ringan: ambil blok JSON paling luar.
+        match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+        if not match:
+            return []
+        try:
+            data = json.loads(match.group(0), strict=False)
+        except Exception:
+            return []
+
+    quiz = data.get("quiz", [])
+    if not isinstance(quiz, list) or len(quiz) != jumlah_soal:
+        return []
+
+    normalized = []
+    expected_prefixes = ("A.", "B.", "C.", "D.")
+
+    for idx, item in enumerate(quiz, start=1):
+        if not isinstance(item, dict):
+            return []
+
+        question = str(item.get("question", "")).strip()
+        options = item.get("options", [])
+        answer = str(item.get("correct_answer", "")).strip()
+        solution_basis = str(item.get("solution_basis", "")).strip()
+
+        if not question or not isinstance(options, list) or len(options) != 4:
+            return []
+        if not solution_basis:
+            return []
+
+        options = [str(x).strip() for x in options]
+        if any(not x for x in options):
+            return []
+        if not all(any(x.startswith(prefix) for prefix in expected_prefixes) for x in options):
+            return []
+        if answer not in options:
+            # Coba normalisasi bila model mengembalikan hanya "C".
+            answer_prefix = answer[:2].upper() if len(answer) >= 1 else ""
+            matching = [x for x in options if x[:1].upper() == answer[:1].upper()]
+            if len(matching) == 1:
+                answer = matching[0]
+            else:
+                return []
+
+        normalized.append({
+            "id": idx,
+            "question": question,
+            "options": options,
+            "correct_answer": answer,
+            "solution_basis": solution_basis,
+        })
+
+    return normalized
 
 
 # ==============================================================================
@@ -908,15 +1058,204 @@ elif st.session_state.page == "guru_dashboard":
         st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>🧕🏼 AI Quiz Generator & Analisis</p>", unsafe_allow_html=True)
         st.markdown("""
         <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; color: #1e3a8a; margin-bottom: 15px;">
-            <b style="font-size: 13px;">🚀 Fitur Mendatang (U.Project Nexus Intelligence v3.6):</b>
-            <ul style="margin: 6px 0 0 0; padding-left: 18px;">
-                <li><b>Server Eksklusif:</b> Engine khusus pemrosesan soal tingkat lanjut</li>
-                <li><b>Generator Massal:</b> Buat puluhan/ratusan paket soal HOTS & tematik secara instan</li>
-                <li><b>Export Cetak & PDF:</b> Siap cetak ber-template eksklusif sekolah</li>
-                <li><b>Analisis Butir Soal:</b> Evaluasi daya pembeda & tingkat kesukaran</li>
-            </ul>
+            <b style="font-size: 13px;">🛠️ RoboMANTAP QUIZ CUSTOM</b><br>
+            Buat kuis sesuai kebutuhan guru: bebas menentukan mapel, jenjang, jumlah soal,
+            tingkat kesulitan, gaya soal, bahasa, konteks, dan batas waktu.
         </div>
         """, unsafe_allow_html=True)
+
+        custom_cfg = st.session_state.get("custom_quiz_config", {})
+        custom_quiz = st.session_state.get("custom_quiz_draft", [])
+
+        with st.form("robomantap_quiz_custom_form", clear_on_submit=False):
+            st.markdown("#### 🧩 Konfigurasi Quiz Custom")
+
+            cqa, cqb = st.columns(2)
+            with cqa:
+                custom_mapel = st.text_input(
+                    "📚 Mata Pelajaran",
+                    value=custom_cfg.get("mapel", "Matematika"),
+                    placeholder="Contoh: Matematika, Fisika, Bahasa Arab...",
+                )
+                custom_jenjang = st.selectbox(
+                    "🏫 Jenjang",
+                    [
+                        "SD",
+                        "SMP",
+                        "MTs",
+                        "SMA",
+                        "MA",
+                        "SMK",
+                        "Umum",
+                    ],
+                    index=[
+                        "SD", "SMP", "MTs", "SMA", "MA", "SMK", "Umum"
+                    ].index(custom_cfg.get("jenjang", "MA")),
+                )
+                custom_kelas = st.text_input(
+                    "🎓 Kelas / Tingkat",
+                    value=custom_cfg.get("kelas", "X MA"),
+                    placeholder="Contoh: VIII MTs / XI MA",
+                )
+                custom_materi = st.text_input(
+                    "📖 Materi Utama",
+                    value=custom_cfg.get("materi", ""),
+                    placeholder="Contoh: Logaritma",
+                )
+                custom_submateri = st.text_input(
+                    "🧠 Submateri (opsional)",
+                    value=custom_cfg.get("submateri", ""),
+                    placeholder="Contoh: Persamaan logaritma",
+                )
+
+            with cqb:
+                custom_jumlah = st.number_input(
+                    "🔢 Jumlah Soal",
+                    min_value=1,
+                    max_value=30,
+                    value=int(custom_cfg.get("jumlah_soal", 10)),
+                    step=1,
+                )
+                difficulty_options = ["Dasar", "Menengah", "Sulit", "HOTS", "Olimpiade"]
+                custom_kesulitan = st.selectbox(
+                    "🎯 Tingkat Kesulitan",
+                    difficulty_options,
+                    index=difficulty_options.index(custom_cfg.get("kesulitan", "HOTS")),
+                )
+                type_options = ["Pilihan Ganda", "HOTS", "Analitis", "Numerik", "Konseptual", "Campuran"]
+                custom_tipe = st.selectbox(
+                    "🧩 Gaya Soal",
+                    type_options,
+                    index=type_options.index(custom_cfg.get("tipe_soal", "Campuran")),
+                )
+                lang_options = ["Bahasa Indonesia", "Bahasa Arab", "Indonesia + Arab", "English"]
+                custom_bahasa = st.selectbox(
+                    "🌐 Bahasa",
+                    lang_options,
+                    index=lang_options.index(custom_cfg.get("bahasa", "Bahasa Indonesia")),
+                )
+                context_options = [
+                    "Standar Sekolah",
+                    "Kehidupan Sehari-hari",
+                    "Keislaman",
+                    "Lingkungan",
+                    "Teknologi",
+                    "OMI / Olimpiade",
+                    "Campuran",
+                ]
+                custom_konteks = st.selectbox(
+                    "🌍 Konteks",
+                    context_options,
+                    index=context_options.index(custom_cfg.get("konteks", "Standar Sekolah")),
+                )
+
+            st.markdown("##### ⏱️ Batas Waktu Presisi")
+            t1, t2, t3 = st.columns(3)
+            with t1:
+                timer_h = st.number_input("Jam", min_value=0, max_value=23, value=int(custom_cfg.get("timer_h", 0)))
+            with t2:
+                timer_m = st.number_input("Menit", min_value=0, max_value=59, value=int(custom_cfg.get("timer_m", 30)))
+            with t3:
+                timer_s = st.number_input("Detik", min_value=0, max_value=59, value=int(custom_cfg.get("timer_s", 0)))
+
+            timer_total = int(timer_h) * 3600 + int(timer_m) * 60 + int(timer_s)
+            timer_label = "Tanpa batas waktu" if timer_total <= 0 else str(timedelta(seconds=timer_total))
+            st.caption(f"⏳ Durasi sesi: **{timer_label}**")
+
+            submitted = st.form_submit_button(
+                "🤖 GENERATE ROBO MANTAP QUIZ CUSTOM",
+                type="primary",
+                use_container_width=True,
+            )
+
+        if submitted:
+            if not custom_mapel.strip():
+                st.error("⚠️ Mata pelajaran wajib diisi.")
+            elif not custom_materi.strip():
+                st.error("⚠️ Materi utama wajib diisi agar AI dapat merancang soal secara spesifik.")
+            elif timer_total == 0:
+                st.warning("⏱️ Timer 0 berarti sesi dibuat tanpa batas waktu.")
+            else:
+                with st.spinner(
+                    f"RoboMANTAP sedang merancang {custom_jumlah} soal {custom_mapel} dengan tingkat {custom_kesulitan}..."
+                ):
+                    generated = generate_custom_quiz_ai(
+                        mapel=custom_mapel.strip(),
+                        jenjang=custom_jenjang,
+                        kelas=custom_kelas.strip(),
+                        materi=custom_materi.strip(),
+                        submateri=custom_submateri.strip(),
+                        jumlah_soal=int(custom_jumlah),
+                        kesulitan=custom_kesulitan,
+                        tipe_soal=custom_tipe,
+                        bahasa=custom_bahasa,
+                        konteks=custom_konteks,
+                        timer_seconds=timer_total,
+                    )
+
+                if generated:
+                    st.session_state.custom_quiz_draft = generated
+                    st.session_state.custom_quiz_config = {
+                        "mapel": custom_mapel.strip(),
+                        "jenjang": custom_jenjang,
+                        "kelas": custom_kelas.strip(),
+                        "materi": custom_materi.strip(),
+                        "submateri": custom_submateri.strip(),
+                        "jumlah_soal": int(custom_jumlah),
+                        "kesulitan": custom_kesulitan,
+                        "tipe_soal": custom_tipe,
+                        "bahasa": custom_bahasa,
+                        "konteks": custom_konteks,
+                        "timer_h": int(timer_h),
+                        "timer_m": int(timer_m),
+                        "timer_s": int(timer_s),
+                        "timer_seconds": timer_total,
+                    }
+                    custom_quiz = generated
+                    custom_cfg = st.session_state.custom_quiz_config
+                    st.success(f"✅ {len(generated)} soal berhasil dibuat dan disimpan sebagai draft.")
+                else:
+                    st.error(
+                        "❌ RoboMANTAP belum berhasil menghasilkan paket yang valid. "
+                        "Coba ulangi atau sederhanakan materi/konteks."
+                    )
+
+        if custom_quiz:
+            st.write("---")
+            st.markdown("#### 👁️ Preview Quiz Custom")
+            st.caption(
+                f"{custom_cfg.get('mapel', '-')} • {custom_cfg.get('jenjang', '-')} • "
+                f"{custom_cfg.get('kesulitan', '-')} • {len(custom_quiz)} soal • "
+                f"Timer: {str(timedelta(seconds=int(custom_cfg.get('timer_seconds', 0)))) if custom_cfg.get('timer_seconds', 0) else 'Tanpa batas'}"
+            )
+
+            for q_idx, cq in enumerate(custom_quiz, start=1):
+                with st.expander(f"Soal {q_idx}", expanded=(q_idx == 1)):
+                    st.markdown(cq["question"])
+                    for option in cq["options"]:
+                        st.markdown(f"- {option}")
+                    st.success(f"Kunci terencana: **{cq['correct_answer']}**")
+                    with st.expander("Lihat Solution Basis"):
+                        st.markdown(cq.get("solution_basis", "Belum tersedia."))
+
+            export_payload = {
+                "product": "RoboMANTAP QUIZ CUSTOM",
+                "config": custom_cfg,
+                "quiz": custom_quiz,
+            }
+            st.download_button(
+                "📥 Download Draft Quiz (.json)",
+                data=json.dumps(export_payload, ensure_ascii=False, indent=2),
+                file_name=f"RoboMANTAP_Quiz_Custom_{custom_cfg.get('mapel', 'Quiz').replace(' ', '_')}.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
+            st.info(
+                "ℹ️ Draft ini sudah siap direview guru. Pada tahap integrasi berikutnya, "
+                "draft yang disetujui dapat diterbitkan menjadi Session Code untuk siswa "
+                "tanpa mengganggu engine CBT OMI yang sekarang."
+            )
 
     with tab3:
         st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 6px;'>📲 WhatsApp Integration Engine</p>", unsafe_allow_html=True)
