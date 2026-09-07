@@ -701,3 +701,29 @@ def generate_custom_quiz_ai(
         })
 
     return normalized
+
+def check_active_session_from_db(nama_siswa: str, mapel: str):
+    """Mengecek apakah siswa memiliki sesi ujian yang belum selesai."""
+    conn = init_db_connection()
+    if not conn: return None
+
+    query = """
+    SELECT id_sesi, detail_jawaban, created_at 
+    FROM sesi_ujian 
+    WHERE LOWER(TRIM(nama_siswa)) = LOWER(TRIM(:nama)) 
+      AND mapel = :mapel 
+      AND status = 'BERJALAN'
+    ORDER BY created_at DESC LIMIT 1;
+    """
+    try:
+        with conn.session as s:
+            res = s.execute(text(query), {"nama": nama_siswa.strip(), "mapel": mapel}).fetchone()
+            if res:
+                return {
+                    "id_sesi": res[0],
+                    "detail_jawaban": res[1] if isinstance(res[1], list) else json.loads(res[1]),
+                    "created_at": res[2]
+                }
+    except Exception:
+        pass
+    return None
