@@ -1087,15 +1087,46 @@ elif st.session_state.page == "guru_dashboard":
                 type="primary",
                 use_container_width=True,
             )
+            
+            st.markdown("##### 📅 Masa Aktif Kuis (Rentang Waktu 1x24 Jam)")
+            st.caption("Set jam kuis mulai dibuka hingga otomatis ditutup:")
+            
+            now_wib_time = (datetime.utcnow() + timedelta(hours=7)).time()
+            default_end_time = (datetime.utcnow() + timedelta(hours=9)).time() # Default aktif 2 jam
+
+            col_act1, col_act2 = st.columns(2)
+            with col_act1:
+                time_start = st.time_input(
+                    "Jam Buka:", 
+                    value=custom_cfg.get("time_start_val", now_wib_time),
+                    key="input_time_start"
+                )
+            with col_act2:
+                time_end = st.time_input(
+                    "Jam Tutup:", 
+                    value=custom_cfg.get("time_end_val", default_end_time),
+                    key="input_time_end"
+                )
+
+            st.info(f"📌 **Masa Aktif Kuis:** ( {time_start.strftime('%H:%M')} hingga {time_end.strftime('%H:%M')} WIB )")
 
         if submitted:
+            now_wib = datetime.utcnow() + timedelta(hours=7)
+            dt_start = datetime.combine(now_wib.date(), time_start)
+            dt_end = datetime.combine(now_wib.date(), time_end)
+            # Jika jam tutup lebih kecil dari jam buka, anggap kuis selesai di hari berikutnya
+            if dt_end <= dt_start:
+                dt_end += timedelta(days=1)
+
             if not custom_mapel.strip():
                 st.error("⚠️ Mata pelajaran wajib diisi")
             elif not custom_materi.strip():
                 st.error("⚠️ Materi utama wajib diisi agar RoboMANTAP dapat merancang soal secara spesifik")
-            elif timer_total == 0:
-                st.warning("⏱️ Timer 0 berarti sesi dibuat tanpa batas waktu")
             else:
+                # Tampilkan info jika tanpa batas waktu (timer 0), tapi proses pembuatan soal tetap berjalan
+                if timer_total == 0:
+                    st.info("⏱️ Kuis dibuat tanpa batas waktu pengerjaan.")
+
                 with st.spinner(
                     f"RoboMANTAP sedang merancang {custom_jumlah} soal {custom_mapel} dengan tingkat {custom_kesulitan}..."
                 ):
@@ -1130,19 +1161,26 @@ elif st.session_state.page == "guru_dashboard":
                         "timer_m": int(timer_m),
                         "timer_s": int(timer_s),
                         "timer_seconds": timer_total,
+                        # --- PENAMBAHAN MASA AKTIF KUIS (WAJIB ADA) ---
+                        "active_from": dt_start.isoformat(),
+                        "active_until": dt_end.isoformat(),
+                        "time_start_str": time_start.strftime('%H:%M'),
+                        "time_end_str": time_end.strftime('%H:%M'),
+                        "time_start_val": time_start,
+                        "time_end_val": time_end,
                     }
                     custom_quiz = generated
                     custom_cfg = st.session_state.custom_quiz_config
                     st.success(f"✅ {len(generated)} soal berhasil dibuat dan disimpan sebagai draft.")
                 else:
                     st.error(
-                        "❌ RoboMANTAP belum berhasil menghasilkan paket yang valid"
-                        "Coba ulangi atau sederhanakan materi/konteks"
+                        "❌ RoboMANTAP belum berhasil menghasilkan paket yang valid. "
+                        "Coba ulangi atau sederhanakan materi/konteks."
                     )
 
         if custom_quiz:
             st.write("---")
-            st.markdown("#### 👁️ Preview Quiz Custom")
+            st.markdown("#### 🔎 Preview Quiz Custom")
             st.caption(
                 f"{custom_cfg.get('mapel', '-')} • {custom_cfg.get('jenjang', '-')} • "
                 f"{custom_cfg.get('kesulitan', '-')} • {len(custom_quiz)} soal • "
