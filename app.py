@@ -56,108 +56,565 @@ components.html(
     height=0,
 )
 
-# Custom Styling 
+# ==============================================================================
+# MODERN PREMIUM UI — VISUAL LAYER ONLY
+# Core logic, AI engine, database, scoring, session flow dan query TIDAK DIUBAH.
+# ==============================================================================
 st.markdown("""
-    <style>
+<style>
+/* ================================================================
+   ROBOMANTAP — FORCED DARK / FUTURISTIC AI VISUAL SYSTEM
+   VISUAL LAYER ONLY — NO APP LOGIC CHANGED
+   ================================================================ */
+:root {
+    --rm-bg: #050816;
+    --rm-bg-2: #08111f;
+    --rm-surface: rgba(10, 20, 34, .88);
+    --rm-surface-2: rgba(13, 28, 47, .92);
+    --rm-surface-3: rgba(18, 39, 62, .88);
+    --rm-line: rgba(130, 160, 190, .16);
+    --rm-line-strong: rgba(45, 212, 191, .28);
+    --rm-text: #ecf7f6;
+    --rm-text-soft: #b7c8d7;
+    --rm-text-muted: #7f94aa;
+    --rm-cyan: #22d3ee;
+    --rm-teal: #2dd4bf;
+    --rm-emerald: #10b981;
+    --rm-emerald-dark: #059669;
+    --rm-blue: #60a5fa;
+    --rm-violet: #8b5cf6;
+    --rm-danger: #fb7185;
+    --rm-warning: #fbbf24;
+    --rm-shadow: 0 18px 50px rgba(0,0,0,.34);
+    --rm-glow: 0 0 32px rgba(34,211,238,.08);
+}
 
-    @keyframes pulse-red {
-    0% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(239, 68, 68, 0.8)); }
-    50% { opacity: 0.35; transform: scale(0.92); filter: drop-shadow(0px 0px 1px rgba(239, 68, 68, 0.1)); }
-    100% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(239, 68, 68, 0.8)); }
-    }
-    
-    @keyframes pulse-green {
-        0% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(16, 185, 129, 0.8)); }
-        50% { opacity: 0.35; transform: scale(0.92); filter: drop-shadow(0px 0px 1px rgba(16, 185, 129, 0.1)); }
-        100% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(16, 185, 129, 0.8)); }
-    }
-    
-    .blinking-dot-red {
-        display: inline-block;
-        animation: pulse-red 1.8s ease-in-out infinite;
-        vertical-align: middle;
-    }
-    
-    .blinking-dot-green {
-        display: inline-block;
-        animation: pulse-green 1.8s ease-in-out infinite;
-        vertical-align: middle;
-    }
-    .mode-card {
-        background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%);
-        border: 1px solid rgba(5, 150, 105, 0.45);
-        padding: 14px 16px;
-        border-radius: 12px;
-        text-align: center;
-        margin-bottom: 8px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-    }
-    .mode-card h2 {
-        font-size: 18px !important;
-        font-weight: 700;
-        color: #ffffff !important;
-        margin-bottom: 4px !important;
-    }
-    .mode-card p {
-        color: #a7f3d0 !important;
-        font-size: 12px !important;
-        margin: 0 !important;
-        opacity: 0.9;
-    }
-    .mapel-card {
-        background-color: var(--secondary-background-color);
-        border: 1px solid rgba(5, 150, 105, 0.3);
-        padding: 16px;
-        border-radius: 10px;
-        text-align: center;
-        margin-bottom: 10px;
+/* ---------- HARD DARK SHELL ---------- */
+html, body,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewContainer"] > .main,
+main,
+section.main {
+    background: var(--rm-bg) !important;
+    color: var(--rm-text) !important;
+}
+
+[data-testid="stAppViewContainer"] {
+    background:
+        radial-gradient(circle at 8% 2%, rgba(34,211,238,.10), transparent 24%),
+        radial-gradient(circle at 94% 8%, rgba(139,92,246,.10), transparent 20%),
+        radial-gradient(circle at 50% 100%, rgba(16,185,129,.07), transparent 28%),
+        linear-gradient(180deg, #040711 0%, #07101d 48%, #050914 100%) !important;
+    min-height: 100vh;
+}
+
+/* Futuristic subtle grid / atmosphere */
+[data-testid="stAppViewContainer"]::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: .16;
+    background-image:
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+    background-size: 34px 34px;
+    mask-image: linear-gradient(to bottom, black 0%, transparent 92%);
+}
+
+[data-testid="stHeader"] {
+    background: rgba(5,8,22,.72) !important;
+    backdrop-filter: blur(16px) saturate(140%);
+    border-bottom: 1px solid rgba(130,160,190,.08);
+}
+
+.block-container {
+    max-width: 1380px;
+    padding-top: 1rem;
+    padding-bottom: 3rem;
+    position: relative;
+    z-index: 1;
+}
+
+/* ---------- TYPOGRAPHY ---------- */
+h1,h2,h3,h4,h5,h6,
+p,div,span,label,button,input,textarea,
+[data-testid="stMarkdownContainer"],
+[data-testid="stMetricValue"],
+[data-testid="stMetricLabel"] {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+                 "Segoe UI", sans-serif !important;
+}
+
+h1,h2,h3,h4,h5,h6 {
+    color: var(--rm-text) !important;
+    letter-spacing: -.025em;
+}
+
+p, label, span, .stCaption, [data-testid="stCaptionContainer"] {
+    color: var(--rm-text-soft) !important;
+}
+
+/* ---------- SCHOOL / PRODUCT HEADER ---------- */
+.school-header {
+    position: relative;
+    overflow: hidden;
+    padding: 23px 24px 21px;
+    margin: 2px 0 20px;
+    border-radius: 24px;
+    border: 1px solid rgba(45,212,191,.24);
+    background:
+        radial-gradient(circle at 14% 10%, rgba(34,211,238,.16), transparent 25%),
+        radial-gradient(circle at 88% 0%, rgba(139,92,246,.14), transparent 22%),
+        linear-gradient(135deg, rgba(7,17,30,.97), rgba(10,29,48,.95) 55%, rgba(8,22,36,.98));
+    box-shadow: var(--rm-shadow), var(--rm-glow);
+    text-align: center;
+}
+
+.school-header::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--rm-cyan), var(--rm-teal), transparent);
+    box-shadow: 0 0 18px rgba(34,211,238,.38);
+}
+
+.school-header::after {
+    content: "";
+    position: absolute;
+    width: 240px;
+    height: 240px;
+    right: -110px;
+    top: -135px;
+    border-radius: 50%;
+    border: 1px solid rgba(34,211,238,.08);
+    box-shadow: 0 0 60px rgba(34,211,238,.05);
+}
+
+.school-header img {
+    filter: drop-shadow(0 0 18px rgba(45,212,191,.18));
+}
+
+.school-title {
+    color: #f4fffe !important;
+    font-weight: 850;
+    font-size: 16px;
+    margin: 0;
+    text-shadow: 0 0 24px rgba(255,255,255,.05);
+}
+
+.school-subtitle {
+    color: #8fdad0 !important;
+    font-size: 11px;
+    margin-top: 6px;
+    font-weight: 600;
+}
+
+/* ---------- GLASS / AI CARDS ---------- */
+.mode-card, .mapel-card, .guru-card,
+.section-card, .section-card-dark,
+.kpi-card, .sidebar-panel {
+    position: relative;
+    overflow: hidden;
+    border-radius: 20px;
+}
+
+.mode-card, .mapel-card, .section-card, .kpi-card, .sidebar-panel {
+    border: 1px solid var(--rm-line) !important;
+    background:
+        linear-gradient(145deg, rgba(14,27,45,.94), rgba(8,17,31,.92)) !important;
+    box-shadow: var(--rm-shadow) !important;
+}
+
+.mode-card:hover, .mapel-card:hover, .guru-card:hover, .kpi-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(45,212,191,.27) !important;
+    box-shadow: 0 22px 55px rgba(0,0,0,.40), 0 0 28px rgba(45,212,191,.06) !important;
+}
+
+.mode-card {
+    min-height: 164px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 25px 20px;
+    transition: all .20s ease;
+}
+
+.mode-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--rm-cyan), var(--rm-teal));
+    box-shadow: 0 0 18px rgba(34,211,238,.30);
+}
+
+.mode-card h2 {
+    color: #efffff !important;
+    font-size: 23px !important;
+    margin: 9px 0 6px !important;
+}
+
+.mode-card p {
+    color: #8fa6bb !important;
+    font-size: 12px !important;
+    margin: 0 !important;
+}
+
+.mapel-card {
+    min-height: 130px;
+    padding: 20px 16px 16px;
+    transition: all .20s ease;
+}
+
+.mapel-card::after {
+    content: "AI LEARNING";
+    position: absolute;
+    right: 12px;
+    top: 11px;
+    font-size: 7px;
+    letter-spacing: .13em;
+    font-weight: 850;
+    color: #4e708a;
+}
+
+.mapel-card h4 {
+    margin: 9px 0 6px !important;
+    color: #eafaf8 !important;
+}
+
+.guru-card {
+    padding: 23px;
+    border: 1px solid rgba(96,165,250,.24) !important;
+    background:
+        radial-gradient(circle at 78% 18%, rgba(96,165,250,.15), transparent 26%),
+        radial-gradient(circle at 12% 100%, rgba(45,212,191,.12), transparent 26%),
+        linear-gradient(135deg, #071321 0%, #0b2238 65%, #0a3040 100%) !important;
+    box-shadow: var(--rm-shadow), 0 0 28px rgba(96,165,250,.05) !important;
+    color: #fff;
+}
+
+.guru-card h2 { color: #f4fbff !important; }
+.guru-card p { color: #aac1d4 !important; }
+
+/* ---------- BADGE ---------- */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 11px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    color: #d9fffb !important;
+    border: 1px solid rgba(45,212,191,.22);
+    background: rgba(45,212,191,.08);
+    box-shadow: inset 0 0 18px rgba(45,212,191,.03);
+}
+
+/* ---------- BUTTONS ---------- */
+.stButton > button,
+.stDownloadButton > button {
+    min-height: 46px;
+    border-radius: 13px !important;
+    border: 1px solid rgba(125,160,190,.16) !important;
+    font-size: 14px !important;
+    font-weight: 750 !important;
+    letter-spacing: -.01em;
+    color: #effffd !important;
+    background: linear-gradient(135deg, #0d2638, #0b1b2d) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,.25) !important;
+    transition: all .18s ease !important;
+}
+
+div.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #0f766e, #0ea5a1 58%, #0891b2) !important;
+    color: #f2ffff !important;
+    border-color: rgba(45,212,191,.34) !important;
+    box-shadow: 0 10px 28px rgba(14,165,162,.18), inset 0 1px 0 rgba(255,255,255,.08) !important;
+}
+
+.stButton > button:hover,
+.stDownloadButton > button:hover {
+    transform: translateY(-1px);
+    border-color: rgba(45,212,191,.34) !important;
+    box-shadow: 0 14px 28px rgba(0,0,0,.35), 0 0 22px rgba(45,212,191,.09) !important;
+}
+
+div.stButton > button[kind="primary"]:hover {
+    background: linear-gradient(135deg, #0f8f84, #0ea5a1 58%, #06b6d4) !important;
+}
+
+/* ---------- INPUTS / SELECTS ---------- */
+div[data-baseweb="input"] > div,
+div[data-baseweb="select"] > div,
+textarea,
+input {
+    border-radius: 12px !important;
+    border: 1px solid rgba(126,158,188,.18) !important;
+    background: #0a1626 !important;
+    color: #e8f7f6 !important;
+    box-shadow: inset 0 0 20px rgba(0,0,0,.14) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: #667e95 !important;
+}
+
+div[data-baseweb="select"] * {
+    color: #e8f7f6 !important;
+}
+
+/* Dropdown menu / popovers */
+ul[role="listbox"],
+[role="listbox"],
+[data-baseweb="popover"] > div,
+[data-baseweb="menu"] {
+    background: #0a1626 !important;
+    color: #e8f7f6 !important;
+    border: 1px solid rgba(126,158,188,.18) !important;
+}
+
+/* ---------- SIDEBAR ---------- */
+section[data-testid="stSidebar"] {
+    background:
+        radial-gradient(circle at 15% 0%, rgba(34,211,238,.08), transparent 28%),
+        linear-gradient(180deg, #06101d 0%, #07101a 100%) !important;
+    border-right: 1px solid rgba(126,158,188,.10) !important;
+}
+
+section[data-testid="stSidebar"] .block-container {
+    padding: 1rem .9rem 1.5rem;
+}
+
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+    color: var(--rm-text-soft) !important;
+}
+
+.sidebar-brand {
+    padding: 17px;
+    border-radius: 18px;
+    border: 1px solid rgba(45,212,191,.20);
+    background:
+        radial-gradient(circle at 80% 10%, rgba(34,211,238,.10), transparent 30%),
+        linear-gradient(135deg, #071321, #0c2033);
+    box-shadow: 0 15px 35px rgba(0,0,0,.28);
+    color: #fff;
+}
+
+.sidebar-brand .name { font-size: 16px; font-weight: 850; color: #f3ffff !important; }
+.sidebar-brand .sub { color: #8fc9c2 !important; font-size: 10px; margin-top: 3px; }
+
+.sidebar-panel {
+    padding: 13px 14px;
+    margin-bottom: 12px;
+}
+
+/* ---------- TABS ---------- */
+button[data-baseweb="tab"] {
+    color: #8095a9 !important;
+    background: transparent !important;
+    font-weight: 750 !important;
+    border-radius: 11px 11px 0 0 !important;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: #d8fffb !important;
+}
+
+[data-baseweb="tab-highlight"] {
+    background: linear-gradient(90deg, var(--rm-cyan), var(--rm-teal)) !important;
+    box-shadow: 0 0 18px rgba(34,211,238,.24);
+}
+
+/* ---------- KPI ---------- */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 12px;
+    margin: 12px 0 18px;
+}
+
+.kpi-card {
+    padding: 16px;
+}
+
+.kpi-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(45,212,191,.35), transparent);
+}
+
+.kpi-title {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .10em;
+    color: #70879d !important;
+    font-weight: 850;
+}
+
+.kpi-value {
+    font-size: 25px;
+    font-weight: 850;
+    line-height: 1.15;
+    margin-top: 5px;
+    color: #f0fffd !important;
+    text-shadow: 0 0 20px rgba(255,255,255,.03);
+}
+
+/* ---------- SECTION CARDS ---------- */
+.section-card {
+    padding: 18px;
+    margin-bottom: 14px;
+}
+
+.section-card-dark {
+    padding: 18px;
+    background:
+        radial-gradient(circle at 80% 10%, rgba(34,211,238,.10), transparent 25%),
+        linear-gradient(135deg, #071321, #0c2135) !important;
+    border: 1px solid rgba(45,212,191,.18) !important;
+    color: #fff !important;
+    box-shadow: var(--rm-shadow) !important;
+}
+
+.section-eyebrow {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: #5d7890 !important;
+    font-weight: 850;
+}
+
+.section-title {
+    margin-top: 3px;
+    font-size: 19px;
+    font-weight: 850;
+    color: #eafdfb !important;
+}
+
+/* ---------- DIVIDERS ---------- */
+hr, [data-testid="stDivider"] {
+    border-color: rgba(126,158,188,.10) !important;
+}
+
+/* ---------- METRICS ---------- */
+[data-testid="stMetric"] {
+    background: linear-gradient(145deg, rgba(12,28,46,.88), rgba(7,17,31,.92));
+    border: 1px solid rgba(126,158,188,.13);
+    border-radius: 16px;
+    padding: 10px 12px;
+}
+
+[data-testid="stMetricLabel"] {
+    color: #7690a6 !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: #effffb !important;
+}
+
+/* ---------- EXPANDERS / CONTAINERS ---------- */
+[data-testid="stExpander"] {
+    border: 1px solid rgba(126,158,188,.14) !important;
+    border-radius: 16px !important;
+    background: rgba(8,18,31,.74) !important;
+}
+
+[data-testid="stExpander"] details summary {
+    color: #eaf8f6 !important;
+}
+
+/* ---------- ALERTS ---------- */
+[data-testid="stAlert"] {
+    background: rgba(10,23,39,.86) !important;
+    border: 1px solid rgba(126,158,188,.14) !important;
+    color: #dcefeb !important;
+}
+
+/* ---------- PROGRESS ---------- */
+[data-testid="stProgressBar"] > div > div > div > div {
+    background: linear-gradient(90deg, #0ea5a1, #22d3ee) !important;
+    box-shadow: 0 0 16px rgba(34,211,238,.20);
+}
+
+/* ---------- RADIO / CHECKBOX / TOGGLE ---------- */
+[data-testid="stRadio"] label,
+[data-testid="stCheckbox"] label,
+[data-testid="stToggle"] label {
+    color: #c7d8e5 !important;
+}
+
+/* ---------- FILE UPLOADER ---------- */
+[data-testid="stFileUploaderDropzone"] {
+    border: 1px dashed rgba(45,212,191,.22) !important;
+    background: rgba(7,18,31,.70) !important;
+    border-radius: 16px !important;
+}
+
+/* ---------- SCROLLBAR ---------- */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #1d425c #07111d;
+}
+
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: #07111d; }
+*::-webkit-scrollbar-thumb {
+    background: #1d425c;
+    border-radius: 999px;
+    border: 2px solid #07111d;
+}
+
+/* ---------- LIVE DOTS ---------- */
+@keyframes pulse-ai {
+    0%,100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(34,211,238,.22); }
+    50% { opacity: .62; transform: scale(.90); box-shadow: 0 0 0 7px rgba(34,211,238,0); }
+}
+
+.blinking-dot-red, .blinking-dot-green {
+    display: inline-block;
+    animation: pulse-ai 1.8s ease-in-out infinite;
+    vertical-align: middle;
+}
+
+/* ---------- MOBILE ---------- */
+@media (max-width: 820px) {
+    .block-container {
+        padding-left: .78rem;
+        padding-right: .78rem;
     }
     .school-header {
-        background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
-        border: 1px solid #059669;
-        border-radius: 12px;
-        padding: 16px;
-        text-align: center;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 20px rgba(5, 150, 105, 0.15);
+        border-radius: 18px;
+        padding: 18px 14px;
     }
-    .school-title { color: #ffffff; font-weight: 800; font-size: 13px; margin: 0; }
-    .school-subtitle { color: #6ee7b7; font-size: 11px; margin-top: 4px; font-weight: 500; }
-    .stButton>button { width: 100%; min-height: 48px; font-size: 16px !important; border-radius: 8px !important; }
-    
-    /* Paksa Warna Tombol Utama Menjadi Hijau Emerald MANTAP */
-    div.stButton > button[kind="primary"],
-    div.stButton > button {
-        background-color: #059669 !important;
-        background-image: none !important;
-        color: #ffffff !important;
-        border: 1px solid #047857 !important;
-        width: 100%;
-        min-height: 48px;
-        font-size: 16px !important;
-        font-weight: 600 !important;
-        border-radius: 8px !important;
-        transition: all 0.3s ease;
+    .school-title { font-size: 13px; }
+    .school-subtitle { font-size: 10px; }
+    .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0,1fr));
+        gap: 9px;
     }
-    
-    /* Efek Hover Tombol saat Diarahkan Kursor */
-    div.stButton > button[kind="primary"]:hover,
-    div.stButton > button:hover {
-        background-color: #047857 !important;
-        border-color: #065f46 !important;
-        box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4) !important;
+    .kpi-value { font-size: 20px; }
+    .mode-card {
+        min-height: 140px;
+        padding: 20px 12px;
     }
-
-    .guru-card {
-        background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%);
-        color: white;
-        border: 1px solid #3b82f6;
-        padding: 18px;
-        border-radius: 12px;
-        text-align: center;
-        margin-bottom: 15px;
-    }
-    </style>
+    .mode-card h2 { font-size: 20px !important; }
+    .mapel-card { min-height: 118px; }
+}
+</style>
 """, unsafe_allow_html=True)
 
 # Helper Base64 Image
@@ -209,13 +666,11 @@ KISI_KISI_OMI = {
 # Header Utama
 st.markdown(f"""
 <div class="school-header">
-    <div style="text-align: center;">
+    <div style="position:relative; z-index:2;">
+        <div style="font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:#8fd4ca; font-weight:800; margin-bottom:8px;">AI LEARNING INTELLIGENCE PLATFORM</div>
         {img_mantap_html}
-    </div>
-    <div class="school-title">MA DAN MTs AL IRSYAD AL ISLAMIYYAH BONDOWOSO</div>
-    <div class="school-subtitle">
-        Madrasah Aliyah dan Tsanawiyah Al Irsyad Putri Bondowoso (MANTAP) &nbsp;•&nbsp; 
-        <span style="color: #6ee7b7; font-weight: 600;">Powered by RoboMANTAP-AI (Assistant Intelligence)</span>
+        <div class="school-title">MA DAN MTs AL IRSYAD AL ISLAMIYYAH BONDOWOSO</div>
+        <div class="school-subtitle">MANTAP • RoboMANTAP-AI • Engineered by U.Project Nexus</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -223,13 +678,12 @@ st.markdown(f"""
 # Sidebar Control
 with st.sidebar:
     st.markdown("""
-    <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 16px; border-radius: 12px; border: 1px solid #059669; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-        <div style="font-size: 26px; margin-bottom: 4px;">🧕🏼</div>
-        <div style="color: #ffffff; font-weight: 700; font-size: 16px; letter-spacing: 0.5px;">RoboMANTAP-AI</div>
-        <div style="color: #6ee7b7; font-size: 11px; font-weight: 500; margin-bottom: 6px;">Assistant Intelligence System</div>
-        <div style="font-size: 10px; color: #a7f3d0; opacity: 0.85; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 4px; font-style: italic;">Engineered by U.Project Nexus</div>
+    <div class="sidebar-brand">
+        <div style="font-size:22px; margin-bottom:5px;">🧕🏼</div>
+        <div class="name">RoboMANTAP-AI</div>
+        <div class="sub">Assistant Intelligence System</div>
+        <div style="margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.12); font-size:9px; color:#91b9b3; letter-spacing:.08em; text-transform:uppercase;">Engineered by U.Project Nexus</div>
     </div>
-
     """, unsafe_allow_html=True)
     # -------------------------------------------------------------------------
     # A. TAMPILAN SIDEBAR JIKA BERADA DI DASHBOARD GURU (PANEL FILTER)
@@ -433,15 +887,19 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
 # ==============================================================================
 if st.session_state.page == "landing":
 
-    st.markdown("<h3 style='text-align: center; font-size: 25px;'>🏆 BINA PRESTASI OMI 2026</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
-    st.write("---")
+    st.markdown("""<div style='text-align:center; margin: 10px 0 18px;'>
+        <div style='font-size:10px; font-weight:800; letter-spacing:.16em; color:#0f9f82; text-transform:uppercase;'>WELCOME TO MANTAP LEARNING SPACE</div>
+        <div style='font-size:32px; font-weight:900; color:#0b1f3a; margin-top:4px;'>Bina Prestasi OMI 2026</div>
+        <div style='font-size:13px; color:#6b7b8f; max-width:620px; margin:8px auto 0;'>Pembinaan olimpiade dengan pengalaman belajar yang lebih personal, interaktif, dan didukung Artificial Intelligence.</div>
+    </div>""", unsafe_allow_html=True)
+    st.write("")
 
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("""
         <div class="mode-card">
-            <h2>🏫 TINGKAT MTs</h2>
+            <div class="section-eyebrow">Learning Track</div>
+            <h2>🏫 Tingkat MTs</h2>
             <p>Madrasah Tsanawiyah Al-Irsyad Putri</p>
         </div>
         """, unsafe_allow_html=True)
@@ -453,7 +911,8 @@ if st.session_state.page == "landing":
     with col2:
         st.markdown("""
         <div class="mode-card">
-            <h2>🏛️ TINGKAT MA</h2>
+            <div class="section-eyebrow">Learning Track</div>
+            <h2>🏛️ Tingkat MA</h2>
             <p>Madrasah Aliyah Al-Irsyad Putri</p>
         </div>
         """, unsafe_allow_html=True)
@@ -463,7 +922,7 @@ if st.session_state.page == "landing":
             st.rerun()
 
     st.write("---")
-    st.markdown("#### 🧕🏼 Portal GuruMANTAP")
+    st.markdown("""<div style='margin:24px 0 10px; text-align:center;'><div class='section-eyebrow'>Teacher Intelligence Center</div><div class='section-title'>Portal GuruMANTAP</div></div>""", unsafe_allow_html=True)
     st.markdown("""
     <div class="guru-card">
         <h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
@@ -479,7 +938,7 @@ if st.session_state.page == "landing":
 # 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
 # ==============================================================================
 elif st.session_state.page == "guru_login":
-    st.subheader("🔒 Akses Portal GuruMANTAP")
+    st.markdown("""<div class='section-card'><div class='section-eyebrow'>SECURE TEACHER ACCESS</div><div class='section-title'>🔒 Portal GuruMANTAP</div><div style='margin-top:6px; color:#6b7b8f; font-size:12px;'>Pusat kontrol pembinaan, monitoring sesi, dan AI tools untuk guru.</div></div>""", unsafe_allow_html=True)
 
     st.markdown("""
     <div style="background-color: rgba(28, 131, 225, 0.1); border-left: 4px solid #1c83e1; padding: 10px 12px; border-radius: 6px; font-size: 10px; color: var(--text-color); margin-bottom: 15px;">
@@ -501,8 +960,8 @@ elif st.session_state.page == "guru_dashboard":
         st.warning("Akses Ditolak.")
         st.stop()
 
-    st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
-    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕Bank Soal", "📲 WA Automation"])
+    st.markdown("""<div style='margin-bottom:12px;'><div class='section-eyebrow'>TEACHER INTELLIGENCE CENTER</div><div style='font-size:29px; font-weight:900; color:#0b1f3a;'>🖥️ Dashboard GuruMANTAP</div><div style='font-size:12px; color:#6b7b8f; margin-top:4px;'>Monitor • Create • Analyze • Improve</div></div>""", unsafe_allow_html=True)
+    tab1, tab2, tab3 = st.tabs(["🟢 Live Monitoring", "📚 Bank Soal", "📲 WA Automation"])
     with tab1:
         st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Evaluasi Pembinaan OMI</p>", unsafe_allow_html=True)
 
@@ -975,7 +1434,11 @@ elif st.session_state.page == "guru_dashboard":
 # 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
 # ==============================================================================
 elif st.session_state.page == "select_mapel":
-    st.markdown(f"### 📚 Pilih Bidang OMI 2026 -<br><span style='color: #059669; display: inline-block;'>{st.session_state.jenjang}</span>", unsafe_allow_html=True)
+    st.markdown(f"""<div class='section-card'>
+        <div class='section-eyebrow'>OMI 2026 • STUDENT LEARNING</div>
+        <div class='section-title'>📚 Pilih Bidang Pembinaan</div>
+        <div style='margin-top:5px; color:#6b7b8f; font-size:12px;'>{st.session_state.jenjang}</div>
+    </div>""", unsafe_allow_html=True)
     if st.button("⬅️ Kembali Pilih Jenjang"):
         st.session_state.page = "landing"
         st.rerun()
@@ -1001,14 +1464,11 @@ elif st.session_state.page == "select_mapel":
 # 4. SETUP CBT & BIODATA SISWA
 # ==============================================================================
 elif st.session_state.page == "setup":
-    st.markdown(f"""
-    <div style="font-size: 23px; font-weight: bold; line-height: 1.4; margin-bottom: 10px;">
-        ⚙️ Persiapan CBT:<br>
-        <span style="font-size: 17px; color: #059669; font-weight: 600;">
-            {st.session_state.mapel} ({st.session_state.jenjang})
-        </span>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<div class='section-card-dark'>
+        <div style='font-size:9px; text-transform:uppercase; letter-spacing:.14em; color:#91cfc7; font-weight:800;'>PREPARE YOUR SESSION</div>
+        <div style='font-size:24px; font-weight:900; margin-top:4px;'>⚙️ Persiapan CBT</div>
+        <div style='font-size:13px; color:#c6ddd9; margin-top:5px;'>{st.session_state.mapel} • {st.session_state.jenjang}</div>
+    </div>""", unsafe_allow_html=True)
     if st.button("⬅️ Ganti Mata Pelajaran"):
         st.session_state.page = "select_mapel"
         st.rerun()
@@ -1079,14 +1539,13 @@ elif st.session_state.page == "quiz":
 
     col_h1, col_h2 = st.columns([8, 4])
     with col_h1:
-        st.subheader(f"📝 CBT OMI: {st.session_state.mapel} ({st.session_state.stage})")
-        st.caption(f"👤 Siswa: **{st.session_state.nama_siswa.strip()}**")
+        st.markdown(f"""<div class='section-eyebrow'>LIVE CBT SESSION • {st.session_state.stage}</div><div style='font-size:24px; font-weight:900; color:#0b1f3a;'>📝 {st.session_state.mapel}</div><div style='font-size:12px; color:#6b7b8f; margin-top:3px;'>👤 {st.session_state.nama_siswa.strip()}</div>""", unsafe_allow_html=True)
     with col_h2:
         st.progress((curr_idx + 1) / 10)
         st.caption(f"Soal **{curr_idx + 1}** dari **10**")
 
     st.write("---")
-    st.markdown(f"#### **Soal No. {curr_idx + 1}**")
+    st.markdown(f"""<div style='margin:8px 0 4px;'><span style='display:inline-flex; align-items:center; padding:6px 10px; border-radius:999px; background:#eaf8f5; color:#0b806a; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em;'>Question {curr_idx + 1}</span></div>""", unsafe_allow_html=True)
     st.markdown(q["question"])
     st.write("")
 
@@ -1178,7 +1637,11 @@ elif st.session_state.page == "quiz":
 # 6. SCORECARD & EVALUASI SESI
 # ==============================================================================
 elif st.session_state.page == "result":
-    st.subheader(f"📊 Evaluasi CBT: {st.session_state.mapel} ({st.session_state.jenjang})")
+    st.markdown(f"""<div class='section-card-dark'>
+        <div style='font-size:9px; text-transform:uppercase; letter-spacing:.14em; color:#91cfc7; font-weight:800;'>SESSION COMPLETE</div>
+        <div style='font-size:26px; font-weight:900;'>📊 Evaluasi CBT</div>
+        <div style='font-size:13px; color:#c6ddd9; margin-top:4px;'>{st.session_state.mapel} • {st.session_state.jenjang}</div>
+    </div>""", unsafe_allow_html=True)
     quiz_data = st.session_state.quiz_data
     user_answers = st.session_state.user_answers
 
@@ -1324,7 +1787,7 @@ elif st.session_state.page == "result":
             st.rerun()
 
     st.write("---")
-    st.markdown("### 📖 Pembahasan Rinci dari Pembina RoboMANTAP ")
+    st.markdown("""<div style='margin-top:20px;'><div class='section-eyebrow'>LEARNING REVIEW</div><div class='section-title'>📖 Pembahasan Rinci dari Pembina RoboMANTAP</div><div style='font-size:12px; color:#6b7b8f; margin-top:5px;'>Buka soal yang ingin dipelajari kembali. Pembahasan yang sudah dibuat tetap tersimpan selama sesi.</div></div>""", unsafe_allow_html=True)
     st.caption("💡 *Untuk meminta RoboMANTAP membahas nya, Klik pada masing-masing soal di bawah ini ya!* 😊")
     
     for idx, q in enumerate(quiz_data):
