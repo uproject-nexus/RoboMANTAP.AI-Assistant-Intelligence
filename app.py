@@ -56,293 +56,108 @@ components.html(
     height=0,
 )
 
-# ==============================================================================
-# MODERN PREMIUM UI — VISUAL LAYER ONLY
-# Core logic, AI engine, database, scoring, session flow dan query TIDAK DIUBAH.
-# ==============================================================================
+# Custom Styling 
 st.markdown("""
-<style>
-:root {
-    --rm-navy: #0b1f3a;
-    --rm-navy-2: #12345a;
-    --rm-emerald: #0f9f82;
-    --rm-emerald-dark: #0b806a;
-    --rm-emerald-soft: #eaf8f5;
-    --rm-ink: #132238;
-    --rm-muted: #66758a;
-    --rm-line: rgba(15, 31, 55, .09);
-    --rm-surface: rgba(255,255,255,.92);
-    --rm-shadow: 0 14px 40px rgba(10, 31, 58, .10);
-}
+    <style>
 
-/* ---------- Global shell ---------- */
-[data-testid="stAppViewContainer"] {
-    background:
-        radial-gradient(circle at 8% 0%, rgba(15,159,130,.08), transparent 28%),
-        radial-gradient(circle at 92% 5%, rgba(11,31,58,.08), transparent 24%),
-        linear-gradient(180deg, #f7fafc 0%, #f3f7f9 100%);
-}
-[data-testid="stHeader"] {
-    background: rgba(247,250,252,.72);
-    backdrop-filter: blur(12px);
-}
-.block-container {
-    max-width: 1320px;
-    padding-top: 1.1rem;
-    padding-bottom: 2.5rem;
-}
+    @keyframes pulse-red {
+    0% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(239, 68, 68, 0.8)); }
+    50% { opacity: 0.35; transform: scale(0.92); filter: drop-shadow(0px 0px 1px rgba(239, 68, 68, 0.1)); }
+    100% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(239, 68, 68, 0.8)); }
+    }
+    
+    @keyframes pulse-green {
+        0% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(16, 185, 129, 0.8)); }
+        50% { opacity: 0.35; transform: scale(0.92); filter: drop-shadow(0px 0px 1px rgba(16, 185, 129, 0.1)); }
+        100% { opacity: 1; transform: scale(1); filter: drop-shadow(0px 0px 5px rgba(16, 185, 129, 0.8)); }
+    }
+    
+    .blinking-dot-red {
+        display: inline-block;
+        animation: pulse-red 1.8s ease-in-out infinite;
+        vertical-align: middle;
+    }
+    
+    .blinking-dot-green {
+        display: inline-block;
+        animation: pulse-green 1.8s ease-in-out infinite;
+        vertical-align: middle;
+    }
+    .mode-card {
+        background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%);
+        border: 1px solid rgba(5, 150, 105, 0.45);
+        padding: 14px 16px;
+        border-radius: 12px;
+        text-align: center;
+        margin-bottom: 8px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+    .mode-card h2 {
+        font-size: 18px !important;
+        font-weight: 700;
+        color: #ffffff !important;
+        margin-bottom: 4px !important;
+    }
+    .mode-card p {
+        color: #a7f3d0 !important;
+        font-size: 12px !important;
+        margin: 0 !important;
+        opacity: 0.9;
+    }
+    .mapel-card {
+        background-color: var(--secondary-background-color);
+        border: 1px solid rgba(5, 150, 105, 0.3);
+        padding: 16px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    .school-header {
+        background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
+        border: 1px solid #059669;
+        border-radius: 12px;
+        padding: 16px;
+        text-align: center;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 20px rgba(5, 150, 105, 0.15);
+    }
+    .school-title { color: #ffffff; font-weight: 800; font-size: 13px; margin: 0; }
+    .school-subtitle { color: #6ee7b7; font-size: 11px; margin-top: 4px; font-weight: 500; }
+    .stButton>button { width: 100%; min-height: 48px; font-size: 16px !important; border-radius: 8px !important; }
+    
+    /* Paksa Warna Tombol Utama Menjadi Hijau Emerald MANTAP */
+    div.stButton > button[kind="primary"],
+    div.stButton > button {
+        background-color: #059669 !important;
+        background-image: none !important;
+        color: #ffffff !important;
+        border: 1px solid #047857 !important;
+        width: 100%;
+        min-height: 48px;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        transition: all 0.3s ease;
+    }
+    
+    /* Efek Hover Tombol saat Diarahkan Kursor */
+    div.stButton > button[kind="primary"]:hover,
+    div.stButton > button:hover {
+        background-color: #047857 !important;
+        border-color: #065f46 !important;
+        box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4) !important;
+    }
 
-/* ---------- Typography ---------- */
-h1,h2,h3,h4,h5,h6,p,div,span,label,button,input,textarea {
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-h1,h2,h3,h4,h5,h6 { color: var(--rm-ink); letter-spacing: -.02em; }
-[data-testid="stCaptionContainer"] { color: var(--rm-muted); }
-
-/* ---------- Header ---------- */
-.school-header {
-    position: relative;
-    overflow: hidden;
-    padding: 22px 24px 20px;
-    margin: 2px 0 18px;
-    border-radius: 22px;
-    border: 1px solid rgba(255,255,255,.18);
-    background:
-        radial-gradient(circle at 12% 15%, rgba(15,159,130,.22), transparent 26%),
-        linear-gradient(135deg, #0a1d36 0%, #102b4c 56%, #173b61 100%);
-    box-shadow: 0 18px 42px rgba(9,25,46,.18);
-    text-align: center;
-}
-.school-header::after {
-    content: "";
-    position: absolute;
-    width: 180px;
-    height: 180px;
-    right: -70px;
-    top: -90px;
-    border-radius: 50%;
-    background: rgba(255,255,255,.06);
-}
-.school-header img {
-    filter: drop-shadow(0 8px 18px rgba(0,0,0,.18));
-}
-.school-title { color: #fff; font-weight: 800; font-size: 16px; margin: 0; }
-.school-subtitle { color: #b9d9d4; font-size: 11px; margin-top: 6px; font-weight: 500; }
-
-/* ---------- Cards ---------- */
-.mode-card, .mapel-card, .guru-card {
-    position: relative;
-    overflow: hidden;
-    border-radius: 20px;
-    box-shadow: var(--rm-shadow);
-    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
-}
-.mode-card:hover, .mapel-card:hover, .guru-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 18px 46px rgba(10,31,58,.14);
-}
-.mode-card {
-    min-height: 155px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding: 24px 20px;
-    border: 1px solid rgba(11,31,58,.08);
-    background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,251,253,.96));
-}
-.mode-card::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto auto 0;
-    width: 100%;
-    height: 4px;
-    background: linear-gradient(90deg, var(--rm-emerald), #57cbb7);
-}
-.mode-card h2 { color: var(--rm-navy) !important; font-size: 23px !important; margin: 8px 0 5px !important; }
-.mode-card p { color: var(--rm-muted) !important; font-size: 12px !important; margin: 0 !important; }
-
-.mapel-card {
-    min-height: 126px;
-    padding: 20px 16px 15px;
-    border: 1px solid var(--rm-line);
-    background: rgba(255,255,255,.94);
-}
-.mapel-card::after {
-    content: "AI LEARNING";
-    position: absolute;
-    right: 12px;
-    top: 11px;
-    font-size: 8px;
-    letter-spacing: .11em;
-    font-weight: 800;
-    color: #7a8b9f;
-}
-.mapel-card h4 { margin: 8px 0 6px !important; color: var(--rm-navy) !important; }
-
-.guru-card {
-    padding: 22px;
-    border: 1px solid rgba(15,159,130,.22);
-    background: linear-gradient(135deg, #0a1d36 0%, #123b5a 72%, #135a68 100%);
-    color: white;
-}
-.guru-card h2 { color: white !important; }
-.guru-card p { color: #c6ddd9 !important; }
-
-/* ---------- Pills / badges ---------- */
-.status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 7px 11px;
-    border-radius: 999px;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: .04em;
-}
-
-/* ---------- Buttons ---------- */
-.stButton > button, .stDownloadButton > button {
-    min-height: 46px;
-    border-radius: 12px !important;
-    border: 1px solid rgba(11,31,58,.10) !important;
-    font-size: 14px !important;
-    font-weight: 700 !important;
-    letter-spacing: -.01em;
-    box-shadow: 0 5px 14px rgba(10,31,58,.05);
-    transition: all .18s ease;
-}
-div.stButton > button[kind="primary"], div.stButton > button {
-    background: linear-gradient(135deg, var(--rm-emerald), #11b591) !important;
-    color: #fff !important;
-}
-div.stButton > button:hover, .stDownloadButton > button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 10px 22px rgba(15,159,130,.20) !important;
-}
-
-/* ---------- Inputs ---------- */
-div[data-baseweb="input"] > div, div[data-baseweb="select"] > div, textarea {
-    border-radius: 12px !important;
-    border-color: rgba(11,31,58,.12) !important;
-    background: rgba(255,255,255,.96) !important;
-}
-
-/* ---------- Sidebar ---------- */
-section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #f7fafc 0%, #edf5f5 100%);
-    border-right: 1px solid rgba(11,31,58,.08);
-}
-section[data-testid="stSidebar"] .block-container { padding: 1rem .9rem 1.5rem; }
-.sidebar-brand {
-    padding: 16px;
-    border-radius: 18px;
-    background: linear-gradient(135deg, #0a1d36, #153d5e);
-    border: 1px solid rgba(255,255,255,.08);
-    box-shadow: 0 12px 25px rgba(10,31,58,.14);
-    color: white;
-}
-.sidebar-brand .name { font-size: 16px; font-weight: 800; }
-.sidebar-brand .sub { color: #b8d9d4; font-size: 10px; margin-top: 3px; }
-.sidebar-panel {
-    padding: 13px 14px;
-    border: 1px solid var(--rm-line);
-    border-radius: 16px;
-    background: rgba(255,255,255,.78);
-    box-shadow: 0 7px 20px rgba(10,31,58,.04);
-    margin-bottom: 12px;
-}
-
-/* ---------- Tabs ---------- */
-button[data-baseweb="tab"] {
-    border-radius: 10px 10px 0 0;
-    font-weight: 700;
-}
-button[data-baseweb="tab"][aria-selected="true"] {
-    color: var(--rm-emerald-dark) !important;
-}
-
-/* ---------- KPI ---------- */
-.kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0,1fr));
-    gap: 12px;
-    margin: 12px 0 18px;
-}
-.kpi-card {
-    padding: 15px;
-    border-radius: 16px;
-    border: 1px solid var(--rm-line);
-    background: rgba(255,255,255,.88);
-    box-shadow: 0 8px 24px rgba(10,31,58,.05);
-}
-.kpi-title {
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: .09em;
-    color: #738398;
-    font-weight: 800;
-}
-.kpi-value {
-    font-size: 24px;
-    font-weight: 850;
-    line-height: 1.15;
-    margin-top: 5px;
-    color: var(--rm-navy);
-}
-
-/* ---------- Modern section cards ---------- */
-.section-card {
-    padding: 17px 18px;
-    border-radius: 18px;
-    border: 1px solid var(--rm-line);
-    background: rgba(255,255,255,.90);
-    box-shadow: 0 8px 24px rgba(10,31,58,.05);
-    margin-bottom: 14px;
-}
-.section-card-dark {
-    padding: 17px 18px;
-    border-radius: 18px;
-    background: linear-gradient(135deg, #0a1d36, #153d5e);
-    color: #fff;
-    box-shadow: 0 12px 28px rgba(10,31,58,.16);
-}
-.section-eyebrow {
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: .13em;
-    color: #7b8da3;
-    font-weight: 800;
-}
-.section-title {
-    margin-top: 3px;
-    font-size: 19px;
-    font-weight: 850;
-    color: var(--rm-navy);
-}
-
-/* ---------- Live status ---------- */
-@keyframes pulse-soft {
-    0%,100% { opacity: 1; transform: scale(1); }
-    50% { opacity: .42; transform: scale(.88); }
-}
-.blinking-dot-red, .blinking-dot-green {
-    display: inline-block;
-    animation: pulse-soft 1.7s ease-in-out infinite;
-    vertical-align: middle;
-}
-
-/* ---------- Mobile ---------- */
-@media (max-width: 820px) {
-    .block-container { padding-left: .85rem; padding-right: .85rem; }
-    .school-header { border-radius: 18px; padding: 18px 15px; }
-    .school-title { font-size: 14px; }
-    .kpi-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
-    .kpi-value { font-size: 20px; }
-    .mode-card { min-height: 138px; padding: 20px 12px; }
-    .mode-card h2 { font-size: 20px !important; }
-}
-</style>
+    .guru-card {
+        background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%);
+        color: white;
+        border: 1px solid #3b82f6;
+        padding: 18px;
+        border-radius: 12px;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    </style>
 """, unsafe_allow_html=True)
 
 # Helper Base64 Image
@@ -394,11 +209,13 @@ KISI_KISI_OMI = {
 # Header Utama
 st.markdown(f"""
 <div class="school-header">
-    <div style="position:relative; z-index:2;">
-        <div style="font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:#8fd4ca; font-weight:800; margin-bottom:8px;">AI LEARNING INTELLIGENCE PLATFORM</div>
+    <div style="text-align: center;">
         {img_mantap_html}
-        <div class="school-title">MA DAN MTs AL IRSYAD AL ISLAMIYYAH BONDOWOSO</div>
-        <div class="school-subtitle">MANTAP • RoboMANTAP-AI • Engineered by U.Project Nexus</div>
+    </div>
+    <div class="school-title">MA DAN MTs AL IRSYAD AL ISLAMIYYAH BONDOWOSO</div>
+    <div class="school-subtitle">
+        Madrasah Aliyah dan Tsanawiyah Al Irsyad Putri Bondowoso (MANTAP) &nbsp;•&nbsp; 
+        <span style="color: #6ee7b7; font-weight: 600;">Powered by RoboMANTAP-AI (Assistant Intelligence)</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -406,12 +223,13 @@ st.markdown(f"""
 # Sidebar Control
 with st.sidebar:
     st.markdown("""
-    <div class="sidebar-brand">
-        <div style="font-size:22px; margin-bottom:5px;">🧕🏼</div>
-        <div class="name">RoboMANTAP-AI</div>
-        <div class="sub">Assistant Intelligence System</div>
-        <div style="margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.12); font-size:9px; color:#91b9b3; letter-spacing:.08em; text-transform:uppercase;">Engineered by U.Project Nexus</div>
+    <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 16px; border-radius: 12px; border: 1px solid #059669; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div style="font-size: 26px; margin-bottom: 4px;">🧕🏼</div>
+        <div style="color: #ffffff; font-weight: 700; font-size: 16px; letter-spacing: 0.5px;">RoboMANTAP-AI</div>
+        <div style="color: #6ee7b7; font-size: 11px; font-weight: 500; margin-bottom: 6px;">Assistant Intelligence System</div>
+        <div style="font-size: 10px; color: #a7f3d0; opacity: 0.85; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 4px; font-style: italic;">Engineered by U.Project Nexus</div>
     </div>
+
     """, unsafe_allow_html=True)
     # -------------------------------------------------------------------------
     # A. TAMPILAN SIDEBAR JIKA BERADA DI DASHBOARD GURU (PANEL FILTER)
@@ -615,19 +433,15 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
 # ==============================================================================
 if st.session_state.page == "landing":
 
-    st.markdown("""<div style='text-align:center; margin: 10px 0 18px;'>
-        <div style='font-size:10px; font-weight:800; letter-spacing:.16em; color:#0f9f82; text-transform:uppercase;'>WELCOME TO MANTAP LEARNING SPACE</div>
-        <div style='font-size:32px; font-weight:900; color:#0b1f3a; margin-top:4px;'>Bina Prestasi OMI 2026</div>
-        <div style='font-size:13px; color:#6b7b8f; max-width:620px; margin:8px auto 0;'>Pembinaan olimpiade dengan pengalaman belajar yang lebih personal, interaktif, dan didukung Artificial Intelligence.</div>
-    </div>""", unsafe_allow_html=True)
-    st.write("")
+    st.markdown("<h3 style='text-align: center; font-size: 25px;'>🏆 BINA PRESTASI OMI 2026</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
+    st.write("---")
 
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("""
         <div class="mode-card">
-            <div class="section-eyebrow">Learning Track</div>
-            <h2>🏫 Tingkat MTs</h2>
+            <h2>🏫 TINGKAT MTs</h2>
             <p>Madrasah Tsanawiyah Al-Irsyad Putri</p>
         </div>
         """, unsafe_allow_html=True)
@@ -639,8 +453,7 @@ if st.session_state.page == "landing":
     with col2:
         st.markdown("""
         <div class="mode-card">
-            <div class="section-eyebrow">Learning Track</div>
-            <h2>🏛️ Tingkat MA</h2>
+            <h2>🏛️ TINGKAT MA</h2>
             <p>Madrasah Aliyah Al-Irsyad Putri</p>
         </div>
         """, unsafe_allow_html=True)
@@ -650,7 +463,7 @@ if st.session_state.page == "landing":
             st.rerun()
 
     st.write("---")
-    st.markdown("""<div style='margin:24px 0 10px; text-align:center;'><div class='section-eyebrow'>Teacher Intelligence Center</div><div class='section-title'>Portal GuruMANTAP</div></div>""", unsafe_allow_html=True)
+    st.markdown("#### 🧕🏼 Portal GuruMANTAP")
     st.markdown("""
     <div class="guru-card">
         <h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
@@ -666,7 +479,7 @@ if st.session_state.page == "landing":
 # 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
 # ==============================================================================
 elif st.session_state.page == "guru_login":
-    st.markdown("""<div class='section-card'><div class='section-eyebrow'>SECURE TEACHER ACCESS</div><div class='section-title'>🔒 Portal GuruMANTAP</div><div style='margin-top:6px; color:#6b7b8f; font-size:12px;'>Pusat kontrol pembinaan, monitoring sesi, dan AI tools untuk guru.</div></div>""", unsafe_allow_html=True)
+    st.subheader("🔒 Akses Portal GuruMANTAP")
 
     st.markdown("""
     <div style="background-color: rgba(28, 131, 225, 0.1); border-left: 4px solid #1c83e1; padding: 10px 12px; border-radius: 6px; font-size: 10px; color: var(--text-color); margin-bottom: 15px;">
@@ -688,8 +501,8 @@ elif st.session_state.page == "guru_dashboard":
         st.warning("Akses Ditolak.")
         st.stop()
 
-    st.markdown("""<div style='margin-bottom:12px;'><div class='section-eyebrow'>TEACHER INTELLIGENCE CENTER</div><div style='font-size:29px; font-weight:900; color:#0b1f3a;'>🖥️ Dashboard GuruMANTAP</div><div style='font-size:12px; color:#6b7b8f; margin-top:4px;'>Monitor • Create • Analyze • Improve</div></div>""", unsafe_allow_html=True)
-    tab1, tab2, tab3 = st.tabs(["🟢 Live Monitoring", "📚 Bank Soal", "📲 WA Automation"])
+    st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
+    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "🧕Bank Soal", "📲 WA Automation"])
     with tab1:
         st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Evaluasi Pembinaan OMI</p>", unsafe_allow_html=True)
 
@@ -1162,11 +975,7 @@ elif st.session_state.page == "guru_dashboard":
 # 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
 # ==============================================================================
 elif st.session_state.page == "select_mapel":
-    st.markdown(f"""<div class='section-card'>
-        <div class='section-eyebrow'>OMI 2026 • STUDENT LEARNING</div>
-        <div class='section-title'>📚 Pilih Bidang Pembinaan</div>
-        <div style='margin-top:5px; color:#6b7b8f; font-size:12px;'>{st.session_state.jenjang}</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(f"### 📚 Pilih Bidang OMI 2026 -<br><span style='color: #059669; display: inline-block;'>{st.session_state.jenjang}</span>", unsafe_allow_html=True)
     if st.button("⬅️ Kembali Pilih Jenjang"):
         st.session_state.page = "landing"
         st.rerun()
@@ -1192,11 +1001,14 @@ elif st.session_state.page == "select_mapel":
 # 4. SETUP CBT & BIODATA SISWA
 # ==============================================================================
 elif st.session_state.page == "setup":
-    st.markdown(f"""<div class='section-card-dark'>
-        <div style='font-size:9px; text-transform:uppercase; letter-spacing:.14em; color:#91cfc7; font-weight:800;'>PREPARE YOUR SESSION</div>
-        <div style='font-size:24px; font-weight:900; margin-top:4px;'>⚙️ Persiapan CBT</div>
-        <div style='font-size:13px; color:#c6ddd9; margin-top:5px;'>{st.session_state.mapel} • {st.session_state.jenjang}</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div style="font-size: 23px; font-weight: bold; line-height: 1.4; margin-bottom: 10px;">
+        ⚙️ Persiapan CBT:<br>
+        <span style="font-size: 17px; color: #059669; font-weight: 600;">
+            {st.session_state.mapel} ({st.session_state.jenjang})
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
     if st.button("⬅️ Ganti Mata Pelajaran"):
         st.session_state.page = "select_mapel"
         st.rerun()
@@ -1267,13 +1079,14 @@ elif st.session_state.page == "quiz":
 
     col_h1, col_h2 = st.columns([8, 4])
     with col_h1:
-        st.markdown(f"""<div class='section-eyebrow'>LIVE CBT SESSION • {st.session_state.stage}</div><div style='font-size:24px; font-weight:900; color:#0b1f3a;'>📝 {st.session_state.mapel}</div><div style='font-size:12px; color:#6b7b8f; margin-top:3px;'>👤 {st.session_state.nama_siswa.strip()}</div>""", unsafe_allow_html=True)
+        st.subheader(f"📝 CBT OMI: {st.session_state.mapel} ({st.session_state.stage})")
+        st.caption(f"👤 Siswa: **{st.session_state.nama_siswa.strip()}**")
     with col_h2:
         st.progress((curr_idx + 1) / 10)
         st.caption(f"Soal **{curr_idx + 1}** dari **10**")
 
     st.write("---")
-    st.markdown(f"""<div style='margin:8px 0 4px;'><span style='display:inline-flex; align-items:center; padding:6px 10px; border-radius:999px; background:#eaf8f5; color:#0b806a; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em;'>Question {curr_idx + 1}</span></div>""", unsafe_allow_html=True)
+    st.markdown(f"#### **Soal No. {curr_idx + 1}**")
     st.markdown(q["question"])
     st.write("")
 
@@ -1365,11 +1178,7 @@ elif st.session_state.page == "quiz":
 # 6. SCORECARD & EVALUASI SESI
 # ==============================================================================
 elif st.session_state.page == "result":
-    st.markdown(f"""<div class='section-card-dark'>
-        <div style='font-size:9px; text-transform:uppercase; letter-spacing:.14em; color:#91cfc7; font-weight:800;'>SESSION COMPLETE</div>
-        <div style='font-size:26px; font-weight:900;'>📊 Evaluasi CBT</div>
-        <div style='font-size:13px; color:#c6ddd9; margin-top:4px;'>{st.session_state.mapel} • {st.session_state.jenjang}</div>
-    </div>""", unsafe_allow_html=True)
+    st.subheader(f"📊 Evaluasi CBT: {st.session_state.mapel} ({st.session_state.jenjang})")
     quiz_data = st.session_state.quiz_data
     user_answers = st.session_state.user_answers
 
@@ -1515,7 +1324,7 @@ elif st.session_state.page == "result":
             st.rerun()
 
     st.write("---")
-    st.markdown("""<div style='margin-top:20px;'><div class='section-eyebrow'>LEARNING REVIEW</div><div class='section-title'>📖 Pembahasan Rinci dari Pembina RoboMANTAP</div><div style='font-size:12px; color:#6b7b8f; margin-top:5px;'>Buka soal yang ingin dipelajari kembali. Pembahasan yang sudah dibuat tetap tersimpan selama sesi.</div></div>""", unsafe_allow_html=True)
+    st.markdown("### 📖 Pembahasan Rinci dari Pembina RoboMANTAP ")
     st.caption("💡 *Untuk meminta RoboMANTAP membahas nya, Klik pada masing-masing soal di bawah ini ya!* 😊")
     
     for idx, q in enumerate(quiz_data):
