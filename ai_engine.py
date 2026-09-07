@@ -455,21 +455,34 @@ def get_custom_quiz_from_db(kode_kuis: str):
         pass
     return None
 
-def update_progress_siswa(session_id: str, nama: str, jenjang: str, mapel: str, 
-                          soal_sekarang: int, detail_jawaban: list, status: str = "BERJALAN"):
+def update_progress_siswa(
+    session_id: str,
+    nama: str,
+    jenjang: str,
+    mapel: str,
+    soal_sekarang: int,
+    detail_jawaban: list,
+    status: str = "BERJALAN",
+    is_custom: bool = False  # <-- Parameter ini wajib ada
+):
     """
     Menyimpan atau memperbarui live status siswa ke database terpusat.
-    Parameter detail_jawaban berupa list [True, False, None, ...] sesuai jawaban per soal.
+    Dukungan skoring otomatis untuk CBT OMI (+4/-1) maupun Kuis Custom (Skala 100).
     """
     conn = init_db_connection()
-    if not conn: return
+    if not conn:
+        return
 
-    # Kalkulasi skor otomatis (Benar +4, Salah -1)
+    total_soal = len(detail_jawaban) if len(detail_jawaban) > 0 else 10
     jumlah_benar = sum(1 for x in detail_jawaban if x is True)
     jumlah_salah = sum(1 for x in detail_jawaban if x is False)
-    nilai_akhir = (jumlah_benar * 4) - (jumlah_salah * 1)
-    
-    # Konversi list boolean ke JSON string agar terbaca oleh PostgreSQL
+
+    # Kalkulasi skor sesuai tipe kuis
+    if is_custom:
+        nilai_akhir = int(round((jumlah_benar / total_soal) * 100)) if total_soal > 0 else 0
+    else:
+        nilai_akhir = (jumlah_benar * 4) - (jumlah_salah * 1)
+
     detail_json = json.dumps(detail_jawaban)
     query = """
     INSERT INTO sesi_ujian (
@@ -494,18 +507,21 @@ def update_progress_siswa(session_id: str, nama: str, jenjang: str, mapel: str,
 
     try:
         with conn.session as s:
-            s.execute(text(query), {
-                "id_sesi": session_id,
-                "nama": nama,
-                "jenjang": jenjang,
-                "mapel": mapel,
-                "soal": soal_sekarang,
-                "detail": detail_json,
-                "benar": jumlah_benar,
-                "salah": jumlah_salah,
-                "nilai": nilai_akhir,
-                "status": status
-            })
+            s.execute(
+                text(query),
+                {
+                    "id_sesi": session_id,
+                    "nama": nama,
+                    "jenjang": jenjang,
+                    "mapel": mapel,
+                    "soal": soal_sekarang,
+                    "detail": detail_json,
+                    "benar": jumlah_benar,
+                    "salah": jumlah_salah,
+                    "nilai": nilai_akhir,
+                    "status": status,
+                },
+            )
             s.commit()
     except Exception:
         pass
