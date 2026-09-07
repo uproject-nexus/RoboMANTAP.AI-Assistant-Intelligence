@@ -1146,16 +1146,35 @@ elif st.session_state.page == "guru_dashboard":
                 use_container_width=True,
             )
 
-            st.write("---")
+            st.markdown("#### 🚀 Terbitkan Kuis ke Siswa")
+
+            # 1. Inisialisasi kode default sekali saja agar tidak berubah saat rerun
+            if "default_quiz_code" not in st.session_state:
+                st.session_state.default_quiz_code = f"MNT-{uuid.uuid4().hex[:4].upper()}"
+
             col_pub1, col_pub2 = st.columns([2, 1])
             with col_pub1:
-                custom_code_input = st.text_input("🔑 Buat Kode Kuis Unik (opsional):", value=f"MNT-{uuid.uuid4().hex[:4].upper()}", max_chars=12)
+                # 2. Gunakan key="user_quiz_code" agar Streamlit mengunci input dari guru
+                st.text_input(
+                    "🔑 Buat Kode Kuis Unik (opsional):", 
+                    value=st.session_state.default_quiz_code, 
+                    max_chars=15,
+                    key="user_quiz_code",
+                    help="Ubah teks ini jika ingin membuat kode khusus (misal: MTK-KLS10)"
+                )
             with col_pub2:
                 st.write("")
                 st.write("")
                 if st.button("🚀 TERBITKAN KUIS CUSTOM", type="primary", use_container_width=True):
-                    clean_code = custom_code_input.strip().upper()
-                    if publish_custom_quiz_to_db(clean_code, custom_cfg, custom_quiz):
+                    # 3. Ambil nilai presisi dari input guru di session_state
+                    clean_code = st.session_state.user_quiz_code.strip().upper()
+                    
+                    if not clean_code:
+                        st.warning("⚠️ Kode kuis tidak boleh kosong!")
+                    elif publish_custom_quiz_to_db(clean_code, custom_cfg, custom_quiz):
+                        # Simpan status sukses dan perbarui default code untuk generasi kuis berikutnya
+                        st.session_state.last_published_code = clean_code
+                        st.session_state.default_quiz_code = f"MNT-{uuid.uuid4().hex[:4].upper()}"
                         st.success(f"🎉 Kuis Berhasil Diterbitkan! Bagikan Kode ini ke Siswa: **{clean_code}**")
                     else:
                         st.error("❌ Gagal menerbitkan kuis. Periksa koneksi Database.")
