@@ -437,7 +437,7 @@ def render_custom_timer(start_time_wib, timer_seconds):
     sisa_detik = timer_seconds - terpakai_detik
 
     if sisa_detik <= 0:
-        st.error("⏱️ Waktu Ujian Telah Habis! Menyerahkan jawaban otomatis...")
+        st.session_state.is_timeout = True  # Set penanda kehabisan waktu
         st.session_state.page = "result"
         st.rerun()
 
@@ -914,13 +914,24 @@ elif st.session_state.page == "guru_dashboard":
                                     st.markdown(f"**Analisis Siswa:** {safe_nama}")
                                     st.caption(f"Mapel: {row['mapel']} | Sesi Ke-{row['total_percobaan']}")
 
-                                    if isinstance(detail_list, list) and len(detail_list) == 10:
+                                    if isinstance(detail_list, list) and len(detail_list) > 0:
+                                        total_soal_sis = len(detail_list)
                                         b_cnt = sum(1 for x in detail_list if x is True)
                                         s_cnt = sum(1 for x in detail_list if x is False)
                                         k_cnt = sum(1 for x in detail_list if x is None)
-                                        pct = (b_cnt / 10) * 100
+                                        
+                                        # Deteksi Jenis Kuis untuk Perhitungan Persentase Presisi
+                                        is_custom_row = check_is_custom(row)
+                                        
+                                        if is_custom_row:
+                                            # Kuis Custom: Rasio Benar dari Total N Soal
+                                            pct = (b_cnt / total_soal_sis) * 100 if total_soal_sis > 0 else 0
+                                        else:
+                                            # CBT OMI: Rasio Skor Riil OMI terhadap Skor Maksimal (40 Poin)
+                                            skor_omi = (b_cnt * 4) - (s_cnt * 1)
+                                            pct = max(0, (skor_omi / 40) * 100) # Konversi proporsional OMI
 
-                                        # Kartu Mikro Ringkas (Sejajar Horizontal di HP)
+                                        # Display Kartu Ringkas
                                         st.markdown(f"""
                                         <div style="display: flex; gap: 6px; margin: 10px 0;">
                                             <div style="flex: 1; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
@@ -938,22 +949,18 @@ elif st.session_state.page == "guru_dashboard":
                                         </div>
                                         """, unsafe_allow_html=True)
 
-                                        # Kategori Kesiapan & Rekomendasi Pedagogis
+                                        # Kategori Kesiapan Pedagogis
                                         if pct >= 80:
                                             st.success(f"🌟 **Kategori: Siap Kompetisi ({pct:.0f}%)**")
-                                            st.markdown("**💡 Rekomendasi Pembinaan:**")
-                                            st.markdown("- Tingkatkan ke materi pengayaan HOTS tingkat Provinsi/Nasional\n- Siswa direkomendasikan masuk skuat utama pembinaan OMI")
+                                            st.markdown("**💡 Rekomendasi Pembinaan:**\n- Tingkatkan ke materi pengayaan HOTS\n- Siswa direkomendasikan masuk skuat utama")
                                         elif pct >= 40:
                                             st.warning(f"⚠️ **Kategori: Berkembang ({pct:.0f}%)**")
-                                            st.markdown("**💡 Rekomendasi Pembinaan:**")
-                                            st.markdown("- Lakukan pembahasan (*review*) khusus pada butir soal yang salah/kosong\n- Penguatan pemahaman konsep dasar masih perlu pematangan")
+                                            st.markdown("**💡 Rekomendasi Pembinaan:**\n- Lakukan pembahasan khusus pada butir soal yang salah/kosong\n- Penguatan pemahaman konsep dasar masih perlu pematangan")
                                         else:
                                             st.error(f"🌱 **Kategori: Perlu Intervensi ({pct:.0f}%)**")
-                                            st.markdown("**💡 Rekomendasi Pembinaan:**")
-                                            st.markdown("- Jadwalkan bimbingan intensif\n- Pelajari ulang modul pembahasan sebelum melakukan latihan berikutnya")
+                                            st.markdown("**💡 Rekomendasi Pembinaan:**\n- Jadwalkan bimbingan intensif\n- Pelajari ulang modul pembahasan sebelum latihan berikutnya")
                                     else:
-                                        st.info("Pengerjaan belum selesai!")
-                                
+                                        st.info("Pengerjaan belum dimulai!") 
                                 
                         except:
                             col_bar.write("-")
@@ -1449,17 +1456,7 @@ elif st.session_state.page == "setup_custom":
             st.session_state.page = "quiz"
             st.rerun()
 
-
-# ==============================================================================
-# 5. ENGINE TEST INTERAKTIF (CBT OMI & KUIS CUSTOM DINAMIS)
-# ==============================================================================
-# ==============================================================================
-# FRAGMENT TIMER SMOOTH (JALAN OTO DETIKAN TANPA INTERUPSI JAWABAN)
-# ==============================================================================
-
-
-# ==============================================================================
-# 5. ENGINE TEST INTERAKTIF
+# 5. ENGINE TEST KUIS
 # ==============================================================================
 elif st.session_state.page == "quiz":
     quiz_data = st.session_state.quiz_data
@@ -1596,6 +1593,10 @@ elif st.session_state.page == "result":
 
     title_prefix = "Kuis Custom" if is_custom else "CBT OMI"
     st.subheader(f"📊 Evaluasi {title_prefix}: {st.session_state.mapel} ({st.session_state.jenjang})")
+
+    if st.session_state.get("is_timeout", False):
+        st.warning("⏱️ **Waktu Ujian Telah Habis!** Sesi kamu otomatis dihentikan dan seluruh jawaban yang sempat terisi telah dievaluasi oleh sistem. Tetap semangat dan tingkatkan manajemen waktu di ujian berikutnya ya!")
+        st.session_state.is_timeout = False  # Reset flag
 
     benar, salah, kosong = 0, 0, 0
     detail = []
