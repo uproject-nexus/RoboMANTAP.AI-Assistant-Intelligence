@@ -1303,7 +1303,8 @@ elif st.session_state.page == "guru_dashboard":
                             mime="application/pdf",
                             use_container_width=True
                         )
-
+                        
+        st.write("---")
         st.markdown("""
         <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; margin-bottom: 15px;">
             <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
