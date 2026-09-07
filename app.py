@@ -486,7 +486,7 @@ if st.session_state.page == "landing":
     with col_c1:
         kode_masuk_input = st.text_input("Masukkan Kode Kuis GuruMANTAP:", placeholder="Masukkan Kode Kuis disini...", label_visibility="collapsed")
     with col_c2:
-        if st.button("Masuk Ujian ➔", key="btn_custom_enter", use_container_width=True, type="primary"):
+        if st.button("Masuk Kuis ➔", key="btn_custom_enter", use_container_width=True, type="primary"):
             if not kode_masuk_input.strip():
                 st.warning("⚠️ Masukkan kode kuisnya dulu ya!")
             else:
