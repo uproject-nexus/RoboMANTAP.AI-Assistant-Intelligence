@@ -492,13 +492,33 @@ if st.session_state.page == "landing":
             else:
                 pkg = get_custom_quiz_from_db(kode_masuk_input.strip())
                 if pkg:
-                    st.session_state.is_custom_quiz = True
-                    st.session_state.custom_pkg = pkg
-                    st.session_state.mapel = pkg['config'].get('mapel', 'Custom Quiz')
-                    st.session_state.jenjang = pkg['config'].get('jenjang', 'Umum')
-                    st.session_state.quiz_data = pkg['quiz']
-                    st.session_state.page = "setup_custom"
-                    st.rerun()
+                    cfg = pkg.get('config', {})
+                    
+                    # Pengecekan Masa Aktif Waktu (WIB)
+                    now_wib = datetime.utcnow() + timedelta(hours=7)
+                    active_from_str = cfg.get('active_from')
+                    active_until_str = cfg.get('active_until')
+                    
+                    is_valid = True
+                    if active_from_str and active_until_str:
+                        dt_from = datetime.fromisoformat(active_from_str)
+                        dt_until = datetime.fromisoformat(active_until_str)
+                        
+                        if now_wib < dt_from:
+                            st.error(f"⏳ **Kuis Belum Dibuka!**\n\nKuis baru dapat diakses pada pukul **{cfg.get('time_start_str', '--:--')} WIB**.")
+                            is_valid = False
+                        elif now_wib > dt_until:
+                            st.error(f"❌ **Kode Kuis Sudah Kedaluwarsa!**\n\nMasa aktif kuis ini telah berakhir pada pukul **{cfg.get('time_end_str', '--:--')} WIB**.")
+                            is_valid = False
+
+                    if is_valid:
+                        st.session_state.is_custom_quiz = True
+                        st.session_state.custom_pkg = pkg
+                        st.session_state.mapel = cfg.get('mapel', 'Custom Quiz')
+                        st.session_state.jenjang = cfg.get('jenjang', 'Umum')
+                        st.session_state.quiz_data = pkg['quiz']
+                        st.session_state.page = "setup_custom"
+                        st.rerun()
                 else:
                     st.error("❌ Kode Kuis tidak ditemukan! Periksa kembali kodenya ya")
 
