@@ -1286,6 +1286,80 @@ elif st.session_state.page == "setup":
                         st.error("Gagal membuat paket soal. Silakan klik tombol sekali lagi.")
 
 # ==============================================================================
+# 4b. SETUP KUIS CUSTOM & BIODATA SISWA (SAMPUL MASUK SISWA)
+# ==============================================================================
+elif st.session_state.page == "setup_custom":
+    pkg = st.session_state.get("custom_pkg", {})
+    cfg = pkg.get("config", {})
+    
+    st.markdown(f"""
+    <div style="font-size: 23px; font-weight: bold; line-height: 1.4; margin-bottom: 10px;">
+        ⚙️ Persiapan Ujian Custom Guru:<br>
+        <span style="font-size: 17px; color: #059669; font-weight: 600;">
+            {st.session_state.mapel} ({st.session_state.jenjang})
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("⬅️ Batal & Kembali ke Beranda Utama"):
+        st.session_state.page = "landing"
+        st.session_state.is_custom_quiz = False
+        st.rerun()
+
+    st.write("---")
+    st.markdown("#### 📝 Masukkan Data Diri Kamu")
+    st.session_state.nama_siswa = st.text_input(
+        "Nama Lengkap Siswa:", 
+        value=st.session_state.nama_siswa, 
+        placeholder="Contoh: Fulanah binti Fulan"
+    )
+    
+    st.write("---")
+    
+    # Ringkasan Parameter Kuis dari Guru
+    timer_sec = cfg.get("timer_seconds", 0)
+    timer_text = "Tanpa Batas Waktu" if timer_sec <= 0 else str(timedelta(seconds=timer_sec))
+    
+    st.subheader("📋 Informasi Kuis Custom")
+    st.markdown(f"""
+    * **Mata Pelajaran:** {cfg.get('mapel', '-')}
+    * **Materi:** {cfg.get('materi', '-')}
+    * **Jumlah Soal:** {len(st.session_state.quiz_data)} Soal
+    * **Tingkat Kesulitan:** {cfg.get('kesulitan', '-')}
+    * **Batas Waktu Ujian:** {timer_text}
+    """)
+    
+    st.write("")
+    if st.button("🚀 MULAI UJIAN CUSTOM SEKARANG!", type="primary", use_container_width=True):
+        nama_input = st.session_state.nama_siswa.strip()
+        jumlah_huruf = len([c for c in nama_input if c.isalpha()])
+        
+        if jumlah_huruf < 3:
+            st.error("⚠️ Masukkan nama lengkap yang valid!")
+        else:
+            # Inisialisasi Sesi & Timer WIB Presisi
+            st.session_state.session_id = str(uuid.uuid4())
+            st.session_state.user_answers = {}
+            st.session_state.current_index = 0
+            st.session_state.custom_timer_seconds = timer_sec
+            st.session_state.start_time_wib = datetime.utcnow() + timedelta(hours=7)
+            
+            # Sinkronisasi Awal Sesi ke Database Live Monitoring Guru
+            update_progress_siswa(
+                st.session_state.session_id, 
+                st.session_state.nama_siswa,
+                st.session_state.jenjang, 
+                st.session_state.mapel, 
+                1, 
+                [], 
+                "BERJALAN"
+            )
+            
+            # Pindah Langsung ke Engine CBT
+            st.session_state.page = "quiz"
+            st.rerun()
+
+# ==============================================================================
 # 5. ENGINE TEST INTERAKTIF (CBT OMI & KUIS CUSTOM DINAMIS)
 # ==============================================================================
 elif st.session_state.page == "quiz":
