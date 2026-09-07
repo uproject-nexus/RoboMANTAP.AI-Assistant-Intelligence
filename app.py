@@ -1362,6 +1362,28 @@ elif st.session_state.page == "setup_custom":
 # ==============================================================================
 # 5. ENGINE TEST INTERAKTIF (CBT OMI & KUIS CUSTOM DINAMIS)
 # ==============================================================================
+# ==============================================================================
+# FRAGMENT TIMER SMOOTH (JALAN OTO DETIKAN TANPA INTERUPSI JAWABAN)
+# ==============================================================================
+@st.fragment(run_every="1s")
+def render_custom_timer(start_time_wib, timer_seconds):
+    sekarang_wib = datetime.utcnow() + timedelta(hours=7)
+    terpakai_detik = int((sekarang_wib - start_time_wib).total_seconds())
+    sisa_detik = timer_seconds - terpakai_detik
+
+    if sisa_detik <= 0:
+        st.error("⏱️ Waktu Ujian Telah Habis! Menyerahkan jawaban otomatis...")
+        st.session_state.page = "result"
+        st.rerun()
+
+    sisa_m = max(0, sisa_detik // 60)
+    sisa_s = max(0, sisa_detik % 60)
+    st.error(f"⏳ **Sisa Waktu Ujian:** {sisa_m:02d}:{sisa_s:02d}")
+
+
+# ==============================================================================
+# 5. ENGINE TEST INTERAKTIF
+# ==============================================================================
 elif st.session_state.page == "quiz":
     quiz_data = st.session_state.quiz_data
     curr_idx = st.session_state.current_index
@@ -1383,25 +1405,14 @@ elif st.session_state.page == "quiz":
         st.progress((curr_idx + 1) / total_soal)
         st.caption(f"Soal **{curr_idx + 1}** dari **{total_soal}**")
 
-    # Anti-Cheat & Countdown Timer WIB (Format Ringkas Tanpa HTML Bocor)
+    # Anti-Cheat & Live Timer WIB Smooth
     if "start_time_wib" not in st.session_state:
         st.session_state.start_time_wib = datetime.utcnow() + timedelta(hours=7)
 
     timer_seconds = st.session_state.get("custom_timer_seconds", 0)
     if is_custom and timer_seconds > 0:
-        sekarang_wib = datetime.utcnow() + timedelta(hours=7)
-        terpakai_detik = int((sekarang_wib - st.session_state.start_time_wib).total_seconds())
-        sisa_detik = timer_seconds - terpakai_detik
+        render_custom_timer(st.session_state.start_time_wib, timer_seconds)
 
-        if sisa_detik <= 0:
-            st.warning("⏱️ Waktu Ujian Telah Habis! Menyerahkan jawaban otomatis...")
-            st.session_state.page = "result"
-            st.rerun()
-
-        sisa_m = sisa_detik // 60
-        sisa_s = sisa_detik % 60
-        st.error(f"⏳ **Sisa Waktu Ujian:** {sisa_m:02d}:{sisa_s:02d}")
-        
     st.write("---")
     st.markdown(f"#### **Soal No. {curr_idx + 1}**")
     st.markdown(q["question"])
@@ -1426,11 +1437,15 @@ elif st.session_state.page == "quiz":
                 is_correct = (u_ans == quiz_data[i]["correct_answer"])
                 detail.append(is_correct)
                 
-        # Contoh saat update jawaban di page == "quiz"
         update_progress_siswa(
-            st.session_state.session_id, st.session_state.nama_siswa,
-            st.session_state.jenjang, st.session_state.mapel, curr_idx + 1, detail, "BERJALAN",
-            is_custom=st.session_state.get("is_custom_quiz", False)
+            st.session_state.session_id,
+            st.session_state.nama_siswa,
+            st.session_state.jenjang,
+            st.session_state.mapel,
+            curr_idx + 1,
+            detail,
+            "BERJALAN",
+            is_custom=is_custom
         )
 
     st.write("---")
