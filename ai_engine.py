@@ -467,21 +467,20 @@ def update_progress_siswa(
     soal_sekarang: int,
     detail_jawaban: list,
     status: str = "BERJALAN",
-    is_custom: bool = False  # <-- Parameter ini wajib ada
+    is_custom: bool = False
 ):
-    """
-    Menyimpan atau memperbarui live status siswa ke database terpusat.
-    Dukungan skoring otomatis untuk CBT OMI (+4/-1) maupun Kuis Custom (Skala 100).
-    """
     conn = init_db_connection()
     if not conn:
         return
+
+    # Otomatis tandai mapel di DB jika ini adalah Kuis Custom
+    mapel_db = f"{mapel} (Custom)" if (is_custom and "(Custom)" not in mapel) else mapel
 
     total_soal = len(detail_jawaban) if len(detail_jawaban) > 0 else 10
     jumlah_benar = sum(1 for x in detail_jawaban if x is True)
     jumlah_salah = sum(1 for x in detail_jawaban if x is False)
 
-    # Kalkulasi skor sesuai tipe kuis
+    # Perhitungan Skor
     if is_custom:
         nilai_akhir = int(round((jumlah_benar / total_soal) * 100)) if total_soal > 0 else 0
     else:
@@ -517,7 +516,7 @@ def update_progress_siswa(
                     "id_sesi": session_id,
                     "nama": nama,
                     "jenjang": jenjang,
-                    "mapel": mapel,
+                    "mapel": mapel_db,
                     "soal": soal_sekarang,
                     "detail": detail_json,
                     "benar": jumlah_benar,
@@ -529,7 +528,7 @@ def update_progress_siswa(
             s.commit()
     except Exception:
         pass
-
+        
 #generate LKPD
 def generate_lkpd_content(mapel: str, kelas: str, topik: str):
     """
