@@ -1422,7 +1422,7 @@ elif st.session_state.page == "setup_custom":
     
     st.markdown(f"""
     <div style="font-size: 23px; font-weight: bold; line-height: 1.4; margin-bottom: 10px;">
-        ⚙️ Persiapan Ujian Custom Guru:<br>
+        ⚙️ Persiapan Kuis:<br>
         <span style="font-size: 17px; color: #059669; font-weight: 600;">
             {st.session_state.mapel} ({st.session_state.jenjang})
         </span>
@@ -1439,16 +1439,15 @@ elif st.session_state.page == "setup_custom":
     st.session_state.nama_siswa = st.text_input(
         "Nama Lengkap Siswa:", 
         value=st.session_state.nama_siswa, 
-        placeholder="Contoh: Fulanah binti Fulan"
+        placeholder="Masukkan Nama Lengkap Kamu disini..."
     )
     
-    st.write("---")
-    
+    st.write("---")  
     # Ringkasan Parameter Kuis dari Guru
     timer_sec = cfg.get("timer_seconds", 0)
     timer_text = "Tanpa Batas Waktu" if timer_sec <= 0 else str(timedelta(seconds=timer_sec))
     
-    st.subheader("📋 Informasi Kuis Custom")
+    st.subheader("📋 Informasi Kuis")
     st.markdown(f"""
     * **Mata Pelajaran:** {cfg.get('mapel', '-')}
     * **Materi:** {cfg.get('materi', '-')}
@@ -1458,7 +1457,7 @@ elif st.session_state.page == "setup_custom":
     """)
     
     st.write("")
-    if st.button("🚀 MULAI UJIAN CUSTOM SEKARANG!", type="primary", use_container_width=True):
+    if st.button("🚀 MULAI KUIS SEKARANG!", type="primary", use_container_width=True):
         nama_input = st.session_state.nama_siswa.strip()
         jumlah_huruf = len([c for c in nama_input if c.isalpha()])
         
@@ -1527,7 +1526,7 @@ elif st.session_state.page == "quiz":
     col_h1, col_h2 = st.columns([8, 4])
     with col_h1:
         if is_custom:
-            st.subheader(f"🛠️ Kuis Custom: {st.session_state.mapel}")
+            st.subheader(f"Kuis By GuruMANTAP: {st.session_state.mapel}")
         else:
             stage_label = st.session_state.get("stage", "Internal")
             st.subheader(f"📝 CBT OMI: {st.session_state.mapel} ({stage_label})")
