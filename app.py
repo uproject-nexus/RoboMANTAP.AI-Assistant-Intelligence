@@ -1369,18 +1369,21 @@ elif st.session_state.page == "quiz":
     q = quiz_data[curr_idx]
 
     is_custom = st.session_state.get("is_custom_quiz", False)
-    stage_label = st.session_state.get("stage", "Kuis Custom") if not is_custom else "Kuis Custom"
 
     col_h1, col_h2 = st.columns([8, 4])
     with col_h1:
-        title_prefix = "🛠️ Kuis Custom" if is_custom else "📝 CBT OMI"
-        st.subheader(f"{title_prefix}: {st.session_state.mapel} ({stage_label})")
+        if is_custom:
+            st.subheader(f"🛠️ Kuis Custom: {st.session_state.mapel}")
+        else:
+            stage_label = st.session_state.get("stage", "Internal")
+            st.subheader(f"📝 CBT OMI: {st.session_state.mapel} ({stage_label})")
+            
         st.caption(f"👤 Siswa: **{st.session_state.nama_siswa.strip()}**")
     with col_h2:
         st.progress((curr_idx + 1) / total_soal)
         st.caption(f"Soal **{curr_idx + 1}** dari **{total_soal}**")
 
-    # Anti-Cheat & Countdown Timer WIB (Khusus Kuis Custom Bertimer)
+    # Anti-Cheat & Countdown Timer WIB (Format Ringkas Tanpa HTML Bocor)
     if "start_time_wib" not in st.session_state:
         st.session_state.start_time_wib = datetime.utcnow() + timedelta(hours=7)
 
@@ -1397,8 +1400,8 @@ elif st.session_state.page == "quiz":
 
         sisa_m = sisa_detik // 60
         sisa_s = sisa_detik % 60
-        st.markdown(f"⏳ **Sisa Waktu:** `<span style='color:#ef4444; font-weight:800;'>{sisa_m:02d}:{sisa_s:02d}</span>`", unsafe_allow_html=True)
-
+        st.error(f"⏳ **Sisa Waktu Ujian:** {sisa_m:02d}:{sisa_s:02d}")
+        
     st.write("---")
     st.markdown(f"#### **Soal No. {curr_idx + 1}**")
     st.markdown(q["question"])
@@ -1423,9 +1426,11 @@ elif st.session_state.page == "quiz":
                 is_correct = (u_ans == quiz_data[i]["correct_answer"])
                 detail.append(is_correct)
                 
+        # Contoh saat update jawaban di page == "quiz"
         update_progress_siswa(
             st.session_state.session_id, st.session_state.nama_siswa,
-            st.session_state.jenjang, st.session_state.mapel, curr_idx + 1, detail, "BERJALAN"
+            st.session_state.jenjang, st.session_state.mapel, curr_idx + 1, detail, "BERJALAN",
+            is_custom=st.session_state.get("is_custom_quiz", False)
         )
 
     st.write("---")
@@ -1532,7 +1537,9 @@ elif st.session_state.page == "result":
         st.session_state.mapel,
         total_soal,
         detail,
-        "SELESAI"
+        "SELESAI",
+        is_custom=st.session_state.get("is_custom_quiz", 
+        False
     )
 
     # Ekstraksi Nama Panggilan Siswa
