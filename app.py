@@ -386,18 +386,73 @@ def clean_math_text(text: str) -> str:
     
 # Generate KUIS docx
 def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
-    """Membuat file Word (.docx) berformat rapi, rata kanan-kiri (Justify), dan garis pembatas penuh."""
+    """Membuat file Word (.docx) berformat LKPD resmi lengkap dengan logo, kop instansi, dan layout rapi."""
     doc = Document()
 
-    # Title Header
-    title_p = doc.add_paragraph()
-    title_run = title_p.add_run(f"PAKET KUIS: {config.get('mapel', 'Mata Pelajaran').upper()}")
-    title_run.bold = True
-    title_run.font.size = Pt(16)
-    title_run.font.color.rgb = RGBColor(6, 78, 59)
-    title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    header_table = doc.add_table(rows=1, cols=2)
+    header_table.autofit = False
+    
+    cells = header_table.rows[0].cells
+    cells[0].width = Inches(1.8)
+    cells[1].width = Inches(4.7)
+    
+    # Vertikal Center
+    cells[0].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+    cells[1].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
 
-    # Meta Info Kuis (Tabel 3 Kolom Lurus Sejajar)
+    # Kolom Kiri: Logo Instansi
+    p_logo = cells[0].paragraphs[0]
+    p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    logo_path = "logo.png"  # File logo.png di root directory
+    if os.path.exists(logo_path):
+        p_logo.add_run().add_picture(logo_path, width=Inches(1.5))
+    else:
+        # Fallback jika file logo belum diunggah
+        r_logo = p_logo.add_run("[LOGO MANTAP]")
+        r_logo.bold = True
+        r_logo.font.size = Pt(12)
+        r_logo.font.color.rgb = RGBColor(6, 78, 59)
+
+    # Kolom Kanan: Teks Kop Instansi
+    p_title = cells[1].paragraphs[0]
+    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_title.paragraph_format.space_after = Pt(2)
+    
+    r1 = p_title.add_run("LEMBAR KERJA PESERTA DIDIK (LKPD)\n")
+    r1.bold = True
+    r1.font.size = Pt(13)
+    r1.font.color.rgb = RGBColor(6, 78, 59) # Warna Hijau Edukasi
+    
+    r2 = p_title.add_run("Madrasah Aliyah dan Tsanawiyah Al-Irsyad Al-Islamiyah Putri Bondowoso\n")
+    r2.bold = True
+    r2.font.size = Pt(10.5)
+    
+    r3 = p_title.add_run("Tahun Ajaran: ..... / .....")
+    r3.italic = True
+    r3.font.size = Pt(9.5)
+    r3.font.color.rgb = RGBColor(100, 100, 100)
+
+    # --- 2. GARIS PEMBATAS HIJAU SOLID DI BAWAH KOP ---
+    p_div = doc.add_paragraph()
+    p_div.paragraph_format.space_before = Pt(4)
+    p_div.paragraph_format.space_after = Pt(10)
+    pBdr = parse_xml(
+        r'<w:pBdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        r'<w:bottom w:val="single" w:sz="18" w:space="1" w:color="064E3B"/>'
+        r'</w:pBdr>'
+    )
+    p_div._p.get_or_add_pPr().append(pBdr)
+
+    # --- 3. JUDUL PAKET KUIS ---
+    p_paket = doc.add_paragraph()
+    p_paket.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_paket.paragraph_format.space_after = Pt(10)
+    r_paket = p_paket.add_run(f"PAKET KUIS: {config.get('mapel', 'Mata Pelajaran').upper()}")
+    r_paket.bold = True
+    r_paket.font.size = Pt(13)
+    r_paket.font.color.rgb = RGBColor(6, 78, 59)
+
+    # --- 4. META INFO KUIS (Tabel 3 Kolom Lurus Sejajar) ---
     meta_items = [
         ("Jenjang / Kelas", f"{config.get('jenjang', '-')} ({config.get('kelas', '-')})"),
         ("Materi Utama", f"{clean_math_text(config.get('materi', '-'))}"),
@@ -434,23 +489,17 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
         p2.paragraph_format.space_after = Pt(2)
         row_cells[2].width = Inches(4.8)
 
-    # Garis Pembatas Solid Penuh Pas Ke Samping (Full Width Border)
-    p_div = doc.add_paragraph()
-    p_div.paragraph_format.space_before = Pt(8)
-    p_div.paragraph_format.space_after = Pt(14)
-    pBdr = parse_xml(
-        r'<w:pBdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
-        r'<w:bottom w:val="single" w:sz="18" w:space="1" w:color="064E3B"/>'
-        r'</w:pBdr>'
-    )
-    p_div._p.get_or_add_pPr().append(pBdr)
+    # Spasi Penghubung Pas menuju Soal (Tanpa Garis Pembatas Lagi)
+    p_space = doc.add_paragraph()
+    p_space.paragraph_format.space_before = Pt(12)
+    p_space.paragraph_format.space_after = Pt(4)
 
-    # Loop Soal & Pembahasan
+    # --- 5. LOOP SOAL & PEMBAHASAN ---
     for idx, item in enumerate(quiz_list, start=1):
         # Teks Soal (Justify / Rata Kanan-Kiri)
         clean_q = clean_math_text(item.get('question', ''))
         p_q = doc.add_paragraph()
-        p_q.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY  # Justify Alignment
+        p_q.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         q_run = p_q.add_run(f"Soal {idx}. {clean_q}")
         q_run.bold = True
         q_run.font.size = Pt(11)
@@ -479,7 +528,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
             clean_sol = clean_math_text(item.get('solution_basis'))
             p_sol = doc.add_paragraph()
             p_sol.paragraph_format.left_indent = Inches(0.25)
-            p_sol.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY  # Justify Alignment
+            p_sol.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             sol_label = p_sol.add_run("Pembahasan: ")
             sol_label.bold = True
             p_sol.add_run(clean_sol)
