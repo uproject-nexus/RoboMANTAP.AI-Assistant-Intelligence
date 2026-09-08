@@ -1499,9 +1499,9 @@ elif st.session_state.page == "guru_dashboard":
 
             with cqb:
                 custom_jumlah = st.number_input(
-                    "🔢 Jumlah Soal (Max 500 Soal)",
+                    "🔢 Jumlah Soal (Max 100 Soal)",
                     min_value=1,
-                    max_value=500,
+                    max_value=100,
                     value=int(custom_cfg.get("jumlah_soal", 25)),
                     step=1,
                 )
@@ -1693,7 +1693,6 @@ elif st.session_state.page == "guru_dashboard":
                     help="Ubah teks ini jika ingin membuat kode khusus (misal: MTK-KLS10)"
                 )
             with col_pub2:
-                st.write("")
                 st.write("")
                 if st.button("🚀 TERBITKAN KUIS CUSTOM", type="primary", use_container_width=True):
                     # 3. Ambil nilai presisi dari input guru di session_state
