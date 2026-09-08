@@ -683,7 +683,7 @@ elif st.session_state.page == "guru_dashboard":
 
         # Indikator Status Auto-Refresh
         if auto_refresh:
-            st.markdown('<p style="font-size: 12px; opacity: 0.8;"><span class="blinking-dot-green">🟢</span> <b>Status:</b> Live Aktif! memperbarui data setiap 3 detik</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-size: 12px; opacity: 0.8;"><span class="blinking-dot-green">🟢</span> <b>Status:</b> Live Aktif! memperbarui data setiap 10 detik</p>', unsafe_allow_html=True)
         else:
             st.caption("⏸️ **Status:** Live dimatikan (tampilan stabil, aman untuk membaca laporan RoboMANTAP)")
 
