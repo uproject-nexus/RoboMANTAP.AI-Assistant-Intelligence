@@ -322,7 +322,41 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-# Helper KUIS docx
+#helper KUIS docx
+def clean_math_text(text: str) -> str:
+    """Membersihkan notasi mentah LaTeX menjadi teks/Unicode bersih untuk Microsoft Word."""
+    if not text:
+        return ""
+    
+    # 1. Ubah pecahan \frac{a}{b} atau \tfrac{a}{b} menjadi bentuk (a/b)
+    text = re.sub(r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}', r'(\1/\2)', text)
+    
+    # 2. Hapus simbol pembungkus LaTeX ($)
+    text = text.replace("$", "")
+    
+    # 3. Ubah perintah LaTeX umum menjadi simbol Unicode Word
+    replacements = {
+        r"\times": "×",
+        r"\div": "÷",
+        r"\cdot": "·",
+        r"\log": "log",
+        r"\infty": "∞",
+        r"\pm": "±",
+        r"\leq": "≤",
+        r"\geq": "≥",
+        r"\neq": "≠",
+        "\\": "" # Hapus sisa backslash
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+        
+    # 4. Hapus sisa kurung kurawal yang tidak terpakai
+    text = text.replace("{", "").replace("}", "")
+    
+    # 5. Rapikan spasi ganda
+    return re.sub(r'\s+', ' ', text).strip()
+    
+# Generate KUIS docx
 def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     """Membuat file Word (.docx) berformat rapi dari draft kuis custom."""
     doc = Document()
@@ -332,7 +366,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     title_run = title_p.add_run(f"PAKET KUIS: {config.get('mapel', 'Mata Pelajaran').upper()}")
     title_run.bold = True
     title_run.font.size = Pt(16)
-    title_run.font.color.rgb = RGBColor(6, 78, 59) # Warna Hijau Edukasi
+    title_run.font.color.rgb = RGBColor(6, 78, 59)
     title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     # Meta Info Kuis
@@ -341,7 +375,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     meta_p.add_run(f"{config.get('jenjang', '-')} ({config.get('kelas', '-')})\n")
     
     meta_p.add_run(f"Materi Utama   : ").bold = True
-    meta_p.add_run(f"{config.get('materi', '-')}\n")
+    meta_p.add_run(f"{clean_math_text(config.get('materi', '-'))}\n")
     
     meta_p.add_run(f"Jumlah Soal    : ").bold = True
     meta_p.add_run(f"{len(quiz_list)} Soal | Durasi: {config.get('timer_h', 0)}j {config.get('timer_m', 0)}m\n")
@@ -354,36 +388,40 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
 
     # Daftar Soal & Kunci Jawaban
     for idx, item in enumerate(quiz_list, start=1):
-        # Pertanyaan
+        # Pertanyaan (Dibersihkan dari LaTeX)
+        clean_q = clean_math_text(item.get('question', ''))
         p_q = doc.add_paragraph()
-        q_run = p_q.add_run(f"Soal {idx}. {item.get('question', '')}")
+        q_run = p_q.add_run(f"Soal {idx}. {clean_q}")
         q_run.bold = True
         q_run.font.size = Pt(11)
         p_q.paragraph_format.space_before = Pt(8)
 
-        # Opsi Pilihan Jawaban
+        # Opsi Pilihan Jawaban (Dibersihkan dari LaTeX)
         for opt in item.get('options', []):
+            clean_opt = clean_math_text(opt)
             p_opt = doc.add_paragraph()
             p_opt.paragraph_format.left_indent = Inches(0.25)
-            p_opt.add_run(f"{opt}")
+            p_opt.add_run(f"{clean_opt}")
             p_opt.paragraph_format.space_after = Pt(2)
 
-        # Kunci Jawaban
+        # Kunci Jawaban (Dibersihkan dari LaTeX)
+        clean_ans = clean_math_text(item.get('correct_answer', ''))
         p_ans = doc.add_paragraph()
         p_ans.paragraph_format.left_indent = Inches(0.25)
         ans_label = p_ans.add_run("Kunci Jawaban: ")
         ans_label.bold = True
-        ans_val = p_ans.add_run(f"{item.get('correct_answer', '')}")
+        ans_val = p_ans.add_run(f"{clean_ans}")
         ans_val.bold = True
         ans_val.font.color.rgb = RGBColor(5, 150, 105)
 
-        # Pembahasan / Solution Basis
+        # Pembahasan (Dibersihkan dari LaTeX)
         if item.get('solution_basis'):
+            clean_sol = clean_math_text(item.get('solution_basis'))
             p_sol = doc.add_paragraph()
             p_sol.paragraph_format.left_indent = Inches(0.25)
             sol_label = p_sol.add_run("Pembahasan: ")
             sol_label.bold = True
-            p_sol.add_run(f"{item.get('solution_basis')}")
+            p_sol.add_run(f"{clean_sol}")
             p_sol.paragraph_format.space_after = Pt(12)
 
     # Output ke Byte Stream
