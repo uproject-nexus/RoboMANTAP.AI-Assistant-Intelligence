@@ -360,6 +360,8 @@ def clean_math_string(text: str) -> str:
     text = text.replace("{", "").replace("}", "")
     text = re.sub(r'\\([a-zA-Z]+)', r'\1', text).replace("\\", "")
     return re.sub(r'\s+', ' ', text).strip()
+    
+clean_math_text = clean_math_string
 
 def add_omml_fraction(paragraph, num_text: str, den_text: str):
     """Menyisipkan struktur Pecahan Tegak Resmi Microsoft Word (Equation)."""
@@ -495,7 +497,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     # --- 4. META INFO KUIS (Tabel 3 Kolom Lurus Sejajar) ---
     meta_items = [
         ("Jenjang / Kelas", f"{config.get('jenjang', '-')} ({config.get('kelas', '-')})"),
-        ("Materi Utama", f"{clean_math_text(config.get('materi', '-'))}"),
+        ("Materi Utama", f"{clean_math_string(config.get('materi', '-'))}"),
         ("Jumlah Soal", f"{len(quiz_list)} Soal | Durasi: {config.get('timer_h', 0)}j {config.get('timer_m', 0)}m"),
         ("Masa Aktif Kuis", f"{config.get('time_start_str', '--:--')} hingga {config.get('time_end_str', '--:--')} WIB")
     ]
