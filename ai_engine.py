@@ -625,7 +625,7 @@ def generate_custom_quiz_ai(
     
     ATURAN KUALITAS:
     1. Tepat {jumlah_soal} soal, jangan kurang dan jangan lebih.
-    2. Setiap soal memiliki tepat 4 opsi: A, B, C, D. KECUALI {tipe_soal} "ESSAY" berikan baris jawaban tulis, JANGAN berikan opsi jawaban. 
+    2. Setiap soal memiliki tepat 4 opsi: A, B, C, D.
     3. Hanya satu opsi yang benar.
     4. correct_answer harus persis sama dengan salah satu opsi lengkap.
     5. Hindari ambiguitas, data yang kurang, dan asumsi yang tidak disebutkan.
