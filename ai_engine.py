@@ -474,7 +474,7 @@ def update_progress_siswa(
         return
 
     # Otomatis tandai mapel di DB jika ini adalah Kuis Custom
-    mapel_db = f"{mapel} (Custom)" if (is_custom and "(Custom)" not in mapel) else mapel
+    mapel_db = f"{mapel} (Quiz)" if (is_custom and "(Quiz)" not in mapel) else mapel
 
     total_soal = len(detail_jawaban) if len(detail_jawaban) > 0 else 10
     jumlah_benar = sum(1 for x in detail_jawaban if x is True)
