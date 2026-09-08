@@ -1094,7 +1094,7 @@ elif st.session_state.page == "guru_dashboard":
 
         # Fragment Execution Logic
         if auto_refresh:
-            @st.fragment(run_every="3s")
+            @st.fragment(run_every="10s")
             def active_live_view():
                 render_monitoring_content()
             active_live_view()
