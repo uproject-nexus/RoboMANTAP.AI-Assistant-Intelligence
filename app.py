@@ -1696,6 +1696,38 @@ elif st.session_state.page == "guru_dashboard":
         st.caption("💡*Modul cetak PDF ini adalah versi demo. Tampilan cover, logo, dan struktur LKPD dapat ditingkatkan atau disesuaikan penuh berdasarkan permintaan pihak sekolah*")
         st.caption("💡 Pilih variasi model LKPD yang sesuai dengan kebutuhan cetak Anda:")
 
+        # --- CSS AGAR 3 TOMBOL TETAP SEJAJAR & TIDAK MELAR DI HP ---
+        st.markdown("""
+        <style>
+        @media (max-width: 640px) {
+            /* Paksa kontainer kolom tetap horizontal (1 baris) */
+            div[data-testid="stHorizontalBlock"] {
+                display: flex !important;
+                flex-direction: row !important;
+                gap: 6px !important;
+            }
+            /* Kunci lebar masing-masing kolom menjadi 33% */
+            div[data-testid="column"] {
+                width: 33.33% !important;
+                flex: 1 1 33.33% !important;
+                min-width: 0px !important;
+            }
+            /* Sesuaikan ukuran font & padding tombol khusus layar HP */
+            div[data-testid="column"] button p {
+                font-size: 10px !important;
+                white-space: nowrap !important;
+            }
+            div[data-testid="column"] button {
+                padding: 4px 2px !important;
+                min-height: 38px !important;
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # --- BARIS KOLOM KAMU (BARIS 1699) ---
+        col1, col2, col3 = st.columns(3)
+
         col1, col2, col3 = st.columns(3)
         # --- MODEL 1: CLASSIC COVER ---
         with col1:
