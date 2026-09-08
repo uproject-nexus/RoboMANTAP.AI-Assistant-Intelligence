@@ -10,6 +10,7 @@ import streamlit.components.v1 as components
 # from-import python-docx untuk generate Word dan Pdf berlogo
 from docx import Document
 from docx.oxml import parse_xml
+from docx.oxml.ns import nsdecls
 from reportlab.lib import colors
 from reportlab.lib.units import cm
 from reportlab.lib.pagesizes import A4
@@ -324,86 +325,96 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 #helper rapikan output KUIS docx
-def clean_math_text(text: str) -> str:
-    """
-    Mengonversi notasi LaTeX menjadi Unicode matematika bersih untuk MS Word (.docx).
-    Menghapus ampas perintah LaTeX (\left, \right, \dots, \frac) dan mengubah pecahan sederhana jadi tegak.
-    """
+def clean_math_string(text: str) -> str:
+    """Pembersih simbol & notasi matematika dasar untuk teks biasa."""
     if not text:
         return ""
     
-    # 1. Bersihkan pembungkus \left dan \right sebelum backslash dibuang
+    # 1. Bersihkan \left, \right, dan \dots
     text = re.sub(r'\\left\s*[\(\[\{\.\|]?', '(', text)
     text = re.sub(r'\\right\s*[\)\]\}\.\|]?', ')', text)
-    
-    # 2. Konversi Titik-Titik (\dots, \cdots, \ldots) menjadi '…'
     text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
 
-    # 3. Konversi Pecahan \frac{a}{b} -> Ubah angka sederhana jadi Pecahan Tegak (Unicode)
-    frac_map = {
-        "1/2": "½", "1/3": "⅓", "2/3": "⅔", "1/4": "¼", "3/4": "¾",
-        "1/5": "⅕", "1/6": "⅙", "1/8": "⅛", "2/5": "⅖", "3/5": "⅗"
-    }
-    
-    def repl_frac(match):
-        num = match.group(1).strip()
-        den = match.group(2).strip()
-        pair = f"{num}/{den}"
-        if pair in frac_map:
-            return frac_map[pair]
-        return f"({num}/{den})"
-        
-    text = re.sub(r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}', repl_frac, text)
-
-    # 4. Konversi Akar \sqrt{x} -> √(x)
+    # 2. Konversi Akar \sqrt{x}
     text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
     text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
 
-    # 5. Konversi Pangkat (^{...} atau ^-1, ^2) & Subscript (_{...})
+    # 3. Pangkat & Subscript Unicode
     sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
     sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
 
-    def repl_sup(match):
-        content = match.group(1) or match.group(2)
-        return content.translate(sup_map)
-    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', repl_sup, text)
+    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sup_map), text)
+    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sub_map), text)
 
-    def repl_sub(match):
-        content = match.group(1) or match.group(2)
-        return content.translate(sub_map)
-    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', repl_sub, text)
-
-    # 6. Kamus Simbol Matematika LaTeX Standar
+    # 4. Simbol Matematika
     replacements = {
-        r"\times": "×",
-        r"\cdot": "·",
-        r"\div": "÷",
-        r"\neq": "≠",
-        r"\leq": "≤",
-        r"\geq": "≥",
-        r"\pm": "±",
-        r"\infty": "∞",
-        r"\pi": "π",
-        r"\alpha": "α",
-        r"\beta": "β",
-        r"\theta": "θ",
-        r"\log": "log",
-        "$": "", # Hapus tanda $
+        r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
+        r"\leq": "≤", r"\geq": "≥", r"\pm": "±", r"\infty": "∞",
+        r"\pi": "π", r"\alpha": "α", r"\beta": "β", r"\theta": "θ", "$": ""
     }
-
     for old, new in replacements.items():
         text = text.replace(old, new)
 
-    # 7. Pembersihan Akhir Ampas Perintah LaTeX
-    text = re.sub(r'\\(frac|left|right|dots|cdots|ldots)', '', text)
+    # 5. Sapu bersih ampas backslash
     text = text.replace("left(", "(").replace("right)", ")").replace("dots", "…")
     text = text.replace("{", "").replace("}", "")
-    text = re.sub(r'\\([a-zA-Z]+)', r'\1', text)
-    text = text.replace("\\", "")
-
-    # 8. Rapikan Spasi & Kurung Ganda
-    text = text.replace("((", "(").replace("))", ")")
+    text = re.sub(r'\\([a-zA-Z]+)', r'\1', text).replace("\\", "")
     return re.sub(r'\s+', ' ', text).strip()
+
+def add_omml_fraction(paragraph, num_text: str, den_text: str):
+    """Menyisipkan struktur Pecahan Tegak Resmi Microsoft Word (Equation)."""
+    num_clean = clean_math_string(num_text)
+    den_clean = clean_math_string(den_text)
+    
+    omml_xml = (
+        f'<m:oMath {nsdecls("m")}>'
+        f'  <m:f>'
+        f'    <m:num><m:r><m:t>{num_clean}</m:t></m:r></m:num>'
+        f'    <m:den><m:r><m:t>{den_clean}</m:t></m:r></m:den>'
+        f'  </m:f>'
+        f'</m:oMath>'
+    )
+    paragraph._p.append(parse_xml(omml_xml))
+
+def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, color_rgb: RGBColor = None):
+    """Membagi paragraf: teks biasa jadi Run standar, \\frac/\\tfrac jadi Pecahan Tegak."""
+    if not text:
+        return
+
+    # Deteksi \frac{pembilang}{penyebut} atau \tfrac{pembilang}{penyebut}
+    frac_pattern = re.compile(r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}')
+    last_idx = 0
+
+    for match in frac_pattern.finditer(text):
+        start, end = match.span()
+        
+        # Cetak teks sebelum pecahan
+        if start > last_idx:
+            plain_part = clean_math_string(text[last_idx:start])
+            if plain_part:
+                run = paragraph.add_run(plain_part + " ")
+                run.bold = is_bold
+                if color_rgb:
+                    run.font.color.rgb = color_rgb
+
+        # Cetak Pecahan Tegak Word
+        add_omml_fraction(paragraph, match.group(1), match.group(2))
+        
+        # Tambah spasi tipis setelah pecahan
+        run_space = paragraph.add_run(" ")
+        run_space.bold = is_bold
+
+        last_idx = end
+
+    # Cetak sisa teks setelah pecahan terakhir
+    if last_idx < len(text):
+        plain_part = clean_math_string(text[last_idx:])
+        if plain_part:
+            run = paragraph.add_run(plain_part)
+            run.bold = is_bold
+            if color_rgb:
+                run.font.color.rgb = color_rgb
+
 
 # Generate KUIS docx
 def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
@@ -525,43 +536,37 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
 
     # --- 5. LOOP SOAL & PEMBAHASAN ---
     for idx, item in enumerate(quiz_list, start=1):
-        # Teks Soal (Justify / Rata Kanan-Kiri)
-        clean_q = clean_math_text(item.get('question', ''))
+        # 1. Soal
         p_q = doc.add_paragraph()
         p_q.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        q_run = p_q.add_run(f"Soal {idx}. {clean_q}")
-        q_run.bold = True
-        q_run.font.size = Pt(11)
         p_q.paragraph_format.space_before = Pt(8)
+        
+        # Cetak Nomor + Teks Soal (Pecahan Tegak Otomatis)
+        p_q.add_run(f"Soal {idx}. ").bold = True
+        append_text_with_fractions(p_q, item.get('question', ''), is_bold=True)
 
-        # Opsi Jawaban
+        # 2. Opsi Jawaban
         for opt in item.get('options', []):
-            clean_opt = clean_math_text(opt)
             p_opt = doc.add_paragraph()
             p_opt.paragraph_format.left_indent = Inches(0.25)
-            p_opt.add_run(clean_opt)
             p_opt.paragraph_format.space_after = Pt(2)
+            append_text_with_fractions(p_opt, opt)
 
-        # Kunci Jawaban
-        clean_ans = clean_math_text(item.get('correct_answer', ''))
+        # 3. Kunci Jawaban
         p_ans = doc.add_paragraph()
         p_ans.paragraph_format.left_indent = Inches(0.25)
-        ans_label = p_ans.add_run("Kunci Jawaban: ")
-        ans_label.bold = True
-        ans_val = p_ans.add_run(clean_ans)
-        ans_val.bold = True
-        ans_val.font.color.rgb = RGBColor(5, 150, 105)
+        p_ans.add_run("Kunci Jawaban: ").bold = True
+        append_text_with_fractions(p_ans, item.get('correct_answer', ''), is_bold=True, color_rgb=RGBColor(5, 150, 105))
 
-        # Pembahasan (Justify / Rata Kanan-Kiri)
+        # 4. Pembahasan
         if item.get('solution_basis'):
-            clean_sol = clean_math_text(item.get('solution_basis'))
             p_sol = doc.add_paragraph()
             p_sol.paragraph_format.left_indent = Inches(0.25)
             p_sol.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            sol_label = p_sol.add_run("Pembahasan: ")
-            sol_label.bold = True
-            p_sol.add_run(clean_sol)
+            p_sol.add_run("Pembahasan: ").bold = True
+            append_text_with_fractions(p_sol, item.get('solution_basis'))
             p_sol.paragraph_format.space_after = Pt(12)
+
 
     buffer = io.BytesIO()
     doc.save(buffer)
