@@ -860,7 +860,7 @@ elif st.session_state.page == "guru_dashboard":
                         <div class="kpi-value" style="color: #f59e0b;">{val_rata_omi} <span style="font-size: 11px; color: #9ca3af;">/ 40</span></div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-title">📊 Rata-rata Custom</div>
+                        <div class="kpi-title">📊 Rata-rata Quiz</div>
                         <div class="kpi-value" style="color: #10b981;">{val_rata_custom} <span style="font-size: 11px; color: #9ca3af;">/ 100</span></div>
                     </div>
                 </div>
