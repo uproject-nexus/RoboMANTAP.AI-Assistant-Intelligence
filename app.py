@@ -1593,6 +1593,7 @@ elif st.session_state.page == "guru_dashboard":
                         
                         st.download_button(
                             label="📥 Download LKPD",
+                            type="primary",
                             data=pdf_buffer,
                             file_name=f"LKPD_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}_RoboMANTAP.pdf",
                             mime="application/pdf",
