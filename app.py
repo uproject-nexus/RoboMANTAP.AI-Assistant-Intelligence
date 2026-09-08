@@ -1891,7 +1891,7 @@ elif st.session_state.page == "result":
     st.write("---")  
     if is_custom:
         # Tampilan Khusus Kuis Custom Guru (Satu Kali Pengerjaan)
-        st.info("✅ **Kuis Selesai!** Hasil pengerjaanmu telah berhasil disimpan dan diteruskan ke GuruMANTAP.")
+        st.info("✅ **Kuis Selesai!** Hasil pengerjaanmu telah berhasil disimpan dan diteruskan ke GuruMANTAP. Man jadda wajada! Terus berjuang dan semangat belajarnya ya!🌟")
         if st.button("🏠 Kembali ke Beranda Utama", type="primary", use_container_width=True):
             st.session_state.page = "landing"
             st.session_state.is_custom_quiz = False
