@@ -1499,9 +1499,9 @@ elif st.session_state.page == "guru_dashboard":
 
             with cqb:
                 custom_jumlah = st.number_input(
-                    "🔢 Jumlah Soal (Max 100 Soal)",
+                    "🔢 Jumlah Soal (Max 50 Soal)",
                     min_value=1,
-                    max_value=100,
+                    max_value=50,
                     value=int(custom_cfg.get("jumlah_soal", 25)),
                     step=1,
                 )
