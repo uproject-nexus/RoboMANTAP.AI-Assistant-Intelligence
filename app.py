@@ -330,23 +330,29 @@ def clean_math_string(text: str) -> str:
     if not text:
         return ""
     
-    # 1. Bersihkan \left, \right, dan \dots
-    text = re.sub(r'\\left\s*[\(\[\{\.\|]?', '(', text)
-    text = re.sub(r'\\right\s*[\)\]\}\.\|]?', ')', text)
+    # 1. Konversi Panah LaTeX SEBELUM memproses \left / \right
+    text = re.sub(r'\\(?:rightarrow|to)\b', '→', text)
+    text = re.sub(r'\\Rightarrow\b', '⇒', text)
+    text = re.sub(r'\\leftarrow\b', '←', text)
+    text = re.sub(r'\\leftrightarrow\b', '↔', text)
+
+    # 2. Bersihkan \left dan \right (Gunakan \b agar \rightarrow tidak terpotong)
+    text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
+    text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
     text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
 
-    # 2. Konversi Akar \sqrt{x}
+    # 3. Konversi Akar \sqrt{x}
     text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
     text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
 
-    # 3. Pangkat & Subscript Unicode
+    # 4. Pangkat & Subscript Unicode
     sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
     sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
 
     text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sup_map), text)
     text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sub_map), text)
 
-    # 4. Simbol Matematika
+    # 5. Simbol Matematika
     replacements = {
         r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
         r"\leq": "≤", r"\geq": "≥", r"\pm": "±", r"\infty": "∞",
@@ -355,7 +361,7 @@ def clean_math_string(text: str) -> str:
     for old, new in replacements.items():
         text = text.replace(old, new)
 
-    # 5. Sapu bersih ampas backslash
+    # 6. Sapu bersih ampas backslash
     text = text.replace("left(", "(").replace("right)", ")").replace("dots", "…")
     text = text.replace("{", "").replace("}", "")
     text = re.sub(r'\\([a-zA-Z]+)', r'\1', text).replace("\\", "")
