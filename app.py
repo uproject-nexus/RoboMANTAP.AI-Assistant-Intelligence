@@ -1122,7 +1122,7 @@ elif st.session_state.page == "guru_dashboard":
                     background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(2, 44, 34, 0.7) 100%);
                     border: 1px solid rgba(5, 150, 105, 0.35);
                     border-radius: 10px;
-                    padding: 10px 12px;
+                    padding: 5px 6px;
                     text-align: center;
                     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
                 }}
