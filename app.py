@@ -1552,7 +1552,7 @@ elif st.session_state.page == "guru_dashboard":
             st.caption(f"⏳ Durasi sesi: **{timer_label}**")
 
             submitted = st.form_submit_button(
-                "🤖 GENERATE RoboMANTAP QUIZ CUSTOM",
+                "🧕🏼 GENERATE RoboMANTAP QUIZ CUSTOM",
                 type="primary",
                 use_container_width=True,
             )
