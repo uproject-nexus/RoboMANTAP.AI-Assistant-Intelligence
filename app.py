@@ -11,6 +11,7 @@ import streamlit.components.v1 as components
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import parse_xml
 
 # Import python-docx untuk generate Word berlogo (ReportLab PDF)
 from reportlab.lib.pagesizes import A4
@@ -385,7 +386,7 @@ def clean_math_text(text: str) -> str:
     
 # Generate KUIS docx
 def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
-    """Membuat file Word (.docx) berformat rapi dan konsisten."""
+    """Membuat file Word (.docx) berformat rapi, rata kanan-kiri (Justify), dan garis pembatas penuh."""
     doc = Document()
 
     # Title Header
@@ -396,7 +397,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     title_run.font.color.rgb = RGBColor(6, 78, 59)
     title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    # Meta Info Kuis (Tabel Tanpa Border agar Titik Dua Sejajar Rapi)
+    # Meta Info Kuis (Tabel 3 Kolom Lurus Sejajar)
     meta_items = [
         ("Jenjang / Kelas", f"{config.get('jenjang', '-')} ({config.get('kelas', '-')})"),
         ("Materi Utama", f"{clean_math_text(config.get('materi', '-'))}"),
@@ -418,7 +419,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
         p0.paragraph_format.space_after = Pt(2)
         row_cells[0].width = Inches(1.5)
         
-        # Kolom 2: Titik Dua (Lurus Sejajar)
+        # Kolom 2: Titik Dua
         p1 = row_cells[1].paragraphs[0]
         r1 = p1.add_run(":")
         r1.bold = True
@@ -433,18 +434,23 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
         p2.paragraph_format.space_after = Pt(2)
         row_cells[2].width = Inches(4.8)
 
-    # Garis Pembatas
+    # Garis Pembatas Solid Penuh Pas Ke Samping (Full Width Border)
     p_div = doc.add_paragraph()
-    p_div.paragraph_format.space_before = Pt(10)
+    p_div.paragraph_format.space_before = Pt(8)
     p_div.paragraph_format.space_after = Pt(14)
-    p_div.add_run("=" * 60)
-
+    pBdr = parse_xml(
+        r'<w:pBdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        r'<w:bottom w:val="single" w:sz="12" w:space="1" w:color="064E3B"/>'
+        r'</w:pBdr>'
+    )
+    p_div._p.get_or_add_pPr().append(pBdr)
 
     # Loop Soal & Pembahasan
     for idx, item in enumerate(quiz_list, start=1):
-        # Teks Soal
+        # Teks Soal (Justify / Rata Kanan-Kiri)
         clean_q = clean_math_text(item.get('question', ''))
         p_q = doc.add_paragraph()
+        p_q.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY  # Justify Alignment
         q_run = p_q.add_run(f"Soal {idx}. {clean_q}")
         q_run.bold = True
         q_run.font.size = Pt(11)
@@ -468,11 +474,12 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
         ans_val.bold = True
         ans_val.font.color.rgb = RGBColor(5, 150, 105)
 
-        # Pembahasan
+        # Pembahasan (Justify / Rata Kanan-Kiri)
         if item.get('solution_basis'):
             clean_sol = clean_math_text(item.get('solution_basis'))
             p_sol = doc.add_paragraph()
             p_sol.paragraph_format.left_indent = Inches(0.25)
+            p_sol.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY  # Justify Alignment
             sol_label = p_sol.add_run("Pembahasan: ")
             sol_label.bold = True
             p_sol.add_run(clean_sol)
