@@ -561,7 +561,7 @@ def generate_lkpd_content(mapel: str, kelas: str, topik: str):
     Instruksi Penyusunan Konten:
     1. Tujuan Pembelajaran: Buatkan 3 poin tujuan berbasis indikator HOTS.
     2. Apersepsi & Ringkasan Konsep: Sajikan materi singkat, tajam, dan korelasikan dengan nilai-nilai Keislaman/Tadabbur Sains.
-    3. Tugas Eksplorasi Mandiri: Buat 3 soal studi kasus/problem solving HOTS yang melatih logika nalar santri/siswi.
+    3. Tugas Eksplorasi Mandiri: Buat 5 soal studi kasus/problem solving HOTS yang melatih logika nalar santri/siswi.
     4. Refleksi Keislaman: Tuliskan 1 kalimat hikmah/perenungan dari mempelajari materi {topik}.
 
     Format keluaran WAJIB objek JSON murni:
@@ -571,6 +571,8 @@ def generate_lkpd_content(mapel: str, kelas: str, topik: str):
         "soal_1": "Pertanyaan eksplorasi HOTS nomor 1",
         "soal_2": "Pertanyaan eksplorasi HOTS nomor 2",
         "soal_3": "Pertanyaan eksplorasi HOTS nomor 3",
+        "soal_4": "Pertanyaan eksplorasi HOTS nomor 4",
+        "soal_5": "Pertanyaan eksplorasi HOTS nomor 5",
         "refleksi": "Kalimat hikmah/refleksi..."
     }}
     """
