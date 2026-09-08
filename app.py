@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
@@ -581,7 +582,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     buffer.seek(0)
     return buffer.getvalue()
     
-# Helper LKPD PDF
+# Helper backgroung LKPD PDF
 def draw_cover_background(canvas_obj, doc):
     canvas_obj.saveState()
     cover_path = "cover.png"
@@ -589,54 +590,87 @@ def draw_cover_background(canvas_obj, doc):
         canvas_obj.drawImage(cover_path, 0, 0, width=A4[0], height=A4[1])
     canvas_obj.restoreState()
 
+# Generator LKPD .pdf
 def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4, leftMargin=2.0 * cm, rightMargin=2.0 * cm,
-        topMargin=2.2 * cm, bottomMargin=2.2 * cm
+        topMargin=2.0 * cm, bottomMargin=2.0 * cm
     )
     styles = getSampleStyleSheet()
     
-    style_cover_school = ParagraphStyle('CoverSchool', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor('#064E3B'), alignment=1)
-    style_cover_title = ParagraphStyle('CoverTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=18, leading=22, textColor=colors.HexColor('#059669'), alignment=1)
-    style_cover_sub = ParagraphStyle('CoverSub', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=13, textColor=colors.HexColor('#374151'), alignment=1)
+    # Ambil Tanggal Presisi WIB saat PDF dibuat
+    now_wib = datetime.utcnow() + timedelta(hours=7)
+    nama_bulan = [
+        "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ]
+    tgl_presisi = f"{now_wib.day} {nama_bulan[now_wib.month]} {now_wib.year}"
+    
+    # Custom Typography Styles
+    style_cover_school = ParagraphStyle('CoverSchool', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor('#064E3B'), alignment=TA_CENTER)
+    style_cover_title = ParagraphStyle('CoverTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=18, leading=22, textColor=colors.HexColor('#059669'), alignment=TA_CENTER)
+    style_cover_sub = ParagraphStyle('CoverSub', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=13, textColor=colors.HexColor('#374151'), alignment=TA_CENTER)
     style_section_heading = ParagraphStyle('SecHeading', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.white)
-    style_body = ParagraphStyle('BodyTextCustom', parent=styles['Normal'], fontName='Helvetica', fontSize=9.5, leading=13, textColor=colors.HexColor('#1F2937'))
+    
+    # Paragraf Body Rata Kanan-Kiri (JUSTIFY)
+    style_body = ParagraphStyle('BodyTextCustom', parent=styles['Normal'], fontName='Helvetica', fontSize=9.5, leading=13.5, textColor=colors.HexColor('#1F2937'), alignment=TA_JUSTIFY)
+    
+    # Meta Info Styles (Label & Value)
+    style_meta_label = ParagraphStyle('MetaLabel', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9.5, leading=13, textColor=colors.HexColor('#064E3B'))
+    style_meta_val = ParagraphStyle('MetaVal', parent=styles['Normal'], fontName='Helvetica', fontSize=9.5, leading=13, textColor=colors.HexColor('#1F2937'))
 
     story = []
-    story.append(Spacer(1, 2.2 * cm))
+    story.append(Spacer(1, 1.5 * cm))
 
+    # Header Logo
     if os.path.exists(logo_path):
         img_logo = Image(logo_path, width=3.8 * cm, height=2.2 * cm)
         img_logo.hAlign = 'CENTER'
         story.append(img_logo)
         story.append(Spacer(1, 0.4 * cm))
 
+    # Header Instansi & Judul LKPD
     school_html = "Madrasah Aliyah dan Tsanawiyah<br/><b>Al-Irsyad Al-Islamiyah Putri Bondowoso</b>"
     story.append(Paragraph(school_html, style_cover_school))
-    story.append(Spacer(1, 0.8 * cm))
+    story.append(Spacer(1, 0.6 * cm))
     story.append(Paragraph("LEMBAR KERJA PESERTA DIDIK", style_cover_title))
     story.append(Paragraph("(LKPD)", style_cover_title))
     story.append(Spacer(1, 0.2 * cm))
     story.append(Paragraph("Model Pembelajaran HOTS & Integrasi Nilai Keislaman", style_cover_sub))
-    story.append(Spacer(1, 1.0 * cm))
+    story.append(Spacer(1, 0.8 * cm))
 
-    meta_text = f"<b>Mata Pelajaran:</b> {mapel}<br/><b>Kelas / Jenjang:</b> {kelas}<br/><b>Topik Utama:</b> {topik}<br/><br/><b>Nama / Kelompok:</b> ............................../............................."
-    p_meta = Paragraph(meta_text, style_body)
+    # Meta Info Box (Tabel 3 Kolom Lurus Sejajar)
+    meta_rows = [
+        [Paragraph("Mata Pelajaran", style_meta_label), Paragraph(":", style_meta_label), Paragraph(mapel, style_meta_val)],
+        [Paragraph("Kelas / Jenjang", style_meta_label), Paragraph(":", style_meta_label), Paragraph(kelas, style_meta_val)],
+        [Paragraph("Topik Utama", style_meta_label), Paragraph(":", style_meta_label), Paragraph(topik, style_meta_val)],
+        [Paragraph("Tanggal", style_meta_label), Paragraph(":", style_meta_label), Paragraph(tgl_presisi, style_meta_val)],
+        [Paragraph("Nama / Kelompok", style_meta_label), Paragraph(":", style_meta_label), Paragraph("......................................................................", style_meta_val)],
+    ]
     
-    table_meta = Table([[p_meta]], colWidths=[14 * cm])
-    table_meta.setStyle(TableStyle([
+    t_meta_inner = Table(meta_rows, colWidths=[3.5 * cm, 0.4 * cm, 10.5 * cm])
+    t_meta_inner.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+
+    t_meta_box = Table([[t_meta_inner]], colWidths=[15.5 * cm])
+    t_meta_box.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#ECFDF5')),
         ('BOX', (0,0), (-1,-1), 1.5, colors.HexColor('#059669')),
-        ('PADDING', (0,0), (-1,-1), 12), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
+        ('PADDING', (0,0), (-1,-1), 10),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
     ]))
-    table_meta.hAlign = 'CENTER'
-    story.append(table_meta)
-    story.append(Spacer(1, 2.5 * cm))
-    story.append(Paragraph("<i>Tahun Ajaran:......../........</i>", style_cover_sub))
+    t_meta_box.hAlign = 'CENTER'
+    story.append(t_meta_box)
     story.append(PageBreak())
 
-    # Halaman 2
+    # --- HALAMAN 2: ISI LKPD ---
+    # [A] TUJUAN PEMBELAJARAN
     head_a = Paragraph("🎯 [A] TUJUAN PEMBELAJARAN (HOTS)", style_section_heading)
     t_head_a = Table([[head_a]], colWidths=[16.5 * cm])
     t_head_a.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')), ('PADDING', (0,0), (-1,-1), 6)]))
@@ -648,6 +682,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     story.append(Paragraph(tujuan_text, style_body))
     story.append(Spacer(1, 0.5 * cm))
 
+    # [B] APERSEPSI & EKSPLORASI KONSEP
     head_b = Paragraph("📖 [B] APERSEPSI & EKSPLORASI KONSEP", style_section_heading)
     t_head_b = Table([[head_b]], colWidths=[16.5 * cm])
     t_head_b.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')), ('PADDING', (0,0), (-1,-1), 6)]))
@@ -660,21 +695,25 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     story.append(t_box_b)
     story.append(Spacer(1, 0.5 * cm))
 
+    # [C] TUGAS EKSPLORASI MANDIRI (3 SOAL)
     head_c = Paragraph("✍️ [C] TUGAS EKSPLORASI MANDIRI", style_section_heading)
     t_head_c = Table([[head_c]], colWidths=[16.5 * cm])
     t_head_c.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')), ('PADDING', (0,0), (-1,-1), 6)]))
     story.append(t_head_c)
     story.append(Spacer(1, 0.3 * cm))
 
-    for i in range(1, 3):
-        story.append(Paragraph(f"<b>Soal {i}:</b> {ai_content.get(f'soal_{i}', '')}", style_body))
-        story.append(Spacer(1, 0.1 * cm))
+    # Loop 3 Soal Eksplorasi (range 1 hingga 4)
+    for i in range(1, 4):
+        soal_text = ai_content.get(f'soal_{i}', f'Soal eksplorasi nomor {i} belum tersedia.')
+        story.append(Paragraph(f"<b>Soal {i}:</b> {soal_text}", style_body))
+        story.append(Spacer(1, 0.15 * cm))
         p_ans = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban:</i></font><br/><br/><br/><br/>", style_body)
         t_ans = Table([[p_ans]], colWidths=[16.5 * cm])
         t_ans.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F9FAFB')), ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#E5E7EB')), ('PADDING', (0,0), (-1,-1), 6)]))
         story.append(t_ans)
         story.append(Spacer(1, 0.4 * cm))
 
+    # [D] REFLEKSI KEISLAMAN & HIKMAH
     head_d = Paragraph("🌿 [D] REFLEKSI KEISLAMAN & HIKMAH", style_section_heading)
     t_head_d = Table([[head_d]], colWidths=[16.5 * cm])
     t_head_d.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#D97706')), ('PADDING', (0,0), (-1,-1), 6)]))
