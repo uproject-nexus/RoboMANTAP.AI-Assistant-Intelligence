@@ -1699,7 +1699,7 @@ elif st.session_state.page == "guru_dashboard":
         # --- CSS AGAR 3 TOMBOL TETAP SEJAJAR & TIDAK MELAR DI HP ---
         st.markdown("""
         <style>
-        @media (max-width: 350px) {
+        @media (max-width: 150px) {
             /* Paksa kontainer kolom tetap horizontal (1 baris) */
             div[data-testid="stHorizontalBlock"] {
                 display: flex !important;
