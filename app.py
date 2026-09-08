@@ -1511,7 +1511,7 @@ elif st.session_state.page == "guru_dashboard":
                     difficulty_options,
                     index=difficulty_options.index(custom_cfg.get("kesulitan", "HOTS")),
                 )
-                type_options = ["Pilihan Ganda", "ESSAY", "HOTS", "Analitis", "Numerik", "Konseptual", "Campuran"]
+                type_options = ["Pilihan Ganda", "HOTS", "Analitis", "Numerik", "Konseptual", "Campuran"]
                 custom_tipe = st.selectbox(
                     "🧩 Gaya Soal",
                     type_options,
