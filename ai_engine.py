@@ -546,14 +546,20 @@ def generate_lkpd_content(mapel: str, kelas: str, topik: str):
 
     ATURAN NOTASI MATEMATIKA, FISIKA, KIMIA & LATEX (SANGAT PENTING):
     1. DILARANG KERAS menggunakan simbol dollar ($) atau backslash (\\) untuk rumus/variabel!
-    2. Untuk angka pangkat atau indeks, HANYA gunakan simbol Unicode atau HTML sederhana:
+    2. UNTUK PECAHAN (SANGAT PENTING):
+       - WAJIB gunakan simbol Unicode Pecahan Tegak untuk semua pecahan umum:
+         '½' (1/2), '⅓' (1/3), '⅔' (2/3), '¼' (1/4), '¾' (3/4), '⅕' (1/5), '⅖' (2/5), '⅗' (3/5), '⅘' (4/5), '⅙' (1/6), '⅚' (5/6), '⅛' (1/8), '⅜' (3/8), '⅝' (5/8), '⅞' (7/8).
+       - DILARANG KERAS menulis pecahan biasa dengan garis miring seperti '1/4', '3/8', atau '1/2'!
+       - Untuk pecahan variabel/aljabar (misal: a/b atau (x+1)/(y-2)), baru diperbolehkan menggunakan tanda kurung rapi.
+    3. Untuk angka pangkat atau indeks, HANYA gunakan simbol Unicode atau HTML sederhana:
        - Pangkat/Eksponen: Gunakan Unicode (x², x³, t²) atau <sup>2</sup>, <sup>3</sup>.
        - Indeks/Bawah: Gunakan Unicode (H₂O, CO₂) atau <sub>2</sub>.
        - Simbol Matematika: Gunakan simbol langsung seperti '≠', 'π', '√', '±', '≤', '≥', '°C'.
-    3. Contoh Penulisan Rumus yang Benar di dalam teks:
+    4. Contoh Penulisan Rumus & Soal yang Benar di dalam teks:
+       - "Ibu Fatimah memiliki persediaan beras sebanyak 24 kg. Sebanyak ⅜ bagian diberikan kepada fakir miskin, dan ¼ bagian dimasak..."
+       - "Pecahan adalah representasi bagian dari keseluruhan yang dituliskan sebagai a/b dengan b ≠ 0. Contoh: ½ + ¼ = ¾."
        - "ax² + bx + c = 0 dengan a ≠ 0"
        - "h(t) = -5t² + 40t"
-       - "Luas kolam adalah x² meter dan panjangnya x + 6 meter"
 
     Instruksi Penyusunan Konten:
     1. Tujuan Pembelajaran: Buatkan 3 poin tujuan berbasis indikator HOTS.
