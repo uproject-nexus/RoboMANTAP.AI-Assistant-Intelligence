@@ -432,12 +432,12 @@ def publish_custom_quiz_to_db(kode_kuis: str, config: dict, quiz_data: list) -> 
     try:
         with conn.session as s:
             s.execute(text(query), {
-                "kode": kode_kuis,
-                "cfg": json.dumps(config),
-                "quiz": json.dumps(quiz_data)
+                "kode": kode_kuis.strip().upper(),
+                "cfg": json.dumps(config, default=str),
+                "quiz": json.dumps(quiz_data, default=str)
             })
             s.commit()
-        return True
+            return True
     except Exception:
         return False
 
