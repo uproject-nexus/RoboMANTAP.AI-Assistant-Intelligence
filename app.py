@@ -866,8 +866,6 @@ elif st.session_state.page == "guru_dashboard":
                 </div>
                 """, unsafe_allow_html=True)
 
-
-                # =========================================================================
                 # 4. DIAGNOSIS AI KONTEKSTUAL (IKUT FILTER)
                 # =========================================================================
                 # Judul Tombol Dinamis Mengikuti Filter
@@ -1282,8 +1280,6 @@ elif st.session_state.page == "guru_dashboard":
                         "active_until": dt_end.isoformat(),
                         "time_start_str": time_start.strftime('%H:%M'),
                         "time_end_str": time_end.strftime('%H:%M'),
-                        "time_start_val": time_start,
-                        "time_end_val": time_end,
                     }
                     custom_quiz = generated
                     custom_cfg = st.session_state.custom_quiz_config
