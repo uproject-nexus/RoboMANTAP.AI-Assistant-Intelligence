@@ -435,7 +435,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     ]
     tgl_presisi = f"{now_wib.day} {nama_bulan[now_wib.month]} {now_wib.year}"
     # Teks Tanggal Terbit
-    r3 = p_title.add_run(f"Tanggal Terbit: {tgl_presisi}")
+    r3 = p_title.add_run(f"Tanggal: {tgl_presisi}")
     r3.italic = True
     r3.font.size = Pt(9.5)
     r3.font.color.rgb = RGBColor(100, 100, 100)
