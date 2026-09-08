@@ -1501,8 +1501,8 @@ elif st.session_state.page == "guru_dashboard":
                 custom_jumlah = st.number_input(
                     "🔢 Jumlah Soal",
                     min_value=1,
-                    max_value=30,
-                    value=int(custom_cfg.get("jumlah_soal", 10)),
+                    max_value=50,
+                    value=int(custom_cfg.get("jumlah_soal", 20)),
                     step=1,
                 )
                 difficulty_options = ["Dasar", "Menengah", "Sulit", "HOTS", "Olimpiade"]
@@ -1511,7 +1511,7 @@ elif st.session_state.page == "guru_dashboard":
                     difficulty_options,
                     index=difficulty_options.index(custom_cfg.get("kesulitan", "HOTS")),
                 )
-                type_options = ["Pilihan Ganda", "HOTS", "Analitis", "Numerik", "Konseptual", "Campuran"]
+                type_options = ["Pilihan Ganda", "ESSAY", "HOTS", "Analitis", "Numerik", "Konseptual", "Campuran"]
                 custom_tipe = st.selectbox(
                     "🧩 Gaya Soal",
                     type_options,
