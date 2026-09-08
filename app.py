@@ -1697,48 +1697,6 @@ elif st.session_state.page == "guru_dashboard":
         st.caption("💡 Pilih variasi model LKPD yang sesuai dengan kebutuhan cetak Anda:")
 
         # --- CSS AGAR 3 TOMBOL TETAP SEJAJAR & TIDAK MELAR DI HP ---
-        # --- CSS FIX AGAR 3 TOMBOL WAJIB 1 BARIS HORIZONTAL DI HP ---
-        st.markdown("""
-        <style>
-        @media (max-width: 640px) {
-            /* 1. Paksa kontainer utama tetap horizontal tanpa pembungkusan */
-            div[data-testid="stHorizontalBlock"] {
-                display: flex !important;
-                flex-direction: row !important;
-                flex-wrap: nowrap !important;
-                gap: 4px !important;
-                align-items: center !important;
-            }
-            
-            /* 2. Paksa setiap kolom berukuran tepat 33% */
-            div[data-testid="stColumn"], 
-            div[data-testid="column"] {
-                width: 33.33% !important;
-                min-width: 33.33% !important;
-                max-width: 33.33% !important;
-                flex: 1 1 33.33% !important;
-            }
-            
-            /* 3. Sesuaikan tinggi dan padding tombol */
-            div[data-testid="stColumn"] button,
-            div[data-testid="column"] button {
-                padding: 6px 2px !important;
-                min-height: 40px !important;
-                height: auto !important;
-            }
-            
-            /* 4. Kecilkan ukuran teks tombol agar muat rapi */
-            div[data-testid="stColumn"] button p,
-            div[data-testid="column"] button p {
-                font-size: 9px !important;
-                font-weight: 700 !important;
-                white-space: nowrap !important;
-                overflow: hidden !important;
-                text-overflow: ellipsis !important;
-            }
-        }
-        </style>
-        """, unsafe_allow_html=True)
 
         col1, col2, col3 = st.columns(3)
         # --- MODEL 1: CLASSIC COVER ---
