@@ -747,7 +747,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
         [Paragraph("Kelas / Jenjang", style_meta_label), Paragraph(":", style_meta_label), Paragraph(kelas, style_meta_val)],
         [Paragraph("Topik Utama", style_meta_label), Paragraph(":", style_meta_label), Paragraph(topik, style_meta_val)],
         [Paragraph("Tanggal", style_meta_label), Paragraph(":", style_meta_label), Paragraph(tgl_presisi, style_meta_val)],
-        [Paragraph("Nama / Kelompok", style_meta_label), Paragraph(":", style_meta_label), Paragraph("......................................................................", style_meta_val)],
+        [Paragraph("Nama Siswa", style_meta_label), Paragraph(":", style_meta_label), Paragraph("......................................................................", style_meta_val)],
     ]
     
     t_meta_inner = Table(meta_rows, colWidths=[3.5 * cm, 0.4 * cm, 10.5 * cm])
@@ -804,7 +804,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     story.append(Spacer(1, 0.3 * cm))
 
     # Loop 3 Soal Eksplorasi (range 1 hingga 4)
-    for i in range(1, 4):
+    for i in range(1, 6):
         soal_raw = ai_content.get(f'soal_{i}', f'Soal eksplorasi nomor {i} belum tersedia.')
         soal_clean = clean_pdf_text(soal_raw)
         story.append(Paragraph(f"<b>Soal {i}:</b> {soal_clean}", style_body))
