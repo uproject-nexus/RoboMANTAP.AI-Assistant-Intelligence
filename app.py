@@ -675,7 +675,7 @@ elif st.session_state.page == "guru_dashboard":
                 # Logika Pemisah Pintar: Cek kata '(Custom)' ATAU jumlah kotak soal != 10
                 def check_is_custom(row):
                     mapel_str = str(row['mapel'])
-                    if "custom" in mapel_str.lower() or "kuis" in mapel_str.lower():
+                    if "custom" in mapel_str.lower() or "kuis" in mapel_str.lower() or "quiz" in mapel_str.lower():
                         return True
                     try:
                         detail = row['detail_jawaban']
