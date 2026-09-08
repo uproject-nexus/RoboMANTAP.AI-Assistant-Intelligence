@@ -1888,25 +1888,18 @@ elif st.session_state.page == "result":
     else:
         st.warning(f"🧕🏼 **Pesan dari RoboMANTAP:**\n\n{feedback_msg}")
 
-    st.write("---")
-    col_act1, col_act2 = st.columns(2)
-    with col_act1:
-        if is_custom:
-            if st.button("🔄 ULANGI KUIS CUSTOM INI", type="primary", use_container_width=True):
-                st.session_state.user_answers = {}
-                st.session_state.current_index = 0
-                st.session_state.ai_hint_cache = {}
-                st.session_state.ai_solution_cache = {}
-                st.session_state.session_id = str(uuid.uuid4())
-                if "start_time_wib" in st.session_state:
-                    del st.session_state.start_time_wib
-                update_progress_siswa(
-                    st.session_state.session_id, st.session_state.nama_siswa,
-                    st.session_state.jenjang, st.session_state.mapel, 1, [], "BERJALAN"
-                )
-                st.session_state.page = "quiz"
-                st.rerun()
-        else:
+    st.write("---")  
+    if is_custom:
+        # Tampilan Khusus Kuis Custom Guru (Satu Kali Pengerjaan)
+        st.info("✅ **Kuis Selesai!** Hasil pengerjaanmu telah berhasil disimpan dan diteruskan ke GuruMANTAP.")
+        if st.button("🏠 Kembali ke Beranda Utama", type="primary", use_container_width=True):
+            st.session_state.page = "landing"
+            st.session_state.is_custom_quiz = False
+            st.rerun()
+    else:
+        # Tampilan Latihan OMI (Bebas Ulangi Sesi Soal Baru)
+        col_act1, col_act2 = st.columns(2)
+        with col_act1:
             if st.button("🔄 LATIHAN SOAL LAGI DONG! (SESI BARU)", type="primary", use_container_width=True):
                 st.cache_data.clear()
                 with st.spinner("Sabar ya, RoboMANTAP sedang menyiapkan soal baru Kamu.. (nggak lama kok, hanya butuh waktu sekitar 15 detik saja! 😊)"):
@@ -1925,11 +1918,11 @@ elif st.session_state.page == "result":
                         st.session_state.page = "quiz"
                         st.rerun()
 
-    with col_act2:
-        if st.button("🏠 Kembali ke Beranda Utama", use_container_width=True):
-            st.session_state.page = "landing"
-            st.session_state.is_custom_quiz = False
-            st.rerun()
+        with col_act2:
+            if st.button("🏠 Kembali ke Beranda Utama", use_container_width=True):
+                st.session_state.page = "landing"
+                st.session_state.is_custom_quiz = False
+                st.rerun()
 
     st.write("---")
     st.markdown("### 📖 Pembahasan Rinci dari Pembina RoboMANTAP ")
