@@ -1099,7 +1099,7 @@ elif st.session_state.page == "guru_dashboard":
                 .kpi-grid-top {{
                     display: grid;
                     grid-template-columns: repeat(3, 1fr);
-                    gap: 10px;
+                    gap: 5px;
                     margin-bottom: 10px;
                 }}
                 .kpi-grid-bottom {{
