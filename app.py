@@ -1065,17 +1065,13 @@ elif st.session_state.page == "guru_dashboard":
                 if df.empty:
                     st.info(f"🚫 Tidak ada data pengerjaan siswa yang sesuai! Silahkan seting Kontrol Panel & Filter di Sidebar (click pojok kiri atas)")
                     return
-
                 # =========================================================================
-                # MINI KPI CARDS ELEGAN (OMI & CUSTOM SEPARATED)
-                # =========================================================================
-                # =========================================================================
-                # MINI KPI CARDS ELEGAN (DETEKSI PRESISI OMI VS CUSTOM)
+                # MINI KPI CARDS ELEGAN (LAYOUT 3 + 2 SIMETRIS)
                 # =========================================================================
                 val_total = len(df['nama_siswa'].unique()) if only_latest else len(df)
                 val_aktif = len(df[df['status_real'] == 'BERJALAN'])
                 val_selesai = len(df[df['status_real'] == 'SELESAI'])
-
+                
                 # Logika Pemisah Pintar: Cek kata '(Custom)' ATAU jumlah kotak soal != 10
                 def check_is_custom(row):
                     mapel_str = str(row['mapel'])
@@ -1090,24 +1086,34 @@ elif st.session_state.page == "guru_dashboard":
                     except Exception:
                         pass
                     return False
-
+                
                 is_custom_mask = df.apply(check_is_custom, axis=1)
                 df_custom = df[is_custom_mask]
                 df_omi = df[~is_custom_mask]
-
+                
                 val_rata_omi = f"{df_omi['nilai_akhir'].mean():.1f}" if not df_omi.empty else "0.0"
                 val_rata_custom = f"{df_custom['nilai_akhir'].mean():.1f}" if not df_custom.empty else "0.0"
-
+                
                 st.markdown(f"""
                 <style>
-                .kpi-grid {{
+                .kpi-grid-top {{
                     display: grid;
-                    grid-template-columns: repeat(5, 1fr);
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 10px;
+                    margin-bottom: 10px;
+                }}
+                .kpi-grid-bottom {{
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
                     gap: 10px;
                     margin-bottom: 15px;
                 }}
                 @media (max-width: 640px) {{
-                    .kpi-grid {{
+                    .kpi-grid-top {{
+                        grid-template-columns: repeat(2, 1fr);
+                        gap: 8px;
+                    }}
+                    .kpi-grid-bottom {{
                         grid-template-columns: repeat(2, 1fr);
                         gap: 8px;
                     }}
@@ -1116,28 +1122,29 @@ elif st.session_state.page == "guru_dashboard":
                     background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(2, 44, 34, 0.7) 100%);
                     border: 1px solid rgba(5, 150, 105, 0.35);
                     border-radius: 10px;
-                    padding: 8px 10px;
+                    padding: 10px 12px;
                     text-align: center;
                     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
                 }}
                 .kpi-title {{
-                    font-size: 10px;
+                    font-size: 11px;
                     color: #a7f3d0;
                     font-weight: 600;
                     text-transform: uppercase;
                     letter-spacing: 0.3px;
-                    margin-bottom: 2px;
+                    margin-bottom: 4px;
                     white-space: nowrap;
                 }}
                 .kpi-value {{
-                    font-size: 18px;
+                    font-size: 19px;
                     font-weight: 800;
                     color: #ffffff;
                     line-height: 1.2;
                 }}
                 </style>
-
-                <div class="kpi-grid">
+                
+                <!-- BARIS 1: 3 KOLOM METRIK AKTIVITAS -->
+                <div class="kpi-grid-top">
                     <div class="kpi-card">
                         <div class="kpi-title">👥 Total Siswa</div>
                         <div class="kpi-value">{val_total}</div>
@@ -1150,6 +1157,10 @@ elif st.session_state.page == "guru_dashboard":
                         <div class="kpi-title">✅ Sesi Selesai</div>
                         <div class="kpi-value" style="color: #60a5fa;">{val_selesai}</div>
                     </div>
+                </div>
+                
+                <!-- BARIS 2: 2 KOLOM METRIK PERFORMA -->
+                <div class="kpi-grid-bottom">
                     <div class="kpi-card">
                         <div class="kpi-title">🎯 Rata-rata OMI</div>
                         <div class="kpi-value" style="color: #f59e0b;">{val_rata_omi} <span style="font-size: 11px; color: #9ca3af;">/ 40</span></div>
