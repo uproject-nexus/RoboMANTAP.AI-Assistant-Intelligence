@@ -1704,9 +1704,9 @@ elif st.session_state.page == "guru_dashboard":
             div[data-testid="stHorizontalBlock"] {
                 display: flex !important;
                 flex-direction: row !important;
-                gap: 6px !important;
+                gap: 2px !important;
             }
-            /* Kunci lebar masing-masing kolom menjadi 33% */
+            /* Kunci lebar masing-masing kolom menjadi 10% */
             div[data-testid="column"] {
                 width: 10.33% !important;
                 flex: 1 1 10.33% !important;
@@ -1718,7 +1718,7 @@ elif st.session_state.page == "guru_dashboard":
                 white-space: nowrap !important;
             }
             div[data-testid="column"] button {
-                padding: 4px 2px !important;
+                padding: 1px 2px !important;
                 min-height: 38px !important;
             }
         }
