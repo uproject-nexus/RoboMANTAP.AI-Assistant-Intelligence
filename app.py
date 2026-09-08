@@ -590,6 +590,34 @@ def draw_cover_background(canvas_obj, doc):
         canvas_obj.drawImage(cover_path, 0, 0, width=A4[0], height=A4[1])
     canvas_obj.restoreState()
 
+def fix_pdf_fractions(text: str) -> str:
+    """Mengubah Unicode pecahan menjadi tag HTML sup/sub agar dirender rapi di PDF ReportLab."""
+    if not text:
+        return ""
+    
+    frac_map = {
+        "½": "<sup>1</sup>/<sub>2</sub>",
+        "⅓": "<sup>1</sup>/<sub>3</sub>",
+        "⅔": "<sup>2</sup>/<sub>3</sub>",
+        "¼": "<sup>1</sup>/<sub>4</sub>",
+        "¾": "<sup>3</sup>/<sub>4</sub>",
+        "⅕": "<sup>1</sup>/<sub>5</sub>",
+        "⅖": "<sup>2</sup>/<sub>5</sub>",
+        "⅗": "<sup>3</sup>/<sub>5</sub>",
+        "⅘": "<sup>4</sup>/<sub>5</sub>",
+        "⅙": "<sup>1</sup>/<sub>6</sub>",
+        "⅚": "<sup>5</sup>/<sub>6</sub>",
+        "⅛": "<sup>1</sup>/<sub>8</sub>",
+        "⅜": "<sup>3</sup>/<sub>8</sub>",
+        "⅝": "<sup>5</sup>/<sub>8</sub>",
+        "⅞": "<sup>7</sup>/<sub>8</sub>",
+    }
+    
+    for uni, html in frac_map.items():
+        text = text.replace(uni, html)
+        
+    return text
+
 # Generator LKPD .pdf
 def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"):
     buffer = io.BytesIO()
@@ -689,7 +717,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     story.append(t_head_b)
     story.append(Spacer(1, 0.2 * cm))
 
-    p_ringkasan = Paragraph(ai_content.get("ringkasan", ""), style_body)
+    p_ringkasan = Paragraph(fix_pdf_fractions(ai_content.get("ringkasan", "")), style_body)
     t_box_b = Table([[p_ringkasan]], colWidths=[16.5 * cm])
     t_box_b.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F0F9FF')), ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#BAE6FD')), ('PADDING', (0,0), (-1,-1), 8)]))
     story.append(t_box_b)
@@ -704,8 +732,9 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
 
     # Loop 3 Soal Eksplorasi (range 1 hingga 4)
     for i in range(1, 4):
-        soal_text = ai_content.get(f'soal_{i}', f'Soal eksplorasi nomor {i} belum tersedia.')
-        story.append(Paragraph(f"<b>Soal {i}:</b> {soal_text}", style_body))
+        soal_raw = ai_content.get(f'soal_{i}', f'Soal eksplorasi nomor {i} belum tersedia.')
+        soal_clean = fix_pdf_fractions(soal_raw)        
+        story.append(Paragraph(f"<b>Soal {i}:</b> {soal_clean}", style_body))
         story.append(Spacer(1, 0.15 * cm))
         p_ans = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban:</i></font><br/><br/><br/><br/>", style_body)
         t_ans = Table([[p_ans]], colWidths=[16.5 * cm])
@@ -719,8 +748,9 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     t_head_d.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#D97706')), ('PADDING', (0,0), (-1,-1), 6)]))
     story.append(t_head_d)
     story.append(Spacer(1, 0.2 * cm))
-
-    p_refleksi = Paragraph(f'<i>"{ai_content.get("refleksi", "")}"</i>', style_body)
+    # Refleksi
+    refleksi_clean = fix_pdf_fractions(ai_content.get("refleksi", ""))
+    p_refleksi = Paragraph(f'<i>"{refleksi_clean}"</i>', style_body)
     t_box_d = Table([[p_refleksi]], colWidths=[16.5 * cm])
     t_box_d.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#FEF3C7')), ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#FDE68A')), ('PADDING', (0,0), (-1,-1), 8)]))
     story.append(t_box_d)
