@@ -8,6 +8,9 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
 import streamlit.components.v1 as components
+from docx import Document
+from docx.shared import Pt, RGBColor, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # Import python-docx untuk generate Word berlogo (ReportLab PDF)
 from reportlab.lib.pagesizes import A4
@@ -319,7 +322,75 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+# Helper KUIS docx
+def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
+    """Membuat file Word (.docx) berformat rapi dari draft kuis custom."""
+    doc = Document()
 
+    # Title Header
+    title_p = doc.add_paragraph()
+    title_run = title_p.add_run(f"PAKET KUIS: {config.get('mapel', 'Mata Pelajaran').upper()}")
+    title_run.bold = True
+    title_run.font.size = Pt(16)
+    title_run.font.color.rgb = RGBColor(6, 78, 59) # Warna Hijau Edukasi
+    title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # Meta Info Kuis
+    meta_p = doc.add_paragraph()
+    meta_p.add_run(f"Jenjang / Kelas : ").bold = True
+    meta_p.add_run(f"{config.get('jenjang', '-')} ({config.get('kelas', '-')})\n")
+    
+    meta_p.add_run(f"Materi Utama   : ").bold = True
+    meta_p.add_run(f"{config.get('materi', '-')}\n")
+    
+    meta_p.add_run(f"Jumlah Soal    : ").bold = True
+    meta_p.add_run(f"{len(quiz_list)} Soal | Durasi: {config.get('timer_h', 0)}j {config.get('timer_m', 0)}m\n")
+    
+    meta_p.add_run(f"Masa Aktif Kuis: ").bold = True
+    meta_p.add_run(f"{config.get('time_start_str', '--:--')} hingga {config.get('time_end_str', '--:--')} WIB\n")
+    meta_p.paragraph_format.space_after = Pt(14)
+
+    doc.add_paragraph("=" * 60)
+
+    # Daftar Soal & Kunci Jawaban
+    for idx, item in enumerate(quiz_list, start=1):
+        # Pertanyaan
+        p_q = doc.add_paragraph()
+        q_run = p_q.add_run(f"Soal {idx}. {item.get('question', '')}")
+        q_run.bold = True
+        q_run.font.size = Pt(11)
+        p_q.paragraph_format.space_before = Pt(8)
+
+        # Opsi Pilihan Jawaban
+        for opt in item.get('options', []):
+            p_opt = doc.add_paragraph()
+            p_opt.paragraph_format.left_indent = Inches(0.25)
+            p_opt.add_run(f"{opt}")
+            p_opt.paragraph_format.space_after = Pt(2)
+
+        # Kunci Jawaban
+        p_ans = doc.add_paragraph()
+        p_ans.paragraph_format.left_indent = Inches(0.25)
+        ans_label = p_ans.add_run("Kunci Jawaban: ")
+        ans_label.bold = True
+        ans_val = p_ans.add_run(f"{item.get('correct_answer', '')}")
+        ans_val.bold = True
+        ans_val.font.color.rgb = RGBColor(5, 150, 105)
+
+        # Pembahasan / Solution Basis
+        if item.get('solution_basis'):
+            p_sol = doc.add_paragraph()
+            p_sol.paragraph_format.left_indent = Inches(0.25)
+            sol_label = p_sol.add_run("Pembahasan: ")
+            sol_label.bold = True
+            p_sol.add_run(f"{item.get('solution_basis')}")
+            p_sol.paragraph_format.space_after = Pt(12)
+
+    # Output ke Byte Stream
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
     
 # Helper LKPD PDF
 def draw_cover_background(canvas_obj, doc):
@@ -1203,17 +1274,17 @@ elif st.session_state.page == "guru_dashboard":
                     with st.expander("Lihat Solution Basis"):
                         st.markdown(cq.get("solution_basis", "Belum tersedia."))
 
-            export_payload = {
-                "product": "RoboMANTAP QUIZ CUSTOM",
-                "config": custom_cfg,
-                "quiz": custom_quiz,
-            }
+            # Generate dokumen Word (.docx) berformat rapi
+            docx_data = generate_quiz_docx(custom_cfg, custom_quiz)
+            clean_mapel_name = custom_cfg.get('mapel', 'Quiz').replace(' ', '_')
+
             st.download_button(
-                "📥 Download Draft Quiz (.json)",
-                data=json.dumps(export_payload, ensure_ascii=False, indent=2),
-                file_name=f"RoboMANTAP_Quiz_Custom_{custom_cfg.get('mapel', 'Quiz').replace(' ', '_')}.json",
-                mime="application/json",
+                label="📄 Download Paket Kuis (.docx)",
+                data=docx_data,
+                file_name=f"RoboMANTAP_Kuis_{clean_mapel_name}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True,
+                type="primary"
             )
 
             st.markdown("#### 🚀 Terbitkan Kuis ke Siswa")
