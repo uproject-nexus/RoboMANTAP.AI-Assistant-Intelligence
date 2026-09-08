@@ -556,17 +556,18 @@ def generate_lkpd_content(mapel: str, kelas: str, topik: str):
        - "Luas kolam adalah x² meter dan panjangnya x + 6 meter"
 
     Instruksi Penyusunan Konten:
-    1. Tujuan Pembelajaran: Buatkan 2 poin tujuan berbasis indikator HOTS.
+    1. Tujuan Pembelajaran: Buatkan 3 poin tujuan berbasis indikator HOTS.
     2. Apersepsi & Ringkasan Konsep: Sajikan materi singkat, tajam, dan korelasikan dengan nilai-nilai Keislaman/Tadabbur Sains.
-    3. Tugas Eksplorasi Mandiri: Buat 2 soal studi kasus/problem solving HOTS yang melatih logika nalar santri/siswi.
+    3. Tugas Eksplorasi Mandiri: Buat 3 soal studi kasus/problem solving HOTS yang melatih logika nalar santri/siswi.
     4. Refleksi Keislaman: Tuliskan 1 kalimat hikmah/perenungan dari mempelajari materi {topik}.
 
     Format keluaran WAJIB objek JSON murni:
     {{
-        "tujuan": ["Poin tujuan 1", "Poin tujuan 2"],
+        "tujuan": ["Poin tujuan 1", "Poin tujuan 2", "Poin tujuan 3"],
         "ringkasan": "Teks ringkasan konsep dan keislaman...",
         "soal_1": "Pertanyaan eksplorasi HOTS nomor 1",
         "soal_2": "Pertanyaan eksplorasi HOTS nomor 2",
+        "soal_3": "Pertanyaan eksplorasi HOTS nomor 3",
         "refleksi": "Kalimat hikmah/refleksi..."
     }}
     """
