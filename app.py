@@ -326,43 +326,61 @@ with st.sidebar:
 #helper rapikan output KUIS docx
 def clean_math_text(text: str) -> str:
     """
-    Mengonversi notasi LaTeX menjadi Unicode matematika bersih untuk dokumen Word (.docx).
-    Contoh: $x_1^2$ -> x₁², \sqrt{x_1} -> √(x₁), \neq -> ≠
+    Mengonversi notasi LaTeX menjadi Unicode matematika bersih untuk MS Word (.docx).
+    Menghapus ampas perintah LaTeX (\left, \right, \dots, \frac) dan mengubah pecahan sederhana jadi tegak.
     """
     if not text:
         return ""
     
-    # 1. Konversi Pecahan \frac{a}{b} atau \tfrac{a}{b} -> (a/b)
-    text = re.sub(r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}', r'(\1/\2)', text)
+    # 1. Bersihkan pembungkus \left dan \right sebelum backslash dibuang
+    text = re.sub(r'\\left\s*[\(\[\{\.\|]?', '(', text)
+    text = re.sub(r'\\right\s*[\)\]\}\.\|]?', ')', text)
     
-    # 2. Konversi Akar \sqrt{x} atau \sqrt x -> √(x)
+    # 2. Konversi Titik-Titik (\dots, \cdots, \ldots) menjadi '…'
+    text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
+
+    # 3. Konversi Pecahan \frac{a}{b} -> Ubah angka sederhana jadi Pecahan Tegak (Unicode)
+    frac_map = {
+        "1/2": "½", "1/3": "⅓", "2/3": "⅔", "1/4": "¼", "3/4": "¾",
+        "1/5": "⅕", "1/6": "⅙", "1/8": "⅛", "2/5": "⅖", "3/5": "⅗"
+    }
+    
+    def repl_frac(match):
+        num = match.group(1).strip()
+        den = match.group(2).strip()
+        pair = f"{num}/{den}"
+        if pair in frac_map:
+            return frac_map[pair]
+        return f"({num}/{den})"
+        
+    text = re.sub(r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}', repl_frac, text)
+
+    # 4. Konversi Akar \sqrt{x} -> √(x)
     text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
     text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
-    
-    # 3. Peta Karakter Pangkat (Superscript) dan Indeks Bawah (Subscript)
-    sup_map = str.maketrans("0123456789+-=()nxy", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸ")
+
+    # 5. Konversi Pangkat (^{...} atau ^-1, ^2) & Subscript (_{...})
+    sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
     sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
-    
-    # Ganti pangkat ^{...} atau ^2, ^3, dll.
+
     def repl_sup(match):
         content = match.group(1) or match.group(2)
         return content.translate(sup_map)
-    text = re.sub(r'\^\{([^}]+)\}|\^([0-9a-zA-Z\+\-\=])', repl_sup, text)
-    
-    # Ganti indeks bawah _{...} atau _1, _2, dll.
+    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', repl_sup, text)
+
     def repl_sub(match):
         content = match.group(1) or match.group(2)
         return content.translate(sub_map)
-    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z\+\-\=])', repl_sub, text)
-    
-    # 4. Simbol Matematika LaTeX Standar
+    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', repl_sub, text)
+
+    # 6. Kamus Simbol Matematika LaTeX Standar
     replacements = {
+        r"\times": "×",
+        r"\cdot": "·",
+        r"\div": "÷",
         r"\neq": "≠",
         r"\leq": "≤",
         r"\geq": "≥",
-        r"\times": "×",
-        r"\div": "÷",
-        r"\cdot": "·",
         r"\pm": "±",
         r"\infty": "∞",
         r"\pi": "π",
@@ -370,20 +388,23 @@ def clean_math_text(text: str) -> str:
         r"\beta": "β",
         r"\theta": "θ",
         r"\log": "log",
-        "$": "", # Hapus simbol pembungkus LaTeX
+        "$": "", # Hapus tanda $
     }
-    
+
     for old, new in replacements.items():
         text = text.replace(old, new)
-        
-    # 5. Bersihkan sisa kurung kurawal & backslash
+
+    # 7. Pembersihan Akhir Ampas Perintah LaTeX
+    text = re.sub(r'\\(frac|left|right|dots|cdots|ldots)', '', text)
+    text = text.replace("left(", "(").replace("right)", ")").replace("dots", "…")
     text = text.replace("{", "").replace("}", "")
     text = re.sub(r'\\([a-zA-Z]+)', r'\1', text)
     text = text.replace("\\", "")
-    
-    # 6. Rapikan spasi ganda
+
+    # 8. Rapikan Spasi & Kurung Ganda
+    text = text.replace("((", "(").replace("))", ")")
     return re.sub(r'\s+', ' ', text).strip()
-    
+
 # Generate KUIS docx
 def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     """Membuat file Word (.docx) berformat LKPD resmi lengkap dengan logo, kop instansi, dan layout rapi."""
