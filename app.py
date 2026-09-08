@@ -1111,7 +1111,7 @@ elif st.session_state.page == "guru_dashboard":
                 @media (max-width: 640px) {{
                     .kpi-grid-top {{
                         grid-template-columns: repeat(2, 1fr);
-                        gap: 8px;
+                        gap: 4px;
                     }}
                     .kpi-grid-bottom {{
                         grid-template-columns: repeat(2, 1fr);
