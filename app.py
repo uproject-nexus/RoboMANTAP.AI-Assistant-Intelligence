@@ -393,7 +393,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     header_table.autofit = False
     
     cells = header_table.rows[0].cells
-    cells[0].width = Inches(1.5)
+    cells[0].width = Inches(1.6)
     cells[1].width = Inches(4.7)
     
     # Vertikal Center
@@ -446,7 +446,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     p_div.paragraph_format.space_after = Pt(10)
     pBdr = parse_xml(
         r'<w:pBdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
-        r'<w:bottom w:val="single" w:sz="18" w:space="1" w:color="064E3B"/>'
+        r'<w:bottom w:val="single" w:sz="20" w:space="1" w:color="064E3B"/>'
         r'</w:pBdr>'
     )
     p_div._p.get_or_add_pPr().append(pBdr)
