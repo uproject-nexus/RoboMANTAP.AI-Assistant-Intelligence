@@ -592,14 +592,16 @@ def draw_cover_background(canvas_obj, doc):
 
 
 # ==================================================================================
-# PEMBERSIH PDF - LKPD
-# =====================================
+# PEMBERSIH PDF MASTER - LKPD (ANTI-KOTAK HITAM ■)
+# ==================================================================================
 _PDF_FRAC_CACHE = {}
+
 def generate_frac_image(num_str: str, den_str: str) -> str:
     """Membuat file gambar PNG pecahan tegak lurus untuk PDF."""
     cache_key = f"{num_str}_{den_str}"
     if cache_key in _PDF_FRAC_CACHE and os.path.exists(_PDF_FRAC_CACHE[cache_key]):
         return _PDF_FRAC_CACHE[cache_key]
+
     try:
         fig = plt.figure(figsize=(0.35, 0.35), dpi=200)
         fig.patch.set_alpha(0.0)
@@ -618,63 +620,93 @@ def generate_frac_image(num_str: str, den_str: str) -> str:
     except Exception:
         return None
 
+
 def clean_pdf_text(text: str) -> str:
     """
-    Master Helper PDF:
-    Mengonversi LaTeX, Unicode Pangkat/Subscript, Logaritma, Kimia, dan Akar
+    Master Helper PDF (3 Lapis Anti-Kotak Hitam):
+    Mengonversi LaTeX, Unicode Pangkat/Subscript, Logaritma, Kimia, dan Pecahan
     menjadi HTML ReportLab (<sup>, <sub>, <img>) untuk mencegah kotak hitam ■.
     """
     if not text:
         return ""
-    # 1. Konversi Unicode Superscript (⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻) -> <sup>...</sup>
-    sup_chars = "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ"
-    sup_trans = str.maketrans(sup_chars, "0123456789+-=()nxyi")
-    text = re.sub(
-        r'[' + re.escape(sup_chars) + r']+',
-        lambda m: f"<sup>{m.group(0).translate(sup_trans)}</sup>",
-        text
-    )
-    # 2. Konversi Unicode Subscript (₀₁₂₃₄₅₆₇₈₉₊₋) -> <sub>...</sub>
-    sub_chars = "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ"
-    sub_trans = str.maketrans(sub_chars, "0123456789+-=()nixy")
-    text = re.sub(
-        r'[' + re.escape(sub_chars) + r']+',
-        lambda m: f"<sub>{m.group(0).translate(sub_trans)}</sub>",
-        text
-    )
-    # 3. Konversi LaTeX Pangkat (^) dan Subscript (_) -> <sup> & <sub>
-    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z]+)', r'<sup>\1\2</sup>', text)
-    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z]+)', r'<sub>\1\2</sub>', text)
-    # 4. Tangani Pecahan Tegak (Unicode, \frac, dan x/y)
+
+    # Kamus Lengkap Pecahan Unicode
     frac_map = {
-        "½": ("1", "2"), "⅓": ("1", "3"), "⅔": ("2", "3"),
-        "¼": ("1", "4"), "¾": ("3", "4"), "⅕": ("1", "5"),
-        "⅖": ("2", "5"), "⅗": ("3", "5"), "⅘": ("4", "5"),
-        "⅙": ("1", "6"), "⅚": ("5", "6"), "⅛": ("1", "8"),
-        "⅜": ("3", "8"), "⅝": ("5", "8"), "⅞": ("7", "8")
+        "¼": ("1", "4"), "½": ("1", "2"), "¾": ("3", "4"),
+        "⅐": ("1", "7"), "⅑": ("1", "9"), "⅒": ("1", "10"),
+        "⅓": ("1", "3"), "⅔": ("2", "3"),
+        "⅕": ("1", "5"), "⅖": ("2", "5"), "⅗": ("3", "5"), "⅘": ("4", "5"),
+        "⅙": ("1", "6"), "⅚": ("5", "6"),
+        "⅛": ("1", "8"), "⅜": ("3", "8"), "⅝": ("5", "8"), "⅞": ("7", "8")
     }
+
+    # 1. Konversi Pecahan Unicode (Gambar PNG -> Fallback HTML sup/sub)
     for uni, (num, den) in frac_map.items():
         if uni in text:
             img_path = generate_frac_image(num, den)
             if img_path:
-                text = text.replace(uni, f'<img src="{img_path}" height="14" valig="middle"/>')
-    text = re.sub(
-        r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}',
-        lambda m: f'<img src="{generate_frac_image(m.group(1).strip(), m.group(2).strip())}" height="14" valig="middle"/>'
-        if generate_frac_image(m.group(1).strip(), m.group(2).strip()) else f'({m.group(1)}/{m.group(2)})',
-        text
-    )
-    # 5. Tangani Akar (\sqrt)
+                text = text.replace(uni, f'<img src="{img_path}" height="13" valign="middle"/>')
+            else:
+                # Fallback Lapis 1: Jika gambar gagal dibuat, ubah ke HTML sup/sub (Aman dari ■)
+                text = text.replace(uni, f'<sup>{num}</sup>/<sub>{den}</sub>')
+
+    # 2. Konversi Perintah LaTeX \\frac{a}{b} dan \\tfrac{a}{b}
+    def repl_latex_frac(match):
+        num, den = match.group(1).strip(), match.group(2).strip()
+        img_path = generate_frac_image(num, den)
+        if img_path:
+            return f'<img src="{img_path}" height="13" valign="middle"/>'
+        return f'<sup>{num}</sup>/<sub>{den}</sub>'
+
+    text = re.sub(r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}', repl_latex_frac, text)
+
+    # 3. Konversi Pecahan Angka Miring Sederhana (Contoh: 1/2, 3/8, 1/4)
+    def repl_slash_frac(match):
+        num, den = match.group(1), match.group(2)
+        img_path = generate_frac_image(num, den)
+        if img_path:
+            return f'<img src="{img_path}" height="13" valign="middle"/>'
+        return f'<sup>{num}</sup>/<sub>{den}</sub>'
+
+    text = re.sub(r'\b([0-9]{1,2})/([0-9]{1,2})\b', repl_slash_frac, text)
+
+    # 4. SAPU BERSIH LAPIS TERAKHIR (Sweeper: Musnahkan sisa pecahan Unicode apapun)
+    def sweep_unicode_fractions(match):
+        ch = match.group(0)
+        if ch in frac_map:
+            n, d = frac_map[ch]
+            return f'<sup>{n}</sup>/<sub>{d}</sub>'
+        return f'<sup>?</sup>/<sub>?</sub>'
+
+    text = re.sub(r'[\u2150-\u2189\u00bc-\u00be]', sweep_unicode_fractions, text)
+
+    # 5. Konversi Unicode Superscript (⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻) -> <sup>...</sup>
+    sup_chars = "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ"
+    sup_trans = str.maketrans(sup_chars, "0123456789+-=()nxyi")
+    text = re.sub(r'[' + re.escape(sup_chars) + r']+', lambda m: f"<sup>{m.group(0).translate(sup_trans)}</sup>", text)
+
+    # 6. Konversi Unicode Subscript (₀₁₂₃₄₅₆₇₈₉₊₋) -> <sub>...</sub>
+    sub_chars = "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ"
+    sub_trans = str.maketrans(sub_chars, "0123456789+-=()nixy")
+    text = re.sub(r'[' + re.escape(sub_chars) + r']+', lambda m: f"<sub>{m.group(0).translate(sub_trans)}</sub>", text)
+
+    # 7. Konversi LaTeX Pangkat (^) dan Subscript (_) -> <sup> & <sub>
+    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z]+)', r'<sup>\1\2</sup>', text)
+    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z]+)', r'<sub>\1\2</sub>', text)
+
+    # 8. Tangani Akar (\sqrt)
     text = re.sub(r'\\sqrt\{([^}]+)\}', r'√( \1 )', text)
     text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
-    # 6. Tangani Panah & Simbol LaTeX
+
+    # 9. Tangani Panah & Simbol LaTeX
     text = re.sub(r'\\(?:rightarrow|to)\b', '→', text)
     text = re.sub(r'\\Rightarrow\b', '⇒', text)
     text = re.sub(r'\\leftarrow\b', '←', text)
     text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
     text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
     text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
-    # 7. Bersihkan Simbol Matematika Standar & Backslash
+
+    # 10. Bersihkan Simbol Matematika Standar & Backslash
     replacements = {
         r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
         r"\leq": "≤", r"\geq": "≥", r"\pm": "±", r"\infty": "∞",
@@ -686,7 +718,7 @@ def clean_pdf_text(text: str) -> str:
 
     text = text.replace("{", "").replace("}", "")
     text = re.sub(r'\\([a-zA-Z]+)', r'\1', text).replace("\\", "")
-    
+
     return re.sub(r'\s+', ' ', text).strip()
     
 # ==============================================================
