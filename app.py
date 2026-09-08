@@ -418,7 +418,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_title.paragraph_format.space_after = Pt(2)
     
-    r1 = p_title.add_run("LEMBAR KERJA PESERTA DIDIK (LKPD)\n")
+    r1 = p_title.add_run("LEMBAR KUIS GuruMANTAP\n")
     r1.bold = True
     r1.font.size = Pt(13)
     r1.font.color.rgb = RGBColor(6, 78, 59) # Warna Hijau Edukasi
@@ -427,7 +427,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     r2.bold = True
     r2.font.size = Pt(10.5)
     
-    r3 = p_title.add_run("Tahun Ajaran: ..... / .....")
+    r3 = p_title.add_run("Tahun Ajaran: ......... / .........")
     r3.italic = True
     r3.font.size = Pt(9.5)
     r3.font.color.rgb = RGBColor(100, 100, 100)
@@ -447,7 +447,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     p_paket = doc.add_paragraph()
     p_paket.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_paket.paragraph_format.space_after = Pt(10)
-    r_paket = p_paket.add_run(f"PAKET KUIS: {config.get('mapel', 'Mata Pelajaran').upper()}")
+    r_paket = p_paket.add_run(f"PAKET KUIS {config.get('mapel', 'Mata Pelajaran').upper()}")
     r_paket.bold = True
     r_paket.font.size = Pt(13)
     r_paket.font.color.rgb = RGBColor(6, 78, 59)
