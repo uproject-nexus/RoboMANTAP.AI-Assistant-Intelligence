@@ -1,22 +1,22 @@
 import io
 import os
-import uuid
-import base64
-import json
 import re
+import uuid
+import json
+import base64
 import pandas as pd
 import streamlit as st
-from datetime import datetime, timedelta
 import streamlit.components.v1 as components
+# from-import python-docx untuk generate Word dan Pdf berlogo
 from docx import Document
-from docx.shared import Pt, RGBColor, Inches
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import parse_xml
-from docx.enum.table import WD_ALIGN_VERTICAL
-# Import python-docx untuk generate Word berlogo (ReportLab PDF)
-from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.units import cm
+from reportlab.lib.pagesizes import A4
+from datetime import datetime, timedelta
+from docx.shared import Pt, RGBColor, Inches
+from docx.enum.table import WD_ALIGN_VERTICAL
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
