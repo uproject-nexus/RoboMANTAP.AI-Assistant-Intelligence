@@ -623,9 +623,9 @@ def generate_frac_image(num_str: str, den_str: str) -> str:
 
 def clean_pdf_text(text: str) -> str:
     """
-    Master Helper PDF (3 Lapis Anti-Kotak Hitam):
+    Master Helper PDF (3 Lapis Anti-Kotak Hitam + Pecahan Campuran Presisi):
     Mengonversi LaTeX, Unicode Pangkat/Subscript, Logaritma, Kimia, dan Pecahan
-    menjadi HTML ReportLab (<sup>, <sub>, <img>) untuk mencegah kotak hitam ■.
+    (termasuk pecahan campuran seperti 5⅓ atau 5 1/3) menjadi HTML ReportLab / PNG Inline.
     """
     if not text:
         return ""
@@ -640,17 +640,25 @@ def clean_pdf_text(text: str) -> str:
         "⅛": ("1", "8"), "⅜": ("3", "8"), "⅝": ("5", "8"), "⅞": ("7", "8")
     }
 
-    # 1. Konversi Pecahan Unicode (Gambar PNG -> Fallback HTML sup/sub)
+    # 0. Normalisasi Format Kurung Dulu: 5(1/3) -> 5 1/3
+    text = re.sub(r'(\d+)\s*\(([0-9]{1,2})/([0-9]{1,2})\)', r'\1 \2/\3', text)
+
+    # 1. Konversi Pecahan Unicode (Ditambah Penanganan Pecahan Campuran 5⅓)
     for uni, (num, den) in frac_map.items():
         if uni in text:
             img_path = generate_frac_image(num, den)
             if img_path:
-                text = text.replace(uni, f'<img src="{img_path}" height="13" valign="middle"/>')
+                img_tag = f'<img src="{img_path}" height="13" valign="middle"/>'
             else:
-                # Fallback Lapis 1: Jika gambar gagal dibuat, ubah ke HTML sup/sub (Aman dari ■)
-                text = text.replace(uni, f'<sup>{num}</sup>/<sub>{den}</sub>')
+                img_tag = f'<sup>{num}</sup>/<sub>{den}</sub>'
 
-    # 2. Konversi Perintah LaTeX \\frac{a}{b} dan \\tfrac{a}{b}
+            # A. Jika Pecahan Campuran (ada angka bulat di depan, contoh: 5⅓ atau 5 ⅓)
+            text = re.sub(rf'(\d+)\s*{re.escape(uni)}', rf'\1&nbsp;{img_tag}', text)
+            
+            # B. Jika Pecahan Berdiri Sendiri (contoh: ⅓)
+            text = text.replace(uni, img_tag)
+
+    # 2. Konversi Perintah LaTeX \frac{a}{b} dan \tfrac{a}{b}
     def repl_latex_frac(match):
         num, den = match.group(1).strip(), match.group(2).strip()
         img_path = generate_frac_image(num, den)
@@ -660,7 +668,17 @@ def clean_pdf_text(text: str) -> str:
 
     text = re.sub(r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}', repl_latex_frac, text)
 
-    # 3. Konversi Pecahan Angka Miring Sederhana (Contoh: 1/2, 3/8, 1/4)
+    # 3A. Konversi Pecahan Campuran Miring (Contoh: 5 1/3 -> 5 <sup>1</sup>/<sub>3</sub>)
+    def repl_mixed_slash_frac(match):
+        whole, num, den = match.group(1), match.group(2), match.group(3)
+        img_path = generate_frac_image(num, den)
+        if img_path:
+            return f'{whole}&nbsp;<img src="{img_path}" height="13" valign="middle"/>'
+        return f'{whole}&nbsp;<sup>{num}</sup>/<sub>{den}</sub>'
+
+    text = re.sub(r'(\d+)\s+([0-9]{1,2})/([0-9]{1,2})\b', repl_mixed_slash_frac, text)
+
+    # 3B. Konversi Pecahan Biasa Miring (Contoh: 1/3, 3/8)
     def repl_slash_frac(match):
         num, den = match.group(1), match.group(2)
         img_path = generate_frac_image(num, den)
