@@ -322,43 +322,70 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-#helper KUIS docx
+#helper rapikan output KUIS docx
 def clean_math_text(text: str) -> str:
-    """Membersihkan notasi mentah LaTeX menjadi teks/Unicode bersih untuk Microsoft Word."""
+    """
+    Mengonversi notasi LaTeX menjadi Unicode matematika bersih untuk dokumen Word (.docx).
+    Contoh: $x_1^2$ -> x₁², \sqrt{x_1} -> √(x₁), \neq -> ≠
+    """
     if not text:
         return ""
     
-    # 1. Ubah pecahan \frac{a}{b} atau \tfrac{a}{b} menjadi bentuk (a/b)
+    # 1. Konversi Pecahan \frac{a}{b} atau \tfrac{a}{b} -> (a/b)
     text = re.sub(r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}', r'(\1/\2)', text)
     
-    # 2. Hapus simbol pembungkus LaTeX ($)
-    text = text.replace("$", "")
+    # 2. Konversi Akar \sqrt{x} atau \sqrt x -> √(x)
+    text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
+    text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
     
-    # 3. Ubah perintah LaTeX umum menjadi simbol Unicode Word
+    # 3. Peta Karakter Pangkat (Superscript) dan Indeks Bawah (Subscript)
+    sup_map = str.maketrans("0123456789+-=()nxy", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸ")
+    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
+    
+    # Ganti pangkat ^{...} atau ^2, ^3, dll.
+    def repl_sup(match):
+        content = match.group(1) or match.group(2)
+        return content.translate(sup_map)
+    text = re.sub(r'\^\{([^}]+)\}|\^([0-9a-zA-Z\+\-\=])', repl_sup, text)
+    
+    # Ganti indeks bawah _{...} atau _1, _2, dll.
+    def repl_sub(match):
+        content = match.group(1) or match.group(2)
+        return content.translate(sub_map)
+    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z\+\-\=])', repl_sub, text)
+    
+    # 4. Simbol Matematika LaTeX Standar
     replacements = {
+        r"\neq": "≠",
+        r"\leq": "≤",
+        r"\geq": "≥",
         r"\times": "×",
         r"\div": "÷",
         r"\cdot": "·",
-        r"\log": "log",
-        r"\infty": "∞",
         r"\pm": "±",
-        r"\leq": "≤",
-        r"\geq": "≥",
-        r"\neq": "≠",
-        "\\": "" # Hapus sisa backslash
+        r"\infty": "∞",
+        r"\pi": "π",
+        r"\alpha": "α",
+        r"\beta": "β",
+        r"\theta": "θ",
+        r"\log": "log",
+        "$": "", # Hapus simbol pembungkus LaTeX
     }
+    
     for old, new in replacements.items():
         text = text.replace(old, new)
         
-    # 4. Hapus sisa kurung kurawal yang tidak terpakai
+    # 5. Bersihkan sisa kurung kurawal & backslash
     text = text.replace("{", "").replace("}", "")
+    text = re.sub(r'\\([a-zA-Z]+)', r'\1', text)
+    text = text.replace("\\", "")
     
-    # 5. Rapikan spasi ganda
+    # 6. Rapikan spasi ganda
     return re.sub(r'\s+', ' ', text).strip()
     
 # Generate KUIS docx
 def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
-    """Membuat file Word (.docx) berformat rapi dari draft kuis custom."""
+    """Membuat file Word (.docx) berformat rapi dan konsisten."""
     doc = Document()
 
     # Title Header
@@ -369,26 +396,53 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     title_run.font.color.rgb = RGBColor(6, 78, 59)
     title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    # Meta Info Kuis
-    meta_p = doc.add_paragraph()
-    meta_p.add_run(f"Jenjang / Kelas : ").bold = True
-    meta_p.add_run(f"{config.get('jenjang', '-')} ({config.get('kelas', '-')})\n")
-    
-    meta_p.add_run(f"Materi Utama   : ").bold = True
-    meta_p.add_run(f"{clean_math_text(config.get('materi', '-'))}\n")
-    
-    meta_p.add_run(f"Jumlah Soal    : ").bold = True
-    meta_p.add_run(f"{len(quiz_list)} Soal | Durasi: {config.get('timer_h', 0)}j {config.get('timer_m', 0)}m\n")
-    
-    meta_p.add_run(f"Masa Aktif Kuis: ").bold = True
-    meta_p.add_run(f"{config.get('time_start_str', '--:--')} hingga {config.get('time_end_str', '--:--')} WIB\n")
-    meta_p.paragraph_format.space_after = Pt(14)
+    # Meta Info Kuis (Tabel Tanpa Border agar Titik Dua Sejajar Rapi)
+    meta_items = [
+        ("Jenjang / Kelas", f"{config.get('jenjang', '-')} ({config.get('kelas', '-')})"),
+        ("Materi Utama", f"{clean_math_text(config.get('materi', '-'))}"),
+        ("Jumlah Soal", f"{len(quiz_list)} Soal | Durasi: {config.get('timer_h', 0)}j {config.get('timer_m', 0)}m"),
+        ("Masa Aktif Kuis", f"{config.get('time_start_str', '--:--')} hingga {config.get('time_end_str', '--:--')} WIB")
+    ]
 
-    doc.add_paragraph("=" * 60)
+    meta_table = doc.add_table(rows=0, cols=3)
+    meta_table.autofit = False
 
-    # Daftar Soal & Kunci Jawaban
+    for label, val in meta_items:
+        row_cells = meta_table.add_row().cells
+        
+        # Kolom 1: Label (Bold)
+        p0 = row_cells[0].paragraphs[0]
+        r0 = p0.add_run(label)
+        r0.bold = True
+        p0.paragraph_format.space_before = Pt(2)
+        p0.paragraph_format.space_after = Pt(2)
+        row_cells[0].width = Inches(1.5)
+        
+        # Kolom 2: Titik Dua (Lurus Sejajar)
+        p1 = row_cells[1].paragraphs[0]
+        r1 = p1.add_run(":")
+        r1.bold = True
+        p1.paragraph_format.space_before = Pt(2)
+        p1.paragraph_format.space_after = Pt(2)
+        row_cells[1].width = Inches(0.2)
+        
+        # Kolom 3: Teks Nilai
+        p2 = row_cells[2].paragraphs[0]
+        p2.add_run(val)
+        p2.paragraph_format.space_before = Pt(2)
+        p2.paragraph_format.space_after = Pt(2)
+        row_cells[2].width = Inches(4.8)
+
+    # Garis Pembatas
+    p_div = doc.add_paragraph()
+    p_div.paragraph_format.space_before = Pt(10)
+    p_div.paragraph_format.space_after = Pt(14)
+    p_div.add_run("=" * 60)
+
+
+    # Loop Soal & Pembahasan
     for idx, item in enumerate(quiz_list, start=1):
-        # Pertanyaan (Dibersihkan dari LaTeX)
+        # Teks Soal
         clean_q = clean_math_text(item.get('question', ''))
         p_q = doc.add_paragraph()
         q_run = p_q.add_run(f"Soal {idx}. {clean_q}")
@@ -396,35 +450,34 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
         q_run.font.size = Pt(11)
         p_q.paragraph_format.space_before = Pt(8)
 
-        # Opsi Pilihan Jawaban (Dibersihkan dari LaTeX)
+        # Opsi Jawaban
         for opt in item.get('options', []):
             clean_opt = clean_math_text(opt)
             p_opt = doc.add_paragraph()
             p_opt.paragraph_format.left_indent = Inches(0.25)
-            p_opt.add_run(f"{clean_opt}")
+            p_opt.add_run(clean_opt)
             p_opt.paragraph_format.space_after = Pt(2)
 
-        # Kunci Jawaban (Dibersihkan dari LaTeX)
+        # Kunci Jawaban
         clean_ans = clean_math_text(item.get('correct_answer', ''))
         p_ans = doc.add_paragraph()
         p_ans.paragraph_format.left_indent = Inches(0.25)
         ans_label = p_ans.add_run("Kunci Jawaban: ")
         ans_label.bold = True
-        ans_val = p_ans.add_run(f"{clean_ans}")
+        ans_val = p_ans.add_run(clean_ans)
         ans_val.bold = True
         ans_val.font.color.rgb = RGBColor(5, 150, 105)
 
-        # Pembahasan (Dibersihkan dari LaTeX)
+        # Pembahasan
         if item.get('solution_basis'):
             clean_sol = clean_math_text(item.get('solution_basis'))
             p_sol = doc.add_paragraph()
             p_sol.paragraph_format.left_indent = Inches(0.25)
             sol_label = p_sol.add_run("Pembahasan: ")
             sol_label.bold = True
-            p_sol.add_run(f"{clean_sol}")
+            p_sol.add_run(clean_sol)
             p_sol.paragraph_format.space_after = Pt(12)
 
-    # Output ke Byte Stream
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
