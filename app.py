@@ -1724,9 +1724,6 @@ elif st.session_state.page == "guru_dashboard":
         }
         </style>
         """, unsafe_allow_html=True)
-        
-        # --- BARIS KOLOM KAMU (BARIS 1699) ---
-        col1, col2, col3 = st.columns(3)
 
         col1, col2, col3 = st.columns(3)
         # --- MODEL 1: CLASSIC COVER ---
