@@ -1694,33 +1694,87 @@ elif st.session_state.page == "guru_dashboard":
             mapel_lkpd = st.selectbox("Mata Pelajaran:", ["Matematika", "IPA", "IPS", "PAI & Bahasa Arab", "Fisika", "Biologi", "Kimia"], key="lkpd_mapel")
 
         st.caption("💡*Modul cetak PDF ini adalah versi demo. Tampilan cover, logo, dan struktur LKPD dapat ditingkatkan atau disesuaikan penuh berdasarkan permintaan pihak sekolah*")
-        if st.button("📄 Generate LKPD (.pdf)", type="primary", use_container_width=True):
-            if not topic_lkpd.strip():
-                st.warning("⚠️ Ketik topik/materi pembelajarannya dulu ya!")
-            else:
-                with st.spinner("RoboMANTAP sedang merancang LKPD Anda..."):
-                    ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, topic_lkpd)
+        st.caption("💡 Pilih variasi model LKPD yang sesuai dengan kebutuhan cetak Anda:")
+
+        col1, col2, col3 = st.columns(3)
+        # --- MODEL 1: CLASSIC COVER ---
+        with col1:
+            if st.button("📄 Model 1: Classic", type="primary", use_container_width=True):
+                if not topic_lkpd.strip():
+                    st.warning("⚠️ Ketik topik/materi pembelajarannya dulu ya!")
+                else:
+                    with st.spinner("RoboMANTAP merancang LKPD Classic Cover..."):
+                        # Nanti bisa diubah: generate_lkpd_content(mapel_lkpd, kelas_lkpd, topic_lkpd, model_type="classic")
+                        ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, topic_lkpd)
         
-                    if not ai_content:
-                        st.error("Gagal menyusun LKPD. Silakan coba klik tombol sekali lagi.")
-                    else:
-                        pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
-                        
-                        # Simpan hasil PDF & nama file ke session_state agar permanen
-                        st.session_state.lkpd_pdf_bytes = pdf_buffer.getvalue()
-                        st.session_state.lkpd_filename = f"LKPD_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}_GuruMANTAP.pdf"
+                        if not ai_content:
+                            st.error("Gagal menyusun LKPD. Silakan coba klik tombol sekali lagi.")
+                        else:
+                            # Nanti bisa diubah: create_lkpd_pdf_model1(...)
+                            pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
+                            
+                            clean_topic = topic_lkpd.strip().replace(' ', '_')
+                            st.session_state.lkpd_pdf_bytes = pdf_buffer.getvalue()
+                            st.session_state.lkpd_filename = f"LKPD_Classic_{mapel_lkpd}_{clean_topic}_GuruMANTAP.pdf"
+                            st.session_state.lkpd_active_model = "Model 1 (Classic Cover)"
         
-        # TAMPILKAN TOMBOL DOWNLOAD PERMANEN
+        # --- MODEL 2: COMPACT DRILL ---
+        with col2:
+            if st.button("⚡ Model 2: Compact", type="primary", use_container_width=True):
+                if not topic_lkpd.strip():
+                    st.warning("⚠️ Ketik topik/materi pembelajarannya dulu ya!")
+                else:
+                    with st.spinner("RoboMANTAP merancang LKPD Compact Drill..."):
+                        # TEMPORARY: Nanti ubah ke model_type="compact" saat ai_engine.py diperbarui
+                        ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, topic_lkpd)
+        
+                        if not ai_content:
+                            st.error("Gagal menyusun LKPD. Silakan coba klik tombol sekali lagi.")
+                        else:
+                            # TEMPORARY: Nanti ganti dengan create_lkpd_pdf_model2(...)
+                            pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
+                            
+                            clean_topic = topic_lkpd.strip().replace(' ', '_')
+                            st.session_state.lkpd_pdf_bytes = pdf_buffer.getvalue()
+                            st.session_state.lkpd_filename = f"LKPD_Compact_{mapel_lkpd}_{clean_topic}_GuruMANTAP.pdf"
+                            st.session_state.lkpd_active_model = "Model 2 (Compact Drill)"
+        
+        # --- MODEL 3: DEEP HOTS ---
+        with col3:
+            if st.button("🌿 Model 3: Deep HOTS", type="primary", use_container_width=True):
+                if not topic_lkpd.strip():
+                    st.warning("⚠️ Ketik topik/materi pembelajarannya dulu ya!")
+                else:
+                    with st.spinner("RoboMANTAP merancang LKPD Deep HOTS..."):
+                        # TEMPORARY: Nanti ubah ke model_type="hots" saat ai_engine.py diperbarui
+                        ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, topic_lkpd)
+        
+                        if not ai_content:
+                            st.error("Gagal menyusun LKPD. Silakan coba klik tombol sekali lagi.")
+                        else:
+                            # TEMPORARY: Nanti ganti dengan create_lkpd_pdf_model3(...)
+                            pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
+                            
+                            clean_topic = topic_lkpd.strip().replace(' ', '_')
+                            st.session_state.lkpd_pdf_bytes = pdf_buffer.getvalue()
+                            st.session_state.lkpd_filename = f"LKPD_HOTS_{mapel_lkpd}_{clean_topic}_GuruMANTAP.pdf"
+                            st.session_state.lkpd_active_model = "Model 3 (Deep HOTS)"
+        
+        # --- TAMPILKAN TOMBOL DOWNLOAD PERMANEN ---
         if st.session_state.get("lkpd_pdf_bytes"):
-            st.success("✅ Dokumen LKPD Berhasil Dibuat!")
+            st.write("---")
+            active_model = st.session_state.get("lkpd_active_model", "LKPD")
+            
+            st.success(f"✅ Dokumen **{active_model}** Berhasil Dibuat!")
             st.download_button(
-                label="📥 Download LKPD",
+                label=f"📥 Download {active_model} (.pdf)",
                 type="primary",
                 data=st.session_state.lkpd_pdf_bytes,
-                file_name=st.session_state.get("lkpd_filename", "LKPD_RoboMANTAP.pdf"),
+                file_name=st.session_state.get("lkpd_filename", "LKPD_GuruMANTAP.pdf"),
                 mime="application/pdf",
                 use_container_width=True
             )
+
                         
         st.write("---")
         st.markdown("""
