@@ -1708,8 +1708,8 @@ elif st.session_state.page == "guru_dashboard":
             }
             /* Kunci lebar masing-masing kolom menjadi 33% */
             div[data-testid="column"] {
-                width: 33.33% !important;
-                flex: 1 1 33.33% !important;
+                width: 10.33% !important;
+                flex: 1 1 10.33% !important;
                 min-width: 0px !important;
             }
             /* Sesuaikan ukuran font & padding tombol khusus layar HP */
