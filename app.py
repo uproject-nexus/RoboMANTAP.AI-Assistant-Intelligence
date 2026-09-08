@@ -12,7 +12,7 @@ from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import parse_xml
-
+from docx.enum.table import WD_ALIGN_VERTICAL
 # Import python-docx untuk generate Word berlogo (ReportLab PDF)
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
