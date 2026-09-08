@@ -1538,7 +1538,7 @@ elif st.session_state.page == "guru_dashboard":
                     index=context_options.index(custom_cfg.get("konteks", "Standar Sekolah")),
                 )
 
-            st.markdown("##### ⏱️ Batas Waktu Presisi")
+            st.markdown("##### ⏱️ Durasi Pengerjaan Kuis")
             t1, t2, t3 = st.columns(3)
             with t1:
                 timer_h = st.number_input("Jam", min_value=0, max_value=23, value=int(custom_cfg.get("timer_h", 0)))
@@ -1550,12 +1550,6 @@ elif st.session_state.page == "guru_dashboard":
             timer_total = int(timer_h) * 3600 + int(timer_m) * 60 + int(timer_s)
             timer_label = "Tanpa batas waktu" if timer_total <= 0 else str(timedelta(seconds=timer_total))
             st.caption(f"⏳ Durasi sesi: **{timer_label}**")
-
-            submitted = st.form_submit_button(
-                "🧕🏼 GENERATE RoboMANTAP QUIZ CUSTOM",
-                type="primary",
-                use_container_width=True,
-            )
             
             st.markdown("##### 📅 Masa Aktif Kuis (Rentang Waktu 1x24 Jam)")
             st.caption("Set jam kuis mulai dibuka hingga otomatis ditutup:")
@@ -1578,6 +1572,12 @@ elif st.session_state.page == "guru_dashboard":
                 )
 
             st.info(f"📌 **Masa Aktif Kuis:** ( {time_start.strftime('%H:%M')} hingga {time_end.strftime('%H:%M')} WIB )")
+            
+            submitted = st.form_submit_button(
+                "🧕🏼 GENERATE RoboMANTAP QUIZ CUSTOM",
+                type="primary",
+                use_container_width=True,
+            )
 
         if submitted:
             now_wib = datetime.utcnow() + timedelta(hours=7)
