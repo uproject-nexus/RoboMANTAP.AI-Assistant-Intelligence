@@ -590,35 +590,108 @@ def draw_cover_background(canvas_obj, doc):
         canvas_obj.drawImage(cover_path, 0, 0, width=A4[0], height=A4[1])
     canvas_obj.restoreState()
 
-def fix_pdf_fractions(text: str) -> str:
-    """Mengubah Unicode pecahan menjadi tag HTML sup/sub agar dirender rapi di PDF ReportLab."""
+
+# ==================================================================================
+# PEMBERSIH PDF - LKPD
+# =====================================
+_PDF_FRAC_CACHE = {}
+def generate_frac_image(num_str: str, den_str: str) -> str:
+    """Membuat file gambar PNG pecahan tegak lurus untuk PDF."""
+    cache_key = f"{num_str}_{den_str}"
+    if cache_key in _PDF_FRAC_CACHE and os.path.exists(_PDF_FRAC_CACHE[cache_key]):
+        return _PDF_FRAC_CACHE[cache_key]
+    try:
+        fig = plt.figure(figsize=(0.35, 0.35), dpi=200)
+        fig.patch.set_alpha(0.0)
+        ax = fig.add_subplot(111)
+        ax.axis('off')
+
+        math_str = f"$\\frac{{{num_str}}}{{{den_str}}}$"
+        ax.text(0.5, 0.5, math_str, fontsize=11, ha='center', va='center', color='#1F2937')
+
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+        plt.savefig(tmp.name, format='png', bbox_inches='tight', pad_inches=0.01, transparent=True)
+        plt.close(fig)
+
+        _PDF_FRAC_CACHE[cache_key] = tmp.name
+        return tmp.name
+    except Exception:
+        return None
+
+def clean_pdf_text(text: str) -> str:
+    """
+    Master Helper PDF:
+    Mengonversi LaTeX, Unicode Pangkat/Subscript, Logaritma, Kimia, dan Akar
+    menjadi HTML ReportLab (<sup>, <sub>, <img>) untuk mencegah kotak hitam ■.
+    """
     if not text:
         return ""
-    
+    # 1. Konversi Unicode Superscript (⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻) -> <sup>...</sup>
+    sup_chars = "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ"
+    sup_trans = str.maketrans(sup_chars, "0123456789+-=()nxyi")
+    text = re.sub(
+        r'[' + re.escape(sup_chars) + r']+',
+        lambda m: f"<sup>{m.group(0).translate(sup_trans)}</sup>",
+        text
+    )
+    # 2. Konversi Unicode Subscript (₀₁₂₃₄₅₆₇₈₉₊₋) -> <sub>...</sub>
+    sub_chars = "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ"
+    sub_trans = str.maketrans(sub_chars, "0123456789+-=()nixy")
+    text = re.sub(
+        r'[' + re.escape(sub_chars) + r']+',
+        lambda m: f"<sub>{m.group(0).translate(sub_trans)}</sub>",
+        text
+    )
+    # 3. Konversi LaTeX Pangkat (^) dan Subscript (_) -> <sup> & <sub>
+    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z]+)', r'<sup>\1\2</sup>', text)
+    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z]+)', r'<sub>\1\2</sub>', text)
+    # 4. Tangani Pecahan Tegak (Unicode, \frac, dan x/y)
     frac_map = {
-        "½": "<sup>1</sup>/<sub>2</sub>",
-        "⅓": "<sup>1</sup>/<sub>3</sub>",
-        "⅔": "<sup>2</sup>/<sub>3</sub>",
-        "¼": "<sup>1</sup>/<sub>4</sub>",
-        "¾": "<sup>3</sup>/<sub>4</sub>",
-        "⅕": "<sup>1</sup>/<sub>5</sub>",
-        "⅖": "<sup>2</sup>/<sub>5</sub>",
-        "⅗": "<sup>3</sup>/<sub>5</sub>",
-        "⅘": "<sup>4</sup>/<sub>5</sub>",
-        "⅙": "<sup>1</sup>/<sub>6</sub>",
-        "⅚": "<sup>5</sup>/<sub>6</sub>",
-        "⅛": "<sup>1</sup>/<sub>8</sub>",
-        "⅜": "<sup>3</sup>/<sub>8</sub>",
-        "⅝": "<sup>5</sup>/<sub>8</sub>",
-        "⅞": "<sup>7</sup>/<sub>8</sub>",
+        "½": ("1", "2"), "⅓": ("1", "3"), "⅔": ("2", "3"),
+        "¼": ("1", "4"), "¾": ("3", "4"), "⅕": ("1", "5"),
+        "⅖": ("2", "5"), "⅗": ("3", "5"), "⅘": ("4", "5"),
+        "⅙": ("1", "6"), "⅚": ("5", "6"), "⅛": ("1", "8"),
+        "⅜": ("3", "8"), "⅝": ("5", "8"), "⅞": ("7", "8")
     }
-    
-    for uni, html in frac_map.items():
-        text = text.replace(uni, html)
-        
-    return text
+    for uni, (num, den) in frac_map.items():
+        if uni in text:
+            img_path = generate_frac_image(num, den)
+            if img_path:
+                text = text.replace(uni, f'<img src="{img_path}" height="14" valig="middle"/>')
+    text = re.sub(
+        r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}',
+        lambda m: f'<img src="{generate_frac_image(m.group(1).strip(), m.group(2).strip())}" height="14" valig="middle"/>'
+        if generate_frac_image(m.group(1).strip(), m.group(2).strip()) else f'({m.group(1)}/{m.group(2)})',
+        text
+    )
+    # 5. Tangani Akar (\sqrt)
+    text = re.sub(r'\\sqrt\{([^}]+)\}', r'√( \1 )', text)
+    text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
+    # 6. Tangani Panah & Simbol LaTeX
+    text = re.sub(r'\\(?:rightarrow|to)\b', '→', text)
+    text = re.sub(r'\\Rightarrow\b', '⇒', text)
+    text = re.sub(r'\\leftarrow\b', '←', text)
+    text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
+    text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
+    text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
+    # 7. Bersihkan Simbol Matematika Standar & Backslash
+    replacements = {
+        r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
+        r"\leq": "≤", r"\geq": "≥", r"\pm": "±", r"\infty": "∞",
+        r"\pi": "π", r"\alpha": "α", r"\beta": "β", r"\theta": "θ",
+        r"\log": "log", "$": ""
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
 
-# Generator LKPD .pdf
+    text = text.replace("{", "").replace("}", "")
+    text = re.sub(r'\\([a-zA-Z]+)', r'\1', text).replace("\\", "")
+    
+    return re.sub(r'\s+', ' ', text).strip()
+    
+# ==============================================================
+# GENERATOR PEMBUAT .PDF - LKPD
+# ===================================
 def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -699,32 +772,32 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
 
     # --- HALAMAN 2: ISI LKPD ---
     # [A] TUJUAN PEMBELAJARAN
-    head_a = Paragraph("🎯 [A] TUJUAN PEMBELAJARAN (HOTS)", style_section_heading)
+    head_a = Paragraph("[A] TUJUAN PEMBELAJARAN (HOTS)", style_section_heading)
     t_head_a = Table([[head_a]], colWidths=[16.5 * cm])
     t_head_a.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')), ('PADDING', (0,0), (-1,-1), 6)]))
     story.append(t_head_a)
     story.append(Spacer(1, 0.2 * cm))
 
     tujuan_list = ai_content.get("tujuan", [])
-    tujuan_text = "<br/>".join([f"{i+1}. {t}" for i, t in enumerate(tujuan_list)])
+    tujuan_text = "<br/>".join([f"{i+1}. {clean_pdf_text(t)}" for i, t in enumerate(tujuan_list)])
     story.append(Paragraph(tujuan_text, style_body))
     story.append(Spacer(1, 0.5 * cm))
 
     # [B] APERSEPSI & EKSPLORASI KONSEP
-    head_b = Paragraph("📖 [B] APERSEPSI & EKSPLORASI KONSEP", style_section_heading)
+    head_b = Paragraph("[B] APERSEPSI & EKSPLORASI KONSEP", style_section_heading)
     t_head_b = Table([[head_b]], colWidths=[16.5 * cm])
     t_head_b.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')), ('PADDING', (0,0), (-1,-1), 6)]))
     story.append(t_head_b)
     story.append(Spacer(1, 0.2 * cm))
 
-    p_ringkasan = Paragraph(fix_pdf_fractions(ai_content.get("ringkasan", "")), style_body)
+    p_ringkasan = Paragraph(clean_pdf_text(ai_content.get("ringkasan", "")), style_body)
     t_box_b = Table([[p_ringkasan]], colWidths=[16.5 * cm])
     t_box_b.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F0F9FF')), ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#BAE6FD')), ('PADDING', (0,0), (-1,-1), 8)]))
     story.append(t_box_b)
     story.append(Spacer(1, 0.5 * cm))
 
     # [C] TUGAS EKSPLORASI MANDIRI (3 SOAL)
-    head_c = Paragraph("✍️ [C] TUGAS EKSPLORASI MANDIRI", style_section_heading)
+    head_c = Paragraph("[C] TUGAS EKSPLORASI MANDIRI", style_section_heading)
     t_head_c = Table([[head_c]], colWidths=[16.5 * cm])
     t_head_c.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')), ('PADDING', (0,0), (-1,-1), 6)]))
     story.append(t_head_c)
@@ -733,7 +806,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     # Loop 3 Soal Eksplorasi (range 1 hingga 4)
     for i in range(1, 4):
         soal_raw = ai_content.get(f'soal_{i}', f'Soal eksplorasi nomor {i} belum tersedia.')
-        soal_clean = fix_pdf_fractions(soal_raw)        
+        soal_clean = clean_pdf_text(soal_raw)
         story.append(Paragraph(f"<b>Soal {i}:</b> {soal_clean}", style_body))
         story.append(Spacer(1, 0.15 * cm))
         p_ans = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban:</i></font><br/><br/><br/><br/>", style_body)
@@ -743,13 +816,12 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
         story.append(Spacer(1, 0.4 * cm))
 
     # [D] REFLEKSI KEISLAMAN & HIKMAH
-    head_d = Paragraph("🌿 [D] REFLEKSI KEISLAMAN & HIKMAH", style_section_heading)
+    head_d = Paragraph("[D] REFLEKSI KEISLAMAN & HIKMAH", style_section_heading)
     t_head_d = Table([[head_d]], colWidths=[16.5 * cm])
     t_head_d.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#D97706')), ('PADDING', (0,0), (-1,-1), 6)]))
     story.append(t_head_d)
     story.append(Spacer(1, 0.2 * cm))
-    # Refleksi
-    refleksi_clean = fix_pdf_fractions(ai_content.get("refleksi", ""))
+    refleksi_clean = clean_pdf_text(ai_content.get("refleksi", ""))
     p_refleksi = Paragraph(f'<i>"{refleksi_clean}"</i>', style_body)
     t_box_d = Table([[p_refleksi]], colWidths=[16.5 * cm])
     t_box_d.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#FEF3C7')), ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#FDE68A')), ('PADDING', (0,0), (-1,-1), 8)]))
@@ -758,7 +830,10 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     doc.build(story, onFirstPage=draw_cover_background, onLaterPages=draw_cover_background)
     buffer.seek(0)
     return buffer
-    
+
+# ========================================================================
+# RENDER CUSTOM TIMER
+# ========================================
 @st.fragment(run_every="1s")
 def render_custom_timer(start_time_wib, timer_seconds):
     sekarang_wib = datetime.utcnow() + timedelta(hours=7)
