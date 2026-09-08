@@ -1584,21 +1584,27 @@ elif st.session_state.page == "guru_dashboard":
             else:
                 with st.spinner("RoboMANTAP sedang merancang LKPD Anda..."):
                     ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, topic_lkpd)
-                    
+        
                     if not ai_content:
                         st.error("Gagal menyusun LKPD. Silakan coba klik tombol sekali lagi.")
                     else:
                         pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
-                        st.success("✅ Dokumen LKPD Berhasil Dibuat!")
                         
-                        st.download_button(
-                            label="📥 Download LKPD",
-                            type="primary",
-                            data=pdf_buffer,
-                            file_name=f"LKPD_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}_RoboMANTAP.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
+                        # Simpan hasil PDF & nama file ke session_state agar permanen
+                        st.session_state.lkpd_pdf_bytes = pdf_buffer.getvalue()
+                        st.session_state.lkpd_filename = f"LKPD_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}_GuruMANTAP.pdf"
+        
+        # TAMPILKAN TOMBOL DOWNLOAD PERMANEN
+        if st.session_state.get("lkpd_pdf_bytes"):
+            st.success("✅ Dokumen LKPD Berhasil Dibuat!")
+            st.download_button(
+                label="📥 Download LKPD",
+                type="primary",
+                data=st.session_state.lkpd_pdf_bytes,
+                file_name=st.session_state.get("lkpd_filename", "LKPD_RoboMANTAP.pdf"),
+                mime="application/pdf",
+                use_container_width=True
+            )
                         
         st.write("---")
         st.markdown("""
