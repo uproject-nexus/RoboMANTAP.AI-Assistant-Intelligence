@@ -1108,7 +1108,7 @@ elif st.session_state.page == "guru_dashboard":
                     gap: 10px;
                     margin-bottom: 15px;
                 }}
-                @media (max-width: 640px) {{
+                @media (max-width: 350px) {{
                     .kpi-grid-top {{
                         grid-template-columns: repeat(2, 1fr);
                         gap: 4px;
@@ -1121,8 +1121,8 @@ elif st.session_state.page == "guru_dashboard":
                 .kpi-card {{
                     background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(2, 44, 34, 0.7) 100%);
                     border: 1px solid rgba(5, 150, 105, 0.35);
-                    border-radius: 5px;
-                    padding: 5px 6px;
+                    border-radius: 10px;
+                    padding: 10px 12px;
                     text-align: center;
                     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
                 }}
