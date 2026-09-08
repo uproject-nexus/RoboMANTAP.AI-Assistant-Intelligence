@@ -440,7 +440,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     p_div.paragraph_format.space_after = Pt(14)
     pBdr = parse_xml(
         r'<w:pBdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
-        r'<w:bottom w:val="single" w:sz="12" w:space="1" w:color="064E3B"/>'
+        r'<w:bottom w:val="single" w:sz="18" w:space="1" w:color="064E3B"/>'
         r'</w:pBdr>'
     )
     p_div._p.get_or_add_pPr().append(pBdr)
