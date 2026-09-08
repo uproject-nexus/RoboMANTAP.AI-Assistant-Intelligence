@@ -393,7 +393,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     header_table.autofit = False
     
     cells = header_table.rows[0].cells
-    cells[0].width = Inches(1.8)
+    cells[0].width = Inches(1.5)
     cells[1].width = Inches(4.7)
     
     # Vertikal Center
@@ -420,12 +420,12 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     
     r1 = p_title.add_run("LEMBAR KUIS GuruMANTAP\n")
     r1.bold = True
-    r1.font.size = Pt(12)
+    r1.font.size = Pt(13)
     r1.font.color.rgb = RGBColor(6, 78, 59) # Warna Hijau Edukasi
     
     r2 = p_title.add_run("Madrasah Aliyah dan Tsanawiyah Al-Irsyad Al-Islamiyah Putri Bondowoso\n")
     r2.bold = True
-    r2.font.size = Pt(9)
+    r2.font.size = Pt(10.5)
     
     # Ambil tanggal WIB presisi saat dokumen dibuat
     now_wib = datetime.utcnow() + timedelta(hours=7)
