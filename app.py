@@ -330,7 +330,7 @@ with st.sidebar:
 # GENERATOR DOCX. KUIS
 #===========================================================
 # HELPER MERAPIKAN OUTPUT KUIS
-import html
+
 
 # ============================================================
 # HELPER RAPIKAN OUTPUT KUIS DOCX (ASLI TANPA DIUBAH)
@@ -440,47 +440,55 @@ def add_omml_matrix(paragraph, matrix_type: str, content: str):
         )
     else:
         omml_xml = f'<m:oMath {nsdecls("m")}>{inner_matrix}</m:oMath>'
+    paragraph._p.append(parse_xml(omml_xml))
+
+def add_omml_fraction(paragraph, num_text: str, den_text: str):
+
+    """Menyisipkan struktur Pecahan Tegak Resmi Microsoft Word (Equation)."""
+    num_clean = clean_math_string(num_text)
+    den_clean = clean_math_string(den_text)
+    omml_xml = (
+        f'<m:oMath {nsdecls("m")}>'
+        f'  <m:f>'
+        f'    <m:num><m:r><m:t>{num_clean}</m:t></m:r></m:num>'
+        f'    <m:den><m:r><m:t>{den_clean}</m:t></m:r></m:den>'
+        f'  </m:f>'
+        f'</m:oMath>'
+    )
 
     paragraph._p.append(parse_xml(omml_xml))
 
-
 def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, color_rgb: RGBColor = None):
-    """Membagi paragraf: teks biasa, pecahan \\frac, dan matriks \\begin{...matrix}."""
+    """Membagi paragraf: teks biasa jadi Run standar, \\frac/\\tfrac jadi Pecahan Tegak."""
     if not text:
         return
 
-    math_pattern = re.compile(
-        r'\\begin\{(?P<mtype>[pbvV]?matrix)\}(?P<mcontent>.*?)\\end\{(?P=mtype)\}|\\(?:f|tf)rac\{(?P<num>[^}]+)\}\{(?P<den>[^}]+)\}',
-        re.DOTALL
-    )
+    # Deteksi \frac{pembilang}{penyebut} atau \tfrac{pembilang}{penyebut}
+    frac_pattern = re.compile(r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}')
     last_idx = 0
 
-    for match in math_pattern.finditer(text):
+    for match in frac_pattern.finditer(text):
         start, end = match.span()
-        
-        # Cetak teks biasa sebelum rumus
+
+        # Cetak teks sebelum pecahan
         if start > last_idx:
             plain_part = clean_math_string(text[last_idx:start])
             if plain_part:
                 run = paragraph.add_run(plain_part + " ")
                 run.bold = is_bold
                 if color_rgb:
+
                     run.font.color.rgb = color_rgb
 
-        # Jika Matriks -> Rendernya pakai add_omml_matrix
-        if match.group('mtype'):
-            add_omml_matrix(paragraph, match.group('mtype'), match.group('mcontent'))
-            
-        # Jika Pecahan -> Rendernya pakai add_omml_fraction (asli)
-        elif match.group('num'):
-            add_omml_fraction(paragraph, match.group('num'), match.group('den'))
-        
+        # Cetak Pecahan Tegak Word
+        add_omml_fraction(paragraph, match.group(1), match.group(2))
+ 
+        # Tambah spasi tipis setelah pecahan
         run_space = paragraph.add_run(" ")
         run_space.bold = is_bold
-
         last_idx = end
 
-    # Cetak sisa teks setelah rumus terakhir
+    # Cetak sisa teks setelah pecahan terakhir
     if last_idx < len(text):
         plain_part = clean_math_string(text[last_idx:])
         if plain_part:
@@ -488,7 +496,6 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
             run.bold = is_bold
             if color_rgb:
                 run.font.color.rgb = color_rgb
-
 
 # GENERATOR KUIS
 def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
