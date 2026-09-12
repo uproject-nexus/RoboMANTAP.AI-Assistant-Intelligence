@@ -331,6 +331,39 @@ def clean_math_string(text: str) -> str:
     if not text:
         return ""
     
+    # 0. Konversi Matriks LaTeX (\begin{pmatrix}...\end{pmatrix}, bmatrix, dll.) SEBELUM backslash dibersihkan
+    def format_matrix(match):
+        m_type = match.group(1) or ""
+        content = match.group(2)
+        
+        # Tentukan jenis kurung
+        if m_type.startswith('p'):
+            open_b, close_b = '(', ')'
+        elif m_type.startswith('b'):
+            open_b, close_b = '[', ']'
+        elif m_type.startswith('v') or m_type.startswith('V'):
+            open_b, close_b = '|', '|'
+        else:
+            open_b, close_b = '(', ')'
+            
+        # Pisahkan baris (\\) dan kolom (&)
+        rows = re.split(r'\\\\|\\cr', content)
+        row_strs = []
+        for r in rows:
+            cols = [c.strip() for c in r.split('&') if c.strip()]
+            if cols:
+                row_strs.append("  ".join(cols))
+        
+        return f"{open_b} {'; '.join(row_strs)} {close_b}"
+
+    # Ubah blok matriks LaTeX ke format pembacaan Unicode rapi
+    text = re.sub(
+        r'\\begin\{([pbvV]?matrix)\}(.*?)\\end\{\1\}',
+        format_matrix,
+        text,
+        flags=re.DOTALL
+    )
+
     # 1. Konversi Panah LaTeX SEBELUM memproses \left / \right
     text = re.sub(r'\\(?:rightarrow|to)\b', '→', text)
     text = re.sub(r'\\Rightarrow\b', '⇒', text)
