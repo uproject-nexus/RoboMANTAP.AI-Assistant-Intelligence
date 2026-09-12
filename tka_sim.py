@@ -6,8 +6,8 @@ def inject_tka_css():
     <style>
         /* Paksa 3 kolom tombol bawah tetap sejajar di HP */
         .bottom-nav-container [data-testid="column"] {
-            min-width: 5% !important;
-            padding: 0px 2px !important;
+            min-width: 3% !important;
+            padding: 0px 0.5px !important;
         }
         
         /* Tombol Navigasi Bawah Pusmendik */
