@@ -330,28 +330,40 @@ with st.sidebar:
 # GENERATOR DOCX. KUIS
 #===========================================================
 # HELPER MERAPIKAN OUTPUT KUIS
+import html
+
+# ============================================================
+# HELPER RAPIKAN OUTPUT KUIS DOCX (ASLI TANPA DIUBAH)
+# ============================================================
+
 def clean_math_string(text: str) -> str:
     """Pembersih simbol & notasi matematika dasar untuk teks biasa."""
     if not text:
         return ""
+    
     # 1. Konversi Panah LaTeX SEBELUM memproses \left / \right
     text = re.sub(r'\\(?:rightarrow|to)\b', '→', text)
     text = re.sub(r'\\Rightarrow\b', '⇒', text)
     text = re.sub(r'\\leftarrow\b', '←', text)
     text = re.sub(r'\\leftrightarrow\b', '↔', text)
+
     # 2. Bersihkan \left dan \right (Gunakan \b agar \rightarrow tidak terpotong)
     text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
     text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
     text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
+
     # 3. Konversi Akar \sqrt{x}
     text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
     text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
+
     # 4. Pangkat & Subscript Unicode
     sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
     sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄⁵₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
+
     text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sup_map), text)
     text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sub_map), text)
-   # 5. Simbol Matematika
+
+    # 5. Simbol Matematika
     replacements = {
         r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
         r"\leq": "≤", r"\geq": "≥", r"\pm": "±", r"\infty": "∞",
@@ -359,6 +371,7 @@ def clean_math_string(text: str) -> str:
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
+
     # 6. Sapu bersih ampas backslash
     text = text.replace("left(", "(").replace("right)", ")").replace("dots", "…")
     text = text.replace("{", "").replace("}", "")
@@ -367,14 +380,14 @@ def clean_math_string(text: str) -> str:
 
 clean_math_text = clean_math_string
 
+
 def add_omml_fraction(paragraph, num_text: str, den_text: str):
     """Menyisipkan struktur Pecahan Tegak Resmi Microsoft Word (Equation)."""
-    # Mengamankan teks dari karakter khusus XML (<, >, &)
-    num_clean = html.escape(clean_math_string(num_text))
-    den_clean = html.escape(clean_math_string(den_text))
+    num_clean = clean_math_string(num_text)
+    den_clean = clean_math_string(den_text)
     
     omml_xml = (
-        f'<m:oMath {nsdecls("m", "w")}>'
+        f'<m:oMath {nsdecls("m")}>'
         f'  <m:f>'
         f'    <m:num><m:r><m:t>{num_clean}</m:t></m:r></m:num>'
         f'    <m:den><m:r><m:t>{den_clean}</m:t></m:r></m:den>'
@@ -383,6 +396,10 @@ def add_omml_fraction(paragraph, num_text: str, den_text: str):
     )
     paragraph._p.append(parse_xml(omml_xml))
 
+
+# ============================================================
+# PENAMBAHAN PARSER MATRIKS WORD EQUATION (OMML VALID)
+# ============================================================
 
 def add_omml_matrix(paragraph, matrix_type: str, content: str):
     """Menyisipkan struktur Matriks 2D Bertingkat Resmi Microsoft Word (Equation)."""
@@ -394,6 +411,7 @@ def add_omml_matrix(paragraph, matrix_type: str, content: str):
     elif matrix_type == "matrix":
         beg_chr, end_chr = "", ""
 
+    # Memecah baris (\\ atau \cr) dan kolom (&)
     rows = [r.strip() for r in re.split(r'\\\\|\\cr', content) if r.strip()]
     
     matrix_xml_rows = []
@@ -401,16 +419,16 @@ def add_omml_matrix(paragraph, matrix_type: str, content: str):
         cols = [c.strip() for c in r.split('&')]
         cols_xml = []
         for c in cols:
-            # Mengamankan teks isi matriks dari karakter khusus XML (<, >, &)
             cleaned_c = html.escape(clean_math_string(c))
             cols_xml.append(f'<m:e><m:r><m:t>{cleaned_c}</m:t></m:r></m:e>')
         matrix_xml_rows.append(f'<m:mr>{"".join(cols_xml)}</m:mr>')
 
-    inner_matrix = f'<m:matrix>{"".join(matrix_xml_rows)}</m:matrix>'
+    # Gunakan tag resmi OMML Word: <m:m>
+    inner_matrix = f'<m:m>{"".join(matrix_xml_rows)}</m:m>'
 
     if beg_chr or end_chr:
         omml_xml = (
-            f'<m:oMath {nsdecls("m", "w")}>'
+            f'<m:oMath {nsdecls("m")}>'
             f'  <m:d>'
             f'    <m:dPr>'
             f'      <m:begChr m:val="{beg_chr}"/>'
@@ -421,7 +439,7 @@ def add_omml_matrix(paragraph, matrix_type: str, content: str):
             f'</m:oMath>'
         )
     else:
-        omml_xml = f'<m:oMath {nsdecls("m", "w")}>{inner_matrix}</m:oMath>'
+        omml_xml = f'<m:oMath {nsdecls("m")}>{inner_matrix}</m:oMath>'
 
     paragraph._p.append(parse_xml(omml_xml))
 
@@ -440,6 +458,7 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
     for match in math_pattern.finditer(text):
         start, end = match.span()
         
+        # Cetak teks biasa sebelum rumus
         if start > last_idx:
             plain_part = clean_math_string(text[last_idx:start])
             if plain_part:
@@ -448,8 +467,11 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
                 if color_rgb:
                     run.font.color.rgb = color_rgb
 
+        # Jika Matriks -> Rendernya pakai add_omml_matrix
         if match.group('mtype'):
             add_omml_matrix(paragraph, match.group('mtype'), match.group('mcontent'))
+            
+        # Jika Pecahan -> Rendernya pakai add_omml_fraction (asli)
         elif match.group('num'):
             add_omml_fraction(paragraph, match.group('num'), match.group('den'))
         
@@ -458,6 +480,7 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
 
         last_idx = end
 
+    # Cetak sisa teks setelah rumus terakhir
     if last_idx < len(text):
         plain_part = clean_math_string(text[last_idx:])
         if plain_part:
@@ -465,6 +488,7 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
             run.bold = is_bold
             if color_rgb:
                 run.font.color.rgb = color_rgb
+
 
 # GENERATOR KUIS
 def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
