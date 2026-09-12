@@ -325,68 +325,32 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-#helper rapikan output KUIS docx
+#===========================================================
+# GENERATOR DOCX. KUIS
+#===========================================================
+# HELPER MERAPIKAN OUTPUT KUIS
 def clean_math_string(text: str) -> str:
     """Pembersih simbol & notasi matematika dasar untuk teks biasa."""
     if not text:
         return ""
-    
-    # 0. Konversi Matriks LaTeX (\begin{pmatrix}...\end{pmatrix}, bmatrix, dll.) SEBELUM backslash dibersihkan
-    def format_matrix(match):
-        m_type = match.group(1) or ""
-        content = match.group(2)
-        
-        # Tentukan jenis kurung
-        if m_type.startswith('p'):
-            open_b, close_b = '(', ')'
-        elif m_type.startswith('b'):
-            open_b, close_b = '[', ']'
-        elif m_type.startswith('v') or m_type.startswith('V'):
-            open_b, close_b = '|', '|'
-        else:
-            open_b, close_b = '(', ')'
-            
-        # Pisahkan baris (\\) dan kolom (&)
-        rows = re.split(r'\\\\|\\cr', content)
-        row_strs = []
-        for r in rows:
-            cols = [c.strip() for c in r.split('&') if c.strip()]
-            if cols:
-                row_strs.append("  ".join(cols))
-        
-        return f"{open_b} {'; '.join(row_strs)} {close_b}"
-
-    # Ubah blok matriks LaTeX ke format pembacaan Unicode rapi
-    text = re.sub(
-        r'\\begin\{([pbvV]?matrix)\}(.*?)\\end\{\1\}',
-        format_matrix,
-        text,
-        flags=re.DOTALL
-    )
-
     # 1. Konversi Panah LaTeX SEBELUM memproses \left / \right
     text = re.sub(r'\\(?:rightarrow|to)\b', '→', text)
     text = re.sub(r'\\Rightarrow\b', '⇒', text)
     text = re.sub(r'\\leftarrow\b', '←', text)
     text = re.sub(r'\\leftrightarrow\b', '↔', text)
-
     # 2. Bersihkan \left dan \right (Gunakan \b agar \rightarrow tidak terpotong)
     text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
     text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
     text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
-
     # 3. Konversi Akar \sqrt{x}
     text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
     text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
-
     # 4. Pangkat & Subscript Unicode
     sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
-    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
-
+    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄⁵₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
     text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sup_map), text)
     text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sub_map), text)
-
-    # 5. Simbol Matematika
+   # 5. Simbol Matematika
     replacements = {
         r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
         r"\leq": "≤", r"\geq": "≥", r"\pm": "±", r"\infty": "∞",
@@ -394,13 +358,12 @@ def clean_math_string(text: str) -> str:
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
-
     # 6. Sapu bersih ampas backslash
     text = text.replace("left(", "(").replace("right)", ")").replace("dots", "…")
     text = text.replace("{", "").replace("}", "")
     text = re.sub(r'\\([a-zA-Z]+)', r'\1', text).replace("\\", "")
     return re.sub(r'\s+', ' ', text).strip()
-    
+
 clean_math_text = clean_math_string
 
 def add_omml_fraction(paragraph, num_text: str, den_text: str):
@@ -418,19 +381,63 @@ def add_omml_fraction(paragraph, num_text: str, den_text: str):
     )
     paragraph._p.append(parse_xml(omml_xml))
 
+def add_omml_matrix(paragraph, matrix_type: str, content: str):
+    """Menyisipkan struktur Matriks 2D Bertingkat Resmi Microsoft Word (Equation)."""
+    beg_chr, end_chr = "(", ")"
+    if matrix_type == "bmatrix":
+        beg_chr, end_chr = "[", "]"
+    elif matrix_type in ["vmatrix", "Vmatrix"]:
+        beg_chr, end_chr = "|", "|"
+    elif matrix_type == "matrix":
+        beg_chr, end_chr = "", ""
+
+    # Pisahkan baris (\\ atau \cr) dan kolom (&)
+    rows = [r.strip() for r in re.split(r'\\\\|\\cr', content) if r.strip()]
+    
+    matrix_xml_rows = []
+    for r in rows:
+        cols = [c.strip() for c in r.split('&')]
+        cols_xml = []
+        for c in cols:
+            cleaned_c = clean_math_string(c)
+            cols_xml.append(f'<m:e><m:r><m:t>{cleaned_c}</m:t></m:r></m:e>')
+        matrix_xml_rows.append(f'<m:mr>{"".join(cols_xml)}</m:mr>')
+
+    inner_matrix = f'<m:matrix>{"".join(matrix_xml_rows)}</m:matrix>'
+
+    if beg_chr or end_chr:
+        omml_xml = (
+            f'<m:oMath {nsdecls("m")}>'
+            f'  <m:d>'
+            f'    <m:dPr>'
+            f'      <m:begChr m:val="{beg_chr}"/>'
+            f'      <m:endChr m:val="{end_chr}"/>'
+            f'    </m:dPr>'
+            f'    <m:e>{inner_matrix}</m:e>'
+            f'  </m:d>'
+            f'</m:oMath>'
+        )
+    else:
+        omml_xml = f'<m:oMath {nsdecls("m")}>{inner_matrix}</m:oMath>'
+
+    paragraph._p.append(parse_xml(omml_xml))
+
 def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, color_rgb: RGBColor = None):
-    """Membagi paragraf: teks biasa jadi Run standar, \\frac/\\tfrac jadi Pecahan Tegak."""
+    """Membagi paragraf: teks biasa jadi Run standar, \\frac/\\tfrac jadi Pecahan Tegak, dan \\begin{...matrix} jadi Matriks OMML."""
     if not text:
         return
 
-    # Deteksi \frac{pembilang}{penyebut} atau \tfrac{pembilang}{penyebut}
-    frac_pattern = re.compile(r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}')
+    # Deteksi Pecahan ATAU Matriks LaTeX
+    math_pattern = re.compile(
+        r'\\begin\{(?P<mtype>[pbvV]?matrix)\}(?P<mcontent>.*?)\\end\{(?P=mtype)\}|\\(?:f|tf)rac\{(?P<num>[^}]+)\}\{(?P<den>[^}]+)\}',
+        re.DOTALL
+    )
     last_idx = 0
 
-    for match in frac_pattern.finditer(text):
+    for match in math_pattern.finditer(text):
         start, end = match.span()
         
-        # Cetak teks sebelum pecahan
+        # Cetak teks sebelum matematika
         if start > last_idx:
             plain_part = clean_math_string(text[last_idx:start])
             if plain_part:
@@ -439,16 +446,21 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
                 if color_rgb:
                     run.font.color.rgb = color_rgb
 
-        # Cetak Pecahan Tegak Word
-        add_omml_fraction(paragraph, match.group(1), match.group(2))
+        # Jika ditemukan Matriks -> Cetak Matriks OMML Word 2D
+        if match.group('mtype'):
+            add_omml_matrix(paragraph, match.group('mtype'), match.group('mcontent'))
+            
+        # Jika ditemukan Pecahan -> Cetak Pecahan OMML Word
+        elif match.group('num'):
+            add_omml_fraction(paragraph, match.group('num'), match.group('den'))
         
-        # Tambah spasi tipis setelah pecahan
+        # Spasi tipis setelah rumus
         run_space = paragraph.add_run(" ")
         run_space.bold = is_bold
 
         last_idx = end
 
-    # Cetak sisa teks setelah pecahan terakhir
+    # Cetak sisa teks setelah rumus terakhir
     if last_idx < len(text):
         plain_part = clean_math_string(text[last_idx:])
         if plain_part:
@@ -457,8 +469,7 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
             if color_rgb:
                 run.font.color.rgb = color_rgb
 
-
-# Generate KUIS docx
+# GENERATOR KUIS
 def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     """Membuat file Word (.docx) berformat LKPD resmi lengkap dengan logo, kop instansi, dan layout rapi."""
     doc = Document()
@@ -614,8 +625,11 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     doc.save(buffer)
     buffer.seek(0)
     return buffer.getvalue()
-    
-# Helper backgroung LKPD PDF
+
+# ===========================================================
+# GENERATOR PDF. LKPD
+# ===========================================================
+# BACKGROUND LKPD
 def draw_cover_background(canvas_obj, doc):
     canvas_obj.saveState()
     cover_path = "cover.png"
@@ -623,10 +637,7 @@ def draw_cover_background(canvas_obj, doc):
         canvas_obj.drawImage(cover_path, 0, 0, width=A4[0], height=A4[1])
     canvas_obj.restoreState()
 
-
-# ==================================================================================
-# PEMBERSIH PDF MASTER - LKPD (ANTI-KOTAK HITAM ■)
-# ==================================================================================
+# HELPER MERAPIKAN LKPD
 _PDF_FRAC_CACHE = {}
 
 def generate_frac_image(num_str: str, den_str: str) -> str:
@@ -771,9 +782,7 @@ def clean_pdf_text(text: str) -> str:
 
     return re.sub(r'\s+', ' ', text).strip()
     
-# ==============================================================
-# GENERATOR PEMBUAT .PDF - LKPD
-# ===================================
+# GENERATOR LKPD
 def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -913,7 +922,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
     buffer.seek(0)
     return buffer
 
-# ========================================================================
+# ========================================
 # RENDER CUSTOM TIMER
 # ========================================
 @st.fragment(run_every="1s")
