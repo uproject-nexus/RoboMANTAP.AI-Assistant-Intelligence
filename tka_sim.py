@@ -11,9 +11,9 @@ def inject_tka_css():
         }
         
         /* Tombol Navigasi Bawah Pusmendik */
-        .btn-merah > button { background-color: #dc3545 !important; color: white !important; border-radius: 10px !important; border: none !important; }
-        .btn-kuning > button { background-color: #ffc107 !important; color: black !important; border-radius: 10px !important; border: none !important; font-weight: bold !important; }
-        .btn-biru > button { background-color: #007bff !important; color: white !important; border-radius: 10px !important; border: none !important; }
+        .btn-merah > button { background-color: #dc3545 !important; color: white !important; border-radius: 3px !important; border: none !important; }
+        .btn-kuning > button { background-color: #ffc107 !important; color: black !important; border-radius: 3px !important; border: none !important; font-weight: bold !important; }
+        .btn-biru > button { background-color: #007bff !important; color: white !important; border-radius: 3px !important; border: none !important; }
         
         /* Warna Tombol Daftar Soal (Grid) */
         .grid-putih > button { background-color: white !important; color: black !important; border: 1px solid #ccc !important; }
