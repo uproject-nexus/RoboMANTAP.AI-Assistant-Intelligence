@@ -369,11 +369,12 @@ clean_math_text = clean_math_string
 
 def add_omml_fraction(paragraph, num_text: str, den_text: str):
     """Menyisipkan struktur Pecahan Tegak Resmi Microsoft Word (Equation)."""
-    num_clean = clean_math_string(num_text)
-    den_clean = clean_math_string(den_text)
+    # Mengamankan teks dari karakter khusus XML (<, >, &)
+    num_clean = html.escape(clean_math_string(num_text))
+    den_clean = html.escape(clean_math_string(den_text))
     
     omml_xml = (
-        f'<m:oMath {nsdecls("m")}>'
+        f'<m:oMath {nsdecls("m", "w")}>'
         f'  <m:f>'
         f'    <m:num><m:r><m:t>{num_clean}</m:t></m:r></m:num>'
         f'    <m:den><m:r><m:t>{den_clean}</m:t></m:r></m:den>'
@@ -381,6 +382,7 @@ def add_omml_fraction(paragraph, num_text: str, den_text: str):
         f'</m:oMath>'
     )
     paragraph._p.append(parse_xml(omml_xml))
+
 
 def add_omml_matrix(paragraph, matrix_type: str, content: str):
     """Menyisipkan struktur Matriks 2D Bertingkat Resmi Microsoft Word (Equation)."""
@@ -392,7 +394,6 @@ def add_omml_matrix(paragraph, matrix_type: str, content: str):
     elif matrix_type == "matrix":
         beg_chr, end_chr = "", ""
 
-    # Pisahkan baris (\\ atau \cr) dan kolom (&)
     rows = [r.strip() for r in re.split(r'\\\\|\\cr', content) if r.strip()]
     
     matrix_xml_rows = []
@@ -400,7 +401,8 @@ def add_omml_matrix(paragraph, matrix_type: str, content: str):
         cols = [c.strip() for c in r.split('&')]
         cols_xml = []
         for c in cols:
-            cleaned_c = clean_math_string(c)
+            # Mengamankan teks isi matriks dari karakter khusus XML (<, >, &)
+            cleaned_c = html.escape(clean_math_string(c))
             cols_xml.append(f'<m:e><m:r><m:t>{cleaned_c}</m:t></m:r></m:e>')
         matrix_xml_rows.append(f'<m:mr>{"".join(cols_xml)}</m:mr>')
 
@@ -408,7 +410,7 @@ def add_omml_matrix(paragraph, matrix_type: str, content: str):
 
     if beg_chr or end_chr:
         omml_xml = (
-            f'<m:oMath {nsdecls("m")}>'
+            f'<m:oMath {nsdecls("m", "w")}>'
             f'  <m:d>'
             f'    <m:dPr>'
             f'      <m:begChr m:val="{beg_chr}"/>'
@@ -419,16 +421,16 @@ def add_omml_matrix(paragraph, matrix_type: str, content: str):
             f'</m:oMath>'
         )
     else:
-        omml_xml = f'<m:oMath {nsdecls("m")}>{inner_matrix}</m:oMath>'
+        omml_xml = f'<m:oMath {nsdecls("m", "w")}>{inner_matrix}</m:oMath>'
 
     paragraph._p.append(parse_xml(omml_xml))
 
+
 def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, color_rgb: RGBColor = None):
-    """Membagi paragraf: teks biasa jadi Run standar, \\frac/\\tfrac jadi Pecahan Tegak, dan \\begin{...matrix} jadi Matriks OMML."""
+    """Membagi paragraf: teks biasa, pecahan \\frac, dan matriks \\begin{...matrix}."""
     if not text:
         return
 
-    # Deteksi Pecahan ATAU Matriks LaTeX
     math_pattern = re.compile(
         r'\\begin\{(?P<mtype>[pbvV]?matrix)\}(?P<mcontent>.*?)\\end\{(?P=mtype)\}|\\(?:f|tf)rac\{(?P<num>[^}]+)\}\{(?P<den>[^}]+)\}',
         re.DOTALL
@@ -438,7 +440,6 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
     for match in math_pattern.finditer(text):
         start, end = match.span()
         
-        # Cetak teks sebelum matematika
         if start > last_idx:
             plain_part = clean_math_string(text[last_idx:start])
             if plain_part:
@@ -447,21 +448,16 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
                 if color_rgb:
                     run.font.color.rgb = color_rgb
 
-        # Jika ditemukan Matriks -> Cetak Matriks OMML Word 2D
         if match.group('mtype'):
             add_omml_matrix(paragraph, match.group('mtype'), match.group('mcontent'))
-            
-        # Jika ditemukan Pecahan -> Cetak Pecahan OMML Word
         elif match.group('num'):
             add_omml_fraction(paragraph, match.group('num'), match.group('den'))
         
-        # Spasi tipis setelah rumus
         run_space = paragraph.add_run(" ")
         run_space.bold = is_bold
 
         last_idx = end
 
-    # Cetak sisa teks setelah rumus terakhir
     if last_idx < len(text):
         plain_part = clean_math_string(text[last_idx:])
         if plain_part:
