@@ -2,6 +2,7 @@ import io
 import os
 import re
 import uuid
+import html
 import json
 import base64
 import pandas as pd
