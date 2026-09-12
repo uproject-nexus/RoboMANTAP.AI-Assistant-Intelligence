@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 # from-import python-docx untuk generate Word dan Pdf berlogo
+from tka_sim import render_tka_quiz
 from docx import Document
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
@@ -29,7 +30,8 @@ from ai_engine import (
     generate_quiz_batch, get_ai_hint_stream, get_ai_solution_stream,
     create_table_if_not_exists, update_progress_siswa, init_db_connection,
     generate_lkpd_content, stream_ai_text, generate_custom_quiz_ai,
-    publish_custom_quiz_to_db, get_custom_quiz_from_db, check_active_session_from_db
+    publish_custom_quiz_to_db, get_custom_quiz_from_db, check_active_session_from_db,
+    generate_tka_batch
 )
 
 st.set_page_config(
@@ -982,6 +984,18 @@ if st.session_state.page == "landing":
             st.session_state.jenjang = "MA (Sederajat SMA)"
             st.session_state.page = "select_mapel"
             st.rerun()
+
+    st.write("---")
+    st.markdown("#### 🎓 Simulasi TKA RoboMANTAP")
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); padding: 16px; border-radius: 12px; text-align: center; color: white;">
+        <h3 style="margin:0;">TKA SIMULATION</h3>
+        <p style="font-size: 12px; opacity: 0.8; margin-top:4px;">Latihan soal multiformat (Benar/Salah, Kompleks) ala Pusmendik</p>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.button("Masuk Simulasi TKA ➔", type="primary", use_container_width=True):
+        st.session_state.page = "tka_setup"
+        st.rerun()
             
     st.write("---")
     st.markdown("#### 📝 Sesi Kuis GuruMANTAP")
@@ -2379,3 +2393,70 @@ elif st.session_state.page == "result":
 
                     if streamed_solution and "⚠️" not in str(streamed_solution):
                         st.session_state.ai_solution_cache[solution_key] = str(streamed_solution)
+
+# ==============================================================================
+# BLOK BARU KHUSUS TKA SIMULATION
+# ==============================================================================
+elif st.session_state.page == "tka_setup":
+    st.subheader("⚙️ Setup Simulasi TKA")
+    if st.button("⬅️ Kembali ke Beranda"):
+        st.session_state.page = "landing"
+        st.rerun()
+        
+    st.write("---")
+    st.session_state.tka_nama_siswa = st.text_input("Nama Siswa:", placeholder="Masukkan nama kamu...")
+    st.session_state.tka_jenjang = st.selectbox("Jenjang:", ["SMA/MA/SMK/MAK/Sederajat", "SMP/MTs/Sederajat"])
+    
+    mapel_options = ["Kemampuan Penalaran Umum", "Pengetahuan Kuantitatif", "Literasi Bahasa Indonesia", "Literasi Bahasa Inggris", "Matematika", "Fisika", "Biologi", "Kimia", "Ekonomi", "Sosiologi"]
+    st.session_state.tka_mapel = st.selectbox("Mata Pelajaran:", mapel_options)
+    
+    if st.button("🚀 MULAI SIMULASI TKA SEKARANG", type="primary", use_container_width=True):
+        if len(st.session_state.tka_nama_siswa.strip()) < 3:
+            st.error("Nama wajib diisi dengan valid!")
+        else:
+            with st.spinner("Merancang soal simulasi TKA..."):
+                tka_quiz = generate_tka_batch(st.session_state.tka_jenjang, st.session_state.tka_mapel)
+                if tka_quiz:
+                    st.session_state.tka_quiz_data = tka_quiz
+                    st.session_state.session_id = str(uuid.uuid4())
+                    # Kosongkan cache sesi TKA sebelumnya
+                    st.session_state.tka_idx = 0
+                    st.session_state.tka_answers = {}
+                    st.session_state.tka_ragu = set()
+                    st.session_state.tka_start_time = datetime.utcnow() + timedelta(hours=7)
+                    st.session_state.page = "tka_quiz"
+                    st.rerun()
+                else:
+                    st.error("Gagal menyusun soal TKA, silakan coba lagi.")
+
+# ====================================================
+# SIMULASI TKA 
+# ====================================================
+elif st.session_state.page == "tka_quiz":
+    # Memanggil file eksternal tka_sim.py secara bersih!
+    render_tka_quiz(update_progress_siswa)
+
+elif st.session_state.page == "tka_result":
+    st.subheader("📊 Hasil Simulasi TKA")
+    quiz_data = st.session_state.tka_quiz_data
+    answers = st.session_state.tka_answers
+    
+    benar = 0
+    for i, q in enumerate(quiz_data):
+        u_ans = answers.get(i)
+        if not u_ans: continue
+        
+        tipe = q.get("type", "pg_biasa")
+        if tipe == "pg_biasa" and u_ans == q["correct_answer"]: benar += 1
+        elif tipe == "pg_kompleks" and set(u_ans) == set(q["correct_answer"]): benar += 1
+        elif tipe == "kategori" and u_ans == q["correct_answer"]: benar += 1
+            
+    total = len(quiz_data)
+    skor = int((benar / total) * 100) if total > 0 else 0
+    
+    st.success(f"**Skor TKA Kamu:** {skor} / 100")
+    st.info(f"Jawaban Benar Penuh: {benar} dari {total} soal.")
+    
+    if st.button("🏠 Selesai & Kembali ke Beranda", type="primary"):
+        st.session_state.page = "landing"
+        st.rerun()
