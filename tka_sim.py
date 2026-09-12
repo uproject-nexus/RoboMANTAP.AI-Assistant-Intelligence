@@ -22,8 +22,8 @@ def inject_tka_css():
         
         .kategori-box {
             background-color: var(--secondary-background-color); 
-            padding: 12px; 
-            border-radius: 8px; 
+            padding: 6px; 
+            border-radius: 4px; 
             border: 1px solid rgba(128,128,128,0.2);
             margin-bottom: 10px;
         }
