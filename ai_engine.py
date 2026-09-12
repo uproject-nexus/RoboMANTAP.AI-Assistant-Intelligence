@@ -742,3 +742,71 @@ def check_active_session_from_db(nama_siswa: str, mapel: str):
     except Exception:
         pass
     return None
+
+# ==============================================================================
+# TAMBAHAN KHUSUS: GENERATOR SOAL TKA SIMULATION PUSMENDIK
+# ==============================================================================
+def generate_tka_batch(jenjang: str, mapel: str):
+    """Menghasilkan soal Simulasi TKA dengan 3 variasi tipe soal resmi Pusmendik."""
+    system_prompt = f"""
+    Buat 10 soal Simulasi TKA (Tes Kemampuan Akademik) standar Pusmendik untuk jenjang {jenjang} mata pelajaran {mapel}.
+    Harus ada 3 variasi tipe soal dalam paket ini. Jangan gunakan markdown pembuka selain JSON.
+    Gunakan format JSON murni yang presisi!
+    
+    ATURAN JSON:
+    {{
+        "quiz": [
+            {{
+                "id": 1,
+                "type": "pg_biasa",
+                "question": "Soal pilihan ganda biasa (1 jawaban benar)...",
+                "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+                "correct_answer": "B. ..."
+            }},
+            {{
+                "id": 2,
+                "type": "pg_kompleks",
+                "question": "Soal pilihan ganda kompleks (jawaban benar lebih dari 1)...",
+                "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+                "correct_answer": ["A. ...", "C. ..."]
+            }},
+            {{
+                "id": 3,
+                "type": "kategori",
+                "question": "Pilih Benar atau Salah untuk setiap pernyataan berikut!",
+                "options_label": ["Benar", "Salah"],
+                "statements": ["Pernyataan pertama...", "Pernyataan kedua...", "Pernyataan ketiga..."],
+                "correct_answer": {{"0": "Benar", "1": "Salah", "2": "Benar"}}
+            }}
+        ]
+    }}
+    """
+    
+    raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
+    if not raw_response: return []
+
+    try:
+        data = json.loads(clean_json_text(raw_response), strict=False)
+        quiz_list = data.get("quiz", [])
+        
+        # Format LaTeX dan Normalisasi Kunci
+        for q in quiz_list:
+            q_type = q.get("type", "pg_biasa")
+            if "options" in q and q_type in ["pg_biasa", "pg_kompleks"]:
+                q["options"] = format_latex_options(q["options"])
+                
+            if q_type == "pg_biasa" and "correct_answer" in q:
+                ans = q["correct_answer"]
+                for opt in q.get("options", []):
+                    if opt.startswith(str(ans)[:2]): q["correct_answer"] = opt; break
+                        
+            elif q_type == "pg_kompleks" and "correct_answer" in q:
+                new_ans_list = []
+                for ans in q["correct_answer"]:
+                    for opt in q.get("options", []):
+                        if opt.startswith(str(ans)[:2]): new_ans_list.append(opt); break
+                q["correct_answer"] = new_ans_list
+                
+        return quiz_list
+    except Exception:
+        return []
