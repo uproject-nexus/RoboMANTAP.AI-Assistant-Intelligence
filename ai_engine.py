@@ -556,8 +556,11 @@ def generate_lkpd_content(mapel: str, kelas: str, topik: str):
        - "Luas kolam adalah x² meter dan panjangnya x + 6 meter"
     4. UNTUK PECAHAN (SANGAT PENTING):
        - WAJIB gunakan simbol Unicode Pecahan Tegak untuk semua pecahan umum.
-       - DILARANG KERAS menulis pecahan biasa dengan garis miring seperti '1/4', '3/8', atau '1/2'!     
-
+       - DILARANG KERAS menulis pecahan biasa dengan garis miring seperti '1/4', '3/8', atau '1/2'!
+    5. Untuk matriks/array, WAJIB gunakan blok $$...$$
+       - Jangan menulis environment matriks tanpa delimiter matematika.
+       - Gunakan dua backslash untuk pindah baris.
+    
     Instruksi Penyusunan Konten:
     1. Tujuan Pembelajaran: Buatkan 3 poin tujuan berbasis indikator HOTS.
     2. Apersepsi & Ringkasan Konsep: Sajikan materi singkat, tajam, dan korelasikan dengan nilai-nilai Keislaman/Tadabbur Sains.
@@ -634,6 +637,9 @@ def generate_custom_quiz_ai(
     8. Jangan memasukkan jawaban atau pembahasan yang saling bertentangan.
     9. Jika menggunakan LaTeX, gunakan $...$ dan escape backslash secara valid untuk JSON.
     10. JANGAN menambahkan markdown atau teks pembuka di luar JSON.
+    11. Untuk matriks/array, WAJIB gunakan blok $$...$$
+    12. Jangan menulis environment matriks tanpa delimiter matematika.
+    13. Gunakan dua backslash untuk pindah baris.
     
     OUTPUT JSON MURNI:
     {{
