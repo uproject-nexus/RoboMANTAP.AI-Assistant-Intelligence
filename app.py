@@ -2341,7 +2341,7 @@ elif st.session_state.page == "quiz":
     if is_custom and timer_seconds > 0:
         render_custom_timer(st.session_state.start_time_wib, timer_seconds)
 
-    st.write("---")
+ 
 
     # Render Soal & Radio Pilihan Jawaban
     st.markdown(f"#### **Soal No. {curr_idx + 1}**")
@@ -2362,7 +2362,7 @@ elif st.session_state.page == "quiz":
     if selected_option:
         st.session_state.user_answers[curr_idx] = selected_option
 
-    st.write("---")
+
     
     # Navigasi Utama (Berikutnya, Sebelumnya, Submit)
 
@@ -2397,7 +2397,7 @@ elif st.session_state.page == "quiz":
         # Eksekusi thread mandiri (bebas antrean)
         threading.Thread(target=worker, daemon=True).start()
     
-    st.write("---")
+
     
     # Navigasi Utama
     col_nav1, col_nav2, col_nav3 = st.columns([3, 6, 3])
