@@ -490,6 +490,10 @@ with st.sidebar:
         # Filter Jenjang & Mapel
         selected_jenjang_filter = st.selectbox("🏫 Filter Jenjang:", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], key="filter_jenjang")
         # SETING KHUSUS KUIS
+
+        # -------------------------------------------------------------------------
+        # BACA KHUSUS MAPEL KUIS CUSTOM BERLABEL (Quiz) SECARA DINAMIS DARI DATABASE
+        # -------------------------------------------------------------------------
         quiz_custom_mapels = []
         conn_filter = init_db_connection()
         if conn_filter:
@@ -508,15 +512,14 @@ with st.sidebar:
                     quiz_custom_mapels = df_quiz_db['mapel'].dropna().tolist()
             except Exception:
                 quiz_custom_mapels = []
-                
-        # FILTER JENJANG 
+
+        # Tentukan mapel dasar OMI berdasarkan jenjang
         if selected_jenjang_filter == "MTs (Sederajat SMP)":
-            mapel_options = ["Semua Mapel"] + list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys())
+            base_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys())
         elif selected_jenjang_filter == "MA (Sederajat SMA)":
-            mapel_options = ["Semua Mapel"] + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
+            base_mapels = list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
         else:
-            all_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys()) + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
-            mapel_options = ["Semua Mapel"] + sorted(list(set(all_mapels)))
+            base_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys()) + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
 
         # Gabungkan Mapel Standar OMI + Mapel Kuis Custom yang aktif
         combined_mapels = sorted(list(set(base_mapels + quiz_custom_mapels)))
