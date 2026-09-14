@@ -1743,12 +1743,11 @@ elif st.session_state.page == "guru_dashboard":
                                     # TOMBOL HAPUS SESI PERCOBAAN PER SISWA
                                     # =========================================================================
                                     st.write("---")
-                                    if st.button("🗑️ Hapus Sesi Percobaan Ini", key=f"del_sesi_{row['id_sesi']}", type="secondary", use_container_width=True):
+                                    if st.button("🗑️ Hapus Sesi siswa Ini!", key=f"del_sesi_{row['id_sesi']}", type="secondary", use_container_width=True):
                                         conn = init_db_connection()
                                         if conn:
                                             try:
                                                 with conn.session as s:
-                                    
                                                     # Ubah status menjadi TRIAL (bukan dihapus dari DB)
                                                     s.execute(text("UPDATE sesi_ujian SET status = 'TRIAL' WHERE id_sesi = :sid;"), {"sid": row['id_sesi']})
                                                     s.commit()
