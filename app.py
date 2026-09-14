@@ -1324,10 +1324,8 @@ elif st.session_state.page == "guru_dashboard":
         else:
             st.caption("⏸️ **Status:** Live dimatikan (tampilan stabil, aman untuk membaca laporan RoboMANTAP)")
 
-        # Kondisi Tanggal
-        # Kondisi Dasar: Abaikan data yang sudah diarsipkan
-        where_clauses = ["status != 'ARCHIVED'"]
-       
+        # Kondisi Dasar: Abaikan status uji coba internal jika ada
+        where_clauses = ["status != 'DRAFT'"]
         
         # Kondisi Tanggal
         if time_filter == "Hari Ini":
@@ -1337,15 +1335,20 @@ elif st.session_state.page == "guru_dashboard":
         else:
             where_clauses.append("DATE(updated_at) >= CURRENT_DATE - INTERVAL '2 days'")
         
-        # Kondisi Jenjang
+        # Filter Jenjang (Jika dipilih spesifik)
         if selected_jenjang_filter != "Semua Jenjang":
             where_clauses.append(f"jenjang = '{selected_jenjang_filter}'")
         
-        # Kondisi Mapel
+        # Filter Mapel (Penting agar kuis antar-guru tidak tercampur!)
         if selected_mapel_filter != "Semua Mapel":
             where_clauses.append(f"mapel = '{selected_mapel_filter}'")
         
+        # Filter Status
+        if selected_status_filter != "Semua Status":
+            where_clauses.append(f"status = '{selected_status_filter}'")
+        
         where_sql = " AND ".join(where_clauses)
+
 
         # Function Progress Bar Visual
         def render_progress_bar_html(detail_list):
@@ -1751,7 +1754,22 @@ elif st.session_state.page == "guru_dashboard":
                                             st.error(f"🌱 **Kategori: Perlu Intervensi ({pct:.0f}%)**")
                                             st.markdown("**💡 Rekomendasi Pembinaan:**\n- Jadwalkan bimbingan intensif\n- Pelajari ulang modul pembahasan sebelum latihan berikutnya")
                                     else:
-                                        st.info("Pengerjaan belum dimulai!") 
+                                        st.info("Pengerjaan belum dimulai!")
+                                    # =========================================================================
+                                    # TOMBOL HAPUS SESI PERCOBAAN PER SISWA
+                                    # =========================================================================
+                                    st.write("---")
+                                    if st.button("🗑️ Hapus Sesi Percobaan Ini", key=f"del_sesi_{row['id_sesi']}", type="secondary", use_container_width=True):
+                                        conn = init_db_connection()
+                                        if conn:
+                                            try:
+                                                with conn.session as s:
+                                                    s.execute(text("DELETE FROM sesi_ujian WHERE id_sesi = :sid;"), {"sid": row['id_sesi']})
+                                                    s.commit()
+                                                st.success("Sesi percobaan berhasil dihapus!")
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"Gagal menghapus: {e}")
                                 
                         except:
                             col_bar.write("-")
