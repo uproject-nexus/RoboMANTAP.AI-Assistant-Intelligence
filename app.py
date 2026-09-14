@@ -2178,7 +2178,6 @@ elif st.session_state.page == "setup_custom":
     )
     
     st.write("---")  
-    # Ringkasan Parameter Kuis dari Guru
     timer_sec = cfg.get("timer_seconds", 0)
     timer_text = "Tanpa Batas Waktu" if timer_sec <= 0 else str(timedelta(seconds=timer_sec))
     
@@ -2207,16 +2206,16 @@ elif st.session_state.page == "setup_custom":
             master_quiz = pkg.get("quiz", [])
             packages_5 = cfg.get("packages", [])
 
-            # Cek apakah siswa sudah pernah masuk sesi ini sebelumnya (Auto-Resume / Relog)
+            # Memanggil helper resmi dari ai_engine.py
             existing_session = check_active_session_from_db(nama_input, st.session_state.mapel)
             
             if existing_session:
                 # --------------------------------------------------------------
-                # RECOVER SESI LAMA (SISWA RELOG / TERPUTUS)
+                # RECOVER SESI LAMA (PAKAI ID_SESI ASLI DARI DATABASE)
                 # --------------------------------------------------------------
                 st.session_state.session_id = existing_session["id_sesi"]
 
-                # Ambil kembali paket soal yang sama persis berdasarkan session_id lama
+                # Ambil variasi paket acak yang sama berdasarkan session_id lama
                 if packages_5:
                     pkg_idx = abs(hash(st.session_state.session_id)) % len(packages_5)
                     st.session_state.quiz_data = packages_5[pkg_idx]
@@ -2232,7 +2231,7 @@ elif st.session_state.page == "setup_custom":
                         st.stop()
                     st.session_state.quiz_data = ordered_quiz
                 
-                # Restore Waktu Mulai Ujian dari DB
+                # Restore Waktu Ujian & Indeks Soal
                 raw_created = existing_session["created_at"]
                 if isinstance(raw_created, str):
                     start_dt = datetime.strptime(str(raw_created)[:19], "%Y-%m-%d %H:%M:%S")
@@ -2241,19 +2240,17 @@ elif st.session_state.page == "setup_custom":
                 
                 st.session_state.start_time_wib = start_dt
                 st.session_state.custom_timer_seconds = timer_sec
-                st.session_state.current_index = 0
+                
+                soal_terakhir = existing_session.get("soal_sekarang", 1)
+                st.session_state.current_index = max(0, min(soal_terakhir - 1, len(st.session_state.quiz_data) - 1))
                 st.session_state.user_answers = {}
                 
-                # Restore Jawaban yang Pernah Diisi
+                # Restore Penanda Pilihan Jawaban
                 detail_saved = existing_session.get("detail_jawaban", [])
-                if isinstance(detail_saved, str):
-                    import json
-                    detail_saved = json.loads(detail_saved)
-
-                for idx, is_corr in enumerate(detail_saved):
-                    if is_corr is not None and idx < len(st.session_state.quiz_data):
-                        # Restore penanda opsi terisi
-                        st.session_state.user_answers[idx] = st.session_state.quiz_data[idx]["options"][0]
+                if isinstance(detail_saved, list):
+                    for idx, is_corr in enumerate(detail_saved):
+                        if is_corr is not None and idx < len(st.session_state.quiz_data):
+                            st.session_state.user_answers[idx] = st.session_state.quiz_data[idx]["options"][0]
                 
                 st.toast("🔄 Sesi pengerjaan sebelumnya berhasil dipulihkan!", icon="ℹ️")
             
@@ -2263,7 +2260,6 @@ elif st.session_state.page == "setup_custom":
                 # --------------------------------------------------------------
                 st.session_state.session_id = str(uuid.uuid4())
 
-                # Ambil 1 dari 5 Paket Soal secara instant (0 Detik Lag)
                 if packages_5:
                     pkg_idx = abs(hash(st.session_state.session_id)) % len(packages_5)
                     st.session_state.quiz_data = packages_5[pkg_idx]
@@ -2284,7 +2280,6 @@ elif st.session_state.page == "setup_custom":
                 st.session_state.custom_timer_seconds = timer_sec
                 st.session_state.start_time_wib = datetime.utcnow() + timedelta(hours=7)
                 
-                # Inisialisasi Progress Sesi Baru di Database
                 update_progress_siswa(
                     st.session_state.session_id, 
                     st.session_state.nama_siswa,
@@ -2298,6 +2293,7 @@ elif st.session_state.page == "setup_custom":
             
             st.session_state.page = "quiz"
             st.rerun()
+    
 # ==============================================================================
 # 5. ENGINE TEST KUIS (OPTIMIZED WITH ST.FRAGMENT FOR ZERO LAG)
 # ==============================================================================
