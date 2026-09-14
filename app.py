@@ -430,7 +430,7 @@ with st.sidebar:
         <div style="background: var(--secondary-background-color); border: 1px solid rgba(5, 150, 105, 0.3); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
                 <span style="font-size: 11px; font-weight: 600; opacity: 0.7;">ENGINE STATUS</span>
-                <span style="font-size: 10px; background: #059669; color: white; padding: 2px 8px; border-radius: 12px; font-weight: 700;">LIVE 🟢</span>
+                <span style="font-size: 10px; background: #059669; color: white; padding: 2px 8px; border-radius: 12px; font-weight: 700;">LIVE <span class="blinking-dot-green">🟢</span></span>
             </div>
             <div style="font-size: 11px; line-height: 1.6; opacity: 0.9;">
                 ⚡ <b>Model:</b> U.Project Nexus Intelligence v3.6<br>
