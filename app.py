@@ -1709,7 +1709,7 @@ elif st.session_state.page == "guru_dashboard":
                 custom_mapel = st.text_input(
                     "📚 Mata Pelajaran",
                     value=custom_cfg.get("mapel", "Matematika"),
-                    placeholder="Contoh: Matematika, Fisika, Bahasa Arab...",
+                    placeholder="Contoh: Fisika, Bahasa Arab, Agama...",
                 )
                 custom_jenjang = st.selectbox(
                     "🏫 Jenjang",
@@ -2259,7 +2259,8 @@ elif st.session_state.page == "setup_custom":
             st.session_state.page = "quiz"
             st.rerun()
 
-# 5. ENGINE TEST KUIS
+# ==============================================================================
+# 5. ENGINE TEST KUIS (OPTIMIZED WITH ST.FRAGMENT FOR ZERO LAG)
 # ==============================================================================
 elif st.session_state.page == "quiz":
     quiz_data = st.session_state.quiz_data
@@ -2291,21 +2292,35 @@ elif st.session_state.page == "quiz":
         render_custom_timer(st.session_state.start_time_wib, timer_seconds)
 
     st.write("---")
-    st.markdown(f"#### **Soal No. {curr_idx + 1}**")
-    st.markdown(q["question"])
-    st.write("")
 
-    opts = q["options"]
-    saved_ans = st.session_state.user_answers.get(curr_idx, None)
-    default_opt_idx = opts.index(saved_ans) if saved_ans in opts else None
+    # ==============================================================================
+    # FRAGMENT KHUSUS SOAL & RADIO (Mencegah Full-Page Rerun saat Klik Cepat)
+    # ==============================================================================
+    @st.fragment
+    def render_question_card(idx, question_obj):
+        st.markdown(f"#### **Soal No. {idx + 1}**")
+        st.markdown(question_obj["question"])
+        st.write("")
 
-    selected_option = st.radio("Pilih Jawaban Anda:", opts, index=default_opt_idx, key=f"radio_q_{curr_idx}")
+        opts = question_obj["options"]
+        saved_ans = st.session_state.user_answers.get(idx, None)
+        default_opt_idx = opts.index(saved_ans) if saved_ans in opts else None
 
-    # 1. SIMPAN KE MEMORI LOKAL SAJA (Instan, 0% beban ke Database)
-    if selected_option:
-        st.session_state.user_answers[curr_idx] = selected_option
+        selected_option = st.radio(
+            "Pilih Jawaban Anda:", 
+            opts, 
+            index=default_opt_idx, 
+            key=f"radio_q_{idx}"
+        )
 
-    # 2. HELPER SINKRONISASI KE DATABASE (Hanya dipanggil saat pindah soal / submit)
+        # Update memori lokal instant (Hanya merender fragment ini saja!)
+        if selected_option:
+            st.session_state.user_answers[idx] = selected_option
+
+    # Panggil Fragment Soal
+    render_question_card(curr_idx, q)
+
+    # Helper untuk sinkronisasi progress ke Database saat navigasi
     def sync_progress_to_db():
         detail = []
         for i in range(total_soal):
@@ -2333,18 +2348,18 @@ elif st.session_state.page == "quiz":
     with col_nav1:
         if curr_idx < total_soal - 1:
             if st.button("Berikutnya ➡️", type="primary", use_container_width=True):
-                sync_progress_to_db()  # Kirim progress ke DB hanya saat pindah ke soal berikutnya
+                sync_progress_to_db()
                 st.session_state.current_index += 1
                 st.rerun()
         else:
             if st.button("🏁 SUBMIT & SELESAIKAN", type="primary", use_container_width=True):
-                sync_progress_to_db()  # Kirim progress ke DB sebelum masuk ke halaman hasil
+                sync_progress_to_db()
                 st.session_state.page = "result"
                 st.rerun()
     with col_nav3:
         if curr_idx > 0:
             if st.button("⬅️ Sebelumnya", use_container_width=True):
-                sync_progress_to_db()  # Kirim progress ke DB saat kembali ke soal sebelumnya
+                sync_progress_to_db()
                 st.session_state.current_index -= 1
                 st.rerun()
 
@@ -2388,7 +2403,6 @@ elif st.session_state.page == "quiz":
                         st.session_state.ai_hint_cache[hint_key] = str(streamed_hint)
             else:
                 st.info("💡 Tolong ketik sedikit ide kamu dulu ya, biar RoboMANTAP bisa kasih petunjuk yang pas!")
-
 
 # ==============================================================================
 # 6. SCORECARD & EVALUASI SESI (OMI & KUIS CUSTOM)
