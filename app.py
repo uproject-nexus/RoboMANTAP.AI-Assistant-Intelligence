@@ -320,121 +320,18 @@ def _get_saved_quiz_order(session_id, quiz_signature):
 
 def get_or_create_student_quiz_order(kode_kuis, mapel, quiz_data, session_id):
     """
-    Production allocator dengan Safe Fallback:
-    Mengacak urutan soal secara unik per siswa dan menyimpannya di PostgreSQL.
-    Jika database tidak merespons, otomatis acak berdasarkan session_id agar siswa tetap bisa ujian.
+    Versi Super Cepat (Anti-Lag / Zero DB Lock):
+    Mengacak urutan soal secara unik berdasarkan session_id siswa di memori lokal.
     """
-    if not quiz_data or len(quiz_data) < 2:
-        return list(quiz_data), None
+    if not quiz_data:
+        return [], None
 
-    # Jika tabel belum siap, gunakan fallback acak stabil berdasarkan session_id
-    if not ensure_quiz_session_order_table():
-        shuffled = list(quiz_data)
-        random.Random(str(session_id)).shuffle(shuffled)
-        return shuffled, None
-
-    signature = _quiz_signature(quiz_data)
-    question_ids = _quiz_question_ids(quiz_data)
-    conn = init_db_connection()
+    # Gunakan session_id sebagai Seed agar pengacakan unik per siswa 
+    # tetapi tetap konsisten (tidak berubah-ubah saat rerun/refresh)
+    shuffled = list(quiz_data)
+    random.Random(str(session_id)).shuffle(shuffled)
     
-    if not conn:
-        shuffled = list(quiz_data)
-        random.Random(str(session_id)).shuffle(shuffled)
-        return shuffled, None
-
-    try:
-        with conn.session as s:
-            # Advisory lock untuk mencegah race condition antar-siswa yang masuk bersamaan
-            s.execute(text("SELECT pg_advisory_xact_lock(hashtext(:kode))"), {"kode": kode_kuis.upper()})
-
-            # 1. Cek apakah sesi ini sudah punya urutan tersimpan
-            existing = s.execute(
-                text("""
-                    SELECT question_order
-                    FROM kuis_session_orders
-                    WHERE session_id = :session_id
-                      AND kode_kuis = :kode
-                      AND quiz_signature = :signature
-                    LIMIT 1
-                """),
-                {"session_id": session_id, "kode": kode_kuis.upper(), "signature": signature},
-            ).fetchone()
-            
-            if existing:
-                saved = existing[0] if isinstance(existing[0], list) else json.loads(existing[0])
-                by_id = {str(q.get("id", i + 1)): q for i, q in enumerate(quiz_data)}
-                ordered = [by_id[x] for x in map(str, saved) if x in by_id]
-                if len(ordered) == len(quiz_data):
-                    return ordered, None
-
-            # 2. Ambil urutan yang sedang dipakai sesi aktif lain
-            occupied = set()
-            rows = s.execute(
-                text("""
-                    SELECT o.question_order
-                    FROM kuis_session_orders o
-                    JOIN sesi_ujian sj ON sj.id_sesi = o.session_id
-                    WHERE o.kode_kuis = :kode
-                      AND o.quiz_signature = :signature
-                      AND sj.status = 'BERJALAN'
-                      AND o.session_id <> :session_id
-                """),
-                {"kode": kode_kuis.upper(), "signature": signature, "session_id": session_id},
-            ).fetchall()
-            
-            for row in rows:
-                order = row[0] if isinstance(row[0], list) else json.loads(row[0])
-                occupied.add(tuple(map(str, order)))
-
-            # 3. Cari permutasi acak unik yang belum dipakai
-            rng = random.SystemRandom()
-            candidate = list(question_ids)
-            max_attempts = max(100, min(5000, len(question_ids) * 100))
-            found = None
-            
-            for _ in range(max_attempts):
-                rng.shuffle(candidate)
-                key = tuple(candidate)
-                if key not in occupied:
-                    found = list(candidate)
-                    break
-
-            if found is None:
-                found = list(question_ids)
-                rng.shuffle(found)
-
-            # 4. Simpan urutan unik ke database
-            s.execute(
-                text("""
-                    INSERT INTO kuis_session_orders
-                        (session_id, kode_kuis, quiz_signature, question_order, created_at)
-                    VALUES
-                        (:session_id, :kode, :signature, :order_data, NOW() AT TIME ZONE 'Asia/Jakarta')
-                    ON CONFLICT (session_id) DO UPDATE SET
-                        kode_kuis = EXCLUDED.kode_kuis,
-                        quiz_signature = EXCLUDED.quiz_signature,
-                        question_order = EXCLUDED.question_order
-                """),
-                {
-                    "session_id": session_id,
-                    "kode": kode_kuis.upper(),
-                    "signature": signature,
-                    "order_data": json.dumps(found),
-                },
-            )
-            s.commit()
-
-            by_id = {str(q.get("id", i + 1)): q for i, q in enumerate(quiz_data)}
-            return [by_id[x] for x in found], None
-
-    except Exception as e:
-        print(f"LOG quiz order allocation fallback triggered: {e}")
-        shuffled = list(quiz_data)
-        random.Random(str(session_id)).shuffle(shuffled)
-        return shuffled, None
-
-# Inisialisasi tabel persistensi urutan kuis production.
-ensure_quiz_session_order_table()
+    return shuffled, None
 
 # Database Kisi-Kisi Operasional OMI 2026
 KISI_KISI_OMI = {
@@ -2404,10 +2301,12 @@ elif st.session_state.page == "quiz":
 
     selected_option = st.radio("Pilih Jawaban Anda:", opts, index=default_opt_idx, key=f"radio_q_{curr_idx}")
 
-    # Trigger sinkronisasi real-time ke Database jika jawaban berubah
-    if selected_option and selected_option != saved_ans:
+    # 1. SIMPAN KE MEMORI LOKAL SAJA (Instan, 0% beban ke Database)
+    if selected_option:
         st.session_state.user_answers[curr_idx] = selected_option
-        
+
+    # 2. HELPER SINKRONISASI KE DATABASE (Hanya dipanggil saat pindah soal / submit)
+    def sync_progress_to_db():
         detail = []
         for i in range(total_soal):
             u_ans = st.session_state.user_answers.get(i, None)
@@ -2434,15 +2333,18 @@ elif st.session_state.page == "quiz":
     with col_nav1:
         if curr_idx < total_soal - 1:
             if st.button("Berikutnya ➡️", type="primary", use_container_width=True):
+                sync_progress_to_db()  # Kirim progress ke DB hanya saat pindah ke soal berikutnya
                 st.session_state.current_index += 1
                 st.rerun()
         else:
             if st.button("🏁 SUBMIT & SELESAIKAN", type="primary", use_container_width=True):
+                sync_progress_to_db()  # Kirim progress ke DB sebelum masuk ke halaman hasil
                 st.session_state.page = "result"
                 st.rerun()
     with col_nav3:
         if curr_idx > 0:
             if st.button("⬅️ Sebelumnya", use_container_width=True):
+                sync_progress_to_db()  # Kirim progress ke DB saat kembali ke soal sebelumnya
                 st.session_state.current_index -= 1
                 st.rerun()
 
