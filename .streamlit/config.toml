@@ -4,3 +4,9 @@ primaryColor = "#059669"
 backgroundColor = "#0e1117"
 secondaryBackgroundColor = "#111827"
 textColor = "#ffffff"
+
+[global]
+maxCachedMessageSize = 0
+
+[server]
+enableWebsocketCompression = false
