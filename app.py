@@ -1326,6 +1326,7 @@ elif st.session_state.page == "guru_dashboard":
 
         # Kondisi Tanggal
         # Kondisi Dasar: Abaikan data yang sudah diarsipkan
+        where_clauses = ["status != 'ARCHIVED'"]
        
         
         # Kondisi Tanggal
