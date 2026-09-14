@@ -1222,6 +1222,11 @@ if st.session_state.page == "landing":
                             is_valid = False
 
                     if is_valid:
+                        # Simpan kode kuis di session state karena widget
+                        # input ini hanya hidup pada halaman landing.
+                        # Halaman setup_custom dijalankan pada rerun berikutnya,
+                        # sehingga variabel lokal kode_masuk_input tidak lagi tersedia.
+                        st.session_state.custom_quiz_code = kode_masuk_input.strip().upper()
                         st.session_state.is_custom_quiz = True
                         st.session_state.custom_pkg = pkg
                         st.session_state.mapel = cfg.get('mapel', 'Custom Quiz')
@@ -2190,6 +2195,14 @@ elif st.session_state.page == "setup_custom":
         if jumlah_huruf < 4:
             st.error("⚠️ Masukkan nama lengkap yang valid!")
         else:
+            # Kode kuis disimpan di session_state saat siswa masuk dari landing.
+            # Jangan menggunakan variabel lokal kode_masuk_input di halaman ini
+            # karena Streamlit melakukan rerun dan variabel tersebut sudah tidak ada.
+            kode_kuis_aktif = st.session_state.get("custom_quiz_code", "").strip().upper()
+            if not kode_kuis_aktif:
+                st.error("⚠️ Kode kuis tidak ditemukan di sesi ini. Silakan kembali ke beranda dan masukkan kode kuis lagi.")
+                st.stop()
+
             # Cek apakah siswa sudah pernah masuk sesi ini sebelumnya (Auto-Resume)
             existing_session = check_active_session_from_db(nama_input, st.session_state.mapel)
             
@@ -2201,7 +2214,7 @@ elif st.session_state.page == "setup_custom":
                 # sebelum fitur production ini, fallback mempertahankan urutan legacy.
                 master_quiz = pkg.get("quiz", [])
                 ordered_quiz, order_error = get_or_create_student_quiz_order(
-                    kode_masuk_input.strip(),
+                    kode_kuis_aktif,
                     st.session_state.mapel,
                     master_quiz,
                     st.session_state.session_id,
@@ -2239,7 +2252,7 @@ elif st.session_state.page == "setup_custom":
                 # membuat permutation unik untuk sesi aktif dan menyimpannya di DB.
                 master_quiz = pkg.get("quiz", [])
                 ordered_quiz, order_error = get_or_create_student_quiz_order(
-                    kode_masuk_input.strip(),
+                    kode_kuis_aktif,
                     st.session_state.mapel,
                     master_quiz,
                     st.session_state.session_id,
