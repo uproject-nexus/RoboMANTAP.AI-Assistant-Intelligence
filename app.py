@@ -1325,7 +1325,9 @@ elif st.session_state.page == "guru_dashboard":
             st.caption("⏸️ **Status:** Live dimatikan (tampilan stabil, aman untuk membaca laporan RoboMANTAP)")
 
         # Kondisi Dasar: Abaikan status uji coba internal jika ada
-        where_clauses = ["status != 'DRAFT'"]
+
+        # Kondisi Dasar: Abaikan data yang sudah diarsipkan
+        where_clauses = ["status != 'ARCHIVED'"]
         
         # Kondisi Tanggal
         if time_filter == "Hari Ini":
@@ -1335,19 +1337,16 @@ elif st.session_state.page == "guru_dashboard":
         else:
             where_clauses.append("DATE(updated_at) >= CURRENT_DATE - INTERVAL '2 days'")
         
-        # Filter Jenjang (Jika dipilih spesifik)
+        # Kondisi Jenjang
         if selected_jenjang_filter != "Semua Jenjang":
             where_clauses.append(f"jenjang = '{selected_jenjang_filter}'")
         
-        # Filter Mapel (Penting agar kuis antar-guru tidak tercampur!)
+        # Kondisi Mapel
         if selected_mapel_filter != "Semua Mapel":
             where_clauses.append(f"mapel = '{selected_mapel_filter}'")
         
-        # Filter Status
-        if selected_status_filter != "Semua Status":
-            where_clauses.append(f"status = '{selected_status_filter}'")
-        
         where_sql = " AND ".join(where_clauses)
+
 
 
         # Function Progress Bar Visual
