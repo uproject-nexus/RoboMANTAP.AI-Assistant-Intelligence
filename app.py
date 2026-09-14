@@ -5,6 +5,8 @@ import uuid
 import html
 import json
 import base64
+import random
+import hashlib
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
@@ -198,6 +200,210 @@ if "session_id" not in st.session_state: st.session_state.session_id = str(uuid.
 if "guru_auth" not in st.session_state: st.session_state.guru_auth = False
 if "ai_hint_cache" not in st.session_state: st.session_state.ai_hint_cache = {}
 if "ai_solution_cache" not in st.session_state: st.session_state.ai_solution_cache = {}
+
+# ------------------------------------------------------------------------------
+# RANDOMISASI PRODUCTION: URUTAN SOAL UNIK PER SESI SISWA
+# ------------------------------------------------------------------------------
+def _quiz_signature(quiz_data):
+    """Fingerprint master quiz agar urutan tidak tertukar ketika paket berubah."""
+    payload = []
+    for idx, q in enumerate(quiz_data):
+        payload.append({
+            "id": q.get("id", idx + 1),
+            "question": q.get("question", ""),
+            "options": q.get("options", []),
+            "correct_answer": q.get("correct_answer", ""),
+        })
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+def _quiz_question_ids(quiz_data):
+    """ID logis soal. Jika ID generator tidak valid/duplikat, gunakan indeks."""
+    ids = []
+    seen = set()
+    for idx, q in enumerate(quiz_data):
+        candidate = str(q.get("id", idx + 1))
+        if not candidate or candidate in seen:
+            candidate = f"IDX-{idx + 1}"
+        seen.add(candidate)
+        ids.append(candidate)
+    return ids
+
+def build_stable_student_quiz_order(quiz_data, session_id, question_order=None):
+    """
+    Mengembalikan quiz dalam urutan siswa yang stabil.
+    question_order adalah daftar ID soal yang sudah disimpan di database.
+    Fallback memakai seed session_id untuk kompatibilitas sesi lama.
+    """
+    if not quiz_data:
+        return []
+
+    if question_order:
+        by_id = {str(q.get("id", i + 1)): q for i, q in enumerate(quiz_data)}
+        ordered = [by_id[qid] for qid in map(str, question_order) if qid in by_id]
+        if len(ordered) == len(quiz_data):
+            return ordered
+
+    # Fallback kompatibilitas dengan implementasi randomisasi sebelumnya.
+    shuffled = list(quiz_data)
+    random.Random(str(session_id)).shuffle(shuffled)
+    return shuffled
+
+def ensure_quiz_session_order_table():
+    """Membuat tabel persistensi urutan tanpa mengubah tabel kuis/sesi lama."""
+    conn = init_db_connection()
+    if not conn:
+        return False
+    query = """
+    CREATE TABLE IF NOT EXISTS kuis_session_orders (
+        session_id VARCHAR(100) PRIMARY KEY,
+        kode_kuis VARCHAR(20) NOT NULL,
+        quiz_signature VARCHAR(64) NOT NULL,
+        question_order JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_kuis_session_orders_kode
+        ON kuis_session_orders (kode_kuis);
+    """
+    try:
+        with conn.session as s:
+            s.execute(text(query))
+            s.commit()
+        return True
+    except Exception as e:
+        print(f"LOG DB quiz order init error: {e}")
+        return False
+
+def _get_saved_quiz_order(session_id, quiz_signature):
+    conn = init_db_connection()
+    if not conn:
+        return None
+    try:
+        with conn.session as s:
+            row = s.execute(
+                text("""
+                    SELECT question_order
+                    FROM kuis_session_orders
+                    WHERE session_id = :session_id
+                      AND quiz_signature = :quiz_signature
+                    LIMIT 1
+                """),
+                {"session_id": session_id, "quiz_signature": quiz_signature},
+            ).fetchone()
+            if row:
+                return row[0] if isinstance(row[0], list) else json.loads(row[0])
+    except Exception as e:
+        print(f"LOG DB get quiz order error: {e}")
+    return None
+
+def get_or_create_student_quiz_order(kode_kuis, mapel, quiz_data, session_id):
+    """
+    Production allocator:
+    - satu urutan disimpan permanen untuk satu session_id;
+    - PostgreSQL advisory lock mencegah dua siswa mendapat permutation yang sama
+      akibat race condition ketika masuk bersamaan;
+    - hanya sesi BERJALAN untuk kode kuis yang sama menjadi pembanding;
+    - jika seluruh permutation sudah habis, sesi tidak dipaksakan memakai urutan
+      yang sama.
+    """
+    if not quiz_data or len(quiz_data) < 2:
+        return list(quiz_data), "Satu soal tidak dapat memiliki urutan berbeda."
+
+    if not ensure_quiz_session_order_table():
+        return None, "Penyimpanan urutan kuis belum tersedia."
+
+    signature = _quiz_signature(quiz_data)
+    question_ids = _quiz_question_ids(quiz_data)
+    conn = init_db_connection()
+    if not conn:
+        return None, "Database tidak terhubung."
+
+    try:
+        with conn.session as s:
+            # Serialisasi assignment untuk satu kode kuis.
+            s.execute(text("SELECT pg_advisory_xact_lock(hashtext(:kode))"), {"kode": kode_kuis.upper()})
+
+            existing = s.execute(
+                text("""
+                    SELECT question_order
+                    FROM kuis_session_orders
+                    WHERE session_id = :session_id
+                      AND kode_kuis = :kode
+                      AND quiz_signature = :signature
+                    LIMIT 1
+                """),
+                {"session_id": session_id, "kode": kode_kuis.upper(), "signature": signature},
+            ).fetchone()
+            if existing:
+                saved = existing[0] if isinstance(existing[0], list) else json.loads(existing[0])
+                by_id = {str(q.get("id", i + 1)): q for i, q in enumerate(quiz_data)}
+                ordered = [by_id[x] for x in map(str, saved) if x in by_id]
+                if len(ordered) == len(quiz_data):
+                    return ordered, None
+
+            occupied = set()
+            rows = s.execute(
+                text("""
+                    SELECT o.question_order
+                    FROM kuis_session_orders o
+                    JOIN sesi_ujian sj ON sj.id_sesi = o.session_id
+                    WHERE o.kode_kuis = :kode
+                      AND o.quiz_signature = :signature
+                      AND sj.status = 'BERJALAN'
+                      AND o.session_id <> :session_id
+                """),
+                {"kode": kode_kuis.upper(), "signature": signature, "session_id": session_id},
+            ).fetchall()
+            for row in rows:
+                order = row[0] if isinstance(row[0], list) else json.loads(row[0])
+                occupied.add(tuple(map(str, order)))
+
+            # Kandidat acak disimpan, sehingga rerun tidak pernah mengacak ulang.
+            rng = random.SystemRandom()
+            candidate = list(question_ids)
+            max_attempts = max(100, min(5000, len(question_ids) * 100))
+            found = None
+            for _ in range(max_attempts):
+                rng.shuffle(candidate)
+                key = tuple(candidate)
+                if key not in occupied:
+                    found = list(candidate)
+                    break
+
+            if found is None:
+                return None, (
+                    "Semua urutan soal unik yang tersedia sedang terpakai oleh sesi aktif. "
+                    "Tunggu salah satu sesi selesai lalu coba lagi."
+                )
+
+            s.execute(
+                text("""
+                    INSERT INTO kuis_session_orders
+                        (session_id, kode_kuis, quiz_signature, question_order, created_at)
+                    VALUES
+                        (:session_id, :kode, :signature, :order_data, NOW() AT TIME ZONE 'Asia/Jakarta')
+                    ON CONFLICT (session_id) DO UPDATE SET
+                        kode_kuis = EXCLUDED.kode_kuis,
+                        quiz_signature = EXCLUDED.quiz_signature,
+                        question_order = EXCLUDED.question_order
+                """),
+                {
+                    "session_id": session_id,
+                    "kode": kode_kuis.upper(),
+                    "signature": signature,
+                    "order_data": json.dumps(found),
+                },
+            )
+            s.commit()
+
+            by_id = {str(q.get("id", i + 1)): q for i, q in enumerate(quiz_data)}
+            return [by_id[x] for x in found], None
+    except Exception as e:
+        print(f"LOG quiz order allocation error: {e}")
+        return None, "Gagal menyimpan urutan soal. Silakan coba lagi."
+
+# Inisialisasi tabel persistensi urutan kuis production.
+ensure_quiz_session_order_table()
 
 # Database Kisi-Kisi Operasional OMI 2026
 KISI_KISI_OMI = {
@@ -1990,6 +2196,20 @@ elif st.session_state.page == "setup_custom":
             if existing_session:
                 # RECOVER SESI LAMA
                 st.session_state.session_id = existing_session["id_sesi"]
+
+                # Ambil urutan yang sudah dipersist. Untuk sesi lama yang dibuat
+                # sebelum fitur production ini, fallback mempertahankan urutan legacy.
+                master_quiz = pkg.get("quiz", [])
+                ordered_quiz, order_error = get_or_create_student_quiz_order(
+                    kode_masuk_input.strip(),
+                    st.session_state.mapel,
+                    master_quiz,
+                    st.session_state.session_id,
+                )
+                if ordered_quiz is None:
+                    st.error(f"⚠️ {order_error}")
+                    st.stop()
+                st.session_state.quiz_data = ordered_quiz
                 
                 # Format ulang waktu mulai dari DB ke format datetime WIB
                 raw_created = existing_session["created_at"]
@@ -2014,6 +2234,21 @@ elif st.session_state.page == "setup_custom":
             else:
                 # INSIALISASI SESI BARU
                 st.session_state.session_id = str(uuid.uuid4())
+
+                # MASTER QUIZ tetap berasal dari paket guru. Production allocator
+                # membuat permutation unik untuk sesi aktif dan menyimpannya di DB.
+                master_quiz = pkg.get("quiz", [])
+                ordered_quiz, order_error = get_or_create_student_quiz_order(
+                    kode_masuk_input.strip(),
+                    st.session_state.mapel,
+                    master_quiz,
+                    st.session_state.session_id,
+                )
+                if ordered_quiz is None:
+                    st.error(f"⚠️ {order_error}")
+                    st.stop()
+                st.session_state.quiz_data = ordered_quiz
+
                 st.session_state.user_answers = {}
                 st.session_state.current_index = 0
                 st.session_state.custom_timer_seconds = timer_sec
