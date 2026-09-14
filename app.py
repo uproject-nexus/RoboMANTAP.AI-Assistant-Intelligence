@@ -7,6 +7,7 @@ import json
 import base64
 import random
 import hashlib
+import threading
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
@@ -1111,6 +1112,28 @@ def render_custom_timer(start_time_wib, timer_seconds):
     st.error(f"⏳ **Sisa Waktu Ujian:** {sisa_m:02d}:{sisa_s:02d}")
 
 # ==============================================================================
+# HELPER GENERATOR 5 PAKET SOAL PRE-GENERATED (ZERO-LAG FOR 60+ STUDENTS)
+# ==============================================================================
+def create_5_quiz_packages(master_quiz):
+    """
+    Membuat 5 variasi paket soal acak yang sudah difiksasi (Paket 1 - 5).
+    Dijalankan sekali saja saat kuis diterbitkan oleh Guru.
+    """
+    if not master_quiz:
+        return []
+    
+    packages = []
+    for i in range(5):
+        # Buat salinan list soal
+        shuffled_list = list(master_quiz)
+        # Gunakan seed acak unik per indeks paket
+        r = random.Random(f"paket_seed_{i}_{len(master_quiz)}")
+        r.shuffle(shuffled_list)
+        packages.append(shuffled_list)
+        
+    return packages
+    
+# ==============================================================================
 # 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
 # ==============================================================================
 if st.session_state.page == "landing":
@@ -1935,18 +1958,21 @@ elif st.session_state.page == "guru_dashboard":
             with col_pub2:
                 st.write("")
                 if st.button("🚀 TERBITKAN KUIS CUSTOM", type="primary", use_container_width=True):
-                    # 3. Ambil nilai presisi dari input guru di session_state
                     clean_code = st.session_state.user_quiz_code.strip().upper()
                     
                     if not clean_code:
                         st.warning("⚠️ Kode kuis tidak boleh kosong!")
-                    elif publish_custom_quiz_to_db(clean_code, custom_cfg, custom_quiz):
-                        # Simpan status sukses dan perbarui default code untuk generasi kuis berikutnya
-                        st.session_state.last_published_code = clean_code
-                        st.session_state.default_quiz_code = f"MNT-{uuid.uuid4().hex[:4].upper()}"
-                        st.success(f"🎉 Kuis Berhasil Diterbitkan! Bagikan Kode ini ke Siswa: **{clean_code}**")
                     else:
-                        st.error("❌ Gagal menerbitkan kuis. Periksa koneksi Database.")
+                        # Pre-generate 5 Paket Soal Acak sebelum masuk Database
+                        packages_5 = create_5_quiz_packages(custom_quiz)
+                        custom_cfg["packages"] = packages_5
+                        
+                        if publish_custom_quiz_to_db(clean_code, custom_cfg, custom_quiz):
+                            st.session_state.last_published_code = clean_code
+                            st.session_state.default_quiz_code = f"MNT-{uuid.uuid4().hex[:4].upper()}"
+                            st.success(f"🎉 Kuis Berhasil Diterbitkan! 5 Paket Soal Acak Siap Digunakan. Bagikan Kode: **{clean_code}**")
+                        else:
+                            st.error("❌ Gagal menerbitkan kuis. Periksa koneksi Database.")
                         
         st.write("---")
         st.markdown("""
@@ -2173,9 +2199,6 @@ elif st.session_state.page == "setup_custom":
         if jumlah_huruf < 4:
             st.error("⚠️ Masukkan nama lengkap yang valid!")
         else:
-            # Kode kuis disimpan di session_state saat siswa masuk dari landing.
-            # Jangan menggunakan variabel lokal kode_masuk_input di halaman ini
-            # karena Streamlit melakukan rerun dan variabel tersebut sudah tidak ada.
             kode_kuis_aktif = st.session_state.get("custom_quiz_code", "").strip().upper()
             if not kode_kuis_aktif:
                 st.error("⚠️ Kode kuis tidak ditemukan di sesi ini. Silakan kembali ke beranda dan masukkan kode kuis lagi.")
@@ -2188,8 +2211,6 @@ elif st.session_state.page == "setup_custom":
                 # RECOVER SESI LAMA
                 st.session_state.session_id = existing_session["id_sesi"]
 
-                # Ambil urutan yang sudah dipersist. Untuk sesi lama yang dibuat
-                # sebelum fitur production ini, fallback mempertahankan urutan legacy.
                 master_quiz = pkg.get("quiz", [])
                 ordered_quiz, order_error = get_or_create_student_quiz_order(
                     kode_kuis_aktif,
@@ -2202,7 +2223,6 @@ elif st.session_state.page == "setup_custom":
                     st.stop()
                 st.session_state.quiz_data = ordered_quiz
                 
-                # Format ulang waktu mulai dari DB ke format datetime WIB
                 raw_created = existing_session["created_at"]
                 if isinstance(raw_created, str):
                     start_dt = datetime.strptime(str(raw_created)[:19], "%Y-%m-%d %H:%M:%S")
@@ -2263,13 +2283,28 @@ elif st.session_state.page == "setup_custom":
 # 5. ENGINE TEST KUIS (OPTIMIZED WITH ST.FRAGMENT FOR ZERO LAG)
 # ==============================================================================
 elif st.session_state.page == "quiz":
-    quiz_data = st.session_state.quiz_data
-    curr_idx = st.session_state.current_index
-    total_soal = len(quiz_data)
-    q = quiz_data[curr_idx]
+    quiz_data = st.session_state.get("quiz_data", [])
+    
+    if not quiz_data:
+        st.error("⚠️ Data kuis tidak ditemukan. Silakan kembali ke beranda.")
+        if st.button("🏠 Kembali ke Beranda"):
+            st.session_state.page = "landing"
+            st.rerun()
+        st.stop()
 
+    total_soal = len(quiz_data)
+    
+    # Pengaman indeks soal agar tidak out of bounds
+    if st.session_state.current_index >= total_soal:
+        st.session_state.current_index = total_soal - 1
+    elif st.session_state.current_index < 0:
+        st.session_state.current_index = 0
+
+    curr_idx = st.session_state.current_index
+    q = quiz_data[curr_idx]
     is_custom = st.session_state.get("is_custom_quiz", False)
 
+    # Header Progress
     col_h1, col_h2 = st.columns([8, 4])
     with col_h1:
         if is_custom:
@@ -2283,7 +2318,7 @@ elif st.session_state.page == "quiz":
         st.progress((curr_idx + 1) / total_soal)
         st.caption(f"Soal **{curr_idx + 1}** dari **{total_soal}**")
 
-    # Anti-Cheat & Live Timer WIB Smooth
+    # Anti-Cheat & Live Timer WIB
     if "start_time_wib" not in st.session_state:
         st.session_state.start_time_wib = datetime.utcnow() + timedelta(hours=7)
 
@@ -2293,35 +2328,39 @@ elif st.session_state.page == "quiz":
 
     st.write("---")
 
-    # ==============================================================================
-    # FRAGMENT KHUSUS SOAL & RADIO (Mencegah Full-Page Rerun saat Klik Cepat)
-    # ==============================================================================
-    @st.fragment
-    def render_question_card(idx, question_obj):
-        st.markdown(f"#### **Soal No. {idx + 1}**")
-        st.markdown(question_obj["question"])
-        st.write("")
+    # Render Soal & Radio Pilihan Jawaban
+    st.markdown(f"#### **Soal No. {curr_idx + 1}**")
+    st.markdown(q["question"])
+    st.write("")
 
-        opts = question_obj["options"]
-        saved_ans = st.session_state.user_answers.get(idx, None)
-        default_opt_idx = opts.index(saved_ans) if saved_ans in opts else None
+    opts = q["options"]
+    saved_ans = st.session_state.user_answers.get(curr_idx, None)
+    default_opt_idx = opts.index(saved_ans) if saved_ans in opts else None
 
-        selected_option = st.radio(
-            "Pilih Jawaban Anda:", 
-            opts, 
-            index=default_opt_idx, 
-            key=f"radio_q_{idx}"
-        )
+    selected_option = st.radio(
+        "Pilih Jawaban Anda:", 
+        opts, 
+        index=default_opt_idx, 
+        key=f"radio_q_{curr_idx}"
+    )
 
-        # Update memori lokal instant (Hanya merender fragment ini saja!)
-        if selected_option:
-            st.session_state.user_answers[idx] = selected_option
+    if selected_option:
+        st.session_state.user_answers[curr_idx] = selected_option
 
-    # Panggil Fragment Soal
-    render_question_card(curr_idx, q)
+    st.write("---")
+    
+    # Navigasi Utama (Berikutnya, Sebelumnya, Submit)
 
-    # Helper untuk sinkronisasi progress ke Database saat navigasi
-    def sync_progress_to_db():
+    # Helper Async Sync (Letakkan di dalam atau di luar blok quiz)
+    def sync_to_db_async():
+        # Salin variabel lokal untuk keamanan thread
+        sess_id = st.session_state.session_id
+        n_siswa = st.session_state.nama_siswa
+        j_jang = st.session_state.jenjang
+        m_pel = st.session_state.mapel
+        c_idx = curr_idx + 1
+        c_custom = is_custom
+        
         detail = []
         for i in range(total_soal):
             u_ans = st.session_state.user_answers.get(i, None)
@@ -2330,36 +2369,40 @@ elif st.session_state.page == "quiz":
             else:
                 is_correct = (u_ans == quiz_data[i]["correct_answer"])
                 detail.append(is_correct)
-                
-        update_progress_siswa(
-            st.session_state.session_id,
-            st.session_state.nama_siswa,
-            st.session_state.jenjang,
-            st.session_state.mapel,
-            curr_idx + 1,
-            detail,
-            "BERJALAN",
-            is_custom=is_custom
-        )
-
+    
+        def worker():
+            try:
+                update_progress_siswa(
+                    sess_id, n_siswa, j_jang, m_pel,
+                    c_idx, detail, "BERJALAN", is_custom=c_custom
+                )
+            except Exception:
+                pass  # Jika DB sibuk, hindari membuat UI siswa crash
+    
+        # Eksekusi thread mandiri (bebas antrean)
+        threading.Thread(target=worker, daemon=True).start()
+    
     st.write("---")
     
+    # Navigasi Utama
     col_nav1, col_nav2, col_nav3 = st.columns([3, 6, 3])
+    
     with col_nav1:
         if curr_idx < total_soal - 1:
-            if st.button("Berikutnya ➡️", type="primary", use_container_width=True):
-                sync_progress_to_db()
+            if st.button("Berikutnya ➡️", type="primary", use_container_width=True, key=f"btn_next_{curr_idx}"):
+                sync_to_db_async()  # Kirim ke DB di background (0 ms lag untuk siswa)
                 st.session_state.current_index += 1
                 st.rerun()
         else:
-            if st.button("🏁 SUBMIT & SELESAIKAN", type="primary", use_container_width=True):
-                sync_progress_to_db()
+            if st.button("🏁 SUBMIT & SELESAIKAN", type="primary", use_container_width=True, key=f"btn_submit_{curr_idx}"):
+                sync_to_db_async()  # Kirim status akhir
                 st.session_state.page = "result"
                 st.rerun()
+                
     with col_nav3:
         if curr_idx > 0:
-            if st.button("⬅️ Sebelumnya", use_container_width=True):
-                sync_progress_to_db()
+            if st.button("⬅️ Sebelumnya", use_container_width=True, key=f"btn_prev_{curr_idx}"):
+                sync_to_db_async()
                 st.session_state.current_index -= 1
                 st.rerun()
 
