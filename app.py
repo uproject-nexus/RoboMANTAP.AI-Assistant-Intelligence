@@ -2204,25 +2204,35 @@ elif st.session_state.page == "setup_custom":
                 st.error("⚠️ Kode kuis tidak ditemukan di sesi ini. Silakan kembali ke beranda dan masukkan kode kuis lagi.")
                 st.stop()
 
-            # Cek apakah siswa sudah pernah masuk sesi ini sebelumnya (Auto-Resume)
+            master_quiz = pkg.get("quiz", [])
+            packages_5 = cfg.get("packages", [])
+
+            # Cek apakah siswa sudah pernah masuk sesi ini sebelumnya (Auto-Resume / Relog)
             existing_session = check_active_session_from_db(nama_input, st.session_state.mapel)
             
             if existing_session:
-                # RECOVER SESI LAMA
+                # --------------------------------------------------------------
+                # RECOVER SESI LAMA (SISWA RELOG / TERPUTUS)
+                # --------------------------------------------------------------
                 st.session_state.session_id = existing_session["id_sesi"]
 
-                master_quiz = pkg.get("quiz", [])
-                ordered_quiz, order_error = get_or_create_student_quiz_order(
-                    kode_kuis_aktif,
-                    st.session_state.mapel,
-                    master_quiz,
-                    st.session_state.session_id,
-                )
-                if ordered_quiz is None:
-                    st.error(f"⚠️ {order_error}")
-                    st.stop()
-                st.session_state.quiz_data = ordered_quiz
+                # Ambil kembali paket soal yang sama persis berdasarkan session_id lama
+                if packages_5:
+                    pkg_idx = abs(hash(st.session_state.session_id)) % len(packages_5)
+                    st.session_state.quiz_data = packages_5[pkg_idx]
+                else:
+                    ordered_quiz, order_error = get_or_create_student_quiz_order(
+                        kode_kuis_aktif,
+                        st.session_state.mapel,
+                        master_quiz,
+                        st.session_state.session_id,
+                    )
+                    if ordered_quiz is None:
+                        st.error(f"⚠️ {order_error}")
+                        st.stop()
+                    st.session_state.quiz_data = ordered_quiz
                 
+                # Restore Waktu Mulai Ujian dari DB
                 raw_created = existing_session["created_at"]
                 if isinstance(raw_created, str):
                     start_dt = datetime.strptime(str(raw_created)[:19], "%Y-%m-%d %H:%M:%S")
@@ -2234,37 +2244,47 @@ elif st.session_state.page == "setup_custom":
                 st.session_state.current_index = 0
                 st.session_state.user_answers = {}
                 
-                # Load kembali jawaban yang pernah diisi
-                detail_saved = existing_session["detail_jawaban"]
+                # Restore Jawaban yang Pernah Diisi
+                detail_saved = existing_session.get("detail_jawaban", [])
+                if isinstance(detail_saved, str):
+                    import json
+                    detail_saved = json.loads(detail_saved)
+
                 for idx, is_corr in enumerate(detail_saved):
-                    if is_corr is not None:
-                        # Tandai bahwa soal indeks ini sudah ada isinya
-                        st.session_state.user_answers[idx] = st.session_state.quiz_data[idx]["options"][0] # placeholder restore
+                    if is_corr is not None and idx < len(st.session_state.quiz_data):
+                        # Restore penanda opsi terisi
+                        st.session_state.user_answers[idx] = st.session_state.quiz_data[idx]["options"][0]
                 
                 st.toast("🔄 Sesi pengerjaan sebelumnya berhasil dipulihkan!", icon="ℹ️")
+            
             else:
-                # INSIALISASI SESI BARU
+                # --------------------------------------------------------------
+                # INISIALISASI SESI BARU
+                # --------------------------------------------------------------
                 st.session_state.session_id = str(uuid.uuid4())
 
-                # MASTER QUIZ tetap berasal dari paket guru. Production allocator
-                # membuat permutation unik untuk sesi aktif dan menyimpannya di DB.
-                master_quiz = pkg.get("quiz", [])
-                ordered_quiz, order_error = get_or_create_student_quiz_order(
-                    kode_kuis_aktif,
-                    st.session_state.mapel,
-                    master_quiz,
-                    st.session_state.session_id,
-                )
-                if ordered_quiz is None:
-                    st.error(f"⚠️ {order_error}")
-                    st.stop()
-                st.session_state.quiz_data = ordered_quiz
+                # Ambil 1 dari 5 Paket Soal secara instant (0 Detik Lag)
+                if packages_5:
+                    pkg_idx = abs(hash(st.session_state.session_id)) % len(packages_5)
+                    st.session_state.quiz_data = packages_5[pkg_idx]
+                else:
+                    ordered_quiz, order_error = get_or_create_student_quiz_order(
+                        kode_kuis_aktif,
+                        st.session_state.mapel,
+                        master_quiz,
+                        st.session_state.session_id,
+                    )
+                    if ordered_quiz is None:
+                        st.error(f"⚠️ {order_error}")
+                        st.stop()
+                    st.session_state.quiz_data = ordered_quiz
 
                 st.session_state.user_answers = {}
                 st.session_state.current_index = 0
                 st.session_state.custom_timer_seconds = timer_sec
                 st.session_state.start_time_wib = datetime.utcnow() + timedelta(hours=7)
                 
+                # Inisialisasi Progress Sesi Baru di Database
                 update_progress_siswa(
                     st.session_state.session_id, 
                     st.session_state.nama_siswa,
@@ -2278,7 +2298,6 @@ elif st.session_state.page == "setup_custom":
             
             st.session_state.page = "quiz"
             st.rerun()
-
 # ==============================================================================
 # 5. ENGINE TEST KUIS (OPTIMIZED WITH ST.FRAGMENT FOR ZERO LAG)
 # ==============================================================================
