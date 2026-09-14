@@ -1325,21 +1325,25 @@ elif st.session_state.page == "guru_dashboard":
             st.caption("⏸️ **Status:** Live dimatikan (tampilan stabil, aman untuk membaca laporan RoboMANTAP)")
 
         # Kondisi Tanggal
+        # Kondisi Dasar: Abaikan data yang sudah diarsipkan
+        where_clauses = ["status != 'ARCHIVED'"]
+        
+        # Kondisi Tanggal
         if time_filter == "Hari Ini":
-            where_clauses = ["DATE(updated_at) = CURRENT_DATE"]
+            where_clauses.append("DATE(updated_at) = CURRENT_DATE")
         elif time_filter == "Kemarin":
-            where_clauses = ["DATE(updated_at) = CURRENT_DATE - INTERVAL '1 day'"]
+            where_clauses.append("DATE(updated_at) = CURRENT_DATE - INTERVAL '1 day'")
         else:
-            where_clauses = ["DATE(updated_at) >= CURRENT_DATE - INTERVAL '2 days'"]
-
+            where_clauses.append("DATE(updated_at) >= CURRENT_DATE - INTERVAL '2 days'")
+        
         # Kondisi Jenjang
         if selected_jenjang_filter != "Semua Jenjang":
             where_clauses.append(f"jenjang = '{selected_jenjang_filter}'")
-
+        
         # Kondisi Mapel
         if selected_mapel_filter != "Semua Mapel":
             where_clauses.append(f"mapel = '{selected_mapel_filter}'")
-
+        
         where_sql = " AND ".join(where_clauses)
 
         # Function Progress Bar Visual
@@ -1513,8 +1517,23 @@ elif st.session_state.page == "guru_dashboard":
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-
-                # 4. DIAGNOSIS AI KONTEKSTUAL (IKUT FILTER)
+                # =========================================================================
+                # AMAN: ARSIPKAN DATA TANPA MENGHAPUS DARI DATABASE
+                # =========================================================================
+                with st.popover("📦 Arsipkan Sesi Saat Ini"):
+                    st.info("💡 Data akan dipindahkan ke arsip. Angka di dashboard akan kembali 0, tetapi data lama TETAP AMAN di database.")
+                    if st.button("📦 Arsipkan Seluruh Sesi Sekarang", type="primary"):
+                        conn = init_db_connection()
+                        if conn:
+                            try:
+                                with conn.session as s:
+                                    # Ubah status data aktif menjadi ARCHIVED
+                                    s.execute(text("UPDATE sesi_ujian SET status = 'ARCHIVED' WHERE status != 'ARCHIVED';"))
+                                    s.commit()
+                                st.success("✅ Sesi berhasil diarsipkan! Dashboard siap untuk sesi baru.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Gagal mengarsipkan: {e}")
                 # =========================================================================
                 # Judul Tombol Dinamis Mengikuti Filter
                 label_target = f"{selected_mapel_filter}" if selected_mapel_filter != "Semua Mapel" else selected_jenjang_filter
