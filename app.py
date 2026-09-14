@@ -489,7 +489,27 @@ with st.sidebar:
         only_latest = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Gabungkan multi-sesi: 1 nama hanya muncul 1 kali (pengerjaan terbaru).", key="filter_latest")
         # Filter Jenjang & Mapel
         selected_jenjang_filter = st.selectbox("🏫 Filter Jenjang:", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], key="filter_jenjang")
-        
+        # SETING KHUSUS KUIS
+        quiz_custom_mapels = []
+        conn_filter = init_db_connection()
+        if conn_filter:
+            try:
+                # Hanya tarik mapel yang mengandung kata '(Quiz)' di tabel sesi_ujian
+                df_quiz_db = conn_filter.query(
+                    """
+                    SELECT DISTINCT mapel 
+                    FROM sesi_ujian 
+                    WHERE mapel LIKE '%(Quiz)%' 
+                      AND status NOT IN ('ARCHIVED', 'TRIAL', 'DRAFT', 'HIDDEN')
+                    """, 
+                    ttl=5
+                )
+                if not df_quiz_db.empty:
+                    quiz_custom_mapels = df_quiz_db['mapel'].dropna().tolist()
+            except Exception:
+                quiz_custom_mapels = []
+                
+        # FILTER JENJANG 
         if selected_jenjang_filter == "MTs (Sederajat SMP)":
             mapel_options = ["Semua Mapel"] + list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys())
         elif selected_jenjang_filter == "MA (Sederajat SMA)":
@@ -497,7 +517,11 @@ with st.sidebar:
         else:
             all_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys()) + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
             mapel_options = ["Semua Mapel"] + sorted(list(set(all_mapels)))
-            
+
+        # Gabungkan Mapel Standar OMI + Mapel Kuis Custom yang aktif
+        combined_mapels = sorted(list(set(base_mapels + quiz_custom_mapels)))
+        mapel_options = ["Semua Mapel"] + combined_mapels
+
         selected_mapel_filter = st.selectbox("📚 Filter Mata Pelajaran:", mapel_options, key="filter_mapel")
         selected_status_filter = st.selectbox("📌 Filter Status:", ["Semua Status", "BERJALAN", "SELESAI", "EXPIRED"], key="filter_status")
 
