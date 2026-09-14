@@ -250,28 +250,47 @@ def build_stable_student_quiz_order(quiz_data, session_id, question_order=None):
     return shuffled
 
 def ensure_quiz_session_order_table():
-    """Membuat tabel persistensi urutan tanpa mengubah tabel kuis/sesi lama."""
+    """
+    Memastikan tabel persistensi urutan soal tersedia.
+
+    Catatan penting: Streamlit SQLConnection/SQLAlchemy tidak selalu menerima
+    beberapa statement DDL dalam satu execute(). Karena itu CREATE TABLE dan
+    CREATE INDEX dijalankan terpisah agar kompatibel dengan deployment
+    PostgreSQL/Supabase yang digunakan RoboMANTAP.
+    """
     conn = init_db_connection()
-    if not conn:
+    if conn is None:
+        print("LOG DB quiz order init: koneksi PostgreSQL tidak tersedia.")
         return False
-    query = """
+
+    create_table_sql = """
     CREATE TABLE IF NOT EXISTS kuis_session_orders (
         session_id VARCHAR(100) PRIMARY KEY,
         kode_kuis VARCHAR(20) NOT NULL,
         quiz_signature VARCHAR(64) NOT NULL,
         question_order JSONB NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE INDEX IF NOT EXISTS idx_kuis_session_orders_kode
-        ON kuis_session_orders (kode_kuis);
+    )
     """
+
+    create_index_sql = """
+    CREATE INDEX IF NOT EXISTS idx_kuis_session_orders_kode
+        ON kuis_session_orders (kode_kuis)
+    """
+
     try:
         with conn.session as s:
-            s.execute(text(query))
+            # Jalankan DDL satu per satu. Jangan menggabungkannya dalam satu
+            # execute() karena driver/deployment tertentu menolak multi-statement.
+            s.execute(text(create_table_sql))
             s.commit()
+
+            s.execute(text(create_index_sql))
+            s.commit()
+
         return True
     except Exception as e:
-        print(f"LOG DB quiz order init error: {e}")
+        print(f"LOG DB quiz order init error: {type(e).__name__}: {e}")
         return False
 
 def _get_saved_quiz_order(session_id, quiz_signature):
