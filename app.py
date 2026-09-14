@@ -382,7 +382,7 @@ with st.sidebar:
     if st.session_state.page == "guru_dashboard":
         st.markdown("### ⚙️ Panel Kontrol & Filter")
         # Filter Rentang Waktu
-        time_filter = st.radio("⏳ Rentang Waktu:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], key="filter_time")
+        time_filter = st.radio("⏳ Rentang Waktu:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], index=2, key="filter_time")
         # Toggle Sesi & Auto-Refresh
         only_latest = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Gabungkan multi-sesi: 1 nama hanya muncul 1 kali (pengerjaan terbaru).", key="filter_latest")
         # Filter Jenjang & Mapel
