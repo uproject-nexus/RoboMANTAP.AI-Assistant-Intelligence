@@ -716,27 +716,47 @@ def generate_custom_quiz_ai(
     return normalized
 
 def check_active_session_from_db(nama_siswa: str, mapel: str):
-    """Mengecek apakah siswa memiliki sesi ujian yang belum selesai."""
+    """Mengecek apakah siswa memiliki sesi ujian yang belum selesai (tahan spasi & label mapel)."""
     conn = init_db_connection()
-    if not conn: return None
+    if not conn: 
+        return None
 
+    # Query fleksibel: Mencari mapel eksak ATAU mengandung nama mapel tersebut (misal: 'Matematika (Quiz)')
     query = """
-    SELECT id_sesi, detail_jawaban, created_at 
-    FROM sesi_ujian 
-    WHERE LOWER(TRIM(nama_siswa)) = LOWER(TRIM(:nama)) 
-      AND mapel = :mapel 
+    SELECT id_sesi, detail_jawaban, created_at, soal_sekarang
+    FROM sesi_ujian
+    WHERE LOWER(TRIM(nama_siswa)) = LOWER(TRIM(:nama))
+      AND (
+          LOWER(TRIM(mapel)) = LOWER(TRIM(:mapel))
+          OR LOWER(mapel) LIKE LOWER(:mapel_like)
+      )
       AND status = 'BERJALAN'
     ORDER BY created_at DESC LIMIT 1;
     """
     try:
         with conn.session as s:
-            res = s.execute(text(query), {"nama": nama_siswa.strip(), "mapel": mapel}).fetchone()
+            res = s.execute(text(query), {
+                "nama": nama_siswa.strip(), 
+                "mapel": mapel.strip(),
+                "mapel_like": f"%{mapel.strip()}%"
+            }).fetchone()
+            
             if res:
+                # Parsing detail jawaban aman dari format JSON string
+                detail_ans = res[1]
+                if isinstance(detail_ans, str):
+                    try:
+                        detail_ans = json.loads(detail_ans)
+                    except Exception:
+                        detail_ans = []
+
                 return {
                     "id_sesi": res[0],
-                    "detail_jawaban": res[1] if isinstance(res[1], list) else json.loads(res[1]),
-                    "created_at": res[2]
+                    "detail_jawaban": detail_ans if isinstance(detail_ans, list) else [],
+                    "created_at": res[2],
+                    "soal_sekarang": res[3] if len(res) > 3 and res[3] is not None else 1
                 }
-    except Exception:
+    except Exception as e:
+        print(f"Error check_active_session_from_db: {e}")
         pass
     return None
