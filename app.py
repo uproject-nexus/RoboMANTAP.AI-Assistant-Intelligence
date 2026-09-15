@@ -1246,6 +1246,11 @@ if st.session_state.page == "landing":
                         st.rerun()
                 else:
                     st.error("❌ Kode Kuis tidak ditemukan! Periksa kembali kodenya ya")
+    st.caption("Klik link di bawah ini untuk memulai sesi kuis by GuruMANTAP:")
+    st.markdown(
+        "[🚀 Buka Portal Ujian CBT Siswa (Render.com)](https://namaservice-kamu.onrender.com)", 
+        unsafe_allow_html=True
+    )
 
     st.write("---")
     st.markdown("#### 🧕🏼 Portal GuruMANTAP")
