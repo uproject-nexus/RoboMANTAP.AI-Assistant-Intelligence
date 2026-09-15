@@ -7,12 +7,10 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Engine Render LaTeX (KaTeX) CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 
-    <!-- CSS Anti-Select Text & Anti-Highlight -->
     <style>
         * {
             -webkit-user-select: none !important;
@@ -25,89 +23,106 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
 
-    <!-- Header Bar Mobile-Optimized -->
-    <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-50 flex justify-between items-center">
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-40 flex justify-between items-center">
         <div class="flex items-center space-x-2">
             <span class="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded">CBT v2.0</span>
             <div>
                 <h1 class="text-xs sm:text-sm font-bold text-white leading-none">RoboMANTAP CBT</h1>
-                <p class="text-[10px] text-emerald-400 mt-0.5 truncate max-w-[120px] sm:max-w-none">{{ sess.config.mapel }}</p>
+                <p class="text-[10px] text-emerald-400 mt-0.5 truncate max-w-[130px] sm:max-w-none">{{ sess.config.mapel }}</p>
             </div>
         </div>
         
         <div class="flex items-center space-x-2 sm:space-x-3">
-            <!-- Tombol Layar Penuh (Fullscreen) -->
-            <button onclick="requestFullscreenMode()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition">
+            <button onclick="requestFullscreenMode()" class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition">
                 📺 Fullscreen
             </button>
             
             <div class="bg-slate-950 border border-slate-800 px-3 py-1 rounded-lg text-xs">
                 ⏱️ <span id="timer-display" class="font-mono text-emerald-400 font-bold">--:--</span>
             </div>
-            
-            <div class="text-right hidden sm:block">
-                <p class="text-xs text-slate-400">{{ sess.nama }}</p>
-                <p class="text-[10px] font-semibold text-emerald-400">Kelas {{ sess.kelas }}</p>
-            </div>
         </div>
     </header>
 
-    <!-- Banner Peringatan Kecurangan -->
     <div id="cheat-warning-bar" class="hidden bg-amber-500/20 border-b border-amber-500/40 px-4 py-2 text-center text-xs text-amber-300 font-semibold">
         ⚠️ Warning Pelanggaran Pindah Tab: <span id="violation-count-text">0</span> / 3
     </div>
 
-    <!-- Main Workspace Layout -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
+    <main class="flex-1 max-w-5xl w-full mx-auto p-3 sm:p-5 flex flex-col justify-between">
         
-        <!-- Area Soal Utama -->
-        <section class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col justify-between min-h-[420px]">
-            <div>
-                <div class="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
-                    <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Memuat...</span>
-                    <span class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded">Pilihan Ganda</span>
+        <div>
+            <div class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 mb-3 shadow-md">
+                <div class="flex items-center space-x-2 text-xs truncate mr-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
+                    <span class="text-slate-200 font-semibold truncate">{{ sess.nama }}</span>
+                    <span class="text-slate-600">•</span>
+                    <span class="text-emerald-400 font-medium text-[11px] flex-shrink-0">Kelas {{ sess.kelas }}</span>
                 </div>
 
-                <!-- Teks Soal -->
-                <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-5 font-medium overflow-x-auto"></div>
-
-                <!-- Pilihan Jawaban -->
-                <div id="options-container" class="space-y-2.5"></div>
-            </div>
-
-            <!-- Bottom Action Navigation -->
-            <div class="flex items-center justify-between border-t border-slate-800 pt-4 mt-6 gap-2">
-                <button onclick="prevQuestion()" class="flex-1 sm:flex-none bg-slate-800 active:bg-slate-700 text-slate-300 font-bold text-xs py-3 px-3 rounded-xl transition text-center">
-                    ← Prev
-                </button>
-
-                <form id="form-submit-exam" action="/submit-exam" method="POST" onsubmit="return confirm('Yakin ingin menyelesaikan ujian?');" class="flex-1 sm:flex-none">
-                    <input type="hidden" name="session_id" value="{{ session_id }}">
-                    <button type="submit" class="w-full bg-rose-500/10 active:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold py-3 px-3 rounded-xl transition text-center truncate">
-                        Selesai Ujian
-                    </button>
-                </form>
-
-                <button onclick="nextQuestion()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-3 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center">
-                    Next →
+                <button onclick="toggleNavModal(true)" class="bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-400 border border-emerald-500/30 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition flex-shrink-0">
+                    <span>📑 Navigasi Soal</span>
                 </button>
             </div>
-        </section>
 
-        <!-- Sidebar / Grid Navigasi Soal -->
-        <aside class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl h-fit">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 border-b border-slate-800 pb-2 flex justify-between items-center">
-                <span>Navigasi Soal</span>
-                <span class="text-[10px] text-emerald-400 font-normal">Tekan nomor untuk pindah</span>
-            </h3>
-            <div id="nav-grid" class="grid grid-cols-5 sm:grid-cols-5 gap-2"></div>
-        </aside>
+            <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col justify-between min-h-[380px]">
+                <div>
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
+                        <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Memuat...</span>
+                        <span class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg">Pilihan Ganda</span>
+                    </div>
+
+                    <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-5 font-medium overflow-x-auto"></div>
+
+                    <div id="options-container" class="space-y-2.5"></div>
+                </div>
+            </section>
+        </div>
+
+        <form id="form-submit-exam" action="/submit-exam" method="POST" class="hidden">
+            <input type="hidden" name="session_id" value="{{ session_id }}">
+        </form>
+
+        <div class="flex items-center justify-between border-t border-slate-800/80 pt-4 mt-4 gap-2">
+            <button id="btn-prev" onclick="prevQuestion()" class="flex-1 sm:flex-none bg-slate-800 active:bg-slate-700 text-slate-300 font-bold text-xs py-3 px-4 rounded-xl transition text-center disabled:opacity-40 disabled:cursor-not-allowed">
+                ← Prev
+            </button>
+
+            <button id="btn-ragu" onclick="toggleRagu()" class="flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold py-3 px-4 rounded-xl transition text-center">
+                ⚠️ Ragu-Ragu
+            </button>
+
+            <button id="btn-next-submit" onclick="handleNextOrSubmit()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-3 px-5 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center">
+                Next →
+            </button>
+        </div>
 
     </main>
 
+    <div id="nav-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                    <span>📑 Navigasi Soal</span>
+                </h3>
+                <button onclick="toggleNavModal(false)" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
+            </div>
+
+            <div class="grid grid-cols-3 gap-1.5 text-[10px] text-center">
+                <div class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 p-1.5 rounded-lg font-medium">Sudah Dijawab</div>
+                <div class="bg-amber-500/20 text-amber-300 border border-amber-500/40 p-1.5 rounded-lg font-medium">Ragu-Ragu</div>
+                <div class="bg-slate-950 text-slate-400 border border-slate-800 p-1.5 rounded-lg font-medium">Belum Dijawab</div>
+            </div>
+
+            <div id="nav-grid" class="grid grid-cols-5 gap-2 max-h-[60vh] overflow-y-auto p-1"></div>
+
+            <button onclick="toggleNavModal(false)" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-2.5 rounded-xl">
+                Tutup
+            </button>
+        </div>
+    </div>
+
     <script>
         // ==============================================================================
-        // 1. FITUR ANTI-COPAS & KUNCI KEYBOARD / KLIK KANAN
+        // 1. ANTI-COPAS & WAKE LOCK & ANTI KECURANGAN
         // ==============================================================================
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.addEventListener('copy', e => e.preventDefault());
@@ -115,78 +130,47 @@
         document.addEventListener('paste', e => e.preventDefault());
 
         document.addEventListener('keydown', function(e) {
-            // Blokir Ctrl+C, Ctrl+V, Ctrl+A, Ctrl+U, Ctrl+S, Ctrl+P
-            if (e.ctrlKey && ['c', 'v', 'a', 'u', 's', 'p'].includes(e.key.toLowerCase())) {
-                e.preventDefault();
-            }
-            // Blokir F12 / Developer Tools
-            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(e.key.toLowerCase()))) {
-                e.preventDefault();
-            }
+            if (e.ctrlKey && ['c', 'v', 'a', 'u', 's', 'p'].includes(e.key.toLowerCase())) e.preventDefault();
+            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(e.key.toLowerCase()))) e.preventDefault();
         });
 
-        // ==============================================================================
-        // 2. SCREEN WAKE LOCK (MENCEGAH LAYAR HP MATI / REDUP)
-        // ==============================================================================
         let wakeLock = null;
         async function requestWakeLock() {
             try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                }
-            } catch (err) {
-                console.log("WakeLock Info:", err.message);
-            }
+                if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+            } catch (err) {}
         }
         requestWakeLock();
 
-        // ==============================================================================
-        // 3. DETEKSI PINDAH TAB & AUTO-SUBMIT KECURANGAN
-        // ==============================================================================
         let violationCount = 0;
         const maxViolations = 3;
-
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible') {
-                // Re-apply Screen Wake Lock saat kembali ke tab
-                if (wakeLock !== null) {
-                    await requestWakeLock();
-                }
+                if (wakeLock !== null) await requestWakeLock();
             } else if (document.hidden) {
-                // Siswa terdeteksi pindah tab / membuka aplikasi lain
                 violationCount++;
-                
                 const warningBar = document.getElementById("cheat-warning-bar");
                 const countText = document.getElementById("violation-count-text");
-                
                 if (warningBar) warningBar.classList.remove("hidden");
                 if (countText) countText.textContent = violationCount;
 
                 if (violationCount >= maxViolations) {
-                    alert("🚨 PELANGGARAN BERAT DETEKSI KECURANGAN!\n\nAnda telah meninggalkan tab ujian sebanyak 3 kali (membuka browser lain/AI). Ujian Anda dihentikan dan otomatis dikirim!");
+                    alert("🚨 DETEKSI KECURANGAN!\n\nAnda meninggalkan tab 3 kali. Ujian otomatis dikirim!");
                     document.getElementById('form-submit-exam').submit();
                 } else {
-                    alert(`⚠️ PERINGATAN KECURANGAN (${violationCount}/${maxViolations})!\n\nDilarang berpindah tab atau membuka aplikasi lain selama ujian berlangsung! Jika mencapai 3 kali, jawaban akan otomatis dikirim.`);
+                    alert(`⚠️ PERINGATAN KECURANGAN (${violationCount}/${maxViolations})!\n\nDilarang meninggalkan tab ujian!`);
                 }
             }
         });
 
-        // ==============================================================================
-        // 4. LAYAR PENUH (FULLSCREEN)
-        // ==============================================================================
         function requestFullscreenMode() {
             const elem = document.documentElement;
-            if (elem.requestFullscreen) {
-                elem.requestFullscreen().catch(err => console.log(err));
-            } else if (elem.webkitRequestFullscreen) { /* Safari */
-                elem.webkitRequestFullscreen();
-            } else if (elem.msRequestFullscreen) { /* IE11 */
-                elem.msRequestFullscreen();
-            }
+            if (elem.requestFullscreen) elem.requestFullscreen().catch(err => {});
+            else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
         }
 
         // ==============================================================================
-        // 5. LOGIKA UTAMA CBT ENGINE & TIMER
+        // 2. LOGIKA UTAMA CBT ENGINE (FLEXIBLE & NO FLICKER BUG FIX)
         // ==============================================================================
         const quizData = {{ quiz_json | safe }};
         const sessionId = "{{ session_id }}";
@@ -194,6 +178,7 @@
         
         let currentIndex = 0;
         let answers = {};
+        let raguState = {};
 
         function triggerKaTeX() {
             if (window.renderMathInElement) {
@@ -207,6 +192,18 @@
             }
         }
 
+        // Toggle Popup Modal Navigasi
+        function toggleNavModal(show) {
+            const modal = document.getElementById("nav-modal");
+            if (show) {
+                renderGrid();
+                modal.classList.remove("hidden");
+            } else {
+                modal.classList.add("hidden");
+            }
+        }
+
+        // Render Halaman Soal saat Berpindah Nomor
         function renderQuestion(index) {
             currentIndex = index;
             const item = quizData[index];
@@ -217,15 +214,16 @@
             const optsDiv = document.getElementById("options-container");
             optsDiv.innerHTML = "";
 
-            item.options.forEach(opt => {
+            item.options.forEach((opt, optIdx) => {
                 const isSelected = answers[index] === opt;
                 const btn = document.createElement("button");
+                btn.id = `opt-btn-${optIdx}`;
                 btn.className = `w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm transition flex items-start space-x-3 ${
                     isSelected 
-                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-medium' 
+                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-medium shadow-[0_0_10px_rgba(16,185,129,0.15)]' 
                     : 'bg-slate-950 border-slate-800 text-slate-300 active:border-slate-700'
                 }`;
-                btn.onclick = () => selectAnswer(index, opt);
+                btn.onclick = () => selectAnswer(index, opt, optIdx);
                 btn.innerHTML = `
                     <span class="w-6 h-6 rounded-full border border-slate-700 flex-shrink-0 flex items-center justify-center text-[11px] font-bold mt-0.5 ${isSelected ? 'border-emerald-500 bg-emerald-500 text-slate-950' : ''}">
                         ${opt.charAt(0)}
@@ -235,22 +233,89 @@
                 optsDiv.appendChild(btn);
             });
 
-            renderGrid();
-            setTimeout(triggerKaTeX, 50);
+            updateNavButtons();
+            updateRaguButtonUI();
+            setTimeout(triggerKaTeX, 30);
         }
 
-        function selectAnswer(index, opt) {
+        // Pilihi Jawaban (SMOOTH & ANTI-FLICKER FIX)
+        function selectAnswer(index, opt, optIdx) {
             answers[index] = opt;
-            renderQuestion(index);
 
+            // Update UI Opsi Jawaban Secara Langsung TANPA Re-render Soal / Re-trigger KaTeX
+            quizData[index].options.forEach((_, idx) => {
+                const btn = document.getElementById(`opt-btn-${idx}`);
+                if (!btn) return;
+                const isSelected = idx === optIdx;
+                btn.className = `w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm transition flex items-start space-x-3 ${
+                    isSelected 
+                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-medium shadow-[0_0_10px_rgba(16,185,129,0.15)]' 
+                    : 'bg-slate-950 border-slate-800 text-slate-300 active:border-slate-700'
+                }`;
+                const badge = btn.querySelector('span');
+                if (badge) {
+                    badge.className = `w-6 h-6 rounded-full border border-slate-700 flex-shrink-0 flex items-center justify-center text-[11px] font-bold mt-0.5 ${
+                        isSelected ? 'border-emerald-500 bg-emerald-500 text-slate-950' : ''
+                    }`;
+                }
+            });
+
+            // Kirim jawaban ke backend secara asinkron
             const formData = new FormData();
             formData.append("session_id", sessionId);
             formData.append("q_index", index);
             formData.append("answer", opt);
-
             fetch("/api/save-answer", { method: "POST", body: formData });
         }
 
+        // Toggle Status Ragu-Ragu
+        function toggleRagu() {
+            raguState[currentIndex] = !raguState[currentIndex];
+            updateRaguButtonUI();
+        }
+
+        function updateRaguButtonUI() {
+            const btnRagu = document.getElementById("btn-ragu");
+            if (raguState[currentIndex]) {
+                btnRagu.className = "flex-1 sm:flex-none bg-amber-500 text-slate-950 border border-amber-400 font-bold text-xs py-3 px-4 rounded-xl transition text-center shadow-[0_0_12px_rgba(245,158,11,0.4)]";
+            } else {
+                btnRagu.className = "flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold py-3 px-4 rounded-xl transition text-center";
+            }
+        }
+
+        // Update Tombol Prev dan Next/Submit
+        function updateNavButtons() {
+            const btnPrev = document.getElementById("btn-prev");
+            const btnNextSubmit = document.getElementById("btn-next-submit");
+
+            // State Prev
+            btnPrev.disabled = currentIndex === 0;
+
+            // State Next / Selesai
+            if (currentIndex === quizData.length - 1) {
+                btnNextSubmit.textContent = "🚀 Selesai Ujian";
+                btnNextSubmit.className = "flex-1 sm:flex-none bg-rose-500 hover:bg-rose-400 active:bg-rose-600 text-white font-bold text-xs py-3 px-5 rounded-xl transition shadow-[0_0_15px_rgba(244,63,94,0.4)] text-center";
+            } else {
+                btnNextSubmit.textContent = "Next →";
+                btnNextSubmit.className = "flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-3 px-5 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center";
+            }
+        }
+
+        function prevQuestion() {
+            if (currentIndex > 0) renderQuestion(currentIndex - 1);
+        }
+
+        function handleNextOrSubmit() {
+            if (currentIndex < quizData.length - 1) {
+                renderQuestion(currentIndex + 1);
+            } else {
+                if (confirm("Yakin ingin mengakhiri dan menyelesaikan ujian ini?")) {
+                    document.getElementById("form-submit-exam").submit();
+                }
+            }
+        }
+
+        // Render Grid Modal Navigasi
         function renderGrid() {
             const grid = document.getElementById("nav-grid");
             grid.innerHTML = "";
@@ -258,23 +323,27 @@
             quizData.forEach((_, idx) => {
                 const btn = document.createElement("button");
                 const isAnswered = answers[idx] !== undefined;
+                const isRagu = raguState[idx] === true;
                 const isCurrent = idx === currentIndex;
 
-                btn.className = `h-10 text-xs font-bold rounded-xl border transition ${
-                    isCurrent ? 'ring-2 ring-emerald-400 border-emerald-500' : ''
-                } ${
-                    isAnswered 
-                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' 
-                    : 'bg-slate-950 border-slate-800 text-slate-400'
+                let colorClasses = "bg-slate-950 border-slate-800 text-slate-400";
+                if (isRagu) {
+                    colorClasses = "bg-amber-500/20 border-amber-500/60 text-amber-300 font-bold";
+                } else if (isAnswered) {
+                    colorClasses = "bg-emerald-500/20 border-emerald-500/60 text-emerald-300 font-bold";
+                }
+
+                btn.className = `h-10 text-xs rounded-xl border transition ${colorClasses} ${
+                    isCurrent ? 'ring-2 ring-emerald-400 border-emerald-400' : ''
                 }`;
                 btn.textContent = idx + 1;
-                btn.onclick = () => renderQuestion(idx);
+                btn.onclick = () => {
+                    renderQuestion(idx);
+                    toggleNavModal(false);
+                };
                 grid.appendChild(btn);
             });
         }
-
-        function prevQuestion() { if (currentIndex > 0) renderQuestion(currentIndex - 1); }
-        function nextQuestion() { if (currentIndex < quizData.length - 1) renderQuestion(currentIndex + 1); }
 
         // Timer Presisi
         const endTime = new Date().getTime() + (durationMinutes * 60 * 1000);
