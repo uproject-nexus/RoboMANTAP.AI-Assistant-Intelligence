@@ -1218,57 +1218,52 @@ if st.session_state.page == "landing":
             st.rerun()
             
     st.write("---")
-    st.markdown("#### 📝 Sesi Kuis GuruMANTAP")
+    st.markdown("#### 📝 Sesi Ujian CBT Siswa")
+    st.caption("Klik tombol di bawah ini untuk menuju Portal Ujian CBT Siswa By GuruMANTAP:")
     
-    col_c1, col_c2 = st.columns([3, 1])
-    with col_c1:
-        kode_masuk_input = st.text_input("Masukkan Kode Kuis GuruMANTAP:", placeholder="Masukkan Kode Kuis disini...", label_visibility="collapsed")
-    with col_c2:
-        if st.button("Masuk Kuis ➔", key="btn_custom_enter", use_container_width=True, type="primary"):
-            if not kode_masuk_input.strip():
-                st.warning("⚠️ Masukkan kode kuisnya dulu ya!")
-            else:
-                pkg = get_custom_quiz_from_db(kode_masuk_input.strip())
-                if pkg:
-                    cfg = pkg.get('config', {})
-                    
-                    # Pengecekan Masa Aktif Waktu (WIB)
-                    now_wib = datetime.utcnow() + timedelta(hours=7)
-                    active_from_str = cfg.get('active_from')
-                    active_until_str = cfg.get('active_until')
-                    
-                    is_valid = True
-                    if active_from_str and active_until_str:
-                        dt_from = datetime.fromisoformat(active_from_str)
-                        dt_until = datetime.fromisoformat(active_until_str)
-                        
-                        if now_wib < dt_from:
-                            st.error(f"⏳ **Kuis Belum Dibuka!**\n\nKuis baru dapat diakses pada pukul **{cfg.get('time_start_str', '--:--')} WIB**.")
-                            is_valid = False
-                        elif now_wib > dt_until:
-                            st.error(f"❌ **Kode Kuis Sudah Kedaluwarsa!**\n\nMasa aktif kuis ini telah berakhir pada pukul **{cfg.get('time_end_str', '--:--')} WIB**.")
-                            is_valid = False
-
-                    if is_valid:
-                        # Simpan kode kuis di session state karena widget
-                        # input ini hanya hidup pada halaman landing.
-                        # Halaman setup_custom dijalankan pada rerun berikutnya,
-                        # sehingga variabel lokal kode_masuk_input tidak lagi tersedia.
-                        st.session_state.custom_quiz_code = kode_masuk_input.strip().upper()
-                        st.session_state.is_custom_quiz = True
-                        st.session_state.custom_pkg = pkg
-                        st.session_state.mapel = cfg.get('mapel', 'Custom Quiz')
-                        st.session_state.jenjang = cfg.get('jenjang', 'Umum')
-                        st.session_state.quiz_data = pkg['quiz']
-                        st.session_state.page = "setup_custom"
-                        st.rerun()
-                else:
-                    st.error("❌ Kode Kuis tidak ditemukan! Periksa kembali kodenya ya")
-    st.caption("Klik link di bawah ini untuk memulai sesi kuis by GuruMANTAP:")
+    # Tombol Futuristik Neon Emerald yang Mengarah ke Render
     st.markdown(
-        "[🚀 Buka Portal Ujian CBT Siswa (Render.com)](https://namaservice-kamu.onrender.com)", 
+        """
+        <a href="https://robomantap-intelligence-cbt.onrender.com" target="_blank" style="text-decoration: none;">
+            <div style="
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: #020617;
+                padding: 14px 24px;
+                border-radius: 12px;
+                text-align: center;
+                font-weight: 800;
+                font-size: 15px;
+                letter-spacing: 0.5px;
+                box-shadow: 0 0 20px rgba(16, 185, 129, 0.35);
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                margin-top: 8px;
+                margin-bottom: 20px;
+                cursor: pointer;
+            ">
+                🚀 BUKA PORTAL UJIAN CBT SISWA (RENDER.COM) →
+            </div>
+        </a>
+        """,
         unsafe_allow_html=True
     )
+    
+    st.write("---")
+    st.markdown("#### 🏢 Portal GuruMANTAP")
+    st.markdown("""
+    <div class="guru-card">
+        <h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
+        <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("🔐 Masuk Portal Guru →", use_container_width=True):
+        st.session_state.page = "guru_login"
+        st.rerun()
+
 
     st.write("---")
     st.markdown("#### 🧕🏼 Portal GuruMANTAP")
