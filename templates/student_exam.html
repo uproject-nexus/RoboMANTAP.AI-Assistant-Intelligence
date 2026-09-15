@@ -2,74 +2,82 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Workspace CBT - RoboMANTAP</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Engine Render LaTeX (KaTeX) CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
 
-    <!-- Header Bar -->
-    <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-        <div class="flex items-center space-x-3">
-            <span class="bg-emerald-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded">CBT v2.0</span>
+    <!-- Header Bar Mobile-Optimized -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-50 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+            <span class="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded">CBT v2.0</span>
             <div>
-                <h1 class="text-base font-bold text-white leading-none">RoboMANTAP CBT</h1>
-                <p class="text-xs text-emerald-400 mt-1">{{ sess.config.mapel }}</p>
+                <h1 class="text-xs sm:text-sm font-bold text-white leading-none">RoboMANTAP CBT</h1>
+                <p class="text-[10px] text-emerald-400 mt-0.5 truncate max-w-[120px] sm:max-w-none">{{ sess.config.mapel }}</p>
             </div>
         </div>
-        <div class="flex items-center space-x-4">
-            <div class="bg-slate-950 border border-slate-800 px-4 py-1.5 rounded-xl text-sm">
-                ⏱️ Waktu: <span id="timer-display" class="font-mono text-emerald-400 font-bold">--:--</span>
+        <div class="flex items-center space-x-2 sm:space-x-4">
+            <div class="bg-slate-950 border border-slate-800 px-3 py-1 rounded-lg text-xs">
+                ⏱️ <span id="timer-display" class="font-mono text-emerald-400 font-bold">--:--</span>
             </div>
             <div class="text-right hidden sm:block">
                 <p class="text-xs text-slate-400">{{ sess.nama }}</p>
-                <p class="text-xs font-semibold text-emerald-400">Kelas {{ sess.kelas }}</p>
+                <p class="text-[10px] font-semibold text-emerald-400">Kelas {{ sess.kelas }}</p>
             </div>
         </div>
     </header>
 
-    <!-- Main Workspace -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <!-- Main Workspace Layout -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
         
-        <!-- Area Soal (Kiri) -->
-        <section class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between min-h-[450px]">
+        <!-- Area Soal Utama -->
+        <section class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col justify-between min-h-[420px]">
             <div>
                 <div class="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
-                    <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Soal No. 1</span>
-                    <span class="text-xs text-slate-500">Tipe: Pilihan Ganda</span>
+                    <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Memuat...</span>
+                    <span class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded">Pilihan Ganda</span>
                 </div>
 
-                <div id="question-text" class="text-slate-100 text-base leading-relaxed mb-6 font-medium"></div>
+                <!-- Teks Soal -->
+                <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-5 font-medium overflow-x-auto"></div>
 
-                <div id="options-container" class="space-y-3"></div>
+                <!-- Pilihan Jawaban -->
+                <div id="options-container" class="space-y-2.5"></div>
             </div>
 
-            <!-- Bottom Action Bar -->
-            <div class="flex justify-between items-center border-t border-slate-800 pt-4 mt-6">
-                <button onclick="prevQuestion()" class="bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-bold px-4 py-2.5 rounded-xl transition">
-                    ← Sebelumnya
+            <!-- Bottom Action Navigation -->
+            <div class="flex items-center justify-between border-t border-slate-800 pt-4 mt-6 gap-2">
+                <button onclick="prevQuestion()" class="flex-1 sm:flex-none bg-slate-800 active:bg-slate-700 text-slate-300 font-bold text-xs py-3 px-3 rounded-xl transition text-center">
+                    ← Prev
                 </button>
 
-                <form action="/submit-exam" method="POST" onsubmit="return confirm('Yakin ingin menyelesaikan ujian?');">
+                <form action="/submit-exam" method="POST" onsubmit="return confirm('Yakin ingin menyelesaikan ujian?');" class="flex-1 sm:flex-none">
                     <input type="hidden" name="session_id" value="{{ session_id }}">
-                    <button type="submit" class="bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 text-xs font-bold px-4 py-2.5 rounded-xl transition">
+                    <button type="submit" class="w-full bg-rose-500/10 active:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold py-3 px-3 rounded-xl transition text-center truncate">
                         Selesai Ujian
                     </button>
                 </form>
 
-                <button onclick="nextQuestion()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-5 py-2.5 rounded-xl transition">
-                    Berikutnya →
+                <button onclick="nextQuestion()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-3 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center">
+                    Next →
                 </button>
             </div>
         </section>
 
-        <!-- Sidebar Grid Navigasi (Kanan) -->
-        <aside class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl h-fit">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">
-                Navigasi Soal
+        <!-- Sidebar / Grid Navigasi Soal Mobile-Optimized -->
+        <aside class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl h-fit">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 border-b border-slate-800 pb-2 flex justify-between items-center">
+                <span>Navigasi Soal</span>
+                <span class="text-[10px] text-emerald-400 font-normal">Tekan nomor untuk pindah</span>
             </h3>
-            <div id="nav-grid" class="grid grid-cols-5 gap-2"></div>
+            <div id="nav-grid" class="grid grid-cols-5 sm:grid-cols-5 gap-2"></div>
         </aside>
 
     </main>
@@ -81,6 +89,19 @@
         
         let currentIndex = 0;
         let answers = {};
+
+        // Fungsi Render Ulang LaTeX menggunakan KaTeX
+        function triggerKaTeX() {
+            if (window.renderMathInElement) {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        {left: "$$", right: "$$", display: true},
+                        {left: "$", right: "$", display: false}
+                    ],
+                    throwOnError: false
+                });
+            }
+        }
 
         function renderQuestion(index) {
             currentIndex = index;
@@ -95,29 +116,29 @@
             item.options.forEach(opt => {
                 const isSelected = answers[index] === opt;
                 const btn = document.createElement("button");
-                btn.className = `w-full text-left p-4 rounded-xl border text-sm transition flex items-center space-x-3 ${
+                btn.className = `w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm transition flex items-start space-x-3 ${
                     isSelected 
                     ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-medium' 
-                    : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                    : 'bg-slate-950 border-slate-800 text-slate-300 active:border-slate-700'
                 }`;
                 btn.onclick = () => selectAnswer(index, opt);
                 btn.innerHTML = `
-                    <span class="w-6 h-6 rounded-full border border-slate-700 flex items-center justify-center text-xs font-bold ${isSelected ? 'border-emerald-500 bg-emerald-500 text-slate-950' : ''}">
+                    <span class="w-6 h-6 rounded-full border border-slate-700 flex-shrink-0 flex items-center justify-center text-[11px] font-bold mt-0.5 ${isSelected ? 'border-emerald-500 bg-emerald-500 text-slate-950' : ''}">
                         ${opt.charAt(0)}
                     </span>
-                    <span>${opt}</span>
+                    <span class="leading-relaxed">${opt}</span>
                 `;
                 optsDiv.appendChild(btn);
             });
 
             renderGrid();
+            setTimeout(triggerKaTeX, 50);
         }
 
         function selectAnswer(index, opt) {
             answers[index] = opt;
             renderQuestion(index);
 
-            // Save to Backend via HTMX/Fetch API
             const formData = new FormData();
             formData.append("session_id", sessionId);
             formData.append("q_index", index);
@@ -135,12 +156,12 @@
                 const isAnswered = answers[idx] !== undefined;
                 const isCurrent = idx === currentIndex;
 
-                btn.className = `h-10 text-xs font-bold rounded-lg border transition ${
+                btn.className = `h-10 text-xs font-bold rounded-xl border transition ${
                     isCurrent ? 'ring-2 ring-emerald-400 border-emerald-500' : ''
                 } ${
                     isAnswered 
                     ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' 
-                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                    : 'bg-slate-950 border-slate-800 text-slate-400'
                 }`;
                 btn.textContent = idx + 1;
                 btn.onclick = () => renderQuestion(idx);
@@ -151,7 +172,7 @@
         function prevQuestion() { if (currentIndex > 0) renderQuestion(currentIndex - 1); }
         function nextQuestion() { if (currentIndex < quizData.length - 1) renderQuestion(currentIndex + 1); }
 
-        // Timer Real-time Presisi
+        // Timer Presisi
         const endTime = new Date().getTime() + (durationMinutes * 60 * 1000);
         setInterval(() => {
             const now = new Date().getTime();
@@ -169,7 +190,9 @@
                 `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
         }, 1000);
 
-        renderQuestion(0);
+        document.addEventListener("DOMContentLoaded", function() {
+            renderQuestion(0);
+        });
     </script>
 </body>
 </html>
