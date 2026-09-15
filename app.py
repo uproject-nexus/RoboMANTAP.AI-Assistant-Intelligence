@@ -1219,7 +1219,7 @@ if st.session_state.page == "landing":
             
     st.write("---")
     st.markdown("#### 📝 Sesi Ujian CBT Siswa")
-    st.caption("Klik tombol di bawah ini untuk menuju Portal Ujian CBT Siswa By GuruMANTAP:")
+    st.caption("Klik tombol di bawah untuk menuju Portal Ujian By GuruMANTAP!")
     
     # Tombol Futuristik Neon Emerald yang Mengarah ke Render
     st.markdown(
