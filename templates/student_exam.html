@@ -11,6 +11,17 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- CSS Anti-Select Text & Anti-Highlight -->
+    <style>
+        * {
+            -webkit-user-select: none !important;
+            -moz-user-select: none !important;
+            -ms-user-select: none !important;
+            user-select: none !important;
+            -webkit-touch-callout: none !important;
+        }
+    </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
 
@@ -23,16 +34,28 @@
                 <p class="text-[10px] text-emerald-400 mt-0.5 truncate max-w-[120px] sm:max-w-none">{{ sess.config.mapel }}</p>
             </div>
         </div>
-        <div class="flex items-center space-x-2 sm:space-x-4">
+        
+        <div class="flex items-center space-x-2 sm:space-x-3">
+            <!-- Tombol Layar Penuh (Fullscreen) -->
+            <button onclick="requestFullscreenMode()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition">
+                📺 Fullscreen
+            </button>
+            
             <div class="bg-slate-950 border border-slate-800 px-3 py-1 rounded-lg text-xs">
                 ⏱️ <span id="timer-display" class="font-mono text-emerald-400 font-bold">--:--</span>
             </div>
+            
             <div class="text-right hidden sm:block">
                 <p class="text-xs text-slate-400">{{ sess.nama }}</p>
                 <p class="text-[10px] font-semibold text-emerald-400">Kelas {{ sess.kelas }}</p>
             </div>
         </div>
     </header>
+
+    <!-- Banner Peringatan Kecurangan -->
+    <div id="cheat-warning-bar" class="hidden bg-amber-500/20 border-b border-amber-500/40 px-4 py-2 text-center text-xs text-amber-300 font-semibold">
+        ⚠️ Warning Pelanggaran Pindah Tab: <span id="violation-count-text">0</span> / 3
+    </div>
 
     <!-- Main Workspace Layout -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -58,7 +81,7 @@
                     ← Prev
                 </button>
 
-                <form action="/submit-exam" method="POST" onsubmit="return confirm('Yakin ingin menyelesaikan ujian?');" class="flex-1 sm:flex-none">
+                <form id="form-submit-exam" action="/submit-exam" method="POST" onsubmit="return confirm('Yakin ingin menyelesaikan ujian?');" class="flex-1 sm:flex-none">
                     <input type="hidden" name="session_id" value="{{ session_id }}">
                     <button type="submit" class="w-full bg-rose-500/10 active:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold py-3 px-3 rounded-xl transition text-center truncate">
                         Selesai Ujian
@@ -71,7 +94,7 @@
             </div>
         </section>
 
-        <!-- Sidebar / Grid Navigasi Soal Mobile-Optimized -->
+        <!-- Sidebar / Grid Navigasi Soal -->
         <aside class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl h-fit">
             <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 border-b border-slate-800 pb-2 flex justify-between items-center">
                 <span>Navigasi Soal</span>
@@ -83,6 +106,88 @@
     </main>
 
     <script>
+        // ==============================================================================
+        // 1. FITUR ANTI-COPAS & KUNCI KEYBOARD / KLIK KANAN
+        // ==============================================================================
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('copy', e => e.preventDefault());
+        document.addEventListener('cut', e => e.preventDefault());
+        document.addEventListener('paste', e => e.preventDefault());
+
+        document.addEventListener('keydown', function(e) {
+            // Blokir Ctrl+C, Ctrl+V, Ctrl+A, Ctrl+U, Ctrl+S, Ctrl+P
+            if (e.ctrlKey && ['c', 'v', 'a', 'u', 's', 'p'].includes(e.key.toLowerCase())) {
+                e.preventDefault();
+            }
+            // Blokir F12 / Developer Tools
+            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(e.key.toLowerCase()))) {
+                e.preventDefault();
+            }
+        });
+
+        // ==============================================================================
+        // 2. SCREEN WAKE LOCK (MENCEGAH LAYAR HP MATI / REDUP)
+        // ==============================================================================
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log("WakeLock Info:", err.message);
+            }
+        }
+        requestWakeLock();
+
+        // ==============================================================================
+        // 3. DETEKSI PINDAH TAB & AUTO-SUBMIT KECURANGAN
+        // ==============================================================================
+        let violationCount = 0;
+        const maxViolations = 3;
+
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible') {
+                // Re-apply Screen Wake Lock saat kembali ke tab
+                if (wakeLock !== null) {
+                    await requestWakeLock();
+                }
+            } else if (document.hidden) {
+                // Siswa terdeteksi pindah tab / membuka aplikasi lain
+                violationCount++;
+                
+                const warningBar = document.getElementById("cheat-warning-bar");
+                const countText = document.getElementById("violation-count-text");
+                
+                if (warningBar) warningBar.classList.remove("hidden");
+                if (countText) countText.textContent = violationCount;
+
+                if (violationCount >= maxViolations) {
+                    alert("🚨 PELANGGARAN BERAT DETEKSI KECURANGAN!\n\nAnda telah meninggalkan tab ujian sebanyak 3 kali (membuka browser lain/AI). Ujian Anda dihentikan dan otomatis dikirim!");
+                    document.getElementById('form-submit-exam').submit();
+                } else {
+                    alert(`⚠️ PERINGATAN KECURANGAN (${violationCount}/${maxViolations})!\n\nDilarang berpindah tab atau membuka aplikasi lain selama ujian berlangsung! Jika mencapai 3 kali, jawaban akan otomatis dikirim.`);
+                }
+            }
+        });
+
+        // ==============================================================================
+        // 4. LAYAR PENUH (FULLSCREEN)
+        // ==============================================================================
+        function requestFullscreenMode() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch(err => console.log(err));
+            } else if (elem.webkitRequestFullscreen) { /* Safari */
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) { /* IE11 */
+                elem.msRequestFullscreen();
+            }
+        }
+
+        // ==============================================================================
+        // 5. LOGIKA UTAMA CBT ENGINE & TIMER
+        // ==============================================================================
         const quizData = {{ quiz_json | safe }};
         const sessionId = "{{ session_id }}";
         const durationMinutes = {{ sess.config.timer_m if sess.config.timer_m else 30 }};
@@ -90,7 +195,6 @@
         let currentIndex = 0;
         let answers = {};
 
-        // Fungsi Render Ulang LaTeX menggunakan KaTeX
         function triggerKaTeX() {
             if (window.renderMathInElement) {
                 renderMathInElement(document.body, {
@@ -180,7 +284,7 @@
 
             if (diff <= 0) {
                 alert("Waktu Ujian telah Habis!");
-                document.forms[0].submit();
+                document.getElementById('form-submit-exam').submit();
                 return;
             }
 
