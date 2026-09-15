@@ -37,6 +37,24 @@ from ai_engine import (
     generate_lkpd_content, stream_ai_text, generate_custom_quiz_ai,
     publish_custom_quiz_to_db, get_custom_quiz_from_db, check_active_session_from_db
 )
+from ai_engine import load_session_review_from_db
+
+# Interseptor Deep Link dari CBT Engine Render
+if "review_session" in st.query_params:
+    review_id = st.query_params["review_session"]
+    
+    # Mencegah pemanggilan ulang jika sudah di load
+    if st.session_state.get("loaded_review_id") != review_id:
+        review_data = load_session_review_from_db(review_id)
+        if review_data and review_data["quiz_data"]:
+            st.session_state.page = "result"
+            st.session_state.quiz_data = review_data["quiz_data"]
+            st.session_state.user_answers = review_data["user_answers"]
+            st.session_state.mapel = review_data["mapel"]
+            st.session_state.jenjang = review_data["jenjang"]
+            st.session_state.nama_siswa = review_data["nama"]
+            st.session_state.is_custom_quiz = True
+            st.session_state.loaded_review_id = review_id
 
 st.set_page_config(
     page_title="RoboMANTAP-Intelligence",
