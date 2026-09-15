@@ -47,6 +47,37 @@ st.set_page_config(
 
 # Inisialisasi Tabel Database saat aplikasi pertama kali dimuat
 create_table_if_not_exists()
+# ==============================================================================
+# ANTI-COPAS & DISABLE KLIK KANAN (PERLINDUNGAN HALAMAN KUIS)
+# ==============================================================================
+st.markdown("""
+    <style>
+    /* Matikan seleksi teks pada soal & pilihan jawaban */
+    body, html, iframe, [data-testid="stMarkdownContainer"] {
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        user-select: none !important;
+    }
+    </style>
+    
+    <script>
+    // Matikan Klik Kanan
+    document.addEventListener('contextmenu', event => event.preventDefault());
+    
+    // Matikan Shortcut Copy (Ctrl+C, Ctrl+A, Ctrl+U, Ctrl+S)
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && (e.key === 'c' || e.key === 'u' || e.key === 's' || e.key === 'a')) {
+            e.preventDefault();
+        }
+    });
+
+    // Matikan Event Copy Teks
+    document.addEventListener('copy', function(e) {
+        e.preventDefault();
+    });
+    </script>
+""", unsafe_allow_html=True)
 
 components.html(
     """
