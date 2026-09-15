@@ -791,3 +791,54 @@ def check_active_session_from_db(nama_siswa: str, mapel: str):
     except Exception as e:
         print(f"Error check_active_session_from_db: {e}")
     return None
+
+def load_session_review_from_db(session_id: str):
+    """Membaca data sesi ujian dari Supabase untuk ditampilkan di Streamlit."""
+    conn = init_db_connection()
+    if not conn:
+        return None
+
+    query = "SELECT nama_siswa, jenjang, mapel, detail_jawaban, nilai_akhir FROM sesi_ujian WHERE id_sesi = :id"
+    try:
+        with conn.session as s:
+            res = s.execute(text(query), {"id": session_id.strip()}).fetchone()
+            if res:
+                nama, jenjang, mapel, detail_raw, nilai = res
+                
+                # Parsing detail_jawaban (apakah berupa dict payload baru atau list boolean lama)
+                if isinstance(detail_raw, dict):
+                    payload = detail_raw
+                elif isinstance(detail_raw, str):
+                    try:
+                        payload = json.loads(detail_raw)
+                    except Exception:
+                        payload = {}
+                else:
+                    payload = {}
+
+                if isinstance(payload, dict):
+                    raw_user_answers = payload.get("user_answers", {})
+                    quiz_data = payload.get("quiz_data", [])
+                else:
+                    raw_user_answers = {}
+                    quiz_data = []
+
+                # Format ulang key dictionary ke integer agar cocok dengan state Streamlit
+                formatted_user_answers = {}
+                for k, v in raw_user_answers.items():
+                    try:
+                        formatted_user_answers[int(k)] = v
+                    except ValueError:
+                        formatted_user_answers[k] = v
+
+                return {
+                    "nama": nama,
+                    "jenjang": jenjang or "MA",
+                    "mapel": mapel.replace(" (Quiz)", "") if mapel else "Kuis",
+                    "quiz_data": quiz_data,
+                    "user_answers": formatted_user_answers,
+                    "nilai": nilai
+                }
+    except Exception as e:
+        print(f"Error load_session_review_from_db: {e}")
+    return None
