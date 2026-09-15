@@ -148,6 +148,10 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
     quiz = sess["quiz"]
     answers = sess["answers"]
     
+    # Ekstraksi Nama Depan/Panggilan Siswa
+    nama_lengkap = sess.get("nama", "").strip()
+    nama_depan = nama_lengkap.split()[0] if nama_lengkap else "Santri MANTAP"
+
     benar = 0
     salah = 0
     kosong = 0
@@ -168,10 +172,10 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
     total_soal = len(quiz)
     skor = int(round((benar / total_soal) * 100)) if total_soal > 0 else 0
 
-    # Simpan pengerjaan lengkap ke Supabase (Termasuk quiz_data dan answers)
+    # Simpan pengerjaan ke Supabase
     update_progress_siswa(
         session_id=session_id,
-        nama=sess["nama"],
+        nama=nama_lengkap, # Di DB tetap tersimpan nama lengkap
         jenjang=sess["config"].get("jenjang", "MA"),
         mapel=sess["config"].get("mapel", "Matematika"),
         soal_sekarang=total_soal,
@@ -182,14 +186,14 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
         quiz_data_list=quiz
     )
 
-    # Buat Deep Link Presisi ke Evaluasi Streamlit
-    target_streamlit_url = f"{STREAMLIT_URL}/?review_session={session_id}"
+    base_url = STREAMLIT_URL.rstrip('/')
+    target_streamlit_url = f"{base_url}/?review_session={session_id}"
 
     return templates.TemplateResponse(
         request=request,
         name="student_result.html", 
         context={
-            "nama": sess["nama"],
+            "nama": nama_depan,  # <-- Dikirim nama depan saja untuk sapaan akrab
             "skor": skor,
             "benar": benar,
             "salah": salah,
