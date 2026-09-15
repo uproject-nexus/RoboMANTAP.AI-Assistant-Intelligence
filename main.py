@@ -32,7 +32,7 @@ except Exception as e:
 # In-Memory Session Storage
 STUDENT_SESSIONS: Dict[str, Dict[str, Any]] = {}
 
-STREAMLIT_URL = "https://share.streamlit.io" # Sesuaikan dengan URL Streamlit app.py kamu
+STREAMLIT_URL = "https://robomantap-intelligence.streamlit.app/" # Sesuaikan dengan URL Streamlit app.py kamu
 
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
