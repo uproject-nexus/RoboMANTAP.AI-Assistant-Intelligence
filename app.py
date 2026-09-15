@@ -1249,20 +1249,6 @@ if st.session_state.page == "landing":
         """,
         unsafe_allow_html=True
     )
-    
-    st.write("---")
-    st.markdown("#### 🏢 Portal GuruMANTAP")
-    st.markdown("""
-    <div class="guru-card">
-        <h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
-        <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if st.button("🔐 Masuk Portal Guru →", use_container_width=True):
-        st.session_state.page = "guru_login"
-        st.rerun()
-
 
     st.write("---")
     st.markdown("#### 🧕🏼 Portal GuruMANTAP")
