@@ -12,7 +12,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 
-    <!-- CSS Anti-Select Text & Anti-Highlight -->
+    <!-- CSS Anti-Select Text & Stabilisator Tinggi Kontainer -->
     <style>
         * {
             -webkit-user-select: none !important;
@@ -21,6 +21,10 @@
             user-select: none !important;
             -webkit-touch-callout: none !important;
         }
+        /* Mencegah Kontainer Menyusut (Penyebab Utama Scroll Jump) */
+        #question-box {
+            min-height: 280px;
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
@@ -28,7 +32,7 @@
     <!-- Header Bar Utama -->
     <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-40 flex justify-between items-center">
         <div class="flex items-center space-x-2">
-            <span class="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded">UPN v2.0</span>
+            <span class="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded">CBT v2.0</span>
             <div>
                 <h1 class="text-xs sm:text-sm font-bold text-white leading-none">RoboMANTAP CBT</h1>
                 <p class="text-[10px] text-emerald-400 mt-0.5 truncate max-w-[130px] sm:max-w-none">{{ sess.config.mapel }}</p>
@@ -51,7 +55,7 @@
         ⚠️ Warning Pelanggaran Pindah Tab: <span id="violation-count-text">0</span> / 3
     </div>
 
-    <!-- Container Utama (Tata Letak Kompak & Mepet) -->
+    <!-- Container Utama -->
     <main class="flex-1 max-w-4xl w-full mx-auto p-3 sm:p-5 flex flex-col justify-start">
         
         <!-- Sub-Header Bar (Nama Siswa & Tombol Popup Navigasi) -->
@@ -68,8 +72,8 @@
             </button>
         </div>
 
-        <!-- Area Soal Utama -->
-        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
+        <!-- Area Soal Utama dengan Stabilizer Box -->
+        <section id="question-box" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2.5 mb-3">
                 <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Memuat...</span>
                 <span class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">Pilihan Ganda</span>
@@ -81,17 +85,17 @@
             <!-- Pilihan Jawaban -->
             <div id="options-container" class="space-y-2.5"></div>
 
-            <!-- Bottom Action Navigation (Prev | Ragu-Ragu | Next/Submit) Mepet di Bawah Opsi -->
+            <!-- Bottom Action Navigation Mepet -->
             <div class="flex items-center justify-between border-t border-slate-800/80 pt-3.5 mt-4 gap-2">
-                <button id="btn-prev" onclick="prevQuestion()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-4 rounded-xl transition text-center disabled:opacity-40 disabled:cursor-not-allowed">
+                <button id="btn-prev" onclick="prevQuestion()" class="flex-1 sm:flex-none bg-slate-800 active:bg-slate-700 text-slate-300 font-bold text-xs py-2.5 px-3.5 rounded-xl transition text-center disabled:opacity-40 disabled:cursor-not-allowed">
                     ← Prev
                 </button>
 
-                <button id="btn-ragu" onclick="toggleRagu()" class="flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold py-2.5 px-4 rounded-xl transition text-center">
-                    ⚠️ Ragu
+                <button id="btn-ragu" onclick="toggleRagu()" class="flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold py-2.5 px-2 rounded-xl transition text-center whitespace-nowrap">
+                    ⚠️ Ragu-Ragu
                 </button>
 
-                <button id="btn-next-submit" onclick="handleNextOrSubmit()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-5 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center">
+                <button id="btn-next-submit" onclick="handleNextOrSubmit()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center">
                     Next →
                 </button>
             </div>
@@ -130,7 +134,7 @@
         </div>
     </div>
 
-    <!-- Modal Pop-up Konfirmasi Selesai Ujian (Futuristic Design) -->
+    <!-- Modal Pop-up Konfirmasi Selesai Ujian -->
     <div id="submit-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl max-w-sm w-full p-6 shadow-[0_0_30px_rgba(16,185,129,0.2)] text-center space-y-4">
             <div class="w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto text-2xl">
@@ -155,7 +159,7 @@
 
     <script>
         // ==============================================================================
-        // 1. ANTI-COPAS & WAKE LOCK & ANTI KECURANGAN
+        // 1. ANTI-COPAS & WAKE LOCK & MOBILE TAB-SWITCH DETECTOR
         // ==============================================================================
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.addEventListener('copy', e => e.preventDefault());
@@ -175,24 +179,36 @@
         }
         requestWakeLock();
 
+        // Deteksi Pindah Tab Mobile dengan Grace Period
         let violationCount = 0;
         const maxViolations = 3;
+        let lastBlurTime = 0;
+
+        function handleTabSwitch() {
+            const now = new Date().getTime();
+            // Abaikan jika jeda keluar < 1.5 detik (menghindari false alarm sistem OS HP)
+            if (now - lastBlurTime < 1500) return;
+            lastBlurTime = now;
+
+            violationCount++;
+            const warningBar = document.getElementById("cheat-warning-bar");
+            const countText = document.getElementById("violation-count-text");
+            if (warningBar) warningBar.classList.remove("hidden");
+            if (countText) countText.textContent = violationCount;
+
+            if (violationCount >= maxViolations) {
+                alert("🚨 DETEKSI KECURANGAN!\n\nAnda meninggalkan tab 3 kali. Ujian otomatis dikirim!");
+                document.getElementById('form-submit-exam').submit();
+            } else {
+                alert(`⚠️ PERINGATAN KECURANGAN (${violationCount}/${maxViolations})!\n\nDilarang meninggalkan tab ujian!`);
+            }
+        }
+
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible') {
                 if (wakeLock !== null) await requestWakeLock();
             } else if (document.hidden) {
-                violationCount++;
-                const warningBar = document.getElementById("cheat-warning-bar");
-                const countText = document.getElementById("violation-count-text");
-                if (warningBar) warningBar.classList.remove("hidden");
-                if (countText) countText.textContent = violationCount;
-
-                if (violationCount >= maxViolations) {
-                    alert("🚨 DETEKSI KECURANGAN!\n\nAnda meninggalkan tab 3 kali. Ujian otomatis dikirim!");
-                    document.getElementById('form-submit-exam').submit();
-                } else {
-                    alert(`⚠️ PERINGATAN KECURANGAN (${violationCount}/${maxViolations})!\n\nDilarang meninggalkan tab ujian!`);
-                }
+                handleTabSwitch();
             }
         });
 
@@ -203,19 +219,22 @@
         }
 
         // ==============================================================================
-        // 2. LOGIKA UTAMA CBT ENGINE (STABLE & NO SCROLL JUMP BUG FIX)
+        // 2. LOGIKA UTAMA CBT ENGINE (RESUME STATE & NO FLICKER BUG)
         // ==============================================================================
         const quizData = {{ quiz_json | safe }};
         const sessionId = "{{ session_id }}";
-        const durationMinutes = {{ sess.config.timer_m if sess.config.timer_m else 30 }};
         
+        // Load State dari Server (Mengatasi Bug Relog/HP Mati)
+        let answers = {{ answers_json | safe }}; 
+        let remainingSeconds = {{ remaining_seconds }};
         let currentIndex = 0;
-        let answers = {};
         let raguState = {};
 
+        // Scope KaTeX Hanya Pada Area Soal (Cegah Flicker / Jump Page)
         function triggerKaTeX() {
-            if (window.renderMathInElement) {
-                renderMathInElement(document.body, {
+            const qBox = document.getElementById("question-box");
+            if (window.renderMathInElement && qBox) {
+                renderMathInElement(qBox, {
                     delimiters: [
                         {left: "$$", right: "$$", display: true},
                         {left: "$", right: "$", display: false}
@@ -225,7 +244,6 @@
             }
         }
 
-        // Modals Controller
         function toggleNavModal(show) {
             const modal = document.getElementById("nav-modal");
             if (show) {
@@ -238,21 +256,21 @@
 
         function toggleSubmitModal(show) {
             const modal = document.getElementById("submit-modal");
-            if (show) {
-                modal.classList.remove("hidden");
-            } else {
-                modal.classList.add("hidden");
-            }
+            if (show) modal.classList.remove("hidden");
+            else modal.classList.add("hidden");
         }
 
         function submitExamNow() {
             document.getElementById("form-submit-exam").submit();
         }
 
-        // Render Halaman Soal (Mulus tanpa Lompatan Scroll)
+        // Render Soal Tanpa Lompatan Scroll
         function renderQuestion(index) {
             currentIndex = index;
             const item = quizData[index];
+
+            // Melepas fokus tombol agar tidak auto-scroll browser
+            if (document.activeElement) document.activeElement.blur();
             
             document.getElementById("label-no-soal").textContent = `Soal No. ${index + 1} dari ${quizData.length}`;
             document.getElementById("question-text").innerHTML = item.question;
@@ -261,15 +279,19 @@
             optsDiv.innerHTML = "";
 
             item.options.forEach((opt, optIdx) => {
-                const isSelected = answers[index] === opt;
+                const isSelected = String(answers[index]) === String(opt);
                 const btn = document.createElement("button");
+                btn.type = "button";
                 btn.id = `opt-btn-${optIdx}`;
                 btn.className = `w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm transition flex items-start space-x-3 ${
                     isSelected 
                     ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-medium shadow-[0_0_10px_rgba(16,185,129,0.15)]' 
                     : 'bg-slate-950 border-slate-800 text-slate-300 active:border-slate-700'
                 }`;
-                btn.onclick = () => selectAnswer(index, opt, optIdx);
+                btn.onclick = (e) => {
+                    e.preventDefault();
+                    selectAnswer(index, opt, optIdx);
+                };
                 btn.innerHTML = `
                     <span class="w-6 h-6 rounded-full border border-slate-700 flex-shrink-0 flex items-center justify-center text-[11px] font-bold mt-0.5 ${isSelected ? 'border-emerald-500 bg-emerald-500 text-slate-950' : ''}">
                         ${opt.charAt(0)}
@@ -281,10 +303,12 @@
 
             updateNavButtons();
             updateRaguButtonUI();
-            setTimeout(triggerKaTeX, 30);
+            
+            // Render KaTeX secara presisi tanpa mengganggu posisi layar
+            setTimeout(triggerKaTeX, 20);
         }
 
-        // Pilih Jawaban (Instan TANPA Re-render Soal)
+        // Pilih Jawaban Instan
         function selectAnswer(index, opt, optIdx) {
             answers[index] = opt;
 
@@ -312,7 +336,6 @@
             fetch("/api/save-answer", { method: "POST", body: formData });
         }
 
-        // Status Ragu-Ragu
         function toggleRagu() {
             raguState[currentIndex] = !raguState[currentIndex];
             updateRaguButtonUI();
@@ -321,13 +344,12 @@
         function updateRaguButtonUI() {
             const btnRagu = document.getElementById("btn-ragu");
             if (raguState[currentIndex]) {
-                btnRagu.className = "flex-1 sm:flex-none bg-amber-500 text-slate-950 border border-amber-400 font-bold text-xs py-2.5 px-4 rounded-xl transition text-center shadow-[0_0_12px_rgba(245,158,11,0.4)]";
+                btnRagu.className = "flex-1 sm:flex-none bg-amber-500 text-slate-950 border border-amber-400 font-bold text-[10px] py-2.5 px-2 rounded-xl transition text-center shadow-[0_0_12px_rgba(245,158,11,0.4)] whitespace-nowrap";
             } else {
-                btnRagu.className = "flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold py-2.5 px-4 rounded-xl transition text-center";
+                btnRagu.className = "flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold py-2.5 px-2 rounded-xl transition text-center whitespace-nowrap";
             }
         }
 
-        // Navigasi Prev/Next
         function updateNavButtons() {
             const btnPrev = document.getElementById("btn-prev");
             const btnNextSubmit = document.getElementById("btn-next-submit");
@@ -336,10 +358,10 @@
 
             if (currentIndex === quizData.length - 1) {
                 btnNextSubmit.textContent = "🚀 Selesai Ujian";
-                btnNextSubmit.className = "flex-1 sm:flex-none bg-rose-500 hover:bg-rose-400 active:bg-rose-600 text-white font-bold text-xs py-2.5 px-5 rounded-xl transition shadow-[0_0_15px_rgba(244,63,94,0.4)] text-center";
+                btnNextSubmit.className = "flex-1 sm:flex-none bg-rose-500 hover:bg-rose-400 active:bg-rose-600 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(244,63,94,0.4)] text-center";
             } else {
                 btnNextSubmit.textContent = "Next →";
-                btnNextSubmit.className = "flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-5 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center";
+                btnNextSubmit.className = "flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center";
             }
         }
 
@@ -355,14 +377,13 @@
             }
         }
 
-        // Render Grid Modal Navigasi
         function renderGrid() {
             const grid = document.getElementById("nav-grid");
             grid.innerHTML = "";
 
             quizData.forEach((_, idx) => {
                 const btn = document.createElement("button");
-                const isAnswered = answers[idx] !== undefined;
+                const isAnswered = answers[idx] !== undefined && answers[idx] !== null;
                 const isRagu = raguState[idx] === true;
                 const isCurrent = idx === currentIndex;
 
@@ -385,8 +406,8 @@
             });
         }
 
-        // Timer Presisi
-        const endTime = new Date().getTime() + (durationMinutes * 60 * 1000);
+        // Timer Sinkron Server
+        const endTime = new Date().getTime() + (remainingSeconds * 1000);
         setInterval(() => {
             const now = new Date().getTime();
             const diff = endTime - now;
