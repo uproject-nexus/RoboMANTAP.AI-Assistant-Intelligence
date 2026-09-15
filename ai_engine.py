@@ -500,7 +500,9 @@ def update_progress_siswa(
     soal_sekarang: int,
     detail_jawaban: list,
     status: str = "BERJALAN",
-    is_custom: bool = False
+    is_custom: bool = False,
+    user_answers_dict: dict = None,
+    quiz_data_list: list = None
 ):
     conn = init_db_connection()
     if not conn:
@@ -517,7 +519,19 @@ def update_progress_siswa(
     else:
         nilai_akhir = (jumlah_benar * 4) - (jumlah_salah * 1)
 
-    detail_json = json.dumps(detail_jawaban)
+    # Jika membawa data soal & jawaban lengkap (saat submit dari CBT Render),
+    # kemas dalam struktur dictionary agar bisa dibaca komplit oleh Streamlit.
+    if user_answers_dict is not None or quiz_data_list is not None:
+        payload = {
+            "detail_boolean": detail_jawaban,
+            "user_answers": user_answers_dict or {},
+            "quiz_data": quiz_data_list or []
+        }
+        detail_json = json.dumps(payload, default=str)
+    else:
+        # Backward compatibility untuk pemanggilan standar
+        detail_json = json.dumps(detail_jawaban)
+
     query = """
     INSERT INTO sesi_ujian (
         id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, 
