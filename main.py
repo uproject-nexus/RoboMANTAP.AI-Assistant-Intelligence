@@ -100,13 +100,24 @@ async def start_exam(request: Request, session_id: str = Form(...)):
     if not sess:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
+    # 1. Catat Waktu Mulai Pertama Kali (Mencegah Reset Timer saat Relog)
+    if "start_time" not in sess:
+        sess["start_time"] = datetime.utcnow()
+
+    # 2. Hitung Sisa Waktu Ujian Real-Time dari Server (dalam detik)
+    duration_m = sess["config"].get("timer_m", 30)
+    elapsed_s = (datetime.utcnow() - sess["start_time"]).total_seconds()
+    remaining_s = max(0, int((duration_m * 60) - elapsed_s))
+
     return templates.TemplateResponse(
         request=request,
         name="student_exam.html", 
         context={
             "session_id": session_id,
             "sess": sess,
-            "quiz_json": json.dumps(sess["quiz"])
+            "quiz_json": json.dumps(sess["quiz"]),
+            "answers_json": json.dumps(sess.get("answers", {})), # <-- Kirim jawaban tersimpan
+            "remaining_seconds": remaining_s                      # <-- Kirim sisa waktu presisi
         }
     )
 
