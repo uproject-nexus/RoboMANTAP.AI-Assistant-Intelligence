@@ -55,53 +55,54 @@
         ⚠️ Warning Pelanggaran Pindah Tab: <span id="violation-count-text">0</span> / 3
     </div>
 
-    <!-- Container Utama -->
-    <main class="flex-1 max-w-4xl w-full mx-auto p-3 sm:p-5 flex flex-col justify-start">
+    <!-- Container Utama yang Terkunci Tingginya di HP -->
+    <main class="flex-1 max-w-4xl w-full mx-auto p-3 sm:p-5 flex flex-col justify-between overflow-hidden">
         
-        <!-- Sub-Header Bar (Nama Siswa & Tombol Popup Navigasi) -->
-        <div class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 mb-3 shadow-md">
+        <!-- Sub-Header (Nama & Navigasi Soal) -->
+        <div class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 mb-3 flex-shrink-0">
             <div class="flex items-center space-x-2 text-xs truncate mr-2">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
                 <span class="text-slate-200 font-semibold truncate">{{ sess.nama }}</span>
                 <span class="text-slate-600">•</span>
                 <span class="text-emerald-400 font-medium text-[11px] flex-shrink-0">Kelas {{ sess.kelas }}</span>
             </div>
-
-            <button onclick="toggleNavModal(true)" class="bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-400 border border-emerald-500/30 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition flex-shrink-0">
-                <span>📑 Navigasi Soal</span>
+    
+            <button onclick="toggleNavModal(true)" class="bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-400 border border-emerald-500/30 text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0">
+                📑 Navigasi Soal
             </button>
         </div>
-
-        <!-- Area Soal Utama dengan Stabilizer Box -->
-        <section id="question-box" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
+    
+        <!-- Area Soal (Scroll Mandiri, Tidak Mendorong Tombol) -->
+        <section class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl overflow-y-auto max-h-[calc(100vh-220px)]">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2.5 mb-3">
                 <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Memuat...</span>
                 <span class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">Pilihan Ganda</span>
             </div>
-
+    
             <!-- Teks Soal -->
             <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-4 font-medium overflow-x-auto"></div>
-
+    
             <!-- Pilihan Jawaban -->
-            <div id="options-container" class="space-y-2.5"></div>
-
-            <!-- Bottom Action Navigation Mepet -->
-            <div class="flex items-center justify-between border-t border-slate-800/80 pt-3.5 mt-4 gap-2">
-                <button id="btn-prev" onclick="prevQuestion()" class="flex-1 sm:flex-none bg-slate-800 active:bg-slate-700 text-slate-300 font-bold text-xs py-2.5 px-3.5 rounded-xl transition text-center disabled:opacity-40 disabled:cursor-not-allowed">
-                    ← Prev
-                </button>
-
-                <button id="btn-ragu" onclick="toggleRagu()" class="flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold py-2.5 px-2 rounded-xl transition text-center whitespace-nowrap">
-                    ⚠️ Ragu-Ragu
-                </button>
-
-                <button id="btn-next-submit" onclick="handleNextOrSubmit()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center">
-                    Next →
-                </button>
-            </div>
+            <div id="options-container" class="space-y-2.5 pb-2"></div>
         </section>
-
+    
+        <!-- Tombol Navigasi Bawah Stasioner (Tetap Diam di Bawah) -->
+        <div class="bg-slate-950/90 backdrop-blur-md pt-3 mt-2 flex items-center justify-between border-t border-slate-800/80 gap-2 flex-shrink-0">
+            <button id="btn-prev" onclick="prevQuestion()" class="flex-1 sm:flex-none bg-slate-800 active:bg-slate-700 text-slate-300 font-bold text-xs py-2.5 px-3.5 rounded-xl transition text-center disabled:opacity-40 disabled:cursor-not-allowed">
+                ← Prev
+            </button>
+    
+            <button id="btn-ragu" onclick="toggleRagu()" class="flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold py-2.5 px-2 rounded-xl transition text-center whitespace-nowrap">
+                ⚠️ Ragu-Ragu
+            </button>
+    
+            <button id="btn-next-submit" onclick="handleNextOrSubmit()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center">
+                Next →
+            </button>
+        </div>
+    
     </main>
+
 
     <!-- Form Tersembunyi untuk Submit Ujian -->
     <form id="form-submit-exam" action="/submit-exam" method="POST" class="hidden">
