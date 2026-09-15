@@ -52,6 +52,21 @@ create_table_if_not_exists()
 # ==============================================================================
 st.markdown("""
     <style>
+    /* Sembunyikan Header bawaan Streamlit (tombol menu & status running) */
+    header {visibility: hidden !important;}
+    #MainMenu {visibility: hidden !important;}
+    footer {visibility: hidden !important;}
+    
+    /* Maksimalkan area tampilan */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+    <style>
     /* Matikan seleksi teks pada soal & pilihan jawaban */
     body, html, iframe, [data-testid="stMarkdownContainer"] {
         -webkit-user-select: none !important;
