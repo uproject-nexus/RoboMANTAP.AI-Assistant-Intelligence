@@ -168,16 +168,22 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
     total_soal = len(quiz)
     skor = int(round((benar / total_soal) * 100)) if total_soal > 0 else 0
 
+    # Simpan pengerjaan lengkap ke Supabase (Termasuk quiz_data dan answers)
     update_progress_siswa(
         session_id=session_id,
         nama=sess["nama"],
-        jenjang=sess["config"].get("jenjang", "Kuis"),
-        mapel=sess["config"].get("mapel", "Kuis"),
+        jenjang=sess["config"].get("jenjang", "MA"),
+        mapel=sess["config"].get("mapel", "Matematika"),
         soal_sekarang=total_soal,
         detail_jawaban=detail_ans,
         status="SELESAI",
-        is_custom=True
+        is_custom=True,
+        user_answers_dict=answers,
+        quiz_data_list=quiz
     )
+
+    # Buat Deep Link Presisi ke Evaluasi Streamlit
+    target_streamlit_url = f"{STREAMLIT_URL}/?review_session={session_id}"
 
     return templates.TemplateResponse(
         request=request,
@@ -189,6 +195,6 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
             "salah": salah,
             "kosong": kosong,
             "total": total_soal,
-            "streamlit_url": STREAMLIT_URL
+            "streamlit_url": target_streamlit_url
         }
     )
