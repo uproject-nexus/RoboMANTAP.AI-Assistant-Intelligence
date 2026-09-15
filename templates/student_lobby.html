@@ -36,12 +36,27 @@
             </ul>
         </div>
 
-        <form action="/start-exam" method="POST">
+        <!-- Form Start Ujian dengan Trigger Otomatis Fullscreen -->
+        <form action="/start-exam" method="POST" onsubmit="triggerAutoFullscreen(event)">
             <input type="hidden" name="session_id" value="{{ session_id }}">
-            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3.5 rounded-xl transition shadow-[0_0_20px_rgba(16,185,129,0.3)] text-center">
+            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-sm py-3.5 px-4 rounded-xl transition shadow-[0_0_20px_rgba(16,185,129,0.35)] mt-4">
                 🚀 Mulai Ujian Sekarang
             </button>
         </form>
+        
+        <script>
+            function triggerAutoFullscreen(e) {
+                // Minta akses fullscreen ke browser saat tombol di-klik
+                const elem = document.documentElement;
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen().catch(() => {});
+                } else if (elem.webkitRequestFullscreen) {
+                    elem.webkitRequestFullscreen(); // Safari / iOS
+                } else if (elem.msRequestFullscreen) {
+                    elem.msRequestFullscreen();
+                }
+            }
+        </script>
     </div>
 </body>
 </html>
