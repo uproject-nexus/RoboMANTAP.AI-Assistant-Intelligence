@@ -1,1 +1,47 @@
-test
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pre-Kuis - RoboMANTAP CBT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
+        <div class="border-b border-slate-800 pb-4">
+            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Informasi Ujian</span>
+            <h1 class="text-xl font-bold text-white mt-1">{{ mapel }}</h1>
+            <p class="text-xs text-slate-400">Materi: {{ materi }}</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 text-sm">
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <p class="text-xs text-slate-400">Peserta</p>
+                <p class="font-semibold text-emerald-300 mt-1">{{ nama }}</p>
+                <p class="text-xs text-slate-500">Kelas {{ kelas }} (No. {{ absen }})</p>
+            </div>
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <p class="text-xs text-slate-400">Jumlah & Durasi</p>
+                <p class="font-semibold text-emerald-300 mt-1">{{ jumlah_soal }} Soal</p>
+                <p class="text-xs text-slate-500">Waktu: {{ durasi_menit }} Menit</p>
+            </div>
+        </div>
+
+        <div class="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 text-xs text-slate-300 space-y-2">
+            <p class="font-bold text-emerald-400">⚠️ Aturan Pengerjaan:</p>
+            <ul class="list-disc list-inside space-y-1 text-slate-400">
+                <li>Jawaban tersimpan otomatis saat memilih opsi.</li>
+                <li>Gunakan navigasi nomor untuk berpindah soal secara bebas.</li>
+                <li>Ujian otomatis berakhir jika timer mencapai 00:00.</li>
+            </ul>
+        </div>
+
+        <form action="/start-exam" method="POST">
+            <input type="hidden" name="session_id" value="{{ session_id }}">
+            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3.5 rounded-xl transition shadow-[0_0_20px_rgba(16,185,129,0.3)] text-center">
+                🚀 Mulai Ujian Sekarang
+            </button>
+        </form>
+    </div>
+</body>
+</html>
