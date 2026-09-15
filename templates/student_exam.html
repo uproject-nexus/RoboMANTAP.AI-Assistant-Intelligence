@@ -7,10 +7,12 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- Engine Render LaTeX (KaTeX) CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 
+    <!-- CSS Anti-Select Text & Anti-Highlight -->
     <style>
         * {
             -webkit-user-select: none !important;
@@ -23,6 +25,7 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
 
+    <!-- Header Bar Utama -->
     <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-40 flex justify-between items-center">
         <div class="flex items-center space-x-2">
             <span class="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded">CBT v2.0</span>
@@ -43,60 +46,65 @@
         </div>
     </header>
 
+    <!-- Banner Peringatan Kecurangan -->
     <div id="cheat-warning-bar" class="hidden bg-amber-500/20 border-b border-amber-500/40 px-4 py-2 text-center text-xs text-amber-300 font-semibold">
         ⚠️ Warning Pelanggaran Pindah Tab: <span id="violation-count-text">0</span> / 3
     </div>
 
-    <main class="flex-1 max-w-5xl w-full mx-auto p-3 sm:p-5 flex flex-col justify-between">
+    <!-- Container Utama (Tata Letak Kompak & Mepet) -->
+    <main class="flex-1 max-w-4xl w-full mx-auto p-3 sm:p-5 flex flex-col justify-start">
         
-        <div>
-            <div class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 mb-3 shadow-md">
-                <div class="flex items-center space-x-2 text-xs truncate mr-2">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
-                    <span class="text-slate-200 font-semibold truncate">{{ sess.nama }}</span>
-                    <span class="text-slate-600">•</span>
-                    <span class="text-emerald-400 font-medium text-[11px] flex-shrink-0">Kelas {{ sess.kelas }}</span>
-                </div>
-
-                <button onclick="toggleNavModal(true)" class="bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-400 border border-emerald-500/30 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition flex-shrink-0">
-                    <span>📑 Navigasi Soal</span>
-                </button>
+        <!-- Sub-Header Bar (Nama Siswa & Tombol Popup Navigasi) -->
+        <div class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 mb-3 shadow-md">
+            <div class="flex items-center space-x-2 text-xs truncate mr-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
+                <span class="text-slate-200 font-semibold truncate">{{ sess.nama }}</span>
+                <span class="text-slate-600">•</span>
+                <span class="text-emerald-400 font-medium text-[11px] flex-shrink-0">Kelas {{ sess.kelas }}</span>
             </div>
 
-            <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col justify-between min-h-[380px]">
-                <div>
-                    <div class="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
-                        <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Memuat...</span>
-                        <span class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg">Pilihan Ganda</span>
-                    </div>
-
-                    <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-5 font-medium overflow-x-auto"></div>
-
-                    <div id="options-container" class="space-y-2.5"></div>
-                </div>
-            </section>
-        </div>
-
-        <form id="form-submit-exam" action="/submit-exam" method="POST" class="hidden">
-            <input type="hidden" name="session_id" value="{{ session_id }}">
-        </form>
-
-        <div class="flex items-center justify-between border-t border-slate-800/80 pt-4 mt-4 gap-2">
-            <button id="btn-prev" onclick="prevQuestion()" class="flex-1 sm:flex-none bg-slate-800 active:bg-slate-700 text-slate-300 font-bold text-xs py-3 px-4 rounded-xl transition text-center disabled:opacity-40 disabled:cursor-not-allowed">
-                ← Prev
-            </button>
-
-            <button id="btn-ragu" onclick="toggleRagu()" class="flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold py-3 px-4 rounded-xl transition text-center">
-                ⚠️ Ragu-Ragu
-            </button>
-
-            <button id="btn-next-submit" onclick="handleNextOrSubmit()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-3 px-5 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center">
-                Next →
+            <button onclick="toggleNavModal(true)" class="bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-400 border border-emerald-500/30 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition flex-shrink-0">
+                <span>📑 Navigasi Soal</span>
             </button>
         </div>
+
+        <!-- Area Soal Utama -->
+        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2.5 mb-3">
+                <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Memuat...</span>
+                <span class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">Pilihan Ganda</span>
+            </div>
+
+            <!-- Teks Soal -->
+            <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-4 font-medium overflow-x-auto"></div>
+
+            <!-- Pilihan Jawaban -->
+            <div id="options-container" class="space-y-2.5"></div>
+
+            <!-- Bottom Action Navigation (Prev | Ragu-Ragu | Next/Submit) Mepet di Bawah Opsi -->
+            <div class="flex items-center justify-between border-t border-slate-800/80 pt-3.5 mt-4 gap-2">
+                <button id="btn-prev" onclick="prevQuestion()" class="flex-1 sm:flex-none bg-slate-800 active:bg-slate-700 text-slate-300 font-bold text-xs py-2.5 px-4 rounded-xl transition text-center disabled:opacity-40 disabled:cursor-not-allowed">
+                    ← Prev
+                </button>
+
+                <button id="btn-ragu" onclick="toggleRagu()" class="flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold py-2.5 px-4 rounded-xl transition text-center">
+                    ⚠️ Ragu-Ragu
+                </button>
+
+                <button id="btn-next-submit" onclick="handleNextOrSubmit()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-5 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center">
+                    Next →
+                </button>
+            </div>
+        </section>
 
     </main>
 
+    <!-- Form Tersembunyi untuk Submit Ujian -->
+    <form id="form-submit-exam" action="/submit-exam" method="POST" class="hidden">
+        <input type="hidden" name="session_id" value="{{ session_id }}">
+    </form>
+
+    <!-- Modal Pop-up Navigasi Soal -->
     <div id="nav-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
@@ -106,17 +114,42 @@
                 <button onclick="toggleNavModal(false)" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
             </div>
 
+            <!-- Petunjuk Warna Status -->
             <div class="grid grid-cols-3 gap-1.5 text-[10px] text-center">
                 <div class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 p-1.5 rounded-lg font-medium">Sudah Dijawab</div>
                 <div class="bg-amber-500/20 text-amber-300 border border-amber-500/40 p-1.5 rounded-lg font-medium">Ragu-Ragu</div>
                 <div class="bg-slate-950 text-slate-400 border border-slate-800 p-1.5 rounded-lg font-medium">Belum Dijawab</div>
             </div>
 
+            <!-- Grid Nomor Soal -->
             <div id="nav-grid" class="grid grid-cols-5 gap-2 max-h-[60vh] overflow-y-auto p-1"></div>
 
             <button onclick="toggleNavModal(false)" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-2.5 rounded-xl">
                 Tutup
             </button>
+        </div>
+    </div>
+
+    <!-- Modal Pop-up Konfirmasi Selesai Ujian (Futuristic Design) -->
+    <div id="submit-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl max-w-sm w-full p-6 shadow-[0_0_30px_rgba(16,185,129,0.2)] text-center space-y-4">
+            <div class="w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto text-2xl">
+                🚀
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-white">Konfirmasi Selesai Ujian</h3>
+                <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+                    Apakah Kamu yakin ingin mengakhiri sesi ujian ini? Pastikan seluruh soal sudah Kamu periksa kembali dengan teliti ya!
+                </p>
+            </div>
+            <div class="flex space-x-2.5 pt-2">
+                <button onclick="toggleSubmitModal(false)" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold py-3 rounded-xl transition">
+                    Batal
+                </button>
+                <button onclick="submitExamNow()" class="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold py-3 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.35)]">
+                    Ya, Selesaikan!
+                </button>
+            </div>
         </div>
     </div>
 
@@ -170,7 +203,7 @@
         }
 
         // ==============================================================================
-        // 2. LOGIKA UTAMA CBT ENGINE (FLEXIBLE & NO FLICKER BUG FIX)
+        // 2. LOGIKA UTAMA CBT ENGINE (STABLE & NO SCROLL JUMP BUG FIX)
         // ==============================================================================
         const quizData = {{ quiz_json | safe }};
         const sessionId = "{{ session_id }}";
@@ -192,7 +225,7 @@
             }
         }
 
-        // Toggle Popup Modal Navigasi
+        // Modals Controller
         function toggleNavModal(show) {
             const modal = document.getElementById("nav-modal");
             if (show) {
@@ -203,7 +236,20 @@
             }
         }
 
-        // Render Halaman Soal saat Berpindah Nomor
+        function toggleSubmitModal(show) {
+            const modal = document.getElementById("submit-modal");
+            if (show) {
+                modal.classList.remove("hidden");
+            } else {
+                modal.classList.add("hidden");
+            }
+        }
+
+        function submitExamNow() {
+            document.getElementById("form-submit-exam").submit();
+        }
+
+        // Render Halaman Soal (Mulus tanpa Lompatan Scroll)
         function renderQuestion(index) {
             currentIndex = index;
             const item = quizData[index];
@@ -238,11 +284,10 @@
             setTimeout(triggerKaTeX, 30);
         }
 
-        // Pilihi Jawaban (SMOOTH & ANTI-FLICKER FIX)
+        // Pilih Jawaban (Instan TANPA Re-render Soal)
         function selectAnswer(index, opt, optIdx) {
             answers[index] = opt;
 
-            // Update UI Opsi Jawaban Secara Langsung TANPA Re-render Soal / Re-trigger KaTeX
             quizData[index].options.forEach((_, idx) => {
                 const btn = document.getElementById(`opt-btn-${idx}`);
                 if (!btn) return;
@@ -260,7 +305,6 @@
                 }
             });
 
-            // Kirim jawaban ke backend secara asinkron
             const formData = new FormData();
             formData.append("session_id", sessionId);
             formData.append("q_index", index);
@@ -268,7 +312,7 @@
             fetch("/api/save-answer", { method: "POST", body: formData });
         }
 
-        // Toggle Status Ragu-Ragu
+        // Status Ragu-Ragu
         function toggleRagu() {
             raguState[currentIndex] = !raguState[currentIndex];
             updateRaguButtonUI();
@@ -277,27 +321,25 @@
         function updateRaguButtonUI() {
             const btnRagu = document.getElementById("btn-ragu");
             if (raguState[currentIndex]) {
-                btnRagu.className = "flex-1 sm:flex-none bg-amber-500 text-slate-950 border border-amber-400 font-bold text-xs py-3 px-4 rounded-xl transition text-center shadow-[0_0_12px_rgba(245,158,11,0.4)]";
+                btnRagu.className = "flex-1 sm:flex-none bg-amber-500 text-slate-950 border border-amber-400 font-bold text-xs py-2.5 px-4 rounded-xl transition text-center shadow-[0_0_12px_rgba(245,158,11,0.4)]";
             } else {
-                btnRagu.className = "flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold py-3 px-4 rounded-xl transition text-center";
+                btnRagu.className = "flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold py-2.5 px-4 rounded-xl transition text-center";
             }
         }
 
-        // Update Tombol Prev dan Next/Submit
+        // Navigasi Prev/Next
         function updateNavButtons() {
             const btnPrev = document.getElementById("btn-prev");
             const btnNextSubmit = document.getElementById("btn-next-submit");
 
-            // State Prev
             btnPrev.disabled = currentIndex === 0;
 
-            // State Next / Selesai
             if (currentIndex === quizData.length - 1) {
                 btnNextSubmit.textContent = "🚀 Selesai Ujian";
-                btnNextSubmit.className = "flex-1 sm:flex-none bg-rose-500 hover:bg-rose-400 active:bg-rose-600 text-white font-bold text-xs py-3 px-5 rounded-xl transition shadow-[0_0_15px_rgba(244,63,94,0.4)] text-center";
+                btnNextSubmit.className = "flex-1 sm:flex-none bg-rose-500 hover:bg-rose-400 active:bg-rose-600 text-white font-bold text-xs py-2.5 px-5 rounded-xl transition shadow-[0_0_15px_rgba(244,63,94,0.4)] text-center";
             } else {
                 btnNextSubmit.textContent = "Next →";
-                btnNextSubmit.className = "flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-3 px-5 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center";
+                btnNextSubmit.className = "flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-5 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center";
             }
         }
 
@@ -309,9 +351,7 @@
             if (currentIndex < quizData.length - 1) {
                 renderQuestion(currentIndex + 1);
             } else {
-                if (confirm("Yakin ingin mengakhiri dan menyelesaikan ujian ini?")) {
-                    document.getElementById("form-submit-exam").submit();
-                }
+                toggleSubmitModal(true);
             }
         }
 
