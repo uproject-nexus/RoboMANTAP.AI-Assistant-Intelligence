@@ -1,1 +1,175 @@
-test
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workspace CBT - RoboMANTAP</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none">
+
+    <!-- Header Bar -->
+    <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center space-x-3">
+            <span class="bg-emerald-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded">CBT v2.0</span>
+            <div>
+                <h1 class="text-base font-bold text-white leading-none">RoboMANTAP CBT</h1>
+                <p class="text-xs text-emerald-400 mt-1">{{ sess.config.mapel }}</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div class="bg-slate-950 border border-slate-800 px-4 py-1.5 rounded-xl text-sm">
+                ⏱️ Waktu: <span id="timer-display" class="font-mono text-emerald-400 font-bold">--:--</span>
+            </div>
+            <div class="text-right hidden sm:block">
+                <p class="text-xs text-slate-400">{{ sess.nama }}</p>
+                <p class="text-xs font-semibold text-emerald-400">Kelas {{ sess.kelas }}</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <!-- Area Soal (Kiri) -->
+        <section class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between min-h-[450px]">
+            <div>
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
+                    <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Soal No. 1</span>
+                    <span class="text-xs text-slate-500">Tipe: Pilihan Ganda</span>
+                </div>
+
+                <div id="question-text" class="text-slate-100 text-base leading-relaxed mb-6 font-medium"></div>
+
+                <div id="options-container" class="space-y-3"></div>
+            </div>
+
+            <!-- Bottom Action Bar -->
+            <div class="flex justify-between items-center border-t border-slate-800 pt-4 mt-6">
+                <button onclick="prevQuestion()" class="bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-bold px-4 py-2.5 rounded-xl transition">
+                    ← Sebelumnya
+                </button>
+
+                <form action="/submit-exam" method="POST" onsubmit="return confirm('Yakin ingin menyelesaikan ujian?');">
+                    <input type="hidden" name="session_id" value="{{ session_id }}">
+                    <button type="submit" class="bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 text-xs font-bold px-4 py-2.5 rounded-xl transition">
+                        Selesai Ujian
+                    </button>
+                </form>
+
+                <button onclick="nextQuestion()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-5 py-2.5 rounded-xl transition">
+                    Berikutnya →
+                </button>
+            </div>
+        </section>
+
+        <!-- Sidebar Grid Navigasi (Kanan) -->
+        <aside class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl h-fit">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">
+                Navigasi Soal
+            </h3>
+            <div id="nav-grid" class="grid grid-cols-5 gap-2"></div>
+        </aside>
+
+    </main>
+
+    <script>
+        const quizData = {{ quiz_json | safe }};
+        const sessionId = "{{ session_id }}";
+        const durationMinutes = {{ sess.config.timer_m if sess.config.timer_m else 30 }};
+        
+        let currentIndex = 0;
+        let answers = {};
+
+        function renderQuestion(index) {
+            currentIndex = index;
+            const item = quizData[index];
+            
+            document.getElementById("label-no-soal").textContent = `Soal No. ${index + 1} dari ${quizData.length}`;
+            document.getElementById("question-text").innerHTML = item.question;
+
+            const optsDiv = document.getElementById("options-container");
+            optsDiv.innerHTML = "";
+
+            item.options.forEach(opt => {
+                const isSelected = answers[index] === opt;
+                const btn = document.createElement("button");
+                btn.className = `w-full text-left p-4 rounded-xl border text-sm transition flex items-center space-x-3 ${
+                    isSelected 
+                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-medium' 
+                    : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                }`;
+                btn.onclick = () => selectAnswer(index, opt);
+                btn.innerHTML = `
+                    <span class="w-6 h-6 rounded-full border border-slate-700 flex items-center justify-center text-xs font-bold ${isSelected ? 'border-emerald-500 bg-emerald-500 text-slate-950' : ''}">
+                        ${opt.charAt(0)}
+                    </span>
+                    <span>${opt}</span>
+                `;
+                optsDiv.appendChild(btn);
+            });
+
+            renderGrid();
+        }
+
+        function selectAnswer(index, opt) {
+            answers[index] = opt;
+            renderQuestion(index);
+
+            // Save to Backend via HTMX/Fetch API
+            const formData = new FormData();
+            formData.append("session_id", sessionId);
+            formData.append("q_index", index);
+            formData.append("answer", opt);
+
+            fetch("/api/save-answer", { method: "POST", body: formData });
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById("nav-grid");
+            grid.innerHTML = "";
+
+            quizData.forEach((_, idx) => {
+                const btn = document.createElement("button");
+                const isAnswered = answers[idx] !== undefined;
+                const isCurrent = idx === currentIndex;
+
+                btn.className = `h-10 text-xs font-bold rounded-lg border transition ${
+                    isCurrent ? 'ring-2 ring-emerald-400 border-emerald-500' : ''
+                } ${
+                    isAnswered 
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' 
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`;
+                btn.textContent = idx + 1;
+                btn.onclick = () => renderQuestion(idx);
+                grid.appendChild(btn);
+            });
+        }
+
+        function prevQuestion() { if (currentIndex > 0) renderQuestion(currentIndex - 1); }
+        function nextQuestion() { if (currentIndex < quizData.length - 1) renderQuestion(currentIndex + 1); }
+
+        // Timer Real-time Presisi
+        const endTime = new Date().getTime() + (durationMinutes * 60 * 1000);
+        setInterval(() => {
+            const now = new Date().getTime();
+            const diff = endTime - now;
+
+            if (diff <= 0) {
+                alert("Waktu Ujian telah Habis!");
+                document.forms[0].submit();
+                return;
+            }
+
+            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const s = Math.floor((diff % (1000 * 60)) / 1000);
+            document.getElementById("timer-display").textContent = 
+                `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
+        }, 1000);
+
+        renderQuestion(0);
+    </script>
+</body>
+</html>
