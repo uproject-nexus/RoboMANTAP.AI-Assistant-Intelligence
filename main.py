@@ -18,7 +18,7 @@ from ai_engine import (
 
 app = FastAPI(title="RoboMANTAP CBT Engine")
 
-# Gunakan Absolute Path agar folder templates 100% terdeteksi di server Render
+# Path absolut agar folder templates selalu terdeteksi di Linux Render
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -37,8 +37,9 @@ STREAMLIT_URL = "https://share.streamlit.io" # Sesuaikan dengan URL Streamlit ap
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse(
+        request=request,
         name="student_login.html", 
-        context={"request": request, "error": None}
+        context={"error": None}
     )
 
 @app.post("/verify-token", response_class=HTMLResponse)
@@ -54,11 +55,9 @@ async def verify_token(
     
     if not quiz_package:
         return templates.TemplateResponse(
+            request=request,
             name="student_login.html", 
-            context={
-                "request": request,
-                "error": "Kode Kuis / Token tidak ditemukan atau belum diterbitkan!"
-            }
+            context={"error": "Kode Kuis / Token tidak ditemukan atau belum diterbitkan!"}
         )
 
     config = quiz_package.get("config", {})
@@ -80,9 +79,9 @@ async def verify_token(
     }
     
     return templates.TemplateResponse(
+        request=request,
         name="student_lobby.html", 
         context={
-            "request": request,
             "session_id": session_id,
             "nama": nama,
             "kelas": kelas,
@@ -101,9 +100,9 @@ async def start_exam(request: Request, session_id: str = Form(...)):
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
     return templates.TemplateResponse(
+        request=request,
         name="student_exam.html", 
         context={
-            "request": request,
             "session_id": session_id,
             "sess": sess,
             "quiz_json": json.dumps(sess["quiz"])
@@ -181,9 +180,9 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
     )
 
     return templates.TemplateResponse(
+        request=request,
         name="student_result.html", 
         context={
-            "request": request,
             "nama": sess["nama"],
             "skor": skor,
             "benar": benar,
