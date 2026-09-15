@@ -1,4 +1,5 @@
 import io
+import os
 import json
 import random
 import uuid
@@ -16,9 +17,17 @@ from ai_engine import (
 )
 
 app = FastAPI(title="RoboMANTAP CBT Engine")
-templates = Jinja2Templates(directory="templates")
 
-create_table_if_not_exists()
+# Gunakan Absolute Path agar folder templates 100% terdeteksi di server Render
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+# Inisialisasi Tabel DB
+try:
+    create_table_if_not_exists()
+except Exception as e:
+    print(f"[DB INIT WARN] {e}")
 
 # In-Memory Session Storage
 STUDENT_SESSIONS: Dict[str, Dict[str, Any]] = {}
@@ -27,7 +36,10 @@ STREAMLIT_URL = "https://share.streamlit.io" # Sesuaikan dengan URL Streamlit ap
 
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse("student_login.html", {"request": request})
+    return templates.TemplateResponse(
+        name="student_login.html", 
+        context={"request": request, "error": None}
+    )
 
 @app.post("/verify-token", response_class=HTMLResponse)
 async def verify_token(
@@ -41,16 +53,18 @@ async def verify_token(
     quiz_package = get_custom_quiz_from_db(clean_token)
     
     if not quiz_package:
-        return templates.TemplateResponse("student_login.html", {
-            "request": request,
-            "error": "Kode Kuis / Token tidak ditemukan atau belum diterbitkan!"
-        })
+        return templates.TemplateResponse(
+            name="student_login.html", 
+            context={
+                "request": request,
+                "error": "Kode Kuis / Token tidak ditemukan atau belum diterbitkan!"
+            }
+        )
 
     config = quiz_package.get("config", {})
     master_quiz = quiz_package.get("quiz", [])
     packages = config.get("packages", [master_quiz])
     
-    # Pilih paket acak dari 5 paket yang disiapkan guru
     selected_quiz = random.choice(packages) if packages else master_quiz
     
     session_id = str(uuid.uuid4())[:8]
@@ -65,17 +79,20 @@ async def verify_token(
         "current_index": 0
     }
     
-    return templates.TemplateResponse("student_lobby.html", {
-        "request": request,
-        "session_id": session_id,
-        "nama": nama,
-        "kelas": kelas,
-        "absen": absen,
-        "mapel": config.get("mapel", "Kuis"),
-        "materi": config.get("materi", "-"),
-        "jumlah_soal": len(selected_quiz),
-        "durasi_menit": config.get("timer_m", 30)
-    })
+    return templates.TemplateResponse(
+        name="student_lobby.html", 
+        context={
+            "request": request,
+            "session_id": session_id,
+            "nama": nama,
+            "kelas": kelas,
+            "absen": absen,
+            "mapel": config.get("mapel", "Kuis"),
+            "materi": config.get("materi", "-"),
+            "jumlah_soal": len(selected_quiz),
+            "durasi_menit": config.get("timer_m", 30)
+        }
+    )
 
 @app.post("/start-exam", response_class=HTMLResponse)
 async def start_exam(request: Request, session_id: str = Form(...)):
@@ -83,12 +100,15 @@ async def start_exam(request: Request, session_id: str = Form(...)):
     if not sess:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-    return templates.TemplateResponse("student_exam.html", {
-        "request": request,
-        "session_id": session_id,
-        "sess": sess,
-        "quiz_json": json.dumps(sess["quiz"])
-    })
+    return templates.TemplateResponse(
+        name="student_exam.html", 
+        context={
+            "request": request,
+            "session_id": session_id,
+            "sess": sess,
+            "quiz_json": json.dumps(sess["quiz"])
+        }
+    )
 
 @app.post("/api/save-answer")
 async def save_answer(
@@ -100,7 +120,6 @@ async def save_answer(
     if sess:
         sess["answers"][q_index] = answer
         
-        # Kirim progress ke Supabase
         detail_ans = []
         for idx, item in enumerate(sess["quiz"]):
             user_ans = sess["answers"].get(idx)
@@ -161,13 +180,16 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
         is_custom=True
     )
 
-    return templates.TemplateResponse("student_result.html", {
-        "request": request,
-        "nama": sess["nama"],
-        "skor": skor,
-        "benar": benar,
-        "salah": salah,
-        "kosong": kosong,
-        "total": total_soal,
-        "streamlit_url": STREAMLIT_URL
-    })
+    return templates.TemplateResponse(
+        name="student_result.html", 
+        context={
+            "request": request,
+            "nama": sess["nama"],
+            "skor": skor,
+            "benar": benar,
+            "salah": salah,
+            "kosong": kosong,
+            "total": total_soal,
+            "streamlit_url": STREAMLIT_URL
+        }
+    )
