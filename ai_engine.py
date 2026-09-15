@@ -1,30 +1,62 @@
 import os
 import json
 import re
+import time
+import pandas as pd
 import streamlit as st
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
-# Tambahan untuk Database Real-Time (Dari Kode Upgrade)
+# Import SQLAlchemy untuk koneksi Database
 try:
-    from sqlalchemy import text
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import sessionmaker
 except ImportError:
     pass
 
 load_dotenv()
 
-# Ambil daftar API Keys dari Streamlit Secrets atau .env
+# ==============================================================================
+# PEMBACAAN API KEY AMAN (DUAL COMPATIBILITY: STREAMLIT & FASTAPI/RENDER)
+# ==============================================================================
 api_keys = []
-if "GEMINI_API_KEYS" in st.secrets:
-    api_keys = list(st.secrets["GEMINI_API_KEYS"])
-elif os.getenv("GEMINI_API_KEY"):
-    api_keys = [os.getenv("GEMINI_API_KEY")]
+raw_keys = os.getenv("GEMINI_API_KEYS") or os.getenv("GEMINI_API_KEY")
 
-if not api_keys:
-    raise ValueError("GEMINI_API_KEYS tidak ditemukan. Pastikan Secrets sudah dikonfigurasi.")
+# Fallback ke st.secrets jika dipanggil di dalam lingkungan Streamlit
+if not raw_keys:
+    try:
+        if hasattr(st, "secrets"):
+            if "GEMINI_API_KEYS" in st.secrets:
+                raw_keys = st.secrets["GEMINI_API_KEYS"]
+            elif "GEMINI_API_KEY" in st.secrets:
+                raw_keys = st.secrets["GEMINI_API_KEY"]
+    except Exception:
+        raw_keys = None
 
-# Fokus ke model paling kencang agar tidak ada jeda retry yang bikin lemot
+if raw_keys:
+    if isinstance(raw_keys, list):
+        api_keys = raw_keys
+    else:
+        raw_keys_str = str(raw_keys).strip()
+        if raw_keys_str.startswith("["):
+            try:
+                api_keys = json.loads(raw_keys_str)
+            except Exception:
+                api_keys = [k.strip(' "\'') for k in raw_keys_str.strip("[]").split(",") if k.strip()]
+        elif "," in raw_keys_str:
+            api_keys = [k.strip(' "\'') for k in raw_keys_str.split(",") if k.strip()]
+        else:
+            api_keys = [raw_keys_str.strip(' "\'')]
+
+# Helper untuk menampilkan error yang aman di kedua lingkungan (Streamlit & Render)
+def show_error(msg: str):
+    print(f"[AI ENGINE ERROR] {msg}")
+    try:
+        st.error(msg)
+    except Exception:
+        pass
+
 # Model untuk pembuatan soal
 QUIZ_MODELS = ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
 
@@ -35,15 +67,18 @@ STREAM_HINT_MAX_TOKENS = 9000
 STREAM_SOLUTION_MAX_TOKENS = 9000
 STREAM_TIMEOUT_MS = 90_000
 
+_clients_cache = None
 
-@st.cache_resource(show_spinner=False)
 def get_gemini_clients():
     """
-    Reuse koneksi Gemini antar rerun Streamlit.
-    Client tidak dibuat ulang setiap kali tombol AI diklik.
+    Reuse koneksi Gemini antar request.
+    Menggunakan caching global yang kompatibel untuk Streamlit maupun Uvicorn FastAPI.
     """
-    clients = []
+    global _clients_cache
+    if _clients_cache is not None:
+        return _clients_cache
 
+    clients = []
     for key in api_keys:
         try:
             clients.append(
@@ -58,15 +93,11 @@ def get_gemini_clients():
         except Exception:
             continue
 
+    _clients_cache = clients
     return clients
 
 
 def _stream_config(model_name: str, max_output_tokens: int):
-    """
-    Konfigurasi live untuk meminimalkan time-to-first-token.
-    Gemini 3.x: thinking minimal.
-    Gemini 2.5 Flash-Lite: thinking dimatikan.
-    """
     if model_name.startswith("gemini-3."):
         return types.GenerateContentConfig(
             max_output_tokens=max_output_tokens,
@@ -85,12 +116,6 @@ def _stream_config(model_name: str, max_output_tokens: int):
 
 
 def _buffer_stream_text(source, min_chars: int = 2, flush_seconds: float = 0.01):
-    """
-    Menggabungkan chunk API yang sangat kecil sebelum dikirim ke Streamlit.
-    Tujuannya mengurangi frekuensi update UI, bukan mengubah token API.
-    """
-    import time
-
     buffer = []
     size = 0
     last_flush = time.monotonic()
@@ -114,13 +139,6 @@ def _buffer_stream_text(source, min_chars: int = 2, flush_seconds: float = 0.01)
 
 
 def _stream_from_clients(prompt: str, max_output_tokens: int):
-    """
-    Streaming:
-    - client reuse
-    - retry internal SDK = 1 attempt
-    - fallback hanya saat request/model benar-benar gagal
-    - chunk dibuffer agar rendering lebih smooth
-    """
     clients = get_gemini_clients()
 
     if not clients:
@@ -163,7 +181,6 @@ def format_latex_options(options):
     formatted = []
     for opt in options:
         opt = str(opt).replace(r"\frac", r"\tfrac")
-        # Bungkus $ hanya jika ada simbol LaTeX (\) dan belum dibungkus $
         if "\\" in opt and "$" not in opt:
             parts = opt.split(". ", 1)
             opt = f"{parts[0]}. ${parts[1]}$" if len(parts) == 2 else f"${opt}$"
@@ -171,32 +188,24 @@ def format_latex_options(options):
     return formatted
 
 def clean_json_text(text: str) -> str:
-    """Membersihkan string JSON murni dari pemungkus markdown."""
     if not text:
         return ""
     
     text = text.strip()
-    # Hapus pemungkus markdown ```json jika ada
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\n?", "", text, flags=re.IGNORECASE)
         text = re.sub(r"\n?```$", "", text)
         text = text.strip()
 
-    # Fungsi pengganti otomatis untuk menjaga validitas JSON
     def replace_slash(match):
         g = match.group(0)
         if g in (r'\\', r'\"'):
-            return g  # Biarkan \\ dan \" yang sudah valid
-        return r'\\'  # Ubah \ tunggal menjadi \\
+            return g 
+        return r'\\' 
 
-    # Amankan backslash tanpa merusak struktur JSON
     return re.sub(r'\\\\|\\"|\\', replace_slash, text)
 
 def call_gemini_with_rotation(prompt: str, is_json: bool = False):
-    """
-    Non-stream request dengan client yang sudah di-cache.
-    Retry internal dimatikan supaya fallback tidak menambah jeda tersembunyi.
-    """
     clients = get_gemini_clients()
     if not clients:
         return None
@@ -225,7 +234,7 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
                     config=types.GenerateContentConfig(**config_kwargs),
                 )
 
-                if response.text:
+                if response and response.text:
                     return response.text
 
             except Exception:
@@ -234,17 +243,12 @@ def call_gemini_with_rotation(prompt: str, is_json: bool = False):
     return None
 
 def stream_ai_text(prompt: str, max_output_tokens: int = STREAM_HINT_MAX_TOKENS):
-    """Generator sinkron yang kompatibel langsung dengan st.write_stream()."""
     yield from _stream_from_clients(
         prompt,
         max_output_tokens=max_output_tokens,
     )
 
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
-    """
-    Menghasilkan 1 paket latihan CBT 10 soal berkualitas tinggi dan natural.
-    Output HANYA soal dan opsi (tanpa pembahasan) agar generasi sangat cepat.
-    """
     submateri_text = ", ".join(selected_submateri) if selected_submateri else "Semua Submateri Terintegrasi"
 
     stage_descriptions = {
@@ -299,12 +303,11 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
 
     if not raw_response:
-        st.error("⚠️ Waduh kuota sedang penuh nih. Silakan coba klik lagi ya...")
+        show_error("⚠️ Waduh kuota sedang penuh nih. Silakan coba klik lagi ya...")
         return []
 
     try:
         cleaned_response = clean_json_text(raw_response)
-        # WAJIB strict=False untuk keamanan maksimal dari karakter escape
         data = json.loads(cleaned_response, strict=False)
         quiz_list = data.get("quiz", [])
         for q in quiz_list:
@@ -317,13 +320,10 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
                         break
         return quiz_list
     except Exception as e:
-        st.error(f"Gagal memproses format soal: {e}")
+        show_error(f"Gagal memproses format soal: {e}")
         return []
 
 def get_ai_hint_stream(question: str, user_attempt: str, mapel: str = "Umum"):
-    """
-    Menyusun prompt petunjuk dan langsung melemparnya ke generator stream.
-    """
     prompt = f"""
     Kamu adalah 'RoboMANTAP', teman belajar dan asisten AI yang ramah, santai, ceria, dan sangat suportif dari MTs & MA Al Irsyad Putri Bondowoso (MANTAP).
     Gunakan gaya bahasa memberi sapaan 'aku' dan 'kamu' yang bersahabat namun tetap edukatif.
@@ -341,9 +341,6 @@ def get_ai_hint_stream(question: str, user_attempt: str, mapel: str = "Umum"):
     return stream_ai_text(prompt, max_output_tokens=STREAM_HINT_MAX_TOKENS)
 
 def get_ai_solution_stream(question: str, correct_answer: str, mapel: str = "Umum"):
-    """
-    Menyusun prompt pembahasan rinci dan langsung melemparnya ke generator stream.
-    """
     prompt = f"""
     Kamu adalah Pembina OMI 2026. Berikan pembahasan komprehensif, runtut, dan analitis step-by-step untuk soal berikut.
 
@@ -364,24 +361,64 @@ def get_ai_solution_stream(question: str, correct_answer: str, mapel: str = "Umu
 
 
 # ==============================================================================
-# INTEGRASI DATABASE REAL-TIME UNTUK DASHBOARD GURU (U.PROJECT NEXUS)
+# INTEGRASI DATABASE SUPABASE POSTGRESQL (STREAMLIT & RENDER READY)
 # ==============================================================================
+class DBWrapper:
+    """Wrapper kompatibel untuk SQLAlchemy agar memiliki interface .session"""
+    def __init__(self, engine):
+        self.engine = engine
+        self.SessionMaker = sessionmaker(bind=self.engine)
+
+    @property
+    def session(self):
+        return self.SessionMaker()
+
+    def query(self, sql_query: str, ttl: int = 0):
+        with self.engine.connect() as connection:
+            return pd.read_sql(text(sql_query), connection)
+
+_db_conn_cache = None
 
 def init_db_connection():
-    """Menginisialisasi koneksi ke PostgreSQL menggunakan fitur native Streamlit."""
-    try:
-        # Membutuhkan konfigurasi [connections.postgresql] di file .streamlit/secrets.toml
-        return st.connection("postgresql", type="sql")
-    except Exception as e:
-        # Gagal silent agar tidak mengganggu aplikasi siswa jika DB belum disetup
-        return None
+    global _db_conn_cache
+    if _db_conn_cache is not None:
+        return _db_conn_cache
 
-# ------------------------------------------------------------------------------
-# UPDATE CREATETABLE: TAMBAHKAN TABEL KUIS CUSTOM
-# ------------------------------------------------------------------------------
+    # 1. Cek Environment Variables (Render.com / .env)
+    db_url = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL")
+
+    # 2. Fallback ke Streamlit Secrets
+    if not db_url:
+        try:
+            if hasattr(st, "secrets") and "DATABASE_URL" in st.secrets:
+                db_url = st.secrets["DATABASE_URL"]
+        except Exception:
+            pass
+
+    if db_url:
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+        try:
+            engine = create_engine(db_url, pool_pre_ping=True)
+            _db_conn_cache = DBWrapper(engine)
+            return _db_conn_cache
+        except Exception as e:
+            print(f"Gagal koneksi SQLAlchemy: {e}")
+
+    # 3. Fallback Native Streamlit Connection (Jika dijalankan di Streamlit Cloud)
+    try:
+        conn = st.connection("postgresql", type="sql")
+        _db_conn_cache = conn
+        return _db_conn_cache
+    except Exception:
+        pass
+
+    return None
+
 def create_table_if_not_exists():
     conn = init_db_connection()
-    if not conn: return
+    if not conn: 
+        return
     
     query = """
     CREATE TABLE IF NOT EXISTS sesi_ujian (
@@ -410,17 +447,13 @@ def create_table_if_not_exists():
         with conn.session as s:
             s.execute(text(query))
             s.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Error create_table_if_not_exists: {e}")
 
-
-# ------------------------------------------------------------------------------
-# FUNGSI PUBLISH & GET KUIS CUSTOM KE DATABASE
-# ------------------------------------------------------------------------------
 def publish_custom_quiz_to_db(kode_kuis: str, config: dict, quiz_data: list) -> bool:
-    """Menyimpan paket Kuis Custom yang diterbitkan guru ke database Supabase."""
     conn = init_db_connection()
-    if not conn: return False
+    if not conn: 
+        return False
 
     query = """
     INSERT INTO kuis_custom (kode_kuis, config, quiz_data, created_at)
@@ -438,14 +471,14 @@ def publish_custom_quiz_to_db(kode_kuis: str, config: dict, quiz_data: list) -> 
             })
             s.commit()
             return True
-    except Exception:
+    except Exception as e:
+        print(f"Error publish_custom_quiz_to_db: {e}")
         return False
 
-
 def get_custom_quiz_from_db(kode_kuis: str):
-    """Mengambil paket Kuis Custom berdasarkan Kode Kuis yang dimasukkan siswa."""
     conn = init_db_connection()
-    if not conn: return None
+    if not conn: 
+        return None
 
     query = "SELECT config, quiz_data FROM kuis_custom WHERE UPPER(kode_kuis) = UPPER(:kode)"
     try:
@@ -455,8 +488,8 @@ def get_custom_quiz_from_db(kode_kuis: str):
                 cfg = result[0] if isinstance(result[0], dict) else json.loads(result[0])
                 quiz = result[1] if isinstance(result[1], list) else json.loads(result[1])
                 return {"config": cfg, "quiz": quiz}
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Error get_custom_quiz_from_db: {e}")
     return None
 
 def update_progress_siswa(
@@ -473,14 +506,12 @@ def update_progress_siswa(
     if not conn:
         return
 
-    # Otomatis tandai mapel di DB jika ini adalah Kuis Custom
     mapel_db = f"{mapel} (Quiz)" if (is_custom and "(Quiz)" not in mapel) else mapel
 
     total_soal = len(detail_jawaban) if len(detail_jawaban) > 0 else 10
     jumlah_benar = sum(1 for x in detail_jawaban if x is True)
     jumlah_salah = sum(1 for x in detail_jawaban if x is False)
 
-    # Perhitungan Skor
     if is_custom:
         nilai_akhir = int(round((jumlah_benar / total_soal) * 100)) if total_soal > 0 else 0
     else:
@@ -526,15 +557,10 @@ def update_progress_siswa(
                 },
             )
             s.commit()
-    except Exception:
-        pass
-        
-#generate LKPD
+    except Exception as e:
+        print(f"Error update_progress_siswa: {e}")
+
 def generate_lkpd_content(mapel: str, kelas: str, topik: str):
-    """
-    Menghasilkan isi materi LKPD HOTS khas Al-Irsyad Bondowoso menggunakan Gemini 3.x
-    dengan aturan format Unicode murni agar kompatibel dengan ReportLab PDF dan Word.
-    """
     prompt = f"""
     Anda adalah Tim Ahli Kurikulum Lembaga Pendidikan Al-Irsyad Al-Islamiyah Putri Bondowoso.
     Rancanglah isi Lembar Kerja Peserta Didik (LKPD) berbasis HOTS dan Terintegrasi Keislaman.
@@ -590,7 +616,6 @@ def generate_lkpd_content(mapel: str, kelas: str, topik: str):
     except Exception:
         return None
 
-#generate KUIS CUSTOM
 def generate_custom_quiz_ai(
     *,
     mapel: str,
@@ -605,10 +630,6 @@ def generate_custom_quiz_ai(
     konteks: str,
     timer_seconds: int,
 ):
-    """
-    Generator Kuis Custom untuk guru di ai_engine.py.
-    Memakai call_gemini_with_rotation + clean_json_text bawaan engine.
-    """
     prompt = f"""
     Anda adalah Question Architect RoboMANTAP untuk guru.
     Buat tepat {jumlah_soal} soal pilihan ganda berkualitas tinggi untuk pembelajaran.
@@ -716,12 +737,10 @@ def generate_custom_quiz_ai(
     return normalized
 
 def check_active_session_from_db(nama_siswa: str, mapel: str):
-    """Mengecek apakah siswa memiliki sesi ujian yang belum selesai (tahan spasi & label mapel)."""
     conn = init_db_connection()
     if not conn: 
         return None
 
-    # Query fleksibel: Mencari mapel eksak ATAU mengandung nama mapel tersebut (misal: 'Matematika (Quiz)')
     query = """
     SELECT id_sesi, detail_jawaban, created_at, soal_sekarang
     FROM sesi_ujian
@@ -742,7 +761,6 @@ def check_active_session_from_db(nama_siswa: str, mapel: str):
             }).fetchone()
             
             if res:
-                # Parsing detail jawaban aman dari format JSON string
                 detail_ans = res[1]
                 if isinstance(detail_ans, str):
                     try:
@@ -758,5 +776,4 @@ def check_active_session_from_db(nama_siswa: str, mapel: str):
                 }
     except Exception as e:
         print(f"Error check_active_session_from_db: {e}")
-        pass
     return None
