@@ -1511,7 +1511,7 @@ elif st.session_state.page == "guru_dashboard":
                 
                 if st.button("🚀 Generate Rekapitulasi & Laporan Eksekutif (.docx)", type="primary", use_container_width=True):
                     with st.spinner("RoboMANTAP sedang merender dokumen eksekutif..."):
-                        
+                        data_siswa_list = df.to_dict('records')
                         cfg = {
                             "mapel": selected_mapel_filter if selected_mapel_filter != "Semua Mapel" else "Kuis Terintegrasi",
                             "jenjang": selected_jenjang_filter,
@@ -1527,7 +1527,7 @@ elif st.session_state.page == "guru_dashboard":
                         # 2. Build Docx Bytes Kedinasan
                         docx_bytes = generate_corporate_executive_docx_report(
                             config=cfg,
-                            data_siswa=data_siswa,
+                            data_siswa=data_siswa_list,
                             collective_ai_summary=collective_summary
                         )
                 
