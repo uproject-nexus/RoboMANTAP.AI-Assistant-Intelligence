@@ -432,7 +432,7 @@ with st.sidebar:
     if st.session_state.page == "guru_dashboard":
         st.markdown("### ⚙️ Panel Kontrol & Filter")
         # Filter Rentang Waktu
-        time_filter = st.radio("⏳ Rentang Waktu:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], index=2, key="filter_time")
+        time_filter = st.radio("⏳ Rentang Waktu:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], key="filter_time")
         # Toggle Sesi & Auto-Refresh
         only_latest = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Gabungkan multi-sesi: 1 nama hanya muncul 1 kali (pengerjaan terbaru).", key="filter_latest")
         # Filter Jenjang & Mapel
@@ -1309,14 +1309,14 @@ elif st.session_state.page == "guru_dashboard":
         # Kondisi Dasar: Abaikan status uji coba internal jika ada
         where_clauses = ["status NOT IN ('ARCHIVED', 'TRIAL', 'DRAFT')"]
         
-        # Kondisi Tanggal
+        # Kondisi Tanggal PRESISI (Terkunci Waktu Indonesia Barat / WIB)
         if time_filter == "Hari Ini":
-            where_clauses.append("DATE(updated_at) = CURRENT_DATE")
+            where_clauses.append("DATE(updated_at AT TIME ZONE 'Asia/Jakarta') = DATE(NOW() AT TIME ZONE 'Asia/Jakarta')")
         elif time_filter == "Kemarin":
-            where_clauses.append("DATE(updated_at) = CURRENT_DATE - INTERVAL '1 day'")
+            where_clauses.append("DATE(updated_at AT TIME ZONE 'Asia/Jakarta') = DATE(NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '1 day'")
         else:
-            where_clauses.append("DATE(updated_at) >= CURRENT_DATE - INTERVAL '2 days'")
-        
+            where_clauses.append("DATE(updated_at AT TIME ZONE 'Asia/Jakarta') >= DATE(NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '2 days'")
+                
         # Filter Jenjang (Jika dipilih spesifik)
         if selected_jenjang_filter != "Semua Jenjang":
             where_clauses.append(f"jenjang = '{selected_jenjang_filter}'")
