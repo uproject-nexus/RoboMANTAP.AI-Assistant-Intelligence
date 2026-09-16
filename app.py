@@ -35,9 +35,10 @@ from ai_engine import (
     generate_quiz_batch, get_ai_hint_stream, get_ai_solution_stream,
     create_table_if_not_exists, update_progress_siswa, init_db_connection,
     generate_lkpd_content, stream_ai_text, generate_custom_quiz_ai,
-    publish_custom_quiz_to_db, get_custom_quiz_from_db, check_active_session_from_db
+    publish_custom_quiz_to_db, get_custom_quiz_from_db, check_active_session_from_db,
+    call_gemini_with_rotation, generate_corporate_executive_docx_report,
+    generate_individual_analysis_ai, load_session_review_from_db
 )
-from ai_engine import load_session_review_from_db
 
 # Interseptor Deep Link dari CBT Engine Render
 if "review_session" in st.query_params:
