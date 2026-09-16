@@ -1699,6 +1699,41 @@ elif st.session_state.page == "guru_dashboard":
                                             st.markdown("**💡 Rekomendasi Pembinaan:**\n- Jadwalkan bimbingan intensif\n- Pelajari ulang modul pembahasan sebelum latihan berikutnya")
                                     else:
                                         st.info("Pengerjaan belum dimulai!")
+
+                                    st.markdown(f"#### 🤖 Diagnosis Pedagogis: **{row['nama_siswa']}**")
+                                    if st.button(f"⚡ Hasilkan Analisis AI Preskriptif", key=f"btn_ai_{row['id_sesi']}"):
+                                        with st.spinner("RoboMANTAP sedang menganalisis miskonsepsi kognitif siswa..."):
+                                            
+                                            # Unpack data detail jika ada
+                                            detail_raw = row.get("detail_jawaban", [])
+                                            quiz_data = None
+                                            user_answers = None
+                                            
+                                            if isinstance(detail_raw, dict):
+                                                detail_boolean = detail_raw.get("detail_boolean", [])
+                                                user_answers = detail_raw.get("user_answers", {})
+                                                quiz_data = detail_raw.get("quiz_data", [])
+                                            elif isinstance(detail_raw, list):
+                                                detail_boolean = detail_raw
+                                            else:
+                                                detail_boolean = []
+                                
+                                            # Panggil AI Engine
+                                            laporan_ai = generate_individual_analysis_ai(
+                                                nama_siswa=row["nama_siswa"],
+                                                mapel=row["mapel"],
+                                                jenjang=row["jenjang"],
+                                                nilai=row["nilai_akhir"],
+                                                detail_jawaban_list=detail_boolean,
+                                                quiz_data=quiz_data,
+                                                user_answers=user_answers
+                                            )
+                                            
+                                            if laporan_ai:
+                                                st.session_state[f"ai_report_{row['id_sesi']}"] = laporan_ai
+                                            else:
+                                                st.error("⚠️ Gagal menghasilkan analisis AI. Coba klik lagi.")
+                                
                                     # =========================================================================
                                     # TOMBOL HAPUS SESI PERCOBAAN PER SISWA
                                     # =========================================================================
