@@ -1689,19 +1689,21 @@ elif st.session_state.page == "guru_dashboard":
 
                                         # Kategori Kesiapan Pedagogis
                                         if pct >= 80:
-                                            st.success(f"🌟 **Kategori: Siap Kompetisi ({pct:.0f}%)**")
-                                            st.markdown("**💡 Rekomendasi Pembinaan:**\n- Tingkatkan ke materi pengayaan HOTS\n- Siswa direkomendasikan masuk skuat utama")
+                                            st.success(f"🌟 **Kategori: Siap Kompetisi ({pct:.0f}%)**")                                    
                                         elif pct >= 40:
-                                            st.warning(f"⚠️ **Kategori: Berkembang ({pct:.0f}%)**")
-                                            st.markdown("**💡 Rekomendasi Pembinaan:**\n- Lakukan pembahasan khusus pada butir soal yang salah/kosong\n- Penguatan pemahaman konsep dasar masih perlu pematangan")
+                                            st.warning(f"⚠️ **Kategori: Berkembang ({pct:.0f}%)**")                                           
                                         else:
-                                            st.error(f"🌱 **Kategori: Perlu Intervensi ({pct:.0f}%)**")
-                                            st.markdown("**💡 Rekomendasi Pembinaan:**\n- Jadwalkan bimbingan intensif\n- Pelajari ulang modul pembahasan sebelum latihan berikutnya")
+                                            st.error(f"🌱 **Kategori: Perlu Intervensi ({pct:.0f}%)**")       
                                     else:
                                         st.info("Pengerjaan belum dimulai!")
 
-                                    st.markdown(f"#### 🤖 Diagnosis Pedagogis: **{row['nama_siswa']}**")
-                                    if st.button(f"⚡ Hasilkan Analisis AI Preskriptif", key=f"btn_ai_{row['id_sesi']}"):
+                                    st.markdown(
+                                        f"<p style='font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #F1F5F9;'>"
+                                        f"🧕🏼 Diagnosis Pedagogis: <span style='color: #10B981;'>{row['nama_siswa']}</span>"
+                                        f"</p>", 
+                                        unsafe_allow_html=True
+                                    )
+                                    if st.button(f"⚡ Hasilkan Analisis RoboMANTAP Preskriptif", key=f"btn_ai_{row['id_sesi']}"):
                                         with st.spinner("RoboMANTAP sedang menganalisis miskonsepsi kognitif siswa..."):
                                             
                                             # Unpack data detail jika ada
