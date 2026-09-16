@@ -1507,7 +1507,7 @@ elif st.session_state.page == "guru_dashboard":
                 # =========================================================================
                 # --- TOMBOL GENERATE LAPORAN EKSEKUTIF KEDINASAN (.DOCX) ---
                 # =========================================================================
-                st.markdown("<p style='font-size: 11px; font-weight: bold; margin-bottom: 10px;'>🧕 RoboMANTAP: buat Rekapitulasi Ujian yuk, Ustadzah!</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size: 14px; font-weight: bold; margin-bottom: 10px;'>🧕 RoboMANTAP: buat Rekapitulasi Ujian yuk, Ustadzah!</p>", unsafe_allow_html=True)
                 
                 if st.button("🚀 Generate Rekapitulasi & Laporan Eksekutif (.docx)", type="primary", use_container_width=True):
                     with st.spinner("RoboMANTAP sedang merender dokumen eksekutif..."):
