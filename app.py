@@ -1520,7 +1520,7 @@ elif st.session_state.page == "guru_dashboard":
                 
                         # 1. Panggil Summary Kolektif AI Kelas
                         collective_summary = call_gemini_with_rotation(
-                            f"Buatkan ringkasan diagnostik kelas secara singkat dan profesional untuk mata pelajaran {cfg['mapel']} berdasarkan performa {len(data_siswa)} siswa.",
+                            f"Buatkan ringkasan diagnostik kelas secara singkat dan profesional untuk mata pelajaran {cfg['mapel']} berdasarkan performa {len(data_siswa_list)} siswa.",
                             is_json=False
                         )
                 
