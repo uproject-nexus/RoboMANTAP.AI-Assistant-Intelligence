@@ -1639,36 +1639,55 @@ elif st.session_state.page == "guru_dashboard":
 
                         # Progress Bar & Micro Analytics
                         try:
-                            detail_list = row['detail_jawaban']
-                            if isinstance(detail_list, str):
+                            # 1. Parsing Robust & Unpacking Payload Data
+                            raw_detail = row['detail_jawaban']
+                            if isinstance(raw_detail, str):
                                 import json
-                                detail_list = json.loads(detail_list)
-                            
-                            col_bar.markdown(render_progress_bar_html(detail_list), unsafe_allow_html=True)
-
+                                try:
+                                    raw_detail = json.loads(raw_detail)
+                                except Exception:
+                                    raw_detail = []
+                        
+                            detail_boolean = []
+                            user_answers = {}
+                            quiz_data = []
+                        
+                            if isinstance(raw_detail, dict):
+                                detail_boolean = raw_detail.get("detail_boolean", [])
+                                user_answers = raw_detail.get("user_answers", {})
+                                quiz_data = raw_detail.get("quiz_data", [])
+                            elif isinstance(raw_detail, list):
+                                detail_boolean = raw_detail
+                        
+                            # 2. Render Bar Progres (Kirim list boolean murni)
+                            col_bar.markdown(render_progress_bar_html(detail_boolean), unsafe_allow_html=True)
+                        
                             with col_act:
                                 with st.popover("📊 Analisis"):
                                     safe_nama = str(row['nama_siswa']).strip().replace("*", "")
+                                    nama_depan = safe_nama.split()[0] if safe_nama else "Santri"
+                        
                                     st.markdown(f"**Analisis Siswa:** {safe_nama}")
-                                    st.caption(f"Mapel: {row['mapel']} | Sesi Ke-{row['total_percobaan']}")
-
-                                    if isinstance(detail_list, list) and len(detail_list) > 0:
-                                        total_soal_sis = len(detail_list)
-                                        b_cnt = sum(1 for x in detail_list if x is True)
-                                        s_cnt = sum(1 for x in detail_list if x is False)
-                                        k_cnt = sum(1 for x in detail_list if x is None)
+                                    st.caption(f"Mapel: {row['mapel']} | Sesi Ke-{row.get('total_percobaan', 1)}")
+                        
+                                    # Validasi Pengerjaan: Cek list boolean ATAU status selesai / nilai > 0
+                                    has_data = len(detail_boolean) > 0 or row.get("status") == "SELESAI" or row.get("nilai_akhir", 0) > 0
+                        
+                                    if has_data:
+                                        total_soal_sis = len(detail_boolean) if len(detail_boolean) > 0 else 5
+                                        b_cnt = sum(1 for x in detail_boolean if x is True)
+                                        s_cnt = sum(1 for x in detail_boolean if x is False)
+                                        k_cnt = sum(1 for x in detail_boolean if x is None)
                                         
                                         # Deteksi Jenis Kuis untuk Perhitungan Persentase Presisi
                                         is_custom_row = check_is_custom(row)
                                         
                                         if is_custom_row:
-                                            # Kuis Custom: Rasio Benar dari Total N Soal
                                             pct = (b_cnt / total_soal_sis) * 100 if total_soal_sis > 0 else 0
                                         else:
-                                            # CBT OMI: Rasio Skor Riil OMI terhadap Skor Maksimal (40 Poin)
                                             skor_omi = (b_cnt * 4) - (s_cnt * 1)
-                                            pct = max(0, (skor_omi / 40) * 100) # Konversi proporsional OMI
-
+                                            pct = max(0, (skor_omi / 40) * 100)
+                        
                                         # Display Kartu Ringkas
                                         st.markdown(f"""
                                         <div style="display: flex; gap: 6px; margin: 10px 0;">
@@ -1686,41 +1705,26 @@ elif st.session_state.page == "guru_dashboard":
                                             </div>
                                         </div>
                                         """, unsafe_allow_html=True)
-
+                        
                                         # Kategori Kesiapan Pedagogis
                                         if pct >= 80:
                                             st.success(f"🌟 **Kategori: Siap Kompetisi ({pct:.0f}%)**")                                    
                                         elif pct >= 40:
-                                            st.warning(f"⚠️ **Kategori: Berkembang ({pct:.0f}%)**")                                           
+                                            st.warning(f"⚠️ **Kategori: Berkembang ({pct:.0f}%)**")                                            
                                         else:
                                             st.error(f"🌱 **Kategori: Perlu Intervensi ({pct:.0f}%)**")       
                                     else:
                                         st.info("Pengerjaan belum dimulai!")
-
+                        
                                     st.markdown(
-                                        f"<p style='font-size: 16px; margin-bottom: 10px; color: #F1F5F9;'>"
-                                        f"🧕🏼 Cek Diagnosis Pedagogis {row['nama_siswa'].strip().split()[0]}"
+                                        f"<p style='font-size: 15px; font-weight: bold; margin-bottom: 10px; color: #F1F5F9;'>"
+                                        f"🧕🏼 Cek Diagnosis Pedagogis <span style='color: #10B981;'>{nama_depan}</span>"
                                         f"</p>", 
                                         unsafe_allow_html=True
                                     )
+                        
                                     if st.button(f"⚡ Hasilkan Analisis RoboMANTAP Preskriptif", key=f"btn_ai_{row['id_sesi']}"):
                                         with st.spinner("RoboMANTAP sedang menganalisis miskonsepsi kognitif siswa..."):
-                                            
-                                            # Unpack data detail jika ada
-                                            detail_raw = row.get("detail_jawaban", [])
-                                            quiz_data = None
-                                            user_answers = None
-                                            
-                                            if isinstance(detail_raw, dict):
-                                                detail_boolean = detail_raw.get("detail_boolean", [])
-                                                user_answers = detail_raw.get("user_answers", {})
-                                                quiz_data = detail_raw.get("quiz_data", [])
-                                            elif isinstance(detail_raw, list):
-                                                detail_boolean = detail_raw
-                                            else:
-                                                detail_boolean = []
-                                
-                                            # Panggil AI Engine
                                             laporan_ai = generate_individual_analysis_ai(
                                                 nama_siswa=row["nama_siswa"],
                                                 mapel=row["mapel"],
@@ -1735,7 +1739,21 @@ elif st.session_state.page == "guru_dashboard":
                                                 st.session_state[f"ai_report_{row['id_sesi']}"] = laporan_ai
                                             else:
                                                 st.error("⚠️ Gagal menghasilkan analisis AI. Coba klik lagi.")
-                                
+                        
+                                    # Tampilkan hasil laporan jika sudah ada di session state
+                                    cached_report = st.session_state.get(f"ai_report_{row['id_sesi']}")
+                                    if cached_report:
+                                        st.markdown("---")
+                                        st.markdown(cached_report)
+                                        
+                                        st.download_button(
+                                            label="📋 Unduh Ringkasan Laporan (.txt)",
+                                            data=cached_report,
+                                            file_name=f"Diagnosis_AI_{row['nama_siswa'].replace(' ', '_')}.txt",
+                                            mime="text/plain",
+                                            key=f"dl_ai_{row['id_sesi']}"
+                                        )
+                                                                
                                     # =========================================================================
                                     # TOMBOL HAPUS SESI PERCOBAAN PER SISWA
                                     # =========================================================================
