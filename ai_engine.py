@@ -8,7 +8,22 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
-# Import SQLAlchemy untuk koneksi Database
+# Setup Matplotlib Headless untuk Server Cloud (Render/Streamlit)
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+# Import Python-Docx & XML Parser untuk Word
+from docx import Document
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
+from docx.oxml import parse_xml
+from docx.oxml.ns import nsdecls
+
+from datetime import datetime, timezone, timedelta
+
+
 try:
     from sqlalchemy import create_engine, text
     from sqlalchemy.orm import sessionmaker
@@ -842,3 +857,451 @@ def load_session_review_from_db(session_id: str):
     except Exception as e:
         print(f"Error load_session_review_from_db: {e}")
     return None
+
+# ==============================================================================
+# HELPER PARSER MATHEMATICA & OMML WORD EQUATION
+# ==============================================================================
+def clean_math_string(text: str) -> str:
+    """Pembersih simbol & notasi matematika dasar untuk teks biasa."""
+    if not text:
+        return ""
+    
+    text = re.sub(r'\\(?:rightarrow|to)\b', '→', text)
+    text = re.sub(r'\\Rightarrow\b', '⇒', text)
+    text = re.sub(r'\\leftarrow\b', '←', text)
+    text = re.sub(r'\\leftrightarrow\b', '↔', text)
+
+    text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
+    text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
+    text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
+
+    text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
+    text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
+
+    sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
+    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄⁵₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
+
+    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sup_map), text)
+    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sub_map), text)
+
+    replacements = {
+        r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
+        r"\leq": "≤", r"\geq": "≥", r"\pm": "±", r"\infty": "∞",
+        r"\pi": "π", r"\alpha": "α", r"\beta": "β", r"\theta": "θ", "$": ""
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    text = text.replace("left(", "(").replace("right)", ")").replace("dots", "…")
+    text = text.replace("{", "").replace("}", "")
+    text = re.sub(r'\\([a-zA-Z]+)', r'\1', text).replace("\\", "")
+    return re.sub(r'\s+', ' ', text).strip()
+
+clean_math_text = clean_math_string
+
+def add_omml_fraction(paragraph, num_text: str, den_text: str):
+    """Menyisipkan struktur Pecahan Tegak Resmi Microsoft Word (Equation)."""
+    num_clean = clean_math_string(num_text)
+    den_clean = clean_math_string(den_text)
+    
+    omml_xml = (
+        f'<m:oMath {nsdecls("m")}>'
+        f'  <m:f>'
+        f'    <m:num><m:r><m:t>{num_clean}</m:t></m:r></m:num>'
+        f'    <m:den><m:r><m:t>{den_clean}</m:t></m:r></m:den>'
+        f'  </m:f>'
+        f'</m:oMath>'
+    )
+    paragraph._p.append(parse_xml(omml_xml))
+
+def add_omml_matrix(paragraph, matrix_type: str, content: str):
+    """Menyisipkan struktur Matriks 2D Bertingkat Resmi Microsoft Word (Equation)."""
+    beg_chr, end_chr = "(", ")"
+    if matrix_type == "bmatrix":
+        beg_chr, end_chr = "[", "]"
+    elif matrix_type in ["vmatrix", "Vmatrix"]:
+        beg_chr, end_chr = "|", "|"
+    elif matrix_type == "matrix":
+        beg_chr, end_chr = "", ""
+
+    rows = [r.strip() for r in re.split(r'\\\\|\\cr', content) if r.strip()]
+    matrix_xml_rows = []
+    for r in rows:
+        cols = [c.strip() for c in r.split('&')]
+        cols_xml = []
+        for c in cols:
+            cleaned_c = html.escape(clean_math_string(c))
+            cols_xml.append(f'<m:e><m:r><m:t>{cleaned_c}</m:t></m:r></m:e>')
+        matrix_xml_rows.append(f'<m:mr>{"".join(cols_xml)}</m:mr>')
+
+    inner_matrix = f'<m:m>{"".join(matrix_xml_rows)}</m:m>'
+    if beg_chr or end_chr:
+        omml_xml = (
+            f'<m:oMath {nsdecls("m")}>'
+            f'  <m:d>'
+            f'    <m:dPr>'
+            f'      <m:begChr m:val="{beg_chr}"/>'
+            f'      <m:endChr m:val="{end_chr}"/>'
+            f'    </m:dPr>'
+            f'    <m:e>{inner_matrix}</m:e>'
+            f'  </m:d>'
+            f'</m:oMath>'
+        )
+    else:
+        omml_xml = f'<m:oMath {nsdecls("m")}>{inner_matrix}</m:oMath>'
+
+    paragraph._p.append(parse_xml(omml_xml))
+
+def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, color_rgb: RGBColor = None):
+    """Membagi paragraf: teks biasa, pecahan \\frac, dan matriks \\begin{...matrix}."""
+    if not text:
+        return
+
+    math_pattern = re.compile(
+        r'\\begin\{(?P<mtype>[pbvV]?matrix)\}(?P<mcontent>.*?)\\end\{(?P=mtype)\}|\\(?:f|tf)rac\{(?P<num>[^}]+)\}\{(?P<den>[^}]+)\}',
+        re.DOTALL
+    )
+    last_idx = 0
+
+    for match in math_pattern.finditer(text):
+        start, end = match.span()
+        if start > last_idx:
+            plain_part = clean_math_string(text[last_idx:start])
+            if plain_part:
+                run = paragraph.add_run(plain_part + " ")
+                run.bold = is_bold
+                if color_rgb:
+                    run.font.color.rgb = color_rgb
+
+        if match.group('mtype'):
+            add_omml_matrix(paragraph, match.group('mtype'), match.group('mcontent'))
+        elif match.group('num'):
+            add_omml_fraction(paragraph, match.group('num'), match.group('den'))
+        
+        run_space = paragraph.add_run(" ")
+        run_space.bold = is_bold
+        last_idx = end
+
+    if last_idx < len(text):
+        plain_part = clean_math_string(text[last_idx:])
+        if plain_part:
+            run = paragraph.add_run(plain_part)
+            run.bold = is_bold
+            if color_rgb:
+                run.font.color.rgb = color_rgb
+# ==============================================================================
+# HELPER PARSER MARKDOWN & OMML UNTUK DOKUMEN KEDINASAN
+# ==============================================================================
+def append_markdown_formatted_text(doc, md_text: str):
+    """
+    Mengurai teks Markdown AI (### header, **bold**, bullet -) 
+    menjadi paragraf Word berstandar kedinasan yang rapi dan elegan.
+    """
+    if not md_text:
+        return
+
+    lines = md_text.split('\n')
+    for line in lines:
+        line_str = line.strip()
+        if not line_str:
+            continue
+
+        # 1. Sub-Header (###)
+        if line_str.startswith('###'):
+            p_h = doc.add_paragraph()
+            p_h.paragraph_format.space_before = Pt(8)
+            p_h.paragraph_format.space_after = Pt(3)
+            h_text = line_str.lstrip('#').strip()
+            run_h = p_h.add_run(h_text)
+            run_h.bold = True
+            run_h.font.size = Pt(11)
+            run_h.font.color.rgb = RGBColor(6, 78, 59) # Emerald Kedinasan
+
+        # 2. Poin Bullet (- atau *)
+        elif line_str.startswith(('-', '*')):
+            p_b = doc.add_paragraph()
+            p_b.paragraph_format.left_indent = Inches(0.25)
+            p_b.paragraph_format.space_after = Pt(2)
+            
+            content = line_str.lstrip('-*').strip()
+            parts = re.split(r'(\*\*.*?\*\*)', content)
+            for part in parts:
+                if part.startswith('**') and part.endswith('**'):
+                    clean_part = part[2:-2]
+                    append_text_with_fractions(p_b, clean_part, is_bold=True, color_rgb=RGBColor(6, 78, 59))
+                else:
+                    append_text_with_fractions(p_b, part, is_bold=False)
+
+        # 3. Paragraf Biasa
+        else:
+            p_gen = doc.add_paragraph()
+            p_gen.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            p_gen.paragraph_format.space_after = Pt(4)
+            
+            parts = re.split(r'(\*\*.*?\*\*)', line_str)
+            for part in parts:
+                if part.startswith('**') and part.endswith('**'):
+                    clean_part = part[2:-2]
+                    append_text_with_fractions(p_gen, clean_part, is_bold=True)
+                else:
+                    append_text_with_fractions(p_gen, part, is_bold=False)
+
+# ==============================================================================
+# MAIN DOCX REPORT GENERATOR (STANDAR RESMI KEDINASAN & VISUAL ANALYTICS)
+# ==============================================================================
+def generate_corporate_executive_docx_report(config: dict, data_siswa: list, collective_ai_summary: str = None) -> bytes:
+    """
+    Menghasilkan Dokumen Word (.docx) Laporan Rekapitulasi Ujian & Diagnostik Eksekutif
+    Presisi Kedinasan: Kop Instansi, Garis XML Solid, Tabel Metadata 3-Kolom, Chart Visual, & Diagnosis Individu.
+    """
+    doc = Document()
+
+    # Set Margin Halaman Standard 1 Inci
+    for section in doc.sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+
+    # --- 1. KOP INSTITUSI RESMI (PERSIS FORMAT ASLI) ---
+    header_table = doc.add_table(rows=1, cols=2)
+    header_table.autofit = False
+    
+    cells = header_table.rows[0].cells
+    cells[0].width = Inches(1.6)
+    cells[1].width = Inches(4.7)
+    cells[0].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+    cells[1].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+
+    # Logo Instansi
+    p_logo = cells[0].paragraphs[0]
+    p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    logo_path = "logo.png"
+    if os.path.exists(logo_path):
+        p_logo.add_run().add_picture(logo_path, width=Inches(1.5))
+    else:
+        r_logo = p_logo.add_run("[LOGO MANTAP]")
+        r_logo.bold = True
+        r_logo.font.size = Pt(12)
+        r_logo.font.color.rgb = RGBColor(6, 78, 59)
+
+    # Teks Kop Instansi
+    p_title = cells[1].paragraphs[0]
+    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_title.paragraph_format.space_after = Pt(2)
+    
+    r1 = p_title.add_run("LAPORAN REKAPITULASI & DIAGNOSIS CBT\n")
+    r1.bold = True
+    r1.font.size = Pt(13)
+    r1.font.color.rgb = RGBColor(6, 78, 59) # Warna Hijau Edukasi Kedinasan
+    
+    r2 = p_title.add_run("Madrasah Aliyah dan Tsanawiyah Al-Irsyad Al-Islamiyah Putri Bondowoso\n")
+    r2.bold = True
+    r2.font.size = Pt(10.5)
+    
+    # Tanggal Presisi WIB dengan Nama Bulan Bahasa Indonesia
+    now_wib = datetime.utcnow() + timedelta(hours=7)
+    nama_bulan = [
+        "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ]
+    tgl_presisi = f"{now_wib.day} {nama_bulan[now_wib.month]} {now_wib.year}"
+    
+    r3 = p_title.add_run(f"Tanggal Penerbitan: {tgl_presisi} WIB")
+    r3.italic = True
+    r3.font.size = Pt(9.5)
+    r3.font.color.rgb = RGBColor(100, 100, 100)
+
+    # --- 2. GARIS PEMBATAS HIJAU SOLID (XML EMBED) ---
+    p_div = doc.add_paragraph()
+    p_div.paragraph_format.space_before = Pt(4)
+    p_div.paragraph_format.space_after = Pt(10)
+    pBdr = parse_xml(
+        r'<w:pBdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        r'<w:bottom w:val="single" w:sz="20" w:space="1" w:color="064E3B"/>'
+        r'</w:pBdr>'
+    )
+    p_div._p.get_or_add_pPr().append(pBdr)
+
+    # --- 3. JUDUL EXECUTIVE REPORT ---
+    p_paket = doc.add_paragraph()
+    p_paket.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_paket.paragraph_format.space_after = Pt(10)
+    r_paket = p_paket.add_run(f"EVALUASI UJIAN {config.get('mapel', 'Mata Pelajaran').upper()}")
+    r_paket.bold = True
+    r_paket.font.size = Pt(13)
+    r_paket.font.color.rgb = RGBColor(6, 78, 59)
+
+    # --- 4. METADATA KUIS (TABEL 3 KOLOM PRESISI & LURUS SEJAJAR) ---
+    meta_items = [
+        ("Jenjang / Kelas", f"{config.get('jenjang', '-')} ({config.get('kelas', 'Semua Kelas')})"),
+        ("Materi Utama", f"{clean_math_string(config.get('materi', 'Ujian Terintegrasi'))}"),
+        ("Total Peserta Ujian", f"{len(data_siswa)} Santri Terdaftar")
+    ]
+
+    meta_table = doc.add_table(rows=0, cols=3)
+    meta_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    meta_table.autofit = False
+
+    for label, val in meta_items:
+        row_cells = meta_table.add_row().cells
+        
+        # Kolom 1: Label
+        p0 = row_cells[0].paragraphs[0]
+        r0 = p0.add_run(label)
+        r0.bold = True
+        p0.paragraph_format.space_before = Pt(2)
+        p0.paragraph_format.space_after = Pt(2)
+        row_cells[0].width = Inches(1.5)
+        
+        # Kolom 2: Titik Dua
+        p1 = row_cells[1].paragraphs[0]
+        r1 = p1.add_run(":")
+        r1.bold = True
+        p1.paragraph_format.space_before = Pt(2)
+        p1.paragraph_format.space_after = Pt(2)
+        row_cells[1].width = Inches(0.2)
+        
+        # Kolom 3: Nilai
+        p2 = row_cells[2].paragraphs[0]
+        p2.add_run(val)
+        p2.paragraph_format.space_before = Pt(2)
+        p2.paragraph_format.space_after = Pt(2)
+        row_cells[2].width = Inches(4.8)
+
+    doc.add_paragraph().paragraph_format.space_after = Pt(12)
+
+    # --- 5. RINGKASAN KPI KELAS ---
+    total = len(data_siswa)
+    if total > 0:
+        scores = [s.get("nilai_akhir", 0) for s in data_siswa]
+        avg_score = sum(scores) / total
+        max_score = max(scores)
+        min_score = min(scores)
+    else:
+        avg_score = max_score = min_score = 0
+
+    kpi_table = doc.add_table(rows=2, cols=4)
+    kpi_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    kpi_table.style = 'Table Grid'
+    
+    headers = ["Total Santri", "Rata-Rata Kelas", "Skor Tertinggi", "Skor Terendah"]
+    values = [str(total), f"{avg_score:.1f}", str(max_score), str(min_score)]
+
+    for i, h in enumerate(headers):
+        cell = kpi_table.cell(0, i)
+        cell.text = h
+        cell.paragraphs[0].runs[0].font.bold = True
+        cell.paragraphs[0].runs[0].font.size = Pt(9.5)
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    for i, v in enumerate(values):
+        cell = kpi_table.cell(1, i)
+        cell.text = v
+        cell.paragraphs[0].runs[0].font.bold = True
+        cell.paragraphs[0].runs[0].font.size = Pt(12.5)
+        cell.paragraphs[0].runs[0].font.color.rgb = RGBColor(6, 78, 59)
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph().paragraph_format.space_after = Pt(14)
+
+    # --- 6. VISUAL ANALYTICS (MATPLOTLIB IN-DOCX CHART) ---
+    chart1_buf, chart2_buf = generate_class_visual_charts(data_siswa)
+    if chart1_buf and chart2_buf:
+        doc.add_heading("1. Analisis Visual Performa Kelas", level=2)
+        p_charts = doc.add_paragraph()
+        p_charts.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        p_charts.add_run().add_picture(chart1_buf, width=Inches(3.1))
+        p_charts.add_run("   ")
+        p_charts.add_run().add_picture(chart2_buf, width=Inches(3.3))
+        
+        doc.add_paragraph().paragraph_format.space_after = Pt(12)
+
+    # --- 7. DIAGNOSIS KOLEKTIF KELAS ---
+    doc.add_heading("2. Diagnosis Pedagogis Kolektif (AI Engine)", level=2)
+    summary_text = collective_ai_summary or "Berdasarkan evaluasi kuis, tingkat penguasaan konsep santri berada pada kategori baik."
+    append_markdown_formatted_text(doc, summary_text)
+    doc.add_paragraph().paragraph_format.space_after = Pt(14)
+
+    # --- 8. TABEL REKAPITULASI DETAIL SISWA ---
+    doc.add_heading("3. Tabel Rekapitulasi Nilai Seluruh Santri", level=2)
+    
+    table = doc.add_table(rows=1, cols=6)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.style = 'Table Grid'
+
+    hdr_cells = table.rows[0].cells
+    headers_text = ["No", "Nama Santri", "Kelas", "Benar", "Salah", "Nilai Akhir"]
+    for i, text in enumerate(headers_text):
+        hdr_cells[i].text = text
+        hdr_cells[i].paragraphs[0].runs[0].font.bold = True
+        hdr_cells[i].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    for idx, s in enumerate(data_siswa, start=1):
+        row_cells = table.add_row().cells
+        row_cells[0].text = str(idx)
+        row_cells[1].text = str(s.get("nama_siswa", "-"))
+        row_cells[2].text = str(s.get("jenjang", "-"))
+        row_cells[3].text = str(s.get("jumlah_benar", 0))
+        row_cells[4].text = str(s.get("jumlah_salah", 0))
+        row_cells[5].text = str(s.get("nilai_akhir", 0))
+        
+        row_cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        row_cells[3].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        row_cells[4].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        row_cells[5].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        row_cells[5].paragraphs[0].runs[0].font.bold = True
+
+    doc.add_paragraph().paragraph_format.space_after = Pt(20)
+
+    # --- 9. LAMPIRAN DIAGNOSIS PRESKRIPTIF PER-SANTRI ---
+    doc.add_page_break()
+    
+    p_lamp = doc.add_paragraph()
+    p_lamp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_lamp = p_lamp.add_run("LAMPIRAN: DIAGNOSIS PRESKRIPTIF INDIVIDU SANTRI")
+    r_lamp.bold = True
+    r_lamp.font.size = Pt(13)
+    r_lamp.font.color.rgb = RGBColor(6, 78, 59)
+    doc.add_paragraph().paragraph_format.space_after = Pt(12)
+
+    for idx, s in enumerate(data_siswa, start=1):
+        p_indiv = doc.add_paragraph()
+        r_indiv = p_indiv.add_run(f"Santri #{idx}: {s.get('nama_siswa', '-')} (Skor Akhir: {s.get('nilai_akhir', 0)})")
+        r_indiv.bold = True
+        r_indiv.font.size = Pt(11)
+        r_indiv.font.color.rgb = RGBColor(6, 78, 59)
+
+        detail_raw = s.get("detail_jawaban", [])
+        quiz_data = None
+        user_answers = None
+        if isinstance(detail_raw, dict):
+            detail_boolean = detail_raw.get("detail_boolean", [])
+            user_answers = detail_raw.get("user_answers", {})
+            quiz_data = detail_raw.get("quiz_data", [])
+        elif isinstance(detail_raw, list):
+            detail_boolean = detail_raw
+        else:
+            detail_boolean = []
+
+        # Diagnosis AI Tanpa Nomor Soal
+        indiv_report_text = generate_individual_analysis_ai(
+            nama_siswa=s.get("nama_siswa", "-"),
+            mapel=config.get("mapel", "Kuis"),
+            jenjang=s.get("jenjang", "MA"),
+            nilai=s.get("nilai_akhir", 0),
+            detail_jawaban_list=detail_boolean,
+            quiz_data=quiz_data,
+            user_answers=user_answers
+        )
+
+        # Render Teks Markdown AI ke Paragraf Kedinasan
+        append_markdown_formatted_text(doc, indiv_report_text)
+        doc.add_paragraph().paragraph_format.space_after = Pt(14)
+
+    # Simpan ke BytesIO Buffer
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
