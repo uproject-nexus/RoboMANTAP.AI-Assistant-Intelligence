@@ -1507,10 +1507,10 @@ elif st.session_state.page == "guru_dashboard":
                 # =========================================================================
                 # --- TOMBOL GENERATE LAPORAN EKSEKUTIF KEDINASAN (.DOCX) ---
                 # =========================================================================
-                st.markdown("### 📊 Laporan & Rekapitulasi Ujian")
+                st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>🧕 RoboMANTAP: buat Rekapitulasi Ujian yuk, Ustadzah!</p>", unsafe_allow_html=True)
                 
                 if st.button("🚀 Generate Rekapitulasi & Laporan Eksekutif (.docx)", type="primary", use_container_width=True):
-                    with st.spinner("RoboMANTAP AI sedang merender dokumen .docx eksekutif lengkap dengan grafik visual..."):
+                    with st.spinner("RoboMANTAP sedang merender dokumen eksekutif..."):
                         
                         cfg = {
                             "mapel": selected_mapel_filter if selected_mapel_filter != "Semua Mapel" else "Kuis Terintegrasi",
