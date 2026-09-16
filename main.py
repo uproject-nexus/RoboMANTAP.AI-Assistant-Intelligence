@@ -3,7 +3,7 @@ import os
 import json
 import random
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 
 from fastapi import FastAPI, Request, Form, HTTPException, status
@@ -43,6 +43,20 @@ async def login_page(request: Request):
         context={"error": None}
     )
 
+def parse_wib_datetime(dt_str):
+    """Helper untuk membaca format ISO dari Supabase dan mengonversinya ke datetime WIB."""
+    if not dt_str:
+        return None
+    try:
+        s = str(dt_str).strip().replace(" ", "T")
+        dt_raw = datetime.fromisoformat(s.replace('Z', '+00:00'))
+        if dt_raw.tzinfo is not None:
+            return dt_raw.astimezone(timezone(timedelta(hours=7))).replace(tzinfo=None)
+        return dt_raw
+    except Exception as e:
+        print(f"[DATE PARSE ERROR] Gagal parse tanggal '{dt_str}': {e}")
+        return None
+
 @app.post("/verify-token", response_class=HTMLResponse)
 async def verify_token(
     request: Request,
@@ -54,17 +68,46 @@ async def verify_token(
     clean_token = token.strip().upper()
     quiz_package = get_custom_quiz_from_db(clean_token)
     
+    # 1. Cek Keberadaan Token di Database Supabase
     if not quiz_package:
         return templates.TemplateResponse(
             request=request,
             name="student_login.html", 
-            context={"error": "Kode Kuis / Token tidak ditemukan atau belum diterbitkan!"}
+            context={"error": "❌ Kode Kuis / Token tidak ditemukan atau belum diterbitkan!"}
         )
 
     config = quiz_package.get("config", {})
+    
+    # 2. Waktu Saat Ini di WIB (UTC+7)
+    now_wib = datetime.utcnow() + timedelta(hours=7)
+    
+    active_from_raw = config.get("active_from")
+    active_until_raw = config.get("active_until")
+
+    # 3. Validasi Masa Aktif Kuis (Strict WIB Comparison)
+    if active_from_raw and active_until_raw:
+        dt_from = parse_wib_datetime(active_from_raw)
+        dt_until = parse_wib_datetime(active_until_raw)
+
+        if dt_from and now_wib < dt_from:
+            time_start = config.get("time_start_str", dt_from.strftime("%H:%M"))
+            return templates.TemplateResponse(
+                request=request,
+                name="student_login.html",
+                context={"error": f"⏰ Kuis Belum Dibuka! Kuis baru dapat diakses pada pukul {time_start} WIB."}
+            )
+
+        if dt_until and now_wib > dt_until:
+            time_end = config.get("time_end_str", dt_until.strftime("%H:%M"))
+            return templates.TemplateResponse(
+                request=request,
+                name="student_login.html",
+                context={"error": f"❌ Kode Kuis Sudah Kedaluwarsa! Masa aktif kuis ini telah berakhir pada pukul {time_end} WIB."}
+            )
+
+    # 4. Ambil Soal dan Buat Sesi Ujian Siswa
     master_quiz = quiz_package.get("quiz", [])
     packages = config.get("packages", [master_quiz])
-    
     selected_quiz = random.choice(packages) if packages else master_quiz
     
     session_id = str(uuid.uuid4())[:8]
@@ -76,7 +119,8 @@ async def verify_token(
         "config": config,
         "quiz": selected_quiz,
         "answers": {},
-        "current_index": 0
+        "current_index": 0,
+        "start_time": datetime.utcnow()
     }
     
     return templates.TemplateResponse(
