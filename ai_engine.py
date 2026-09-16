@@ -1047,6 +1047,80 @@ def append_markdown_formatted_text(doc, md_text: str):
                     append_text_with_fractions(p_gen, part, is_bold=False)
 
 # ==============================================================================
+# GENERATOR GRAFIK VISUAL MATPLOTLIB (IN-MEMORY BUFFER)
+# ==============================================================================
+def generate_class_visual_charts(data_siswa: list):
+    """Menghasilkan 2 gambar grafik statistik (Donut Chart & Horizontal Bar Chart)."""
+    if not data_siswa:
+        return None, None
+
+    df = pd.DataFrame(data_siswa)
+    
+    # 1. Klasifikasi Kognitif Kelas
+    mahir = len(df[df['nilai_akhir'] >= 80])
+    berkembang = len(df[(df['nilai_akhir'] >= 50) & (df['nilai_akhir'] < 80)])
+    intervensi = len(df[df['nilai_akhir'] < 50])
+
+    # --- GRAFIK 1: DONUT CHART KATEGORI PENGUASAAN ---
+    fig1, ax1 = plt.subplots(figsize=(5, 3.5), dpi=200)
+    labels = ['Sangat Mahir (≥80)', 'Berkembang (50-79)', 'Perlu Intervensi (<50)']
+    sizes = [mahir, berkembang, intervensi]
+    colors = ['#10B981', '#F59E0B', '#EF4444']
+    
+    # Filter kategori bernilai > 0
+    active_labels = [l for l, s in zip(labels, sizes) if s > 0]
+    active_sizes = [s for s in sizes if s > 0]
+    active_colors = [c for c, s in zip(colors, sizes) if s > 0]
+
+    wedges, texts, autotexts = ax1.pie(
+        active_sizes, labels=active_labels, colors=active_colors,
+        autopct='%1.1f%%', startangle=140, pctdistance=0.75,
+        textprops=dict(color="#1E293B", fontsize=8, weight="bold")
+    )
+    
+    # Lubang Donut Tengah
+    centre_circle = plt.Circle((0, 0), 0.50, fc='white')
+    fig1.gca().add_artist(centre_circle)
+    ax1.set_title("Distribusi Tingkat Penguasaan Kognitif Santri", fontsize=10, fontweight='bold', pad=12, color='#064E3B')
+    plt.tight_layout()
+
+    buf1 = io.BytesIO()
+    plt.savefig(buf1, format='png', bbox_inches='tight')
+    plt.close(fig1)
+    buf1.seek(0)
+
+    # --- GRAFIK 2: BAR CHART NILAI PER-SISWA ---
+    fig2, ax2 = plt.subplots(figsize=(6, max(3, len(df) * 0.4)), dpi=200)
+    df_sorted = df.sort_values(by='nilai_akhir', ascending=True)
+
+    names = [n[:18] + '...' if len(n) > 18 else n for n in df_sorted['nama_siswa']]
+    scores = df_sorted['nilai_akhir']
+    bar_colors = ['#10B981' if s >= 80 else ('#F59E0B' if s >= 50 else '#EF4444') for s in scores]
+
+    bars = ax2.barh(names, scores, color=bar_colors, height=0.6)
+    ax2.set_xlim(0, 100)
+    ax2.set_xlabel("Skor Akhir Ujian", fontsize=8, fontweight='bold', color='#475569')
+    ax2.set_title("Peringkat & Performa Skor Santri", fontsize=10, fontweight='bold', pad=12, color='#064E3B')
+    
+    # Label Nilai di Ujung Bar
+    for bar in bars:
+        width = bar.get_width()
+        ax2.text(width + 1.5, bar.get_y() + bar.get_height()/2, f'{int(width)}',
+                 va='center', ha='left', fontsize=8, fontweight='bold', color='#1E293B')
+
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    ax2.grid(axis='x', linestyle='--', alpha=0.5)
+    plt.tight_layout()
+
+    buf2 = io.BytesIO()
+    plt.savefig(buf2, format='png', bbox_inches='tight')
+    plt.close(fig2)
+    buf2.seek(0)
+
+    return buf1, buf2
+
+# ==============================================================================
 # MAIN DOCX REPORT GENERATOR (STANDAR RESMI KEDINASAN & VISUAL ANALYTICS)
 # ==============================================================================
 def generate_corporate_executive_docx_report(config: dict, data_siswa: list, collective_ai_summary: str = None) -> bytes:
