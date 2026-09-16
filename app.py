@@ -1502,68 +1502,45 @@ elif st.session_state.page == "guru_dashboard":
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+                
                 # =========================================================================
-
+                # --- TOMBOL GENERATE LAPORAN EKSEKUTIF KEDINASAN (.DOCX) ---
                 # =========================================================================
-                # Judul Tombol Dinamis Mengikuti Filter
-                label_target = f"{selected_mapel_filter}" if selected_mapel_filter != "Semua Mapel" else selected_jenjang_filter
-                if st.button(f"🧕 Buat Laporan RoboMANTAP! ({label_target})", type="primary", use_container_width=True):
-                    with st.spinner(f"RoboMANTAP sedang menganalisis data {label_target}..."):
-                        total_siswa = len(df)
-                        rata_rata = df['nilai_akhir'].mean()
-                        tertinggi = df['nilai_akhir'].max()
-                        terendah = df['nilai_akhir'].min()
-
-                        kelompok_mahir = len(df[df['nilai_akhir'] >= 32])
-                        kelompok_sedang = len(df[(df['nilai_akhir'] >= 16) & (df['nilai_akhir'] < 32)])
-                        kelompok_butuh_bimbingan = len(df[df['nilai_akhir'] < 16])
-
-                        prompt = f"""
-                        Anda cukup buatkan Laporan Evaluasi Eksekutif Spesifik dengan kalimat padat dan ringkas berdasarkan data berikut:
-
-                        SCOPE EVALUASI:
-                        - Rentang Waktu: {time_filter}
-                        - Target Jenjang: {selected_jenjang_filter}
-                        - Target Mata Pelajaran: {selected_mapel_filter}
-                        - Mode Sesi: {"Sesi Terbaru Saja (Deduplikasi)" if only_latest else "Seluruh Riwayat Sesi"}
-
-                        STATISTIK KELAS:
-                        - Total Siswa/Sesi: {total_siswa}
-                        - Rata-Rata Nilai: {rata_rata:.1f} / 40
-                        - Nilai Tertinggi: {tertinggi} / 40 | Nilai Terendah: {terendah} / 40
-                        - Kelompok Sangat Mahir (Skor >= 32): {kelompok_mahir} santri
-                        - Kelompok Berkembang (Skor 16 - 31): {kelompok_sedang} santri
-                        - Kelompok Perlu Intervensi (Skor < 16): {kelompok_butuh_bimbingan} santri
-
-                        INSTRUKSI STRUKTUR LAPORAN (Format Markdown Rapi & Tajam):
-                        1. 📊 **EXECUTIVE SUMMARY & EVALUASI PERFORMA ({label_target})**
-                           (Evaluasi ketuntasan materi secara mendalam dan tingkat kesenjangan nilai).
-                        2. 👥 **PETA PEMBAGIAN KELOMPOK PEMBINAAN SISTER CLASS**
-                           (Saran pengelompokan santri berdasarkan kesiapan materi).
-                        3. 🚀 **ACTION PLAN STRATEGIS UNTUK GURU PEMBINA**
-                           (3 langkah konkret yang harus dieksekusi guru pembina minggu ini).
-                        """
-                        report_result = stream_ai_text(prompt, max_output_tokens=3000)
-                        st.session_state.cached_ai_report = "".join(list(report_result))
-
-                # Display Cache Laporan AI
-                if "cached_ai_report" in st.session_state and st.session_state.cached_ai_report:
-                    st.markdown(f"### 📊 Laporan Evaluasi RoboMANTAP ({label_target})")
-                    st.markdown(st.session_state.cached_ai_report)
-
-                    col_rep1, col_rep2 = st.columns(2)
-                    with col_rep1:
-                        st.download_button(
-                            label="📥 Unduh Teks Laporan (.txt)",
-                            data=st.session_state.cached_ai_report,
-                            file_name=f"Laporan_Diagnosis_AI_{label_target.replace(' ', '_')}_{time_filter.replace(' ', '_')}.txt",
-                            mime="text/plain",
-                            use_container_width=True
+                st.markdown("### 📊 Laporan & Rekapitulasi Ujian")
+                
+                if st.button("🚀 Generate Rekapitulasi & Laporan Eksekutif (.docx)", type="primary", use_container_width=True):
+                    with st.spinner("RoboMANTAP AI sedang merender dokumen .docx eksekutif lengkap dengan grafik visual..."):
+                        
+                        cfg = {
+                            "mapel": selected_mapel_filter if selected_mapel_filter != "Semua Mapel" else "Kuis Terintegrasi",
+                            "jenjang": selected_jenjang_filter,
+                            "kelas": "Semua Kelas"
+                        }
+                
+                        # 1. Panggil Summary Kolektif AI Kelas
+                        collective_summary = call_gemini_with_rotation(
+                            f"Buatkan ringkasan diagnostik kelas secara singkat dan profesional untuk mata pelajaran {cfg['mapel']} berdasarkan performa {len(data_siswa)} siswa.",
+                            is_json=False
                         )
-                    with col_rep2:
-                        if st.button("🗑️ Hapus Laporan dari Layar", use_container_width=True):
-                            st.session_state.cached_ai_report = ""
-                            st.rerun()
+                
+                        # 2. Build Docx Bytes Kedinasan
+                        docx_bytes = generate_corporate_executive_docx_report(
+                            config=cfg,
+                            data_siswa=data_siswa,
+                            collective_ai_summary=collective_summary
+                        )
+                
+                        st.session_state["docx_report_bytes"] = docx_bytes
+                        st.success("✅ Dokumen Laporan Eksekutif (.docx) Berhasil Dibuat!")
+                
+                if "docx_report_bytes" in st.session_state:
+                    st.download_button(
+                        label="📥 Unduh Dokumen Rekap (.docx)",
+                        data=st.session_state["docx_report_bytes"],
+                        file_name=f"Laporan_CBT_RoboMANTAP_{selected_mapel_filter}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True
+                    )
 
                 # =========================================================================
                 # 5. LIVE TRACKING TABEL
