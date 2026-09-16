@@ -1699,7 +1699,7 @@ elif st.session_state.page == "guru_dashboard":
 
                                     st.markdown(
                                         f"<p style='font-size: 16px; margin-bottom: 10px; color: #F1F5F9;'>"
-                                        f"🧕🏼 Diagnosis Pedagogis <span style='color: #10B981;'>{row['nama_siswa'].strip().split()[0]}...</span>"
+                                        f"🧕🏼 Diagnosis Pedagogis >{row['nama_siswa'].strip().split()[0]}..."
                                         f"</p>", 
                                         unsafe_allow_html=True
                                     )
