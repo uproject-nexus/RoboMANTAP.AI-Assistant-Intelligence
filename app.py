@@ -1698,7 +1698,7 @@ elif st.session_state.page == "guru_dashboard":
                                         st.info("Pengerjaan belum dimulai!")
 
                                     st.markdown(
-                                        f"<p style='font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #F1F5F9;'>"
+                                        f"<p style='font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #F1F5F9;'>"
                                         f"🧕🏼 Diagnosis Pedagogis: <span style='color: #10B981;'>{row['nama_siswa']}</span>"
                                         f"</p>", 
                                         unsafe_allow_html=True
