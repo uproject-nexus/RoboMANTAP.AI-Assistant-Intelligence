@@ -57,8 +57,12 @@
         </div>
         
         <div class="flex items-center space-x-2 sm:space-x-3">
-            <button onclick="requestFullscreenMode()" class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition">
-                📺 Fullscreen
+            <!-- Tombol Dynamic Fullscreen / Outfullscreen -->
+            <button id="btn-fullscreen-toggle" 
+                    onclick="toggleFullscreenMode()" 
+                    class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+                <span id="fs-icon">📺</span> 
+                <span id="fs-text">Outfullscreen</span>
             </button>
             
             <div class="bg-slate-950 border border-slate-800 px-3 py-1 rounded-lg text-xs">
@@ -506,6 +510,87 @@
 
         document.addEventListener("DOMContentLoaded", function() {
             renderQuestion(0);
+        });
+        // Tambahkan ini di bagian bawah script student_exam.html
+        document.addEventListener("DOMContentLoaded", function() {
+            renderQuestion(0);
+        });
+        
+        // Jika dimuat via HTMX Swap, trigger fungsi pengerjaan soal pertama
+        if (document.readyState === "complete" || document.readyState === "interactive") {
+            setTimeout(() => {
+                if (typeof renderQuestion === "function") {
+                    renderQuestion(0);
+                }
+            }, 50);
+        }
+        // ==============================================================================
+        // 1. PENGUNCI NAVIGASI KEMBALI (LOCK BROWSER BACK BUTTON & SWIPE GESTURE)
+        // ==============================================================================
+        (function lockBackNavigation() {
+            // Sisipkan dummy state ke dalam sejarah browser
+            history.pushState(null, null, location.href);
+            
+            // Cegah aksi tombol Back / Gesture Swipe Back
+            window.addEventListener('popstate', function (event) {
+                history.pushState(null, null, location.href);
+                alert("⚠️ NAVIGASI KEMBALI DIMATIKAN!\n\nDemi ketertiban ujian, Anda tidak dapat kembali ke halaman sebelumnya. Selesaikan seluruh soal lalu klik tombol Selesai Ujian.");
+            });
+        })();
+        
+        // ==============================================================================
+        // 2. LOGIKA DYNAMIC FULLSCREEN / OUTFULLSCREEN TOGGLE
+        // ==============================================================================
+        function updateFullscreenButtonUI() {
+            const textElem = document.getElementById("fs-text");
+            const iconElem = document.getElementById("fs-icon");
+            if (!textElem) return;
+        
+            // Cek apakah browser saat ini sedang dalam mode Fullscreen
+            const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+        
+            if (isFS) {
+                textElem.textContent = "Outfullscreen";
+                if (iconElem) iconElem.textContent = "📺";
+            } else {
+                textElem.textContent = "Fullscreen";
+                if (iconElem) iconElem.textContent = "📺";
+            }
+        }
+        
+        function toggleFullscreenMode() {
+            const elem = document.documentElement;
+            const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+        
+            if (!isFS) {
+                // Masuk ke Mode Fullscreen
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen().catch(err => {});
+                } else if (elem.webkitRequestFullscreen) {
+                    elem.webkitRequestFullscreen(); // Safari / iOS
+                } else if (elem.msRequestFullscreen) {
+                    elem.msRequestFullscreen();
+                }
+            } else {
+                // Keluar dari Mode Fullscreen (Outfullscreen)
+                if (document.exitFullscreen) {
+                    document.exitFullscreen().catch(err => {});
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen(); // Safari / iOS
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
+            }
+        }
+        
+        // Event Listener: Pantau perubahan status fullscreen dari sistem operasi/keyboard
+        document.addEventListener("fullscreenchange", updateFullscreenButtonUI);
+        document.addEventListener("webkitfullscreenchange", updateFullscreenButtonUI);
+        document.addEventListener("msfullscreenchange", updateFullscreenButtonUI);
+        
+        // Jalankan penyesuaian tombol saat halaman ujian selesai dimuat
+        document.addEventListener("DOMContentLoaded", function() {
+            updateFullscreenButtonUI();
         });
     </script>
 </body>
