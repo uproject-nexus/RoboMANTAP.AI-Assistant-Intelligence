@@ -35,27 +35,19 @@
                 <li>Ujian otomatis berakhir jika timer mencapai 00:00</li>
             </ul>
         </div>
-
-        <!-- Form Start Ujian dengan Trigger Otomatis Fullscreen -->
-        <form action="/start-exam" method="POST" onsubmit="triggerAutoFullscreen(event)">
-            <input type="hidden" name="session_id" value="{{ session_id }}">
-            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-sm py-3.5 px-4 rounded-xl transition shadow-[0_0_20px_rgba(16,185,129,0.35)] mt-4">
-                🚀 Mulai Ujian Sekarang
-            </button>
-        </form>
+        <!-- Panggil langsung pada tombol pemicu masuk ujian -->
+        <button onclick="requestFullscreenAndStart()" class="btn-start">
+            🚀 Mulai Ujian Sekarang
+        </button>
         
         <script>
-            function triggerAutoFullscreen(e) {
-                // Minta akses fullscreen ke browser saat tombol di-klik
-                const elem = document.documentElement;
-                if (elem.requestFullscreen) {
-                    elem.requestFullscreen().catch(() => {});
-                } else if (elem.webkitRequestFullscreen) {
-                    elem.webkitRequestFullscreen(); // Safari / iOS
-                } else if (elem.msRequestFullscreen) {
-                    elem.msRequestFullscreen();
-                }
+        function requestFullscreenAndStart() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch(err => {});
             }
+            // Lanjutkan submit form / redirect ke workspace_cbt.html
+        }
         </script>
     </div>
 </body>
