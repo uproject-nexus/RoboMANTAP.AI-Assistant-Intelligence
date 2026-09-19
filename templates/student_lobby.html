@@ -40,35 +40,33 @@
         <!-- Form Start Ujian dengan Trigger Otomatis Fullscreen -->
         <form hx-post="/start-exam"
               hx-target="body"
-              hx-swap="outerHTML"
+              hx-select="body > *"
+              hx-swap="innerHTML"
               onsubmit="triggerAutoFullscreen(event)">
             
             <input type="hidden" name="session_id" value="{{ session_id }}">
             
             <button type="submit" 
                     class="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-sm py-3.5 px-4 rounded-xl transition shadow-[0_0_20px_rgba(16,185,129,0.35)] mt-4">
-                🚀 Mulai Ujian Sekarang
+                🚀 Mulai Kuis Sekarang!
             </button>
         </form>
         
         <script>
             async function triggerAutoFullscreen(e) {
-                // Tahan sebentar agar fungsi Fullscreen berjalan sebelum HTMX mengirim data
                 const elem = document.documentElement;
-        
                 try {
                     if (elem.requestFullscreen) {
                         await elem.requestFullscreen();
                     } else if (elem.webkitRequestFullscreen) {
-                        await elem.webkitRequestFullscreen(); // Safari / iOS
-                    } else if (elem.msRequestFullscreen) {
-                        await elem.msRequestFullscreen();
+                        await elem.webkitRequestFullscreen();
                     }
                 } catch (err) {
-                    console.log("Fullscreen request declined:", err);
+                    console.log("Fullscreen declined:", err);
                 }
             }
         </script>
+
     </div>
 </body>
 </html>
