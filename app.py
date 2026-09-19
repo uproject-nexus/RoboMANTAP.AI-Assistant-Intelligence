@@ -1308,7 +1308,12 @@ elif st.session_state.page == "guru_dashboard":
             st.caption("⏸️ **Status:** Live dimatikan (tampilan stabil, aman untuk membaca laporan RoboMANTAP)")
 
         # Kondisi Dasar: Abaikan status uji coba internal jika ada
-        where_clauses = ["status NOT IN ('ARCHIVED', 'TRIAL', 'DRAFT')"]
+        # ==============================================================================
+        # PERBAIKAN FILTER KONTROL PANEL (app.py Baris 1310 - 1330)
+        # ==============================================================================
+        
+        # Kondisi Dasar: Abaikan status uji coba internal jika ada
+        where_clauses = ["status NOT IN ('ARCHIVED', 'TRIAL', 'DRAFT', 'HIDDEN')"]
         
         # Kondisi Tanggal PRESISI (Terkunci Waktu Indonesia Barat / WIB)
         if time_filter == "Hari Ini":
@@ -1317,11 +1322,16 @@ elif st.session_state.page == "guru_dashboard":
             where_clauses.append("DATE(updated_at AT TIME ZONE 'Asia/Jakarta') = DATE(NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '1 day'")
         else:
             where_clauses.append("DATE(updated_at AT TIME ZONE 'Asia/Jakarta') >= DATE(NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '2 days'")
-                
-        # Filter Jenjang (Jika dipilih spesifik)
-        if selected_jenjang_filter != "Semua Jenjang":
-            where_clauses.append(f"jenjang = '{selected_jenjang_filter}'")
         
+        # FIX KRUSIAL: Mapping String Jenjang agar Cocok dengan Database ("MTs" / "MA")
+        if selected_jenjang_filter != "Semua Jenjang":
+            if "MTs" in selected_jenjang_filter:
+                where_clauses.append("(jenjang = 'MTs' OR jenjang LIKE '%MTs%')")
+            elif "MA" in selected_jenjang_filter:
+                where_clauses.append("(jenjang = 'MA' OR jenjang LIKE '%MA%')")
+            else:
+                where_clauses.append(f"jenjang = '{selected_jenjang_filter}'")
+
         # Filter Mapel (Penting agar kuis antar-guru tidak tercampur!)
         if selected_mapel_filter != "Semua Mapel":
             where_clauses.append(f"mapel = '{selected_mapel_filter}'")
