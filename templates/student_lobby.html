@@ -9,14 +9,14 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
     <div class="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
         <div class="border-b border-slate-800 pb-4">
-            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Informasi Ujian</span>
+            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Informasi Quiz</span>
             <h1 class="text-xl font-bold text-white mt-1">{{ mapel }}</h1>
             <p class="text-xs text-slate-400">Materi: {{ materi }}</p>
         </div>
 
         <div class="grid grid-cols-2 gap-4 text-sm">
             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <p class="text-xs text-slate-400">Peserta Ujian</p>
+                <p class="text-xs text-slate-400">Peserta Kuis</p>
                 <p class="font-semibold text-emerald-300 mt-1">{{ nama }}</p>
                 <p class="text-xs text-slate-500">Kelas {{ kelas }} (Absen. {{ absen }})</p>
             </div>
@@ -32,22 +32,41 @@
             <ul class="list-disc list-outside ml-4 space-y-1 text-[11px] text-slate-400">
                 <li>Jawaban tersimpan otomatis saat memilih opsi</li>
                 <li>Gunakan navigasi nomor untuk berpindah soal secara bebas</li>
-                <li>Ujian otomatis berakhir jika timer mencapai 00:00</li>
+                <li>Kuis otomatis berakhir jika timer mencapai 00:00</li>
             </ul>
         </div>
-        <!-- Panggil langsung pada tombol pemicu masuk ujian -->
-        <button onclick="requestFullscreenAndStart()" class="btn-start">
-            🚀 Mulai Ujian Sekarang
-        </button>
+
+        <!-- Form Start Ujian dengan Trigger Otomatis Fullscreen -->
+        <form action="/start-exam" method="POST" onsubmit="triggerAutoFullscreen(event)">
+            <input type="hidden" name="session_id" value="{{ session_id }}">
+            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-sm py-3.5 px-4 rounded-xl transition shadow-[0_0_20px_rgba(16,185,129,0.35)] mt-4">
+                🚀 Mulai Ujian Sekarang
+            </button>
+        </form>
         
         <script>
-        function requestFullscreenAndStart() {
-            const elem = document.documentElement;
-            if (elem.requestFullscreen) {
-                elem.requestFullscreen().catch(err => {});
+            async function triggerAutoFullscreen(e) {
+                // 1. Tahan pengiriman form otomatis agar browser sempat masuk mode fullscreen
+                e.preventDefault(); 
+                const form = e.target;
+                const elem = document.documentElement;
+        
+                // 2. Eksekusi permintaan Fullscreen & tunggu hingga aktif
+                try {
+                    if (elem.requestFullscreen) {
+                        await elem.requestFullscreen();
+                    } else if (elem.webkitRequestFullscreen) {
+                        await elem.webkitRequestFullscreen(); // Safari / iOS
+                    } else if (elem.msRequestFullscreen) {
+                        await elem.msRequestFullscreen();
+                    }
+                } catch (err) {
+                    // Abaikan jika browser menolak fullscreen
+                } finally {
+                    // 3. Kirim form setelah mode fullscreen berhasil diaktifkan
+                    form.submit();
+                }
             }
-            // Lanjutkan submit form / redirect ke workspace_cbt.html
-        }
         </script>
     </div>
 </body>
