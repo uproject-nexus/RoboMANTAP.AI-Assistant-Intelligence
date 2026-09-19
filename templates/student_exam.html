@@ -210,6 +210,18 @@
     </div>
 
     <script>
+        // Otomatis render KaTeX setiap kali HTMX selesai menempelkan respon (termasuk Hint AI)
+        document.body.addEventListener('htmx:afterSettle', function(evt) {
+            if (window.renderMathInElement) {
+                renderMathInElement(evt.detail.target, {
+                    delimiters: [
+                        {left: "$$", right: "$$", display: true},
+                        {left: "$", right: "$", display: false}
+                    ],
+                    throwOnError: false
+                });
+            }
+        });
         // ==============================================================================
         // 1. ANTI-COPAS & WAKE LOCK & MOBILE TAB-SWITCH DETECTOR
         // ==============================================================================
