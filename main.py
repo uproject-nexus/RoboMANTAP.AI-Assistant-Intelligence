@@ -5,7 +5,6 @@ import random
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
-
 from fastapi import FastAPI, Request, Form, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -14,7 +13,7 @@ from ai_engine import (
     create_table_if_not_exists,
     get_custom_quiz_from_db,
     update_progress_siswa,
-    get_ai_hint_stream
+    get_ai_hint_stream, ai_hint_cache
 )
 
 app = FastAPI(title="RoboMANTAP CBT Engine")
@@ -258,3 +257,32 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
             "streamlit_url": target_streamlit_url
         }
     )
+
+@app.post("/api/hint", response_class=HTMLResponse)
+async def handle_hint_request(
+    curr_idx: int = Form(...),
+    mapel: str = Form(""),
+    question: str = Form(""),
+    attempt_input: str = Form("")
+):
+    attempt_str = attempt_input.strip()
+
+    # Validasi input kosong (Sama persis dengan kode Streamlit kamu)
+    if not attempt_str:
+        return """
+        <div class="p-2.5 bg-blue-950/40 border border-blue-500/30 text-blue-300 rounded-lg text-xs mt-2">
+            💡 Tolong ketik sedikit ide kamu dulu ya, biar RoboMANTAP bisa kasih petunjuk yang pas!
+        </div>
+        """
+
+    # Panggil fungsi stream dari ai_engine.py kamu
+    hint_chunks = [chunk for chunk in get_ai_hint_stream(question, attempt_str, mapel)]
+    hint_text = "".join(hint_chunks)
+
+    # Kembalikan balasan HTML untuk langsung ditempelkan HTMX
+    return f"""
+    <div class="p-3 bg-slate-900 border border-slate-800 rounded-lg text-slate-200 text-xs leading-relaxed mt-2 animate-fade-in">
+        <div class="font-bold text-emerald-400 mb-1">🧕🏼 RoboMANTAP:</div>
+        <div>{hint_text}</div>
+    </div>
+    """
