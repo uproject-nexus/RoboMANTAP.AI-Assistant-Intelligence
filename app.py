@@ -1219,8 +1219,8 @@ if st.session_state.page == "landing":
             st.rerun()
             
     st.write("---")
-    st.markdown("#### 📝 Sesi Ujian CBT Siswa")
-    st.caption("Klik tombol untuk menuju Portal Ujian By GuruMANTAP!")
+    st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
+    st.caption("Klik tombol dibawah ini untuk menuju Portal Kuis!")
     
     # Tombol Futuristik Neon Emerald yang Mengarah ke Render
     st.markdown(
@@ -1244,7 +1244,7 @@ if st.session_state.page == "landing":
                 margin-bottom: 20px;
                 cursor: pointer;
             ">
-                🚀 BUKA PORTAL UJIAN CBT →
+                🚀 BUKA PORTAL KUIS! →
             </div>
         </a>
         """,
