@@ -140,31 +140,21 @@ async def verify_token(
 # ==============================================================================
 # ROUTE WORKSPACE EXAM (MENGGABUNGKAN GET & POST KE SINGLE-FILE STUDENT_EXAM.HTML)
 # ==============================================================================
-@app.api_route("/start-exam", methods=["GET", "POST"], response_class=HTMLResponse)
-@app.get("/exam/{session_id}", response_class=HTMLResponse)
-async def serve_student_exam(
-    request: Request, 
-    session_id: str = Form(None),
-    # Menangani parameter session_id dari URL GET jika ada
-):
-    # Fallback ambil session_id dari URL Path jika Form None
-    if not session_id and "session_id" in request.path_params:
-        session_id = request.path_params["session_id"]
+# ==============================================================================
+# HELPER FUNCTION & ROUTE WORKSPACE EXAM (PENGGANTI /start-exam LAMA)
+# ==============================================================================
 
-    # Cek keberadaan sesi siswa
+async def render_exam_workspace(request: Request, session_id: str):
     sess = STUDENT_SESSIONS.get(session_id)
     if not sess:
-        # Jika sesi tidak ditemukan, kembalikan ke halaman login utama
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-    # 1. Catat Waktu Mulai Pertama Kali saat Halaman Dibuka (Mencegah Reset Timer saat Relog/Refresh)
+    # 1. Catat Waktu Mulai Pertama Kali (Mencegah Reset Timer saat Refresh)
     if "start_time" not in sess:
         sess["start_time"] = datetime.now(timezone.utc)
 
-    # 2. Hitung Sisa Waktu Ujian Real-Time dari Server (dalam detik)
+    # 2. Hitung Sisa Waktu Ujian Real-Time dari Server
     duration_m = sess.get("config", {}).get("timer_m", 30)
-    
-    # Hitung selisih waktu
     now_utc = datetime.now(timezone.utc)
     start_time = sess["start_time"]
     if start_time.tzinfo is None:
@@ -173,7 +163,7 @@ async def serve_student_exam(
     elapsed_s = (now_utc - start_time).total_seconds()
     remaining_s = max(0, int((duration_m * 60) - elapsed_s))
 
-    # 3. Render Langsung ke Single-File student_exam.html
+    # 3. Render Single-File student_exam.html
     return templates.TemplateResponse(
         request=request,
         name="student_exam.html", 
@@ -186,10 +176,20 @@ async def serve_student_exam(
             "kelas": sess.get("kelas", "-"),
             "absen": sess.get("absen", "-"),
             "quiz_json": json.dumps(sess.get("quiz", [])),
-            "answers_json": json.dumps(sess.get("answers", {})), # <-- Jawaban tersimpan real-time
-            "remaining_seconds": remaining_s                      # <-- Sisa waktu presisi dalam detik
+            "answers_json": json.dumps(sess.get("answers", {})),
+            "remaining_seconds": remaining_s
         }
     )
+
+# Route 1: Menerima submit form POST dari Login
+@app.post("/start-exam", response_class=HTMLResponse)
+async def start_exam_post(request: Request, session_id: str = Form(...)):
+    return await render_exam_workspace(request, session_id)
+
+# Route 2: Menerima akses langsung via URL GET / refresh browser
+@app.get("/exam/{session_id}", response_class=HTMLResponse)
+async def start_exam_get(request: Request, session_id: str):
+    return await render_exam_workspace(request, session_id)
 
 # ==============================================================================
 # 1. API SAVE ANSWER (MENYIMPAN JAWABAN REAL-TIME)
