@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>Workspace CBT - RoboMANTAP</title>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <!-- TailWind CSS & HTMX -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     
+    <!-- KaTeX Mathematics Renderer -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
@@ -23,7 +26,7 @@
             min-height: 260px;
         }
 
-        /* FIX KATEX: Mencegah rumus matematika terdistorsi/hancur akibat text-justify */
+        /* FIX KATEX: Mencegah rumus matematika terdistorsi */
         .katex, .katex-html {
             text-align: left !important;
             text-justify: none !important;
@@ -35,7 +38,8 @@
             display: block !important;
             white-space: normal !important;
         }
-        /* Aturan tampilan Spinner Loading HTMX */
+
+        /* HTMX Indicator Spinner Custom Style */
         .htmx-indicator {
             display: none;
         }
@@ -45,129 +49,181 @@
         }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased w-full">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans select-none antialiased w-full flex flex-col justify-center items-center">
 
-    <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-40 flex justify-between items-center w-full">
-        <div class="flex items-center space-x-2">
-            <span class="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded">UPN v2.0</span>
-            <div>
-                <h1 class="text-xs sm:text-sm font-bold text-white leading-none">RoboMANTAP CBT</h1>
-                <p class="text-[10px] text-emerald-400 mt-0.5 truncate max-w-[130px] sm:max-w-none">{{ sess.config.mapel }}</p>
+    <!-- ============================================================================== -->
+    <!-- 1. CONTAINER LOBBY PRE-KUIS (TAMPIL DEFAUT SAAT HALAMAN DIBUKA) -->
+    <!-- ============================================================================== -->
+    <div id="lobby-container" class="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6 my-auto mx-auto">
+        <div class="border-b border-slate-800 pb-4">
+            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Informasi Quiz</span>
+            <h1 class="text-xl font-bold text-white mt-1">{{ sess.config.mapel if sess.config else mapel }}</h1>
+            <p class="text-xs text-slate-400">Materi: {{ sess.config.materi if sess.config else materi }}</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 text-sm">
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <p class="text-xs text-slate-400">Peserta Kuis</p>
+                <p class="font-semibold text-emerald-300 mt-1">{{ sess.nama if sess else nama }}</p>
+                <p class="text-xs text-slate-500">Kelas {{ sess.kelas if sess else kelas }}</p>
+            </div>
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <p class="text-xs text-slate-400">Status Sesi</p>
+                <p class="font-semibold text-emerald-300 mt-1">Siap Mengerjakan</p>
+                <p class="text-xs text-slate-500">Waktu Terkunci</p>
             </div>
         </div>
-        
-        <div class="flex items-center space-x-2 sm:space-x-3">
-            <!-- Tombol Dynamic Fullscreen / Outfullscreen -->
-            <button id="btn-fullscreen-toggle" 
-                    onclick="toggleFullscreenMode()" 
-                    class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
-                <span id="fs-icon">📺</span> 
-                <span id="fs-text">Outfullscreen</span>
-            </button>
-            
-            <div class="bg-slate-950 border border-slate-800 px-3 py-1 rounded-lg text-xs">
-                ⏱️ <span id="timer-display" class="font-mono text-emerald-400 font-bold">--:--</span>
-            </div>
-        </div>
-    </header>
 
-    <div id="cheat-warning-bar" class="hidden bg-amber-500/20 border-b border-amber-500/40 px-4 py-2 text-center text-xs text-amber-300 font-semibold">
-        ⚠️ Warning Pelanggaran Pindah Tab: <span id="violation-count-text">0</span> / 3
+        <div class="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 text-xs text-slate-300 space-y-2">
+            <p class="font-bold text-emerald-400">⚠️ Aturan Pengerjaan:</p>
+            <ul class="list-disc list-outside ml-4 space-y-1 text-[11px] text-slate-400">
+                <li>Jawaban tersimpan otomatis saat memilih opsi</li>
+                <li>Gunakan navigasi nomor untuk berpindah soal secara bebas</li>
+                <li>Dilarang meninggalkan tab atau berpindah aplikasi (Maksimal 3 kali peringatan)</li>
+                <li>Kuis otomatis berakhir jika timer mencapai 00:00</li>
+            </ul>
+        </div>
+
+        <!-- Tombol Trigger Pindah dari Lobby ke Exam + Fullscreen -->
+        <button type="button" 
+                onclick="startExamFromLobby()"
+                class="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-sm py-3.5 px-4 rounded-xl transition shadow-[0_0_20px_rgba(16,185,129,0.35)] mt-4">
+            🚀 Mulai Kuis Sekarang!
+        </button>
     </div>
 
-    <main class="flex-1 max-w-4xl w-full mx-auto p-3 sm:p-5 flex flex-col justify-start">
-        
-        <div class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 mb-3 shadow-md flex-shrink-0">
-            <div class="flex items-center space-x-2 text-xs truncate mr-2">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
-                <span class="text-slate-200 font-semibold truncate">{{ sess.nama }}</span>
-                <span class="text-slate-600">•</span>
-                <span class="text-emerald-400 font-medium text-[11px] flex-shrink-0">Kelas {{ sess.kelas }}</span>
-            </div>
+    <!-- ============================================================================== -->
+    <!-- 2. CONTAINER WORKSPACE EXAM (DISEMBUNYIKAN SEBELUM KLIK MULAI) -->
+    <!-- ============================================================================== -->
+    <div id="exam-container" class="hidden w-full min-h-screen flex flex-col justify-start">
 
-            <button onclick="toggleNavModal(true)" class="bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-400 border border-emerald-500/30 text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0">
-                📑 Navigasi Soal
-            </button>
+        <!-- HEADER UTAMA -->
+        <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-40 flex justify-between items-center w-full">
+            <div class="flex items-center space-x-2">
+                <span class="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded">UPN v2.0</span>
+                <div>
+                    <h1 class="text-xs sm:text-sm font-bold text-white leading-none">RoboMANTAP CBT</h1>
+                    <p class="text-[10px] text-emerald-400 mt-0.5 truncate max-w-[130px] sm:max-w-none">{{ sess.config.mapel if sess.config else mapel }}</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <!-- Tombol Fullscreen / Outfullscreen Dinamis -->
+                <button id="btn-fullscreen-toggle" 
+                        onclick="toggleFullscreenMode()" 
+                        class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+                    <span id="fs-icon">📺</span> 
+                    <span id="fs-text">Outfullscreen</span>
+                </button>
+                
+                <div class="bg-slate-950 border border-slate-800 px-3 py-1 rounded-lg text-xs">
+                    ⏱️ <span id="timer-display" class="font-mono text-emerald-400 font-bold">--:--</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- CHEAT WARNING BAR -->
+        <div id="cheat-warning-bar" class="hidden bg-amber-500/20 border-b border-amber-500/40 px-4 py-2 text-center text-xs text-amber-300 font-semibold">
+            ⚠️ Warning Pelanggaran Pindah Tab: <span id="violation-count-text">0</span> / 3
         </div>
 
-        <section id="question-box" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col justify-between">
-            <div>
-                <div class="flex justify-between items-center border-b border-slate-800 pb-2.5 mb-3">
-                    <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Memuat...</span>
-                    <span class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">Pilihan Ganda</span>
+        <!-- MAIN QUESTION AREA -->
+        <main class="flex-1 max-w-4xl w-full mx-auto p-3 sm:p-5 flex flex-col justify-start">
+            
+            <div class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 mb-3 shadow-md flex-shrink-0">
+                <div class="flex items-center space-x-2 text-xs truncate mr-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
+                    <span class="text-slate-200 font-semibold truncate">{{ sess.nama if sess else nama }}</span>
+                    <span class="text-slate-600">•</span>
+                    <span class="text-emerald-400 font-medium text-[11px] flex-shrink-0">Kelas {{ sess.kelas if sess else kelas }}</span>
                 </div>
 
-                <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-4 font-medium overflow-x-auto text-justify"></div>
-
-                <div id="options-container" class="space-y-2.5"></div>
-            </div>
-
-            <div class="flex items-center justify-between border-t border-slate-800/80 pt-3.5 mt-4 gap-2">
-                <button id="btn-prev" onclick="prevQuestion()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-3.5 rounded-xl transition text-center disabled:opacity-40 disabled:cursor-not-allowed">
-                    ← Prev
-                </button>
-
-                <button id="btn-ragu" onclick="toggleRagu()" class="flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold py-2.5 px-2 rounded-xl transition text-center whitespace-nowrap">
-                    ⚠️ Ragu-Ragu
-                </button>
-
-                <button id="btn-next-submit" onclick="handleNextOrSubmit()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center">
-                    Next →
+                <button onclick="toggleNavModal(true)" class="bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-400 border border-emerald-500/30 text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0">
+                    📑 Navigasi Soal
                 </button>
             </div>
 
-            <!-- BOX ROBOMANTAP HINT (HTMX CONSULTATION) -->
-            <details class="group my-3 border border-slate-800 bg-slate-950/80 rounded-xl overflow-hidden transition">
-                <summary class="flex items-center justify-between p-3 cursor-pointer font-semibold text-emerald-400 bg-slate-800/40 hover:bg-slate-800/70 select-none text-xs">
-                    <span>Kamu bingung? Konsultasi di sini sama aku, RoboMANTAP! 🧕🏼</span>
-                    <span class="text-[10px] transition-transform group-open:rotate-180">▼</span>
-                </summary>
-            
-                <div class="p-3.5 space-y-2.5 text-slate-200">
-                    <p class="text-[11px] text-slate-400 leading-relaxed">
-                        Fungsi kolom ini: Tulis ide awal atau rumus yang mau kamu coba, nanti RoboMANTAP bakal kasih petunjuk jalan keluarnya tanpa langsung bocorin jawaban!
-                    </p>
-            
-                    <!-- Form HTMX -->
-                    <form hx-post="/api/hint"
-                          hx-target="#hint-result"
-                          hx-indicator="#hint-loading"
-                          class="space-y-2">
-                        
-                        <input type="hidden" id="hint-curr-idx" name="curr_idx" value="0">
-                        <input type="hidden" id="hint-mapel" name="mapel" value="{{ sess.config.mapel }}">
-                        <input type="hidden" id="hint-question" name="question" value="">
-            
-                        <div>
-                            <label class="block text-[11px] font-medium text-slate-300 mb-1">
-                                Gagasan / Ide Logika Kamu apa coba?:
-                            </label>
-                            <input type="text" 
-                                   id="hint-attempt-input"
-                                   name="attempt_input" 
-                                   placeholder="Contoh: Bantu cari jawaban-nya dong 😟"
-                                   class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none">
-                        </div>
-            
-                        <button type="submit" 
-                                class="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-xs rounded-lg transition">
-                            Diskusikan Yuk!
-                        </button>
-                    </form>
-            
-                    <div id="hint-loading" class="htmx-indicator mt-2">
-                        <div class="flex items-center gap-2 text-xs text-emerald-400 animate-pulse">
-                            <span>🧕🏼 RoboMANTAP sedang memproses diskusi kita...</span>
-                        </div>
+            <section id="question-box" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-2.5 mb-3">
+                        <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Memuat...</span>
+                        <span class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">Pilihan Ganda</span>
                     </div>
-            
-                    <div id="hint-result" class="mt-2"></div>
+
+                    <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-4 font-medium overflow-x-auto text-justify"></div>
+
+                    <div id="options-container" class="space-y-2.5"></div>
                 </div>
-            </details>
-        </section>
 
-    </main>
+                <div class="flex items-center justify-between border-t border-slate-800/80 pt-3.5 mt-4 gap-2">
+                    <button id="btn-prev" onclick="prevQuestion()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-3.5 rounded-xl transition text-center disabled:opacity-40 disabled:cursor-not-allowed">
+                        ← Prev
+                    </button>
 
+                    <button id="btn-ragu" onclick="toggleRagu()" class="flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold py-2.5 px-2 rounded-xl transition text-center whitespace-nowrap">
+                        ⚠️ Ragu-Ragu
+                    </button>
+
+                    <button id="btn-next-submit" onclick="handleNextOrSubmit()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center">
+                        Next →
+                    </button>
+                </div>
+
+                <!-- BOX ROBOMANTAP HINT (HTMX CONSULTATION) -->
+                <details class="group my-3 border border-slate-800 bg-slate-950/80 rounded-xl overflow-hidden transition">
+                    <summary class="flex items-center justify-between p-3 cursor-pointer font-semibold text-emerald-400 bg-slate-800/40 hover:bg-slate-800/70 select-none text-xs">
+                        <span>Kamu bingung? Konsultasi di sini sama aku, RoboMANTAP! 🧕🏼</span>
+                        <span class="text-[10px] transition-transform group-open:rotate-180">▼</span>
+                    </summary>
+                
+                    <div class="p-3.5 space-y-2.5 text-slate-200">
+                        <p class="text-[11px] text-slate-400 leading-relaxed">
+                            Fungsi kolom ini: Tulis ide awal atau rumus yang mau kamu coba, nanti RoboMANTAP bakal kasih petunjuk jalan keluarnya tanpa langsung bocorin jawaban!
+                        </p>
+                
+                        <!-- Form HTMX -->
+                        <form hx-post="/api/hint"
+                              hx-target="#hint-result"
+                              hx-indicator="#hint-loading"
+                              class="space-y-2">
+                            
+                            <input type="hidden" id="hint-curr-idx" name="curr_idx" value="0">
+                            <input type="hidden" id="hint-mapel" name="mapel" value="{{ sess.config.mapel if sess.config else mapel }}">
+                            <input type="hidden" id="hint-question" name="question" value="">
+                
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-300 mb-1">
+                                    Gagasan / Ide Logika Kamu apa coba?:
+                                </label>
+                                <input type="text" 
+                                       id="hint-attempt-input"
+                                       name="attempt_input" 
+                                       placeholder="Contoh: Bantu cari jawaban-nya dong 😟"
+                                       class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none">
+                            </div>
+                
+                            <button type="submit" 
+                                    class="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-xs rounded-lg transition">
+                                Diskusikan Yuk!
+                            </button>
+                        </form>
+                
+                        <!-- SPINNER LOADING HTMX -->
+                        <div id="hint-loading" class="htmx-indicator mt-2">
+                            <div class="flex items-center gap-2 text-xs text-emerald-400 animate-pulse">
+                                <span>🧕🏼 RoboMANTAP sedang memproses diskusi kita...</span>
+                            </div>
+                        </div>
+                
+                        <div id="hint-result" class="mt-2"></div>
+                    </div>
+                </details>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- FORM SUBMIT EXAM HIDDEN -->
     <form id="form-submit-exam" action="/submit-exam" method="POST" class="hidden">
         <input type="hidden" name="session_id" value="{{ session_id }}">
     </form>
@@ -196,7 +252,7 @@
         </div>
     </div>
 
-    <!-- MODAL SUBMIT -->
+    <!-- MODAL SUBMIT KONFIRMASI -->
     <div id="submit-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl max-w-sm w-full p-6 shadow-[0_0_30px_rgba(16,185,129,0.2)] text-center space-y-4">
             <div class="w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto text-2xl">
@@ -219,10 +275,78 @@
         </div>
     </div>
 
+    <!-- ============================================================================== -->
+    <!-- LOGIKA JAVASCRIPT UTAMA -->
+    <!-- ============================================================================== -->
     <script>
-        // ==============================================================================
-        // 1. ANTI-COPAS, WAKE LOCK, TAB-SWITCH DETECTOR
-        // ==============================================================================
+        // --- 1. PROSES PINDAH DARI LOBBY KE EXAM ---
+        async function startExamFromLobby() {
+            // A. Trigger Fullscreen Mode
+            const elem = document.documentElement;
+            try {
+                if (elem.requestFullscreen) {
+                    await elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) {
+                    await elem.webkitRequestFullscreen();
+                }
+            } catch (err) {
+                console.log("Fullscreen declined:", err);
+            }
+
+            // B. Sembunyikan Lobby, Tampilkan Exam Workspace
+            const lobbyElem = document.getElementById("lobby-container");
+            const examElem = document.getElementById("exam-container");
+
+            lobbyElem.classList.add("hidden");
+            examElem.classList.remove("hidden");
+
+            // C. Aktifkan Pengunci Tombol Back & Initialize Engine
+            activateBackLock();
+            initExamEngine();
+        }
+
+        // --- 2. PENGUNCI NAVIGASI KEMBALI (LOCK BROWSER BACK BUTTON) ---
+        function activateBackLock() {
+            history.pushState(null, null, location.href);
+            window.addEventListener('popstate', function () {
+                history.pushState(null, null, location.href);
+                alert("⚠️ NAVIGASI KEMBALI DIMATIKAN!\n\nDemi ketertiban ujian, Anda tidak dapat kembali ke halaman sebelumnya. Selesaikan seluruh soal lalu klik tombol Selesai Ujian.");
+            });
+        }
+
+        // --- 3. LOGIKA DYNAMIC FULLSCREEN TOGGLE ---
+        function updateFullscreenButtonUI() {
+            const textElem = document.getElementById("fs-text");
+            const iconElem = document.getElementById("fs-icon");
+            if (!textElem) return;
+            const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+
+            if (isFS) {
+                textElem.textContent = "Outfullscreen";
+                if (iconElem) iconElem.textContent = "📺";
+            } else {
+                textElem.textContent = "Fullscreen";
+                if (iconElem) iconElem.textContent = "📺";
+            }
+        }
+
+        function toggleFullscreenMode() {
+            const elem = document.documentElement;
+            const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+
+            if (!isFS) {
+                if (elem.requestFullscreen) elem.requestFullscreen().catch(() => {});
+                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+        }
+
+        document.addEventListener("fullscreenchange", updateFullscreenButtonUI);
+        document.addEventListener("webkitfullscreenchange", updateFullscreenButtonUI);
+
+        // --- 4. ANTI-COPAS & TAB-SWITCH DETECTOR ---
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.addEventListener('copy', e => e.preventDefault());
         document.addEventListener('cut', e => e.preventDefault());
@@ -272,51 +396,7 @@
             }
         });
 
-        // ==============================================================================
-        // 2. PENGUNCI NAVIGASI KEMBALI & FULLSCREEN TOGGLE DINAMIS
-        // ==============================================================================
-        (function lockBackNavigation() {
-            history.pushState(null, null, location.href);
-            window.addEventListener('popstate', function () {
-                history.pushState(null, null, location.href);
-                alert("⚠️ NAVIGASI KEMBALI DIMATIKAN!\n\nDemi ketertiban ujian, Anda tidak dapat kembali ke halaman sebelumnya.");
-            });
-        })();
-
-        function updateFullscreenButtonUI() {
-            const textElem = document.getElementById("fs-text");
-            const iconElem = document.getElementById("fs-icon");
-            if (!textElem) return;
-            const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-
-            if (isFS) {
-                textElem.textContent = "Outfullscreen";
-                if (iconElem) iconElem.textContent = "📺";
-            } else {
-                textElem.textContent = "Fullscreen";
-                if (iconElem) iconElem.textContent = "📺";
-            }
-        }
-
-        function toggleFullscreenMode() {
-            const elem = document.documentElement;
-            const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-
-            if (!isFS) {
-                if (elem.requestFullscreen) elem.requestFullscreen().catch(() => {});
-                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-            } else {
-                if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
-                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-            }
-        }
-
-        document.addEventListener("fullscreenchange", updateFullscreenButtonUI);
-        document.addEventListener("webkitfullscreenchange", updateFullscreenButtonUI);
-
-        // ==============================================================================
-        // 3. LOGIKA UTAMA ENGINE CBT & KATEX RENDERER
-        // ==============================================================================
+        // --- 5. LOGIKA UTAMA ENGINE CBT & KATEX RENDERER ---
         const quizData = {{ quiz_json | safe }};
         const sessionId = "{{ session_id }}";
         
@@ -324,6 +404,7 @@
         let remainingSeconds = {{ remaining_seconds }};
         let currentIndex = 0;
         let raguState = {};
+        let timerInterval = null;
 
         function triggerKaTeX(targetElem) {
             const container = targetElem || document.getElementById("question-box") || document.body;
@@ -396,7 +477,7 @@
             updateNavButtons();
             updateRaguButtonUI();
             
-            // Render ulang matematika pada soal & opsi baru
+            // Render KaTeX pada soal & opsi
             setTimeout(() => triggerKaTeX(document.getElementById("question-box")), 30);
 
             // Reset Form Hint AI
@@ -504,22 +585,27 @@
         }
 
         // Timer Sinkron Server
-        const endTime = new Date().getTime() + (remainingSeconds * 1000);
-        setInterval(() => {
-            const now = new Date().getTime();
-            const diff = endTime - now;
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            const endTime = new Date().getTime() + (remainingSeconds * 1000);
+            
+            timerInterval = setInterval(() => {
+                const now = new Date().getTime();
+                const diff = endTime - now;
 
-            if (diff <= 0) {
-                alert("Waktu Ujian telah Habis!");
-                document.getElementById('form-submit-exam').submit();
-                return;
-            }
+                if (diff <= 0) {
+                    clearInterval(timerInterval);
+                    alert("Waktu Ujian telah Habis!");
+                    document.getElementById('form-submit-exam').submit();
+                    return;
+                }
 
-            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            const s = Math.floor((diff % (1000 * 60)) / 1000);
-            document.getElementById("timer-display").textContent = 
-                `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
-        }, 1000);
+                const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const s = Math.floor((diff % (1000 * 60)) / 1000);
+                document.getElementById("timer-display").textContent = 
+                    `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
+            }, 1000);
+        }
 
         // Auto-Scroll Input ke Tengah Layar Saat Keyboard HP Aktif
         const inputHint = document.getElementById("hint-attempt-input");
@@ -536,16 +622,11 @@
             triggerKaTeX(evt.detail.target);
         });
 
-        // INISIALISASI UTAMA
+        // Inisialisasi Utama saat tombol Mulai diklik
         function initExamEngine() {
             renderQuestion(0);
+            startTimer();
             updateFullscreenButtonUI();
-        }
-
-        if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", initExamEngine);
-        } else {
-            initExamEngine();
         }
     </script>
 </body>
