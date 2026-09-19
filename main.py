@@ -13,9 +13,9 @@ from ai_engine import (
     create_table_if_not_exists,
     get_custom_quiz_from_db,
     update_progress_siswa,
-    get_ai_hint_stream, ai_hint_cache
+    get_ai_hint_stream
 )
-
+ai_hint_cache = {}
 app = FastAPI(title="RoboMANTAP CBT Engine")
 
 # Path absolut agar folder templates selalu terdeteksi di Linux Render
@@ -267,7 +267,7 @@ async def handle_hint_request(
 ):
     attempt_str = attempt_input.strip()
 
-    # Validasi input kosong (Sama persis dengan kode Streamlit kamu)
+    # Validasi input kosong
     if not attempt_str:
         return """
         <div class="p-2.5 bg-blue-950/40 border border-blue-500/30 text-blue-300 rounded-lg text-xs mt-2">
@@ -275,11 +275,20 @@ async def handle_hint_request(
         </div>
         """
 
-    # Panggil fungsi stream dari ai_engine.py kamu
-    hint_chunks = [chunk for chunk in get_ai_hint_stream(question, attempt_str, mapel)]
-    hint_text = "".join(hint_chunks)
+    # Cek cache lokal
+    hint_key = (mapel, curr_idx, question, attempt_str)
+    
+    if hint_key in ai_hint_cache:
+        hint_text = ai_hint_cache[hint_key]
+    else:
+        # Panggil AI Stream dari ai_engine.py
+        hint_chunks = [chunk for chunk in get_ai_hint_stream(question, attempt_str, mapel)]
+        hint_text = "".join(hint_chunks)
+        
+        # Simpan ke cache jika tidak error
+        if hint_text and "⚠️" not in hint_text:
+            ai_hint_cache[hint_key] = hint_text
 
-    # Kembalikan balasan HTML untuk langsung ditempelkan HTMX
     return f"""
     <div class="p-3 bg-slate-900 border border-slate-800 rounded-lg text-slate-200 text-xs leading-relaxed mt-2 animate-fade-in">
         <div class="font-bold text-emerald-400 mb-1">🧕🏼 RoboMANTAP:</div>
