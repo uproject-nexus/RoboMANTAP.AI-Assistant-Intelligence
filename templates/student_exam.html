@@ -103,6 +103,59 @@
                     Next →
                 </button>
             </div>
+            <!-- ============================================================================== -->
+            <!-- BOX ROBOMANTAP HINT (HTMX CONSULTATION) -->
+            <!-- ============================================================================== -->
+            <details class="group my-3 border border-slate-800 bg-slate-950/80 rounded-xl overflow-hidden transition">
+                <summary class="flex items-center justify-between p-3 cursor-pointer font-semibold text-emerald-400 bg-slate-800/40 hover:bg-slate-800/70 select-none text-xs">
+                    <span>Kamu bingung? Konsultasi di sini sama aku, RoboMANTAP! 🧕🏼</span>
+                    <span class="text-[10px] transition-transform group-open:rotate-180">▼</span>
+                </summary>
+            
+                <div class="p-3.5 space-y-2.5 text-slate-200">
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                        Fungsi kolom ini: Tulis ide awal atau rumus yang mau kamu coba, nanti RoboMANTAP bakal kasih petunjuk jalan keluarnya tanpa langsung bocorin jawaban!
+                    </p>
+            
+                    <!-- Form HTMX -->
+                    <form hx-post="/api/hint"
+                          hx-target="#hint-result"
+                          hx-indicator="#hint-loading"
+                          class="space-y-2">
+                        
+                        <!-- Hidden inputs yang nilainya diisi otomatis oleh JavaScript saat ganti soal -->
+                        <input type="hidden" id="hint-curr-idx" name="curr_idx" value="0">
+                        <input type="hidden" id="hint-mapel" name="mapel" value="{{ sess.config.mapel }}">
+                        <input type="hidden" id="hint-question" name="question" value="">
+            
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-300 mb-1">
+                                Gagasan / Ide Logika Kamu apa coba?:
+                            </label>
+                            <input type="text" 
+                                   id="hint-attempt-input"
+                                   name="attempt_input" 
+                                   placeholder="Contoh: Arti Bahasa Arab-nya apa?😟"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none">
+                        </div>
+            
+                        <button type="submit" 
+                                class="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-xs rounded-lg transition">
+                            Diskusikan Yuk!
+                        </button>
+                    </form>
+            
+                    <!-- Status Loading HTMX -->
+                    <div id="hint-loading" class="htmx-indicator hidden">
+                        <div class="flex items-center gap-2 text-xs text-emerald-400 animate-pulse mt-1">
+                            <span>🧕🏼 RoboMANTAP sedang berpikir...</span>
+                        </div>
+                    </div>
+            
+                    <!-- Wadah Hasil Balasan AI -->
+                    <div id="hint-result" class="mt-2"></div>
+                </div>
+            </details>
         </section>
 
     </main>
@@ -298,6 +351,10 @@
             updateRaguButtonUI();
             
             setTimeout(triggerKaTeX, 20);
+            document.getElementById("hint-curr-idx").value = index;
+            document.getElementById("hint-question").value = item.question;
+            document.getElementById("hint-attempt-input").value = "";
+            document.getElementById("hint-result").innerHTML = "";
         }
 
         function selectAnswer(index, opt, optIdx) {
