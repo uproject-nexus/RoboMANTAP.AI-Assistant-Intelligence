@@ -45,9 +45,9 @@
         }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased w-full">
 
-    <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-40 flex justify-between items-center">
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-40 flex justify-between items-center w-full">
         <div class="flex items-center space-x-2">
             <span class="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded">UPN v2.0</span>
             <div>
@@ -115,9 +115,8 @@
                     Next →
                 </button>
             </div>
-            <!-- ============================================================================== -->
+
             <!-- BOX ROBOMANTAP HINT (HTMX CONSULTATION) -->
-            <!-- ============================================================================== -->
             <details class="group my-3 border border-slate-800 bg-slate-950/80 rounded-xl overflow-hidden transition">
                 <summary class="flex items-center justify-between p-3 cursor-pointer font-semibold text-emerald-400 bg-slate-800/40 hover:bg-slate-800/70 select-none text-xs">
                     <span>Kamu bingung? Konsultasi di sini sama aku, RoboMANTAP! 🧕🏼</span>
@@ -135,7 +134,6 @@
                           hx-indicator="#hint-loading"
                           class="space-y-2">
                         
-                        <!-- Hidden inputs yang nilainya diisi otomatis oleh JavaScript saat ganti soal -->
                         <input type="hidden" id="hint-curr-idx" name="curr_idx" value="0">
                         <input type="hidden" id="hint-mapel" name="mapel" value="{{ sess.config.mapel }}">
                         <input type="hidden" id="hint-question" name="question" value="">
@@ -156,15 +154,13 @@
                             Diskusikan Yuk!
                         </button>
                     </form>
-        
-                    <!-- gunakan class htmx-indicator tanpa class 'hidden' bawaan Tailwind -->
+            
                     <div id="hint-loading" class="htmx-indicator mt-2">
                         <div class="flex items-center gap-2 text-xs text-emerald-400 animate-pulse">
                             <span>🧕🏼 RoboMANTAP sedang memproses diskusi kita...</span>
                         </div>
                     </div>
             
-                    <!-- Wadah Hasil Balasan AI -->
                     <div id="hint-result" class="mt-2"></div>
                 </div>
             </details>
@@ -176,6 +172,7 @@
         <input type="hidden" name="session_id" value="{{ session_id }}">
     </form>
 
+    <!-- MODAL NAVIGASI SOAL -->
     <div id="nav-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
@@ -199,6 +196,7 @@
         </div>
     </div>
 
+    <!-- MODAL SUBMIT -->
     <div id="submit-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl max-w-sm w-full p-6 shadow-[0_0_30px_rgba(16,185,129,0.2)] text-center space-y-4">
             <div class="w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto text-2xl">
@@ -222,32 +220,8 @@
     </div>
 
     <script>
-        // Otomatis gulir posisi input ke tengah saat keyboard HP aktif
-        document.addEventListener("DOMContentLoaded", function() {
-            const inputHint = document.getElementById("hint-attempt-input");
-            if (inputHint) {
-                inputHint.addEventListener("focus", function() {
-                    setTimeout(() => {
-                        this.scrollIntoView({ behavior: "smooth", block: "center" });
-                    }, 300);
-                });
-            }
-        });
-        
-        // Otomatis render KaTeX setiap kali HTMX selesai menempelkan respon (termasuk Hint AI)
-        document.body.addEventListener('htmx:afterSettle', function(evt) {
-            if (window.renderMathInElement) {
-                renderMathInElement(evt.detail.target, {
-                    delimiters: [
-                        {left: "$$", right: "$$", display: true},
-                        {left: "$", right: "$", display: false}
-                    ],
-                    throwOnError: false
-                });
-            }
-        });
         // ==============================================================================
-        // 1. ANTI-COPAS & WAKE LOCK & MOBILE TAB-SWITCH DETECTOR
+        // 1. ANTI-COPAS, WAKE LOCK, TAB-SWITCH DETECTOR
         // ==============================================================================
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.addEventListener('copy', e => e.preventDefault());
@@ -298,14 +272,50 @@
             }
         });
 
-        function requestFullscreenMode() {
-            const elem = document.documentElement;
-            if (elem.requestFullscreen) elem.requestFullscreen().catch(err => {});
-            else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+        // ==============================================================================
+        // 2. PENGUNCI NAVIGASI KEMBALI & FULLSCREEN TOGGLE DINAMIS
+        // ==============================================================================
+        (function lockBackNavigation() {
+            history.pushState(null, null, location.href);
+            window.addEventListener('popstate', function () {
+                history.pushState(null, null, location.href);
+                alert("⚠️ NAVIGASI KEMBALI DIMATIKAN!\n\nDemi ketertiban ujian, Anda tidak dapat kembali ke halaman sebelumnya.");
+            });
+        })();
+
+        function updateFullscreenButtonUI() {
+            const textElem = document.getElementById("fs-text");
+            const iconElem = document.getElementById("fs-icon");
+            if (!textElem) return;
+            const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+
+            if (isFS) {
+                textElem.textContent = "Outfullscreen";
+                if (iconElem) iconElem.textContent = "📺";
+            } else {
+                textElem.textContent = "Fullscreen";
+                if (iconElem) iconElem.textContent = "📺";
+            }
         }
 
+        function toggleFullscreenMode() {
+            const elem = document.documentElement;
+            const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+
+            if (!isFS) {
+                if (elem.requestFullscreen) elem.requestFullscreen().catch(() => {});
+                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+        }
+
+        document.addEventListener("fullscreenchange", updateFullscreenButtonUI);
+        document.addEventListener("webkitfullscreenchange", updateFullscreenButtonUI);
+
         // ==============================================================================
-        // 2. LOGIKA UTAMA CBT ENGINE (RESUME STATE & NO FLICKER BUG)
+        // 3. LOGIKA UTAMA ENGINE CBT & KATEX RENDERER
         // ==============================================================================
         const quizData = {{ quiz_json | safe }};
         const sessionId = "{{ session_id }}";
@@ -315,10 +325,10 @@
         let currentIndex = 0;
         let raguState = {};
 
-        function triggerKaTeX() {
-            const qBox = document.getElementById("question-box");
-            if (window.renderMathInElement && qBox) {
-                renderMathInElement(qBox, {
+        function triggerKaTeX(targetElem) {
+            const container = targetElem || document.getElementById("question-box") || document.body;
+            if (window.renderMathInElement && container) {
+                renderMathInElement(container, {
                     delimiters: [
                         {left: "$$", right: "$$", display: true},
                         {left: "$", right: "$", display: false}
@@ -386,7 +396,10 @@
             updateNavButtons();
             updateRaguButtonUI();
             
-            setTimeout(triggerKaTeX, 20);
+            // Render ulang matematika pada soal & opsi baru
+            setTimeout(() => triggerKaTeX(document.getElementById("question-box")), 30);
+
+            // Reset Form Hint AI
             document.getElementById("hint-curr-idx").value = index;
             document.getElementById("hint-question").value = item.question;
             document.getElementById("hint-attempt-input").value = "";
@@ -508,90 +521,32 @@
                 `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
         }, 1000);
 
-        document.addEventListener("DOMContentLoaded", function() {
-            renderQuestion(0);
-        });
-        // Tambahkan ini di bagian bawah script student_exam.html
-        document.addEventListener("DOMContentLoaded", function() {
-            renderQuestion(0);
-        });
-        
-        // Jika dimuat via HTMX Swap, trigger fungsi pengerjaan soal pertama
-        if (document.readyState === "complete" || document.readyState === "interactive") {
-            setTimeout(() => {
-                if (typeof renderQuestion === "function") {
-                    renderQuestion(0);
-                }
-            }, 50);
-        }
-        // ==============================================================================
-        // 1. PENGUNCI NAVIGASI KEMBALI (LOCK BROWSER BACK BUTTON & SWIPE GESTURE)
-        // ==============================================================================
-        (function lockBackNavigation() {
-            // Sisipkan dummy state ke dalam sejarah browser
-            history.pushState(null, null, location.href);
-            
-            // Cegah aksi tombol Back / Gesture Swipe Back
-            window.addEventListener('popstate', function (event) {
-                history.pushState(null, null, location.href);
-                alert("⚠️ NAVIGASI KEMBALI DIMATIKAN!\n\nDemi ketertiban ujian, Anda tidak dapat kembali ke halaman sebelumnya. Selesaikan seluruh soal lalu klik tombol Selesai Ujian.");
+        // Auto-Scroll Input ke Tengah Layar Saat Keyboard HP Aktif
+        const inputHint = document.getElementById("hint-attempt-input");
+        if (inputHint) {
+            inputHint.addEventListener("focus", function() {
+                setTimeout(() => {
+                    this.scrollIntoView({ behavior: "smooth", block: "center" });
+                }, 300);
             });
-        })();
-        
-        // ==============================================================================
-        // 2. LOGIKA DYNAMIC FULLSCREEN / OUTFULLSCREEN TOGGLE
-        // ==============================================================================
-        function updateFullscreenButtonUI() {
-            const textElem = document.getElementById("fs-text");
-            const iconElem = document.getElementById("fs-icon");
-            if (!textElem) return;
-        
-            // Cek apakah browser saat ini sedang dalam mode Fullscreen
-            const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-        
-            if (isFS) {
-                textElem.textContent = "Outfullscreen";
-                if (iconElem) iconElem.textContent = "📺";
-            } else {
-                textElem.textContent = "Fullscreen";
-                if (iconElem) iconElem.textContent = "📺";
-            }
         }
-        
-        function toggleFullscreenMode() {
-            const elem = document.documentElement;
-            const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-        
-            if (!isFS) {
-                // Masuk ke Mode Fullscreen
-                if (elem.requestFullscreen) {
-                    elem.requestFullscreen().catch(err => {});
-                } else if (elem.webkitRequestFullscreen) {
-                    elem.webkitRequestFullscreen(); // Safari / iOS
-                } else if (elem.msRequestFullscreen) {
-                    elem.msRequestFullscreen();
-                }
-            } else {
-                // Keluar dari Mode Fullscreen (Outfullscreen)
-                if (document.exitFullscreen) {
-                    document.exitFullscreen().catch(err => {});
-                } else if (document.webkitExitFullscreen) {
-                    document.webkitExitFullscreen(); // Safari / iOS
-                } else if (document.msExitFullscreen) {
-                    document.msExitFullscreen();
-                }
-            }
-        }
-        
-        // Event Listener: Pantau perubahan status fullscreen dari sistem operasi/keyboard
-        document.addEventListener("fullscreenchange", updateFullscreenButtonUI);
-        document.addEventListener("webkitfullscreenchange", updateFullscreenButtonUI);
-        document.addEventListener("msfullscreenchange", updateFullscreenButtonUI);
-        
-        // Jalankan penyesuaian tombol saat halaman ujian selesai dimuat
-        document.addEventListener("DOMContentLoaded", function() {
-            updateFullscreenButtonUI();
+
+        // Render KaTeX Otomatis Setelah HTMX Menempelkan Hint AI
+        document.body.addEventListener('htmx:afterSettle', function(evt) {
+            triggerKaTeX(evt.detail.target);
         });
+
+        // INISIALISASI UTAMA
+        function initExamEngine() {
+            renderQuestion(0);
+            updateFullscreenButtonUI();
+        }
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", initExamEngine);
+        } else {
+            initExamEngine();
+        }
     </script>
 </body>
 </html>
