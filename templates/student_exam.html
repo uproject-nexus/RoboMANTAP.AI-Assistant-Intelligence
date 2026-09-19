@@ -147,7 +147,7 @@
                             <input type="text" 
                                    id="hint-attempt-input"
                                    name="attempt_input" 
-                                   placeholder="Contoh: Arti Bahasa Arab-nya apa?😟"
+                                   placeholder="Contoh: Bantu cari jawaban-nya dong 😟"
                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none">
                         </div>
             
@@ -160,7 +160,7 @@
                     <!-- gunakan class htmx-indicator tanpa class 'hidden' bawaan Tailwind -->
                     <div id="hint-loading" class="htmx-indicator mt-2">
                         <div class="flex items-center gap-2 text-xs text-emerald-400 animate-pulse">
-                            <span>🧕🏼 RoboMANTAP sedang berpikir...</span>
+                            <span>🧕🏼 RoboMANTAP sedang memproses diskusi kita...</span>
                         </div>
                     </div>
             
@@ -205,9 +205,9 @@
                 🚀
             </div>
             <div>
-                <h3 class="text-base font-bold text-white">Konfirmasi Selesai Ujian</h3>
+                <h3 class="text-base font-bold text-white">Konfirmasi Selesai Quiz</h3>
                 <p class="text-xs text-slate-300 mt-2 leading-relaxed">
-                    Apakah Kamu yakin ingin mengakhiri sesi ujian ini? Pastikan seluruh soal sudah Kamu periksa kembali dengan teliti ya!
+                    Apakah Kamu yakin ingin mengakhiri sesi Kuis ini? Pastikan seluruh soal sudah Kamu periksa kembali dengan teliti ya!
                 </p>
             </div>
             <div class="flex space-x-2.5 pt-2">
@@ -441,7 +441,7 @@
             btnPrev.disabled = currentIndex === 0;
 
             if (currentIndex === quizData.length - 1) {
-                btnNextSubmit.textContent = "🚀 Selesai Ujian";
+                btnNextSubmit.textContent = "🚀 Selesai Kuis";
                 btnNextSubmit.className = "flex-1 sm:flex-none bg-rose-500 hover:bg-rose-400 active:bg-rose-600 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(244,63,94,0.4)] text-center";
             } else {
                 btnNextSubmit.textContent = "Next →";
