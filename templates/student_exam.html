@@ -64,13 +64,15 @@
         <div class="grid grid-cols-2 gap-4 text-sm">
             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
                 <p class="text-xs text-slate-400">Peserta Kuis</p>
-                <p class="font-semibold text-emerald-300 mt-1">{{ sess.nama if sess else nama }}</p>
-                <p class="text-xs text-slate-500">Kelas {{ sess.kelas if sess else kelas }}</p>
+                <p class="font-semibold text-emerald-300 mt-1 truncate">{{ sess.nama if sess else nama }}</p>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Kelas {{ sess.kelas if sess else kelas }} • Absen: <span class="text-slate-300 font-medium">{{ sess.absen if sess else absen }}</span>
+                </p>
             </div>
             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <p class="text-xs text-slate-400">Status Sesi</p>
-                <p class="font-semibold text-emerald-300 mt-1">Siap Mengerjakan</p>
-                <p class="text-xs text-slate-500">Waktu Terkunci</p>
+                <p class="text-xs text-slate-400">Jumlah & Durasi</p>
+                <p class="font-semibold text-emerald-300 mt-1">{{ jumlah_soal if jumlah_soal is defined else (sess.quiz|length if sess and sess.quiz else 0) }} Soal</p>
+                <p class="text-xs text-slate-500 mt-0.5">Waktu: <span class="text-slate-300 font-medium">{{ durasi_menit if durasi_menit is defined else (sess.config.timer_m if sess and sess.config else 30) }} Menit</span></p>
             </div>
         </div>
 
