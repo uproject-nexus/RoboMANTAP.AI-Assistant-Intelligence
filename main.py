@@ -122,19 +122,9 @@ async def verify_token(
         "start_time": datetime.utcnow()
     }
     
-    return templates.TemplateResponse(
-        request=request,
-        name="student_lobby.html", 
-        context={
-            "session_id": session_id,
-            "nama": nama,
-            "kelas": kelas,
-            "absen": absen,
-            "mapel": config.get("mapel", "Kuis"),
-            "materi": config.get("materi", "-"),
-            "jumlah_soal": len(selected_quiz),
-            "durasi_menit": config.get("timer_m", 30)
-        }
+    return RedirectResponse(
+        url=f"/exam/{session_id}", 
+        status_code=status.HTTP_303_SEE_OTHER
     )
 
 # ==============================================================================
