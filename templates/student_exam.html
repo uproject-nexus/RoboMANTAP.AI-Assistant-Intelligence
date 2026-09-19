@@ -279,6 +279,7 @@
     <!-- LOGIKA JAVASCRIPT UTAMA -->
     <!-- ============================================================================== -->
     <script>
+        let isSubmitting = false; // Penanda agar deteksi kecurangan mati saat submit
         // --- 1. PROSES PINDAH DARI LOBBY KE EXAM ---
         async function startExamFromLobby() {
             // A. Trigger Fullscreen Mode
@@ -370,6 +371,7 @@
         let lastBlurTime = 0;
 
         function handleTabSwitch() {
+            if (isSubmitting) return;
             const now = new Date().getTime();
             if (now - lastBlurTime < 1500) return;
             lastBlurTime = now;
@@ -381,6 +383,7 @@
             if (countText) countText.textContent = violationCount;
 
             if (violationCount >= maxViolations) {
+                isSubmitting = true;
                 alert("🚨 DETEKSI KECURANGAN!\n\nAnda meninggalkan tab 3 kali. Ujian otomatis dikirim!");
                 document.getElementById('form-submit-exam').submit();
             } else {
@@ -389,6 +392,7 @@
         }
 
         document.addEventListener('visibilitychange', async () => {
+            if (isSubmitting) return;
             if (document.visibilityState === 'visible') {
                 if (wakeLock !== null) await requestWakeLock();
             } else if (document.hidden) {
@@ -436,6 +440,7 @@
         }
 
         function submitExamNow() {
+            isSubmitting = true;
             document.getElementById("form-submit-exam").submit();
         }
 
@@ -595,6 +600,7 @@
 
                 if (diff <= 0) {
                     clearInterval(timerInterval);
+                    isSubmitting = true;
                     alert("Waktu Ujian telah Habis!");
                     document.getElementById('form-submit-exam').submit();
                     return;
