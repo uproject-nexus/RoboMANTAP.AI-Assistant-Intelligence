@@ -214,6 +214,15 @@ async def save_answer(
             else:
                 detail_ans.append(None)
 
+        # Di main.py (save_answer & submit_exam)
+        jenjang_clean = sess.get("config", {}).get("jenjang", "MA").strip()
+        if "MTS" in jenjang_clean.upper():
+            jenjang_val = "MTs"
+        elif "MA" in jenjang_clean.upper():
+            jenjang_val = "MA"
+        else:
+            jenjang_val = jenjang_clean
+
         # Update progress ke Supabase (dengan penangkap error agar tidak crash)
         try:
             update_progress_siswa(
@@ -269,6 +278,14 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
 
     total_soal = len(quiz)
     skor = int(round((benar / total_soal) * 100)) if total_soal > 0 else 0
+    # Di main.py (save_answer & submit_exam)
+    jenjang_clean = sess.get("config", {}).get("jenjang", "MA").strip()
+    if "MTS" in jenjang_clean.upper():
+        jenjang_val = "MTs"
+    elif "MA" in jenjang_clean.upper():
+        jenjang_val = "MA"
+    else:
+        jenjang_val = jenjang_clean
 
     # Simpan pengerjaan ke Supabase
     try:
