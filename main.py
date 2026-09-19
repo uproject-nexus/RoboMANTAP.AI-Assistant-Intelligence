@@ -165,8 +165,8 @@ async def render_exam_workspace(request: Request, session_id: str):
             "nama": sess.get("nama", "Siswa"),
             "kelas": sess.get("kelas", "-"),
             "absen": sess.get("absen", "-"),
-            "jumlah_soal": len(quiz_list),     
-            "durasi_menit": duration_m,
+            "jumlah_soal": len(sess.get("quiz", [])),
+            "durasi_menit": sess.get("config", {}).get("timer_m", 30),
             "quiz_json": json.dumps(sess.get("quiz", [])),
             "answers_json": json.dumps(sess.get("answers", {})),
             "remaining_seconds": remaining_s
