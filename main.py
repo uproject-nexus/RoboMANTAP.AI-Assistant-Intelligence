@@ -137,33 +137,63 @@ async def verify_token(
         }
     )
 
-@app.post("/start-exam", response_class=HTMLResponse)
-async def start_exam(request: Request, session_id: str = Form(...)):
+# ==============================================================================
+# ROUTE WORKSPACE EXAM (MENGGABUNGKAN GET & POST KE SINGLE-FILE STUDENT_EXAM.HTML)
+# ==============================================================================
+@app.api_route("/start-exam", methods=["GET", "POST"], response_class=HTMLResponse)
+@app.get("/exam/{session_id}", response_class=HTMLResponse)
+async def serve_student_exam(
+    request: Request, 
+    session_id: str = Form(None),
+    # Menangani parameter session_id dari URL GET jika ada
+):
+    # Fallback ambil session_id dari URL Path jika Form None
+    if not session_id and "session_id" in request.path_params:
+        session_id = request.path_params["session_id"]
+
+    # Cek keberadaan sesi siswa
     sess = STUDENT_SESSIONS.get(session_id)
     if not sess:
+        # Jika sesi tidak ditemukan, kembalikan ke halaman login utama
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-    # 1. Catat Waktu Mulai Pertama Kali (Mencegah Reset Timer saat Relog)
+    # 1. Catat Waktu Mulai Pertama Kali saat Halaman Dibuka (Mencegah Reset Timer saat Relog/Refresh)
     if "start_time" not in sess:
-        sess["start_time"] = datetime.utcnow()
+        sess["start_time"] = datetime.now(timezone.utc)
 
     # 2. Hitung Sisa Waktu Ujian Real-Time dari Server (dalam detik)
-    duration_m = sess["config"].get("timer_m", 30)
-    elapsed_s = (datetime.utcnow() - sess["start_time"]).total_seconds()
+    duration_m = sess.get("config", {}).get("timer_m", 30)
+    
+    # Hitung selisih waktu
+    now_utc = datetime.now(timezone.utc)
+    start_time = sess["start_time"]
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+        
+    elapsed_s = (now_utc - start_time).total_seconds()
     remaining_s = max(0, int((duration_m * 60) - elapsed_s))
 
+    # 3. Render Langsung ke Single-File student_exam.html
     return templates.TemplateResponse(
         request=request,
         name="student_exam.html", 
         context={
             "session_id": session_id,
             "sess": sess,
-            "quiz_json": json.dumps(sess["quiz"]),
-            "answers_json": json.dumps(sess.get("answers", {})), # <-- Kirim jawaban tersimpan
-            "remaining_seconds": remaining_s                      # <-- Kirim sisa waktu presisi
+            "mapel": sess.get("config", {}).get("mapel", "Kuis RoboMANTAP"),
+            "materi": sess.get("config", {}).get("materi", "Umum"),
+            "nama": sess.get("nama", "Siswa"),
+            "kelas": sess.get("kelas", "-"),
+            "absen": sess.get("absen", "-"),
+            "quiz_json": json.dumps(sess.get("quiz", [])),
+            "answers_json": json.dumps(sess.get("answers", {})), # <-- Jawaban tersimpan real-time
+            "remaining_seconds": remaining_s                      # <-- Sisa waktu presisi dalam detik
         }
     )
 
+# ==============================================================================
+# 1. API SAVE ANSWER (MENYIMPAN JAWABAN REAL-TIME)
+# ==============================================================================
 @app.post("/api/save-answer")
 async def save_answer(
     session_id: str = Form(...),
@@ -172,37 +202,55 @@ async def save_answer(
 ):
     sess = STUDENT_SESSIONS.get(session_id)
     if sess:
+        # Inisialisasi dictionary answers jika belum ada
+        if "answers" not in sess:
+            sess["answers"] = {}
+
+        # Simpan dalam format integer dan string agar konsisten
         sess["answers"][q_index] = answer
-        
+        sess["answers"][str(q_index)] = answer
+
         detail_ans = []
-        for idx, item in enumerate(sess["quiz"]):
-            user_ans = sess["answers"].get(idx)
-            if user_ans:
-                detail_ans.append(user_ans == item.get("correct_answer"))
+        quiz = sess.get("quiz", [])
+
+        for idx, item in enumerate(quiz):
+            # Toleransi cek kunci tipe integer maupun string
+            user_ans = sess["answers"].get(idx) or sess["answers"].get(str(idx))
+            if user_ans is not None:
+                correct_ans = item.get("correct_answer") or item.get("key")
+                detail_ans.append(user_ans == correct_ans)
             else:
                 detail_ans.append(None)
-                
-        update_progress_siswa(
-            session_id=session_id,
-            nama=sess["nama"],
-            jenjang=sess["config"].get("jenjang", "Kuis"),
-            mapel=sess["config"].get("mapel", "Kuis"),
-            soal_sekarang=q_index + 1,
-            detail_jawaban=detail_ans,
-            status="BERJALAN",
-            is_custom=True
-        )
-    return HTMLResponse(status_code=200)
 
+        # Update progress ke Supabase (dengan penangkap error agar tidak crash)
+        try:
+            update_progress_siswa(
+                session_id=session_id,
+                nama=sess.get("nama", "Siswa"),
+                jenjang=sess.get("config", {}).get("jenjang", "Kuis"),
+                mapel=sess.get("config", {}).get("mapel", "Kuis"),
+                soal_sekarang=q_index + 1,
+                detail_jawaban=detail_ans,
+                status="BERJALAN",
+                is_custom=True
+            )
+        except Exception as e:
+            print(f"⚠️ Warning Sync Supabase (Save Answer): {e}")
+
+    return HTMLResponse(content="", status_code=200)
+
+# ==============================================================================
+# 2. API SUBMIT EXAM (KALKULASI NILAI & Halaman student_result.html)
+# ==============================================================================
 @app.post("/submit-exam", response_class=HTMLResponse)
 async def submit_exam(request: Request, session_id: str = Form(...)):
     sess = STUDENT_SESSIONS.get(session_id)
     if not sess:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
-    quiz = sess["quiz"]
-    answers = sess["answers"]
-    
+    quiz = sess.get("quiz", [])
+    answers = sess.get("answers", {})
+
     # Ekstraksi Nama Depan/Panggilan Siswa
     nama_lengkap = sess.get("nama", "").strip()
     nama_depan = nama_lengkap.split()[0] if nama_lengkap else "Santri MANTAP"
@@ -213,11 +261,14 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
     detail_ans = []
 
     for idx, item in enumerate(quiz):
-        user_ans = answers.get(idx)
+        # FIX: Toleransi pencarian kunci integer dan string
+        user_ans = answers.get(idx) or answers.get(str(idx))
+        correct_ans = item.get("correct_answer") or item.get("key")
+
         if not user_ans:
             kosong += 1
             detail_ans.append(False)
-        elif user_ans == item.get("correct_answer"):
+        elif user_ans == correct_ans:
             benar += 1
             detail_ans.append(True)
         else:
@@ -228,18 +279,21 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
     skor = int(round((benar / total_soal) * 100)) if total_soal > 0 else 0
 
     # Simpan pengerjaan ke Supabase
-    update_progress_siswa(
-        session_id=session_id,
-        nama=nama_lengkap, # Di DB tetap tersimpan nama lengkap
-        jenjang=sess["config"].get("jenjang", "MA"),
-        mapel=sess["config"].get("mapel", "Matematika"),
-        soal_sekarang=total_soal,
-        detail_jawaban=detail_ans,
-        status="SELESAI",
-        is_custom=True,
-        user_answers_dict=answers,
-        quiz_data_list=quiz
-    )
+    try:
+        update_progress_siswa(
+            session_id=session_id,
+            nama=nama_lengkap,  # Di DB tetap tersimpan nama lengkap
+            jenjang=sess.get("config", {}).get("jenjang", "MA"),
+            mapel=sess.get("config", {}).get("mapel", "Matematika"),
+            soal_sekarang=total_soal,
+            detail_jawaban=detail_ans,
+            status="SELESAI",
+            is_custom=True,
+            user_answers_dict=answers,
+            quiz_data_list=quiz
+        )
+    except Exception as e:
+        print(f"⚠️ Warning Sync Supabase (Submit Exam): {e}")
 
     base_url = STREAMLIT_URL.rstrip('/')
     target_streamlit_url = f"{base_url}/?review_session={session_id}"
@@ -258,6 +312,10 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
         }
     )
 
+
+# ==============================================================================
+# 3. API HINT AI (ROBOMANTAP CONSULTATION)
+# ==============================================================================
 @app.post("/api/hint", response_class=HTMLResponse)
 async def handle_hint_request(
     curr_idx: int = Form(...),
@@ -277,17 +335,20 @@ async def handle_hint_request(
 
     # Cek cache lokal
     hint_key = (mapel, curr_idx, question, attempt_str)
-    
+
     if hint_key in ai_hint_cache:
         hint_text = ai_hint_cache[hint_key]
     else:
-        # Panggil AI Stream dari ai_engine.py
-        hint_chunks = [chunk for chunk in get_ai_hint_stream(question, attempt_str, mapel)]
-        hint_text = "".join(hint_chunks)
-        
-        # Simpan ke cache jika tidak error
-        if hint_text and "⚠️" not in hint_text:
-            ai_hint_cache[hint_key] = hint_text
+        try:
+            # Panggil AI Stream dari ai_engine.py
+            hint_chunks = [chunk for chunk in get_ai_hint_stream(question, attempt_str, mapel)]
+            hint_text = "".join(hint_chunks)
+
+            # Simpan ke cache jika tidak error
+            if hint_text and "⚠️" not in hint_text:
+                ai_hint_cache[hint_key] = hint_text
+        except Exception as e:
+            hint_text = f"⚠️ Maaf, RoboMANTAP sedang sibuk sebentar. Coba tekan tombol diskusi lagi ya! ({e})"
 
     return f"""
     <div class="p-3 bg-slate-900 border border-slate-800 rounded-lg text-slate-200 text-xs leading-relaxed mt-2 animate-fade-in">
