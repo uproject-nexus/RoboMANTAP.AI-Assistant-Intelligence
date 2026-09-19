@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pre-Kuis - RoboMANTAP CBT</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
     <div class="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
@@ -37,21 +38,24 @@
         </div>
 
         <!-- Form Start Ujian dengan Trigger Otomatis Fullscreen -->
-        <form action="/start-exam" method="POST" onsubmit="triggerAutoFullscreen(event)">
+        <form hx-post="/start-exam"
+              hx-target="body"
+              hx-swap="outerHTML"
+              onsubmit="triggerAutoFullscreen(event)">
+            
             <input type="hidden" name="session_id" value="{{ session_id }}">
-            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-sm py-3.5 px-4 rounded-xl transition shadow-[0_0_20px_rgba(16,185,129,0.35)] mt-4">
+            
+            <button type="submit" 
+                    class="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-sm py-3.5 px-4 rounded-xl transition shadow-[0_0_20px_rgba(16,185,129,0.35)] mt-4">
                 🚀 Mulai Ujian Sekarang
             </button>
         </form>
         
         <script>
             async function triggerAutoFullscreen(e) {
-                // 1. Tahan pengiriman form otomatis agar browser sempat masuk mode fullscreen
-                e.preventDefault(); 
-                const form = e.target;
+                // Tahan sebentar agar fungsi Fullscreen berjalan sebelum HTMX mengirim data
                 const elem = document.documentElement;
         
-                // 2. Eksekusi permintaan Fullscreen & tunggu hingga aktif
                 try {
                     if (elem.requestFullscreen) {
                         await elem.requestFullscreen();
@@ -61,10 +65,7 @@
                         await elem.msRequestFullscreen();
                     }
                 } catch (err) {
-                    // Abaikan jika browser menolak fullscreen
-                } finally {
-                    // 3. Kirim form setelah mode fullscreen berhasil diaktifkan
-                    form.submit();
+                    console.log("Fullscreen request declined:", err);
                 }
             }
         </script>
