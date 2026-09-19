@@ -72,7 +72,7 @@ async def verify_token(
         return templates.TemplateResponse(
             request=request,
             name="student_login.html", 
-            context={"error": "❌ Kode Kuis / Token tidak ditemukan atau belum diterbitkan!"}
+            context={"error": "❌ Kode Kuis tidak ditemukan atau belum diterbitkan!"}
         )
 
     config = quiz_package.get("config", {})
