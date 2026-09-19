@@ -35,6 +35,14 @@
             display: block !important;
             white-space: normal !important;
         }
+        /* Aturan tampilan Spinner Loading HTMX */
+        .htmx-indicator {
+            display: none;
+        }
+        .htmx-request .htmx-indicator, 
+        .htmx-request.htmx-indicator {
+            display: flex !important;
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
@@ -144,10 +152,10 @@
                             Diskusikan Yuk!
                         </button>
                     </form>
-            
-                    <!-- Status Loading HTMX -->
-                    <div id="hint-loading" class="htmx-indicator hidden">
-                        <div class="flex items-center gap-2 text-xs text-emerald-400 animate-pulse mt-1">
+        
+                    <!-- gunakan class htmx-indicator tanpa class 'hidden' bawaan Tailwind -->
+                    <div id="hint-loading" class="htmx-indicator mt-2">
+                        <div class="flex items-center gap-2 text-xs text-emerald-400 animate-pulse">
                             <span>🧕🏼 RoboMANTAP sedang berpikir...</span>
                         </div>
                     </div>
@@ -210,6 +218,18 @@
     </div>
 
     <script>
+        // Otomatis gulir posisi input ke tengah saat keyboard HP aktif
+        document.addEventListener("DOMContentLoaded", function() {
+            const inputHint = document.getElementById("hint-attempt-input");
+            if (inputHint) {
+                inputHint.addEventListener("focus", function() {
+                    setTimeout(() => {
+                        this.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }, 300);
+                });
+            }
+        });
+        
         // Otomatis render KaTeX setiap kali HTMX selesai menempelkan respon (termasuk Hint AI)
         document.body.addEventListener('htmx:afterSettle', function(evt) {
             if (window.renderMathInElement) {
