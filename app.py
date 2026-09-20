@@ -1604,9 +1604,9 @@ elif st.session_state.page == "guru_dashboard":
                                 detik = selisih_detik % 60
                                 
                                 if menit < 60:
-                                    durasi_str = f"⏱️ {menit}m {detik:02d}s"
+                                    durasi_str = f"🔄 Berjalan ({menit}m {detik:02d}s)"
                                 else:
-                                    durasi_str = f"⏱️ {menit // 60}j {menit % 60}m"
+                                    durasi_str = f"🔄 Berjalan ({menit // 60}j {menit % 60}m)"
                 
                             elif row['status_real'] == 'EXPIRED':
                                 # Khusus status Terputus/Inaktif
@@ -1796,7 +1796,7 @@ elif st.session_state.page == "guru_dashboard":
 
         # Fragment Execution Logic
         if auto_refresh:
-            @st.fragment(run_every="10s")
+            @st.fragment(run_every="1s")
             def active_live_view():
                 render_monitoring_content()
             active_live_view()
