@@ -1561,7 +1561,7 @@ elif st.session_state.page == "guru_dashboard":
             st.markdown(
                 '<p style="font-size: 12px; opacity: 0.82;">'
                 '<span class="blinking-dot-green">🟢</span> '
-                '<b>Live aktif</b> · memperbarui monitoring secara real time!'
+                '<b>Live aktif</b> · memperbarui monitoring secara real time! · Matikan Live bila Hp/Perangkat terasa Lemot'
                 '</p>',
                 unsafe_allow_html=True
             )
@@ -1825,13 +1825,8 @@ elif st.session_state.page == "guru_dashboard":
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-                
-                # =========================================================================
-                # --- TOMBOL GENERATE LAPORAN EKSEKUTIF KEDINASAN (.DOCX) ---
-                # =========================================================================
-                st.markdown("<p style='font-size: 14px; font-weight: bold; margin-bottom: 10px;'>Rekapitulasi Nilai</p>", unsafe_allow_html=True)
-                
-                if st.button("🚀 Generate Rekapitulasi & Laporan Eksekutif (.docx)", type="primary", use_container_width=True):
+                               
+                if st.button("🚀 Generate Rekapitulasi Nilai & Laporan (.docx)", type="primary", use_container_width=True):
                     with st.spinner("RoboMANTAP sedang merender dokumen eksekutif..."):
                         data_siswa_list = df.to_dict('records')
                         cfg = {
@@ -1868,6 +1863,7 @@ elif st.session_state.page == "guru_dashboard":
                 # =========================================================================
                 # 5. LIVE TRACKING — UPN MODERN MONITORING
                 # =========================================================================
+                st.write("---")
                 def _row_duration(row):
                     try:
                         waktu_mulai_raw = (
@@ -1981,7 +1977,7 @@ elif st.session_state.page == "guru_dashboard":
                                 <div class="upn-live-eyebrow">UPN · CBT-Intelligence</div>
                                 <div class="upn-live-title">Live Tracking Pengerjaan</div>
                                 <div class="upn-live-subtitle">
-                                    Pantau progress siswa dan integritas sesi secara real-time!
+                                    Pantau progress siswa secara real-time!
                                 </div>
                             </div>
                         </div>
