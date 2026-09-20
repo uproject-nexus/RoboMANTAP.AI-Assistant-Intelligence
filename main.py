@@ -126,6 +126,33 @@ async def verify_token(
         url=f"/exam/{session_id}", 
         status_code=status.HTTP_303_SEE_OTHER
     )
+    
+    # ============================================================
+    # CATAT SESI KE DATABASE SEGERA SAAT SISWA KLIK "MULAI"
+    # created_at = waktu mulai pengerjaan yang sebenarnya
+    # ============================================================
+    jenjang_clean = config.get("jenjang", "MA").strip()
+    
+    if "MTS" in jenjang_clean.upper():
+        jenjang_val = "MTs"
+    elif "MA" in jenjang_clean.upper():
+        jenjang_val = "MA"
+    else:
+        jenjang_val = jenjang_clean
+    
+    try:
+        update_progress_siswa(
+            session_id=session_id,
+            nama=nama.strip(),
+            jenjang=jenjang_val,
+            mapel=config.get("mapel", "Kuis"),
+            soal_sekarang=1,
+            detail_jawaban=[None] * len(selected_quiz),
+            status="BERJALAN",
+            is_custom=True
+        )
+    except Exception as e:
+        print(f"⚠️ Warning Sync Supabase (Start Exam): {e}")
 
 # ==============================================================================
 # ROUTE WORKSPACE EXAM (MENGGABUNGKAN GET & POST KE SINGLE-FILE STUDENT_EXAM.HTML)
