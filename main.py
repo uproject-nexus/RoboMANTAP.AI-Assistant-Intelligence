@@ -228,7 +228,7 @@ async def save_answer(
             update_progress_siswa(
                 session_id=session_id,
                 nama=sess.get("nama", "Siswa"),
-                jenjang=sess.get("config", {}).get("jenjang", "Kuis"),
+                jenjang=jenjang_val,
                 mapel=sess.get("config", {}).get("mapel", "Kuis"),
                 soal_sekarang=q_index + 1,
                 detail_jawaban=detail_ans,
@@ -292,7 +292,7 @@ async def submit_exam(request: Request, session_id: str = Form(...)):
         update_progress_siswa(
             session_id=session_id,
             nama=nama_lengkap,  # Di DB tetap tersimpan nama lengkap
-            jenjang=sess.get("config", {}).get("jenjang", "MA"),
+            jenjang=jenjang_val,
             mapel=sess.get("config", {}).get("mapel", "Matematika"),
             soal_sekarang=total_soal,
             detail_jawaban=detail_ans,
