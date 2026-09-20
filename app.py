@@ -1543,7 +1543,7 @@ elif st.session_state.page == "guru_dashboard":
     st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
     tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "✨ Quiz Custom", "⚡ Automation"])
     with tab1:
-        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Evaluasi Pembinaan OMI</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Evaluasi Siswa</p>", unsafe_allow_html=True)
 
         time_filter = st.session_state.get("filter_time", "Hari Ini")
         selected_jenjang_filter = st.session_state.get("filter_jenjang", "Semua Jenjang")
@@ -1551,9 +1551,9 @@ elif st.session_state.page == "guru_dashboard":
         selected_status_filter = st.session_state.get("filter_status", "Semua Status")
  
         auto_refresh = st.toggle(
-            "🔄 Live Now · 5s",
+            "🔄 Live Now!",
             value=False,
-            help="Nyalakan untuk memantau siswa secara real-time. Data diperbarui tiap 5 detik."
+            help="Nyalakan untuk memantau siswa secara real-time!"
         )
 
         # Indikator Status Auto-Refresh
@@ -1561,7 +1561,7 @@ elif st.session_state.page == "guru_dashboard":
             st.markdown(
                 '<p style="font-size: 12px; opacity: 0.82;">'
                 '<span class="blinking-dot-green">🟢</span> '
-                '<b>Live aktif</b> · memperbarui monitoring setiap 5 detik'
+                '<b>Live aktif</b> · memperbarui monitoring secara real time!'
                 '</p>',
                 unsafe_allow_html=True
             )
@@ -1569,11 +1569,6 @@ elif st.session_state.page == "guru_dashboard":
             st.caption(
                 "⏸️ **Live dimatikan** · tampilan stabil dan nyaman untuk membaca laporan RoboMANTAP."
             )
-
-        # Kondisi Dasar: Abaikan status uji coba internal jika ada
-        # ==============================================================================
-        # PERBAIKAN FILTER KONTROL PANEL (app.py Baris 1310 - 1330)
-        # ==============================================================================
         
         # Kondisi Dasar: Abaikan status uji coba internal jika ada
         where_clauses = ["status NOT IN ('ARCHIVED', 'TRIAL', 'DRAFT', 'HIDDEN')"]
@@ -1834,7 +1829,7 @@ elif st.session_state.page == "guru_dashboard":
                 # =========================================================================
                 # --- TOMBOL GENERATE LAPORAN EKSEKUTIF KEDINASAN (.DOCX) ---
                 # =========================================================================
-                st.markdown("<p style='font-size: 14px; font-weight: bold; margin-bottom: 10px;'>🧕 RoboMANTAP: buat Rekapitulasi Ujian yuk, Ustadzah!</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size: 14px; font-weight: bold; margin-bottom: 10px;'>Rekapitulasi Nilai</p>", unsafe_allow_html=True)
                 
                 if st.button("🚀 Generate Rekapitulasi & Laporan Eksekutif (.docx)", type="primary", use_container_width=True):
                     with st.spinner("RoboMANTAP sedang merender dokumen eksekutif..."):
@@ -1983,10 +1978,10 @@ elif st.session_state.page == "guru_dashboard":
                         <div class="upn-live-hero-left">
                             <span class="upn-live-orb"></span>
                             <div>
-                                <div class="upn-live-eyebrow">UPN · CBT SUPERVISION</div>
+                                <div class="upn-live-eyebrow">UPN · CBT-Intelligence</div>
                                 <div class="upn-live-title">Live Tracking Pengerjaan</div>
                                 <div class="upn-live-subtitle">
-                                    Pantau progress soal, durasi, skor, dan integritas sesi secara real-time.
+                                    Pantau progress siswa dan integritas sesi secara real-time!
                                 </div>
                             </div>
                         </div>
@@ -1997,8 +1992,6 @@ elif st.session_state.page == "guru_dashboard":
                 )
 
                 status_chips = [
-                    f"<span>👥 {len(tracking_rows)} sesi</span>",
-                    f"<span>🟢 {active_count} aktif</span>",
                     f"<span>⚠️ {warning_count} peringatan</span>",
                     f"<span>🚨 {cheat_count} dihentikan</span>",
                 ]
