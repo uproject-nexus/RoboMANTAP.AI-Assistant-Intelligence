@@ -550,23 +550,36 @@ def update_progress_siswa(
 
     query = """
     INSERT INTO sesi_ujian (
-        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban, 
+        id_sesi, nama_siswa, jenjang, mapel, soal_sekarang, detail_jawaban,
         jumlah_benar, jumlah_salah, nilai_akhir, status, created_at, updated_at
     )
     VALUES (
-        :id_sesi, :nama, :jenjang, :mapel, :soal, :detail, 
-        :benar, :salah, :nilai, :status, 
-        NOW() AT TIME ZONE 'Asia/Jakarta', 
+        :id_sesi, :nama, :jenjang, :mapel, :soal, :detail,
+        :benar, :salah, :nilai, :status,
+        NOW() AT TIME ZONE 'Asia/Jakarta',
         NOW() AT TIME ZONE 'Asia/Jakarta'
     )
     ON CONFLICT (id_sesi) DO UPDATE SET
+        nama_siswa = EXCLUDED.nama_siswa,
+        jenjang = EXCLUDED.jenjang,
+        mapel = EXCLUDED.mapel,
         soal_sekarang = EXCLUDED.soal_sekarang,
         detail_jawaban = EXCLUDED.detail_jawaban,
         jumlah_benar = EXCLUDED.jumlah_benar,
         jumlah_salah = EXCLUDED.jumlah_salah,
         nilai_akhir = EXCLUDED.nilai_akhir,
-        status = EXCLUDED.status,
-        updated_at = NOW() AT TIME ZONE 'Asia/Jakarta';
+    
+        -- SELESAI bersifat final dan tidak boleh mundur menjadi BERJALAN
+        status = CASE
+            WHEN sesi_ujian.status = 'SELESAI' THEN 'SELESAI'
+            ELSE EXCLUDED.status
+        END,
+    
+        -- Setelah selesai, timestamp selesai juga tidak boleh digeser
+        updated_at = CASE
+            WHEN sesi_ujian.status = 'SELESAI' THEN sesi_ujian.updated_at
+            ELSE NOW() AT TIME ZONE 'Asia/Jakarta'
+        END;
     """
 
     try:
