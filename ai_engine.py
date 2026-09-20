@@ -569,15 +569,14 @@ def update_progress_siswa(
         jumlah_salah = EXCLUDED.jumlah_salah,
         nilai_akhir = EXCLUDED.nilai_akhir,
     
-        -- SELESAI bersifat final dan tidak boleh mundur menjadi BERJALAN
         status = CASE
             WHEN sesi_ujian.status = 'SELESAI' THEN 'SELESAI'
             ELSE EXCLUDED.status
         END,
     
-        -- Setelah selesai, timestamp selesai juga tidak boleh digeser
         updated_at = CASE
-            WHEN sesi_ujian.status = 'SELESAI' THEN sesi_ujian.updated_at
+            WHEN sesi_ujian.status = 'SELESAI'
+                THEN sesi_ujian.updated_at
             ELSE NOW() AT TIME ZONE 'Asia/Jakarta'
         END;
     """
