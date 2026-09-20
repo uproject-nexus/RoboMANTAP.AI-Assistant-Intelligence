@@ -613,16 +613,25 @@ def update_progress_siswa(
         jumlah_benar = EXCLUDED.jumlah_benar,
         jumlah_salah = EXCLUDED.jumlah_salah,
         nilai_akhir = EXCLUDED.nilai_akhir,
-
+    
+        -- created_at adalah WAKTU MULAI.
+        -- Jangan pernah mengambil created_at dari request/update berikutnya.
+        created_at = sesi_ujian.created_at,
+    
+        -- Status final tidak boleh hidup kembali menjadi BERJALAN.
         status = CASE
-            WHEN sesi_ujian.status IN ('SELESAI', 'TRIAL', 'ARCHIVED') THEN sesi_ujian.status
+            WHEN sesi_ujian.status IN ('SELESAI', 'TRIAL', 'ARCHIVED')
+                THEN sesi_ujian.status
             ELSE EXCLUDED.status
         END,
-
+    
+        -- Untuk sesi aktif: heartbeat/save-answer memperbarui updated_at.
+        -- Untuk sesi final: waktu selesai dikunci.
         updated_at = CASE
             WHEN sesi_ujian.status IN ('SELESAI', 'TRIAL', 'ARCHIVED')
                 THEN sesi_ujian.updated_at
-            ELSE NOW() AT TIME ZONE 'Asia/Jakarta'
+            ELSE
+                NOW() AT TIME ZONE 'Asia/Jakarta'
         END;
     """
 
