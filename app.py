@@ -1317,11 +1317,17 @@ elif st.session_state.page == "guru_dashboard":
         
         # Kondisi Tanggal PRESISI (Terkunci Waktu Indonesia Barat / WIB)
         if time_filter == "Hari Ini":
-            where_clauses.append("DATE(updated_at AT TIME ZONE 'Asia/Jakarta') = DATE(NOW() AT TIME ZONE 'Asia/Jakarta')")
+            where_clauses.append(
+                "DATE(updated_at) = DATE(NOW() AT TIME ZONE 'Asia/Jakarta')"
+            )
         elif time_filter == "Kemarin":
-            where_clauses.append("DATE(updated_at AT TIME ZONE 'Asia/Jakarta') = DATE(NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '1 day'")
+            where_clauses.append(
+                "DATE(updated_at) = DATE(NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '1 day'"
+            )
         else:
-            where_clauses.append("DATE(updated_at AT TIME ZONE 'Asia/Jakarta') >= DATE(NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '2 days'")
+            where_clauses.append(
+                "DATE(updated_at) >= DATE(NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '2 days'"
+            )
         
         # FIX KRUSIAL: Mapping String Jenjang agar Cocok dengan Database ("MTs" / "MA")
         if selected_jenjang_filter != "Semua Jenjang":
