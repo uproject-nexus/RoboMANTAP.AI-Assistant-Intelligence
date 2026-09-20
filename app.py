@@ -1244,7 +1244,7 @@ if st.session_state.page == "landing":
                 margin-bottom: 20px;
                 cursor: pointer;
             ">
-                🚀 BUKA PORTAL KUIS! →
+                🚀 BUKA PORTAL KUIS →
             </div>
         </a>
         """,
