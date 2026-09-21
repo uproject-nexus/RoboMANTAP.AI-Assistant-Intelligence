@@ -819,42 +819,34 @@ with st.sidebar:
 #===========================================================
 # PEMBERSIH
 def clean_math_string(text: str) -> str:
-    """Pembersih simbol & notasi matematika dasar untuk teks biasa."""
+    r"""Pembersih notasi matematika untuk Word; khususnya mencegah \circ -> circ/circl mentah."""
     if not text:
         return ""
-    
-    # 1. Konversi Panah LaTeX SEBELUM memproses \left / \right
-    text = re.sub(r'\\(?:rightarrow|to)\b', '→', text)
-    text = re.sub(r'\\Rightarrow\b', '⇒', text)
-    text = re.sub(r'\\leftarrow\b', '←', text)
-    text = re.sub(r'\\leftrightarrow\b', '↔', text)
-
-    # 2. Bersihkan \left dan \right (Gunakan \b agar \rightarrow tidak terpotong)
-    text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
-    text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
-    text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
-
-    # 3. Konversi Akar \sqrt{x}
-    text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
-    text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
-
-    # 4. Pangkat & Subscript Unicode
-    sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
-    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄⁵₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
-
-    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sup_map), text)
-    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sub_map), text)
-
-    # 5. Simbol Matematika
+    text = str(text)
     replacements = {
+        r"\rightarrow": "→", r"\to": "→", r"\Rightarrow": "⇒",
+        r"\leftarrow": "←", r"\leftrightarrow": "↔",
+        r"\circ": "∘", r"\circl": "∘",
         r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
-        r"\leq": "≤", r"\geq": "≥", r"\pm": "±", r"\infty": "∞",
-        r"\pi": "π", r"\alpha": "α", r"\beta": "β", r"\theta": "θ", "$": ""
+        r"\leq": "≤", r"\geq": "≥", r"\le": "≤", r"\ge": "≥",
+        r"\pm": "±", r"\mp": "∓", r"\infty": "∞", r"\pi": "π",
+        r"\alpha": "α", r"\beta": "β", r"\theta": "θ", r"\lambda": "λ",
+        r"\in": "∈", r"\notin": "∉", r"\forall": "∀", r"\exists": "∃",
+        r"\emptyset": "∅", r"\angle": "∠", r"\perp": "⊥", r"\parallel": "∥",
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
-
-    # 6. Sapu bersih ampas backslash
+    text = re.sub(r"(?<![A-Za-z])circl(?![A-Za-z])", "∘", text)
+    text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
+    text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
+    text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
+    text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
+    text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
+    sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
+    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄⁵₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
+    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sup_map), text)
+    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sub_map), text)
+    text = text.replace("$", "")
     text = text.replace("left(", "(").replace("right)", ")").replace("dots", "…")
     text = text.replace("{", "").replace("}", "")
     text = re.sub(r'\\([a-zA-Z]+)', r'\1', text).replace("\\", "")
@@ -872,6 +864,61 @@ def clean_solution_preview(text: str) -> str:
     if not text:
         return ""
 
+    value = str(text).strip()
+
+    # Token rusak yang sering muncul ketika LaTeX dipotong oleh model.
+    value = re.sub(r"(?<![A-Za-z])circl(?![A-Za-z])", lambda _: r"\circ", value)
+
+    # Perintah sederhana lebih aman ditampilkan sebagai Unicode pada preview,
+    # sehingga tidak pernah terlihat sebagai backslash mentah.
+    simple_math = {
+        r"\longrightarrow": "→", r"\rightarrow": "→", r"\to": "→",
+        r"\Longrightarrow": "⇒", r"\Rightarrow": "⇒",
+        r"\leftarrow": "←", r"\leftrightarrow": "↔",
+        r"\times": "×", r"\cdot": "·", r"\div": "÷",
+        r"\neq": "≠", r"\leq": "≤", r"\le": "≤",
+        r"\geq": "≥", r"\ge": "≥", r"\pm": "±",
+        r"\infty": "∞", r"\circ": "∘", r"\perp": "⊥",
+        r"\parallel": "∥", r"\angle": "∠", r"\in": "∈",
+        r"\notin": "∉", r"\forall": "∀", r"\exists": "∃",
+        r"\emptyset": "∅", r"\pi": "π", r"\alpha": "α",
+        r"\beta": "β", r"\gamma": "γ", r"\delta": "δ",
+        r"\theta": "θ", r"\lambda": "λ", r"\mu": "μ",
+        r"\approx": "≈", r"\equiv": "≡", r"\propto": "∝",
+        r"\sum": "Σ", r"\int": "∫", r"\partial": "∂",
+        r"\Delta": "Δ", r"\Omega": "Ω", r"\degree": "°",
+    }
+    for old, new in simple_math.items():
+        value = value.replace(old, new)
+
+    value = value.replace(" -> ", " → ").replace(" => ", " ⇒ ")
+    value = value.replace("->", "→").replace("=>", "⇒")
+    value = re.sub(r"\\left\s*([\(\[\{])", r"\1", value)
+    value = re.sub(r"\\right\s*([\)\]\}])", r"\1", value)
+    value = re.sub(r"\\(?:mathrm|text|mathbf|operatorname)\{([^{}]+)\}", r"\1", value)
+    value = re.sub(r"\\ce\{([^{}]+)\}", r"\1", value)
+
+    # Pecahan/akar tetap memakai KaTeX agar tampil sebagai notasi matematika,
+    # tetapi hanya bagian rumusnya yang dibungkus, bukan seluruh paragraf.
+    def wrap_formula(match):
+        expr = match.group(0)
+        return f"${expr}$"
+
+    value = re.sub(r"\\frac\{[^{}]+\}\{[^{}]+\}", wrap_formula, value)
+    value = re.sub(r"\\sqrt(?:\{[^{}]+\}|[A-Za-z0-9]+)", wrap_formula, value)
+
+    # Pangkat/indeks sederhana tanpa delimiter: ubah ke Unicode agar tidak mentah.
+    sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
+    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
+    value = re.sub(r"\^\{([^}]+)\}|\^([A-Za-z0-9])", lambda m: (m.group(1) or m.group(2)).translate(sup_map), value)
+    value = re.sub(r"_\{([^}]+)\}|_([A-Za-z0-9])", lambda m: (m.group(1) or m.group(2)).translate(sub_map), value)
+
+    # Hapus delimiter math kosong yang kadang ditinggalkan generator.
+    value = value.replace("$$$$", "")
+    value = re.sub(r"\$\s*\$", "", value)
+    return value.strip()
+
+
 def contains_arabic(text: str) -> bool:
     return bool(re.search(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]", str(text or "")))
 
@@ -888,6 +935,7 @@ def apply_arabic_paragraph_style(paragraph):
     except Exception:
         pass
 
+
 def apply_arabic_run_style(run):
     """Gunakan font complex-script yang aman untuk aksara Arab di Word."""
     if not run:
@@ -903,8 +951,6 @@ def apply_arabic_run_style(run):
         rfonts.set('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}ascii', 'Aptos')
     except Exception:
         pass
-
-# ==============================================================================
 
 
 def add_omml_fraction(paragraph, num_text: str, den_text: str):
@@ -985,6 +1031,9 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
             if plain_part:
                 run = paragraph.add_run(plain_part + " ")
                 run.bold = is_bold
+                if contains_arabic(plain_part):
+                    apply_arabic_paragraph_style(paragraph)
+                    apply_arabic_run_style(run)
                 if color_rgb:
                     run.font.color.rgb = color_rgb
 
@@ -1007,6 +1056,9 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
         if plain_part:
             run = paragraph.add_run(plain_part)
             run.bold = is_bold
+            if contains_arabic(plain_part):
+                apply_arabic_paragraph_style(paragraph)
+                apply_arabic_run_style(run)
             if color_rgb:
                 run.font.color.rgb = color_rgb
 
