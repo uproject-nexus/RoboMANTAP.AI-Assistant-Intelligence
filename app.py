@@ -833,6 +833,30 @@ def clean_math_string(text: str) -> str:
         r"\alpha": "α", r"\beta": "β", r"\theta": "θ", r"\lambda": "λ",
         r"\in": "∈", r"\notin": "∉", r"\forall": "∀", r"\exists": "∃",
         r"\emptyset": "∅", r"\angle": "∠", r"\perp": "⊥", r"\parallel": "∥",
+        r"\implies": "⇒",
+        r"\impliedby": "⇐",
+        r"\iff": "⇔",
+        r"\Longleftrightarrow": "⇔",
+        r"\longleftrightarrow": "↔",
+        r"\Longleftarrow": "⇐",
+        r"\Longrightarrow": "⇒",
+        
+        r"\approx": "≈",
+        r"\equiv": "≡",
+        r"\propto": "∝",
+        
+        r"\sum": "Σ",
+        r"\prod": "Π",
+        r"\int": "∫",
+        r"\partial": "∂",
+        r"\nabla": "∇",
+        
+        r"\Delta": "Δ",
+        r"\Omega": "Ω",
+        r"\Gamma": "Γ",
+        r"\Lambda": "Λ",
+        r"\Sigma": "Σ",
+        r"\Phi": "Φ",
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
@@ -2930,59 +2954,17 @@ elif st.session_state.page == "guru_dashboard":
                     expanded=(q_idx == 1)
                 ):
                     st.markdown(f"**Soal {q_idx}**")
-                    st.markdown(
-                        clean_preview_math_scientific(
-                            cq.get("question", "Soal")
-                        )
+                    question_text = clean_solution_preview(
+                        cq.get("question", "Soal")
                     )
-                    # ============================================================
-                    # OPSI JAWABAN — CLEANER MATEMATIKA / ILMIAH
-                    # ============================================================
-                    opt_cols = st.columns(2)
-                    
-                    for opt_idx, option in enumerate(cq.get("options", [])):
-                    
-                        # Ambil teks opsi
-                        raw_option = str(option).strip()
-                    
-                        # Jika format AI: "A. jawaban..."
-                        if "." in raw_option:
-                            option_parts = raw_option.split(".", 1)
-                            option_label = option_parts[0].strip()
-                            option_text = option_parts[1].strip()
-                        else:
-                            option_label = chr(65 + opt_idx)
-                            option_text = raw_option
-                    
-                        # --------------------------------------------------------
-                        # CLEANER HARUS DILAKUKAN SEBELUM html.escape()
-                        # --------------------------------------------------------
-                        option_text = clean_preview_math_scientific(option_text)
-                    
-                        with opt_cols[opt_idx % 2]:
-                            st.markdown(
-                                f"""
-                                <div class="answer-card">
-                                    <b>{html.escape(option_label)}</b>
-                                    {html.escape(option_text)}
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
-
-
-                            
+                    option_text = clean_solution_preview(option_text)
                     st.success(f"Kunci terencana: **{cq.get('correct_answer','-')}**")
                     if cq.get("source_locator"):
                         st.caption(f"🔎 Grounded source: {cq.get('source_locator')}")
                     with st.expander("Lihat Solution Basis"):
-                        solution_basis = cq.get(
-                            "solution_basis",
-                            "Belum tersedia."
+                        solution_basis = clean_solution_preview(
+                            cq.get("solution_basis", "Belum tersedia.")
                         )
-                        
-                        solution_basis = clean_solution_preview(solution_basis)
-                        solution_basis = clean_preview_math_scientific(solution_basis)
                         
                         st.markdown(solution_basis)
 
