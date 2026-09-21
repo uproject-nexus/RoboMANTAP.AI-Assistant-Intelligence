@@ -2954,17 +2954,42 @@ elif st.session_state.page == "guru_dashboard":
                     expanded=(q_idx == 1)
                 ):
                     st.markdown(f"**Soal {q_idx}**")
-                    question_text = clean_solution_preview(
-                        cq.get("question", "Soal")
+                    st.markdown(
+                        clean_preview_math_scientific(
+                            cq.get("question", "Soal")
+                        )
                     )
-                    option_text = clean_solution_preview(option_text)
+
+                    option_text = (
+                        str(option).split(".", 1)[1].strip()
+                        if "." in str(option)
+                        else str(option)
+                    )
+                    
+                    option_text = clean_preview_math_scientific(option_text)
+                    
+                    with opt_cols[opt_idx % 2]:
+                        st.markdown(
+                            f"""
+                            <div class="answer-card">
+                                <b>{chr(65 + opt_idx)}</b>
+                                {html.escape(option_text)}
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
                     st.success(f"Kunci terencana: **{cq.get('correct_answer','-')}**")
                     if cq.get("source_locator"):
                         st.caption(f"🔎 Grounded source: {cq.get('source_locator')}")
                     with st.expander("Lihat Solution Basis"):
-                        solution_basis = clean_solution_preview(
-                            cq.get("solution_basis", "Belum tersedia.")
+                        solution_basis = cq.get(
+                            "solution_basis",
+                            "Belum tersedia."
                         )
+                        
+                        solution_basis = clean_solution_preview(solution_basis)
+                        solution_basis = clean_preview_math_scientific(solution_basis)
                         
                         st.markdown(solution_basis)
 
