@@ -1554,89 +1554,7 @@ def create_5_quiz_packages(master_quiz):
         packages.append(shuffled_list)
         
     return packages
-    
-# ==============================================================================
-# 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
-# ==============================================================================
-if st.session_state.page == "landing":
 
-    st.markdown("<h3 style='text-align: center; font-size: 25px;'>🏆 BINA PRESTASI OMI 2026</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
-    st.write("---")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("""
-        <div class="mode-card">
-            <h2>🏫 TINGKAT MTs</h2>
-            <p>Madrasah Tsanawiyah Al-Irsyad Putri</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Masuk Modul MTs ➔", key="btn_mts", use_container_width=True, type="primary"):
-            st.session_state.jenjang = "MTs (Sederajat SMP)"
-            st.session_state.page = "select_mapel"
-            st.rerun()
-
-    with col2:
-        st.markdown("""
-        <div class="mode-card">
-            <h2>🏛️ TINGKAT MA</h2>
-            <p>Madrasah Aliyah Al-Irsyad Putri</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Masuk Modul MA ➔", key="btn_ma", use_container_width=True, type="primary"):
-            st.session_state.jenjang = "MA (Sederajat SMA)"
-            st.session_state.page = "select_mapel"
-            st.rerun()
-            
-    st.write("---")
-    st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
-    st.caption("Klik tombol dibawah ini untuk menuju Portal Kuis!")
-    
-    # Tombol Futuristik Neon Emerald yang Mengarah ke Render
-    st.markdown(
-        """
-        <a href="https://robomantap-intelligence-cbt.onrender.com" target="_blank" style="text-decoration: none;">
-            <div style="
-                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                color: #020617;
-                padding: 14px 24px;
-                border-radius: 12px;
-                text-align: center;
-                font-weight: 800;
-                font-size: 15px;
-                letter-spacing: 0.5px;
-                transition: all 0.3s ease;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 8px;
-                margin-top: 8px;
-                margin-bottom: 20px;
-                cursor: pointer;
-            ">
-                🚀 BUKA PORTAL KUIS →
-            </div>
-        </a>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.write("---")
-    st.markdown("#### 🧕🏼 Portal GuruMANTAP")
-    st.markdown("""
-    <div class="guru-card">
-        <h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
-        <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp</p>
-    </div>
-    """, unsafe_allow_html=True)
-    if st.button("🔒 Masuk Portal Guru ➔", use_container_width=True):
-        st.session_state.page = "guru_login"
-        st.rerun()
-
-# ==============================================================================
-# 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
-# ==============================================================================
 # HELPER PEMBERSIH NOTASI MATEMATIKA
 import re
 import html
@@ -1852,6 +1770,88 @@ def clean_preview_math_scientific(text):
 
     return text.strip()
 
+# ==============================================================================
+# 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
+# ==============================================================================
+if st.session_state.page == "landing":
+
+    st.markdown("<h3 style='text-align: center; font-size: 25px;'>🏆 BINA PRESTASI OMI 2026</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
+    st.write("---")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("""
+        <div class="mode-card">
+            <h2>🏫 TINGKAT MTs</h2>
+            <p>Madrasah Tsanawiyah Al-Irsyad Putri</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Masuk Modul MTs ➔", key="btn_mts", use_container_width=True, type="primary"):
+            st.session_state.jenjang = "MTs (Sederajat SMP)"
+            st.session_state.page = "select_mapel"
+            st.rerun()
+
+    with col2:
+        st.markdown("""
+        <div class="mode-card">
+            <h2>🏛️ TINGKAT MA</h2>
+            <p>Madrasah Aliyah Al-Irsyad Putri</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Masuk Modul MA ➔", key="btn_ma", use_container_width=True, type="primary"):
+            st.session_state.jenjang = "MA (Sederajat SMA)"
+            st.session_state.page = "select_mapel"
+            st.rerun()
+            
+    st.write("---")
+    st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
+    st.caption("Klik tombol dibawah ini untuk menuju Portal Kuis!")
+    
+    # Tombol Futuristik Neon Emerald yang Mengarah ke Render
+    st.markdown(
+        """
+        <a href="https://robomantap-intelligence-cbt.onrender.com" target="_blank" style="text-decoration: none;">
+            <div style="
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: #020617;
+                padding: 14px 24px;
+                border-radius: 12px;
+                text-align: center;
+                font-weight: 800;
+                font-size: 15px;
+                letter-spacing: 0.5px;
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                margin-top: 8px;
+                margin-bottom: 20px;
+                cursor: pointer;
+            ">
+                🚀 BUKA PORTAL KUIS →
+            </div>
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.write("---")
+    st.markdown("#### 🧕🏼 Portal GuruMANTAP")
+    st.markdown("""
+    <div class="guru-card">
+        <h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
+        <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp</p>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.button("🔒 Masuk Portal Guru ➔", use_container_width=True):
+        st.session_state.page = "guru_login"
+        st.rerun()
+
+# ==============================================================================
+# 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
+# ==============================================================================
 #=========================================================================================================
 elif st.session_state.page == "guru_login":
     st.subheader("🔒 Akses Portal GuruMANTAP")
