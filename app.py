@@ -818,6 +818,49 @@ with st.sidebar:
 # GENERATOR DOCX. KUIS
 #===========================================================
 # PEMBERSIH
+def clean_solution_preview(text: str) -> str:
+    """Pembersih KHUSUS Solution Basis pada preview Quiz Custom.
+
+    Tujuannya bukan mengubah isi pembahasan, tetapi membuat notasi matematika/
+    ilmiah yang dikirim AI tetap terbaca di Streamlit: arrow, relasi, komposisi,
+    pecahan, akar, pangkat, indeks, dan token rusak seperti ``circl``.
+    """
+    if not text:
+        return ""
+
+def contains_arabic(text: str) -> bool:
+    return bool(re.search(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]", str(text or "")))
+
+
+def apply_arabic_paragraph_style(paragraph):
+    """Aktifkan RTL untuk paragraf Word yang mengandung aksara Arab."""
+    if not paragraph:
+        return
+    try:
+        ppr = paragraph._p.get_or_add_pPr()
+        bidi = parse_xml(r'<w:bidi xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="1"/>')
+        ppr.append(bidi)
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    except Exception:
+        pass
+
+def apply_arabic_run_style(run):
+    """Gunakan font complex-script yang aman untuk aksara Arab di Word."""
+    if not run:
+        return
+    try:
+        run.font.name = "Traditional Arabic"
+        rpr = run._r.get_or_add_rPr()
+        rfonts = rpr.rFonts
+        if rfonts is None:
+            rfonts = parse_xml(r'<w:rFonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+            rpr.append(rfonts)
+        rfonts.set('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}cs', 'Traditional Arabic')
+        rfonts.set('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}ascii', 'Aptos')
+    except Exception:
+        pass
+
+# ==============================================================================
 def clean_math_string(text: str) -> str:
     """Pembersih simbol & notasi matematika dasar untuk teks biasa."""
     if not text:
