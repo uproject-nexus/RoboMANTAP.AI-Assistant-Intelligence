@@ -503,7 +503,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-UPN_PRIMARY_LOGO = "LOGO/dark_secound_primary_nexus.png"
+UPN_PRIMARY_LOGO = "nexus_logo.png"
 UPN_MARK_LOGO = "LOGO/dark_new no bg_favicon_nexus.png"
 logo_mantap_b64 = get_image_base64("logo.png")
 logo_nexus_b64 = get_image_base64(UPN_PRIMARY_LOGO) or get_image_base64("nexus_logo.png")
