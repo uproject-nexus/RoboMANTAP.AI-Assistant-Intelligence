@@ -1561,7 +1561,7 @@ elif st.session_state.page == "guru_dashboard":
             st.markdown(
                 '<p style="font-size: 12px; opacity: 0.82;">'
                 '<span class="blinking-dot-green">🟢</span> '
-                '<b>Live aktif</b> · memperbarui monitoring secara real time! · Matikan Live bila Hp/Perangkat terasa Lemot'
+                '<b>Live aktif!</b> · memperbarui data secara real time, matikan Live bila Hp/Perangkat terasa Lemot'
                 '</p>',
                 unsafe_allow_html=True
             )
@@ -2056,7 +2056,7 @@ elif st.session_state.page == "guru_dashboard":
                         status_badge = (
                             f"⚠️ SELESAI · {violation_count}/3 PERINGATAN"
                             if row["status_real"] == "SELESAI"
-                            else f"⚠️ PERINGATAN {violation_count}/3"
+                            else f"⚠️ PERINGATAN {violation_count}"
                         )
                         status_class = "upn-tag-warn"
                         finish_note = (
@@ -2283,7 +2283,7 @@ elif st.session_state.page == "guru_dashboard":
 
         # Fragment Execution Logic
         if auto_refresh:
-            @st.fragment(run_every="5s")
+            @st.fragment(run_every="1s")
             def active_live_view():
                 render_monitoring_content()
             active_live_view()
