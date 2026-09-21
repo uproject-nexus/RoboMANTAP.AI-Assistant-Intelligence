@@ -1637,6 +1637,222 @@ if st.session_state.page == "landing":
 # ==============================================================================
 # 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
 # ==============================================================================
+# HELPER PEMBERSIH NOTASI MATEMATIKA
+import re
+import html
+
+
+def clean_preview_math_scientific(text):
+    """
+    Cleaner khusus tampilan Preview Quiz Custom.
+    Tidak mengubah data asli quiz/database.
+    Fokus pada matematika, sains, notasi ilmiah, dan simbol umum.
+    """
+    if text is None:
+        return ""
+
+    text = str(text)
+
+    # ---------------------------------------------------------
+    # 1. NORMALISASI NOTASI LATEX UMUM
+    # ---------------------------------------------------------
+    replacements = {
+        r"\rightarrow": "→",
+        r"\to": "→",
+        r"\Rightarrow": "⇒",
+        r"\Longrightarrow": "⟹",
+        r"\leftarrow": "←",
+        r"\Leftarrow": "⇐",
+        r"\leftrightarrow": "↔",
+        r"\Leftrightarrow": "⇔",
+
+        r"\circ": "∘",
+        r"circl": "∘",
+
+        r"\times": "×",
+        r"\cdot": "·",
+        r"\div": "÷",
+        r"\pm": "±",
+        r"\mp": "∓",
+
+        r"\leq": "≤",
+        r"\le": "≤",
+        r"\geq": "≥",
+        r"\ge": "≥",
+        r"\neq": "≠",
+        r"\ne": "≠",
+        r"\approx": "≈",
+        r"\equiv": "≡",
+
+        r"\infty": "∞",
+        r"\degree": "°",
+        r"\angle": "∠",
+        r"\perp": "⊥",
+        r"\parallel": "∥",
+
+        r"\therefore": "∴",
+        r"\because": "∵",
+
+        r"\sum": "Σ",
+        r"\prod": "Π",
+        r"\int": "∫",
+        r"\partial": "∂",
+        r"\nabla": "∇",
+
+        r"\in": "∈",
+        r"\notin": "∉",
+        r"\subset": "⊂",
+        r"\subseteq": "⊆",
+        r"\supset": "⊃",
+        r"\supseteq": "⊇",
+        r"\cup": "∪",
+        r"\cap": "∩",
+        r"\emptyset": "∅",
+
+        r"\alpha": "α",
+        r"\beta": "β",
+        r"\gamma": "γ",
+        r"\delta": "δ",
+        r"\epsilon": "ε",
+        r"\theta": "θ",
+        r"\lambda": "λ",
+        r"\mu": "μ",
+        r"\pi": "π",
+        r"\sigma": "σ",
+        r"\phi": "φ",
+        r"\omega": "ω",
+    }
+
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    # ---------------------------------------------------------
+    # 2. BERSIHKAN COMMAND FORMAT LATEX
+    # ---------------------------------------------------------
+    text = re.sub(r"\\mathrm\{([^{}]*)\}", r"\1", text)
+    text = re.sub(r"\\mathbf\{([^{}]*)\}", r"\1", text)
+    text = re.sub(r"\\text\{([^{}]*)\}", r"\1", text)
+    text = re.sub(r"\\operatorname\{([^{}]*)\}", r"\1", text)
+
+    # ---------------------------------------------------------
+    # 3. \frac{a}{b}
+    # Dibuat menjadi bentuk linear yang tetap terbaca.
+    # ---------------------------------------------------------
+    def replace_frac(match):
+        numerator = match.group(1).strip()
+        denominator = match.group(2).strip()
+        return f"({numerator})/({denominator})"
+
+    text = re.sub(
+        r"\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}",
+        replace_frac,
+        text
+    )
+
+    # ---------------------------------------------------------
+    # 4. \sqrt{x}
+    # ---------------------------------------------------------
+    text = re.sub(
+        r"\\sqrt\s*\{([^{}]*)\}",
+        r"√(\1)",
+        text
+    )
+
+    # ---------------------------------------------------------
+    # 5. SUPERSCRIPT ANGKA / HURUF
+    # x^2 -> x²
+    # x^{-1} -> x⁻¹
+    # ---------------------------------------------------------
+    superscript_map = str.maketrans(
+        "0123456789+-=()nixy",
+        "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱˣʸ"
+    )
+
+    def superscript_replace(match):
+        value = match.group(1)
+        return value.translate(superscript_map)
+
+    text = re.sub(
+        r"\^\{([^{}]+)\}",
+        superscript_replace,
+        text
+    )
+
+    text = re.sub(
+        r"\^([0-9+\-=()nixy]+)",
+        lambda m: m.group(1).translate(superscript_map),
+        text
+    )
+
+    # ---------------------------------------------------------
+    # 6. SUBSCRIPT
+    # H_2O -> H₂O
+    # x_{1} -> x₁
+    # ---------------------------------------------------------
+    subscript_map = str.maketrans(
+        "0123456789+-=()aeinorstu",
+        "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑᵢₙₒᵣₛₜᵤ"
+    )
+
+    def subscript_replace(match):
+        value = match.group(1)
+        return value.translate(subscript_map)
+
+    text = re.sub(
+        r"_\{([^{}]+)\}",
+        subscript_replace,
+        text
+    )
+
+    text = re.sub(
+        r"_([0-9]+)",
+        lambda m: m.group(1).translate(subscript_map),
+        text
+    )
+
+    # ---------------------------------------------------------
+    # 7. NOTASI ILMIAH
+    # 3 x 10^-8 / 3 × 10^{-8}
+    # ---------------------------------------------------------
+    text = re.sub(
+        r"(\d+(?:[.,]\d+)?)\s*[x×]\s*10\s*([⁻⁺]?\d+)",
+        lambda m: f"{m.group(1)} × 10{m.group(2)}",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    # ---------------------------------------------------------
+    # 8. SIMBOL RAW YANG SERING MUNCUL DARI AI
+    # ---------------------------------------------------------
+    raw_symbols = {
+        "->": "→",
+        "=>": "⇒",
+        "<->": "↔",
+        "<=": "≤",
+        ">=": "≥",
+        "!=": "≠",
+        "+/-": "±",
+        "inf": "∞",
+    }
+
+    for old, new in raw_symbols.items():
+        text = text.replace(old, new)
+
+    # ---------------------------------------------------------
+    # 9. BERSIHKAN BACKSLASH YANG TERSISA
+    # Jangan menghapus backslash pada escape yang tidak perlu.
+    # ---------------------------------------------------------
+    text = re.sub(r"\\([A-Za-z]+)", r"\1", text)
+
+    # ---------------------------------------------------------
+    # 10. RAPATKAN SPASI BERLEBIH
+    # ---------------------------------------------------------
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    return text.strip()
+
+#=========================================================================================================
 elif st.session_state.page == "guru_login":
     st.subheader("🔒 Akses Portal GuruMANTAP")
 
@@ -2432,9 +2648,9 @@ elif st.session_state.page == "guru_dashboard":
 
         st.markdown("""
         <div class="premium-hero">
-            <div class="premium-kicker">UPN • QUIZ ENGINE</div>
+            <div class="premium-kicker">UPN • QUIZ-Intelligence</div>
             <div class="premium-title">🧩 RoboMANTAP <span>Quiz Custom</span></div>
-            <div class="premium-subtitle">Susun soal presisi dari topik manual atau langsung dari materi guru yang dilampirkan.</div>
+            <div class="premium-subtitle">Susun soal presisi dari topik manual atau langsung dari materi GuruMANTAP yang dilampirkan.</div>
             <div class="premium-pills">
                 <span>AI Grounded</span><span>QA Validator</span><span>Mobile Ready</span><span>Teacher First</span>
             </div>
@@ -2443,7 +2659,7 @@ elif st.session_state.page == "guru_dashboard":
 
         st.markdown("""
         <div class="source-warning">
-            <div class="source-warning-title">📌 PENTING UNTUK GURU</div>
+            <div class="source-warning-title">📌 PENTING!</div>
             Mohon Ustadzah untuk ketik di kolom <b>Materi Utama</b> dengan teks <code>materi dilampirkan</code>
             agar RoboMANTAP menggunakan file yang sudah di-drop sebagai sumber utama pembuatan soal dengan lebih akurat dan presisi.
         </div>
@@ -2709,18 +2925,51 @@ elif st.session_state.page == "guru_dashboard":
 
             total_q = len(custom_quiz)
             for q_idx, cq in enumerate(custom_quiz, start=1):
-                with st.expander(f"{q_idx:02d} • {cq.get('question','Soal')[:88]}", expanded=(q_idx == 1)):
+                with st.expander(
+                    f"{q_idx:02d} • {clean_preview_math_scientific(str(cq.get('question', 'Soal')))[:88]}",
+                    expanded=(q_idx == 1)
+                ):
                     st.markdown(f"**Soal {q_idx}**")
-                    st.markdown(cq.get("question", ""))
+                    st.markdown(
+                        clean_preview_math_scientific(
+                            cq.get("question", "Soal")
+                        )
+                    )
                     opt_cols = st.columns(2)
                     for opt_idx, option in enumerate(cq.get("options", [])):
                         with opt_cols[opt_idx % 2]:
-                            st.markdown(f"<div class='answer-card'><b>{html.escape(str(option).split('.',1)[0] if '.' in str(option) else chr(65+opt_idx))}</b> {html.escape(str(option).split('.',1)[1].strip() if '.' in str(option) else str(option))}</div>", unsafe_allow_html=True)
+                            option_text = (
+                                str(option).split(".", 1)[1].strip()
+                                if "." in str(option)
+                                else str(option)
+                            )
+                            
+                            option_text = clean_preview_math_scientific(option_text)
+                            
+                            with opt_cols[opt_idx % 2]:
+                                st.markdown(
+                                    f"""
+                                    <div class="answer-card">
+                                        <b>{chr(65 + opt_idx)}</b>
+                                        {html.escape(option_text)}
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True
+                                )
+                            
                     st.success(f"Kunci terencana: **{cq.get('correct_answer','-')}**")
                     if cq.get("source_locator"):
                         st.caption(f"🔎 Grounded source: {cq.get('source_locator')}")
                     with st.expander("Lihat Solution Basis"):
-                        st.markdown(clean_solution_preview(cq.get("solution_basis", "Belum tersedia.")))
+                        solution_basis = cq.get(
+                            "solution_basis",
+                            "Belum tersedia."
+                        )
+                        
+                        solution_basis = clean_solution_preview(solution_basis)
+                        solution_basis = clean_preview_math_scientific(solution_basis)
+                        
+                        st.markdown(solution_basis)
 
             docx_data = generate_quiz_docx(custom_cfg, custom_quiz)
             clean_mapel_name = custom_cfg.get('mapel', 'Quiz').replace(' ', '_')
