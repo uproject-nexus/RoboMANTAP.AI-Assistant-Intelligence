@@ -2936,24 +2936,41 @@ elif st.session_state.page == "guru_dashboard":
                         )
                     )
 
-                    option_text = (
-                        str(option).split(".", 1)[1].strip()
-                        if "." in str(option)
-                        else str(option)
-                    )
+                    # ============================================================
+                    # OPSI JAWABAN — CLEANER MATEMATIKA / ILMIAH
+                    # ============================================================
+                    opt_cols = st.columns(2)
                     
-                    option_text = clean_preview_math_scientific(option_text)
+                    for opt_idx, option in enumerate(cq.get("options", [])):
                     
-                    with opt_cols[opt_idx % 2]:
-                        st.markdown(
-                            f"""
-                            <div class="answer-card">
-                                <b>{chr(65 + opt_idx)}</b>
-                                {html.escape(option_text)}
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                        # Ambil teks opsi
+                        raw_option = str(option).strip()
+                    
+                        # Jika format AI: "A. jawaban..."
+                        if "." in raw_option:
+                            option_parts = raw_option.split(".", 1)
+                            option_label = option_parts[0].strip()
+                            option_text = option_parts[1].strip()
+                        else:
+                            option_label = chr(65 + opt_idx)
+                            option_text = raw_option
+                    
+                        # --------------------------------------------------------
+                        # CLEANER HARUS DILAKUKAN SEBELUM html.escape()
+                        # --------------------------------------------------------
+                        option_text = clean_preview_math_scientific(option_text)
+                    
+                        with opt_cols[opt_idx % 2]:
+                            st.markdown(
+                                f"""
+                                <div class="answer-card">
+                                    <b>{html.escape(option_label)}</b>
+                                    {html.escape(option_text)}
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
 
                             
                     st.success(f"Kunci terencana: **{cq.get('correct_answer','-')}**")
