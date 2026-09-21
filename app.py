@@ -2935,27 +2935,26 @@ elif st.session_state.page == "guru_dashboard":
                             cq.get("question", "Soal")
                         )
                     )
-                    opt_cols = st.columns(2)
-                    for opt_idx, option in enumerate(cq.get("options", [])):
-                        with opt_cols[opt_idx % 2]:
-                            option_text = (
-                                str(option).split(".", 1)[1].strip()
-                                if "." in str(option)
-                                else str(option)
-                            )
-                            
-                            option_text = clean_preview_math_scientific(option_text)
-                            
-                            with opt_cols[opt_idx % 2]:
-                                st.markdown(
-                                    f"""
-                                    <div class="answer-card">
-                                        <b>{chr(65 + opt_idx)}</b>
-                                        {html.escape(option_text)}
-                                    </div>
-                                    """,
-                                    unsafe_allow_html=True
-                                )
+
+                    option_text = (
+                        str(option).split(".", 1)[1].strip()
+                        if "." in str(option)
+                        else str(option)
+                    )
+                    
+                    option_text = clean_preview_math_scientific(option_text)
+                    
+                    with opt_cols[opt_idx % 2]:
+                        st.markdown(
+                            f"""
+                            <div class="answer-card">
+                                <b>{chr(65 + opt_idx)}</b>
+                                {html.escape(option_text)}
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
                             
                     st.success(f"Kunci terencana: **{cq.get('correct_answer','-')}**")
                     if cq.get("source_locator"):
