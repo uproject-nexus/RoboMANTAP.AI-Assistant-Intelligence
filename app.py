@@ -503,10 +503,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-UPN_PRIMARY_LOGO = "nexus_logo.png"
-UPN_MARK_LOGO = "LOGO/dark_new no bg_favicon_nexus.png"
 logo_mantap_b64 = get_image_base64("logo.png")
-logo_nexus_b64 = get_image_base64(UPN_PRIMARY_LOGO) or get_image_base64("nexus_logo.png")
+logo_nexus_b64 = get_image_base64("nexus_logo.png")
 
 img_mantap_html = f'<img src="data:image/png;base64,{logo_mantap_b64}" style="height: 70px; margin-bottom: 8px;">' if logo_mantap_b64 else '<div style="font-size: 32px;">🎓</div>'
 
@@ -1084,7 +1082,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     # Kolom Kiri: Logo Instansi
     p_logo = cells[0].paragraphs[0]
     p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    logo_path = UPN_PRIMARY_LOGO
+    logo_path = logo_mantap_b64
     if os.path.exists(logo_path):
         p_logo.add_run().add_picture(logo_path, width=Inches(1.5))
     else:
