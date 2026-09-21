@@ -41,7 +41,7 @@ from ai_engine import (
     build_material_knowledge_pack, save_material_bundle_to_db, get_material_bundle_from_db,
     normalize_material_trigger, generate_media_ajar_ai, build_media_ajar_pptx,
     option_labels_for_jenjang, option_count_for_jenjang, normalize_quiz_options,
-    build_language_guidance
+    normalize_custom_timer_config, build_language_guidance
 )
 
 # Interseptor Deep Link dari CBT Engine Render
@@ -856,6 +856,71 @@ def clean_math_string(text: str) -> str:
 
 clean_math_text = clean_math_string
 
+def clean_solution_preview(text: str) -> str:
+    """Pembersih KHUSUS Solution Basis pada preview Quiz Custom.
+
+    Tujuannya bukan mengubah isi pembahasan, tetapi membuat notasi matematika/
+    ilmiah yang dikirim AI tetap terbaca di Streamlit: arrow, relasi, komposisi,
+    pecahan, akar, pangkat, indeks, dan token rusak seperti ``circl``.
+    """
+    if not text:
+        return ""
+
+    value = str(text).strip()
+
+    # Token rusak yang sering muncul ketika LaTeX dipotong oleh model.
+    value = re.sub(r"(?<![A-Za-z])circl(?![A-Za-z])", lambda _: r"\circ", value)
+
+    # Perintah sederhana lebih aman ditampilkan sebagai Unicode pada preview,
+    # sehingga tidak pernah terlihat sebagai backslash mentah.
+    simple_math = {
+        r"\longrightarrow": "→", r"\rightarrow": "→", r"\to": "→",
+        r"\Longrightarrow": "⇒", r"\Rightarrow": "⇒",
+        r"\leftarrow": "←", r"\leftrightarrow": "↔",
+        r"\times": "×", r"\cdot": "·", r"\div": "÷",
+        r"\neq": "≠", r"\leq": "≤", r"\le": "≤",
+        r"\geq": "≥", r"\ge": "≥", r"\pm": "±",
+        r"\infty": "∞", r"\circ": "∘", r"\perp": "⊥",
+        r"\parallel": "∥", r"\angle": "∠", r"\in": "∈",
+        r"\notin": "∉", r"\forall": "∀", r"\exists": "∃",
+        r"\emptyset": "∅", r"\pi": "π", r"\alpha": "α",
+        r"\beta": "β", r"\gamma": "γ", r"\delta": "δ",
+        r"\theta": "θ", r"\lambda": "λ", r"\mu": "μ",
+        r"\approx": "≈", r"\equiv": "≡", r"\propto": "∝",
+        r"\sum": "Σ", r"\int": "∫", r"\partial": "∂",
+        r"\Delta": "Δ", r"\Omega": "Ω", r"\degree": "°",
+    }
+    for old, new in simple_math.items():
+        value = value.replace(old, new)
+
+    value = value.replace(" -> ", " → ").replace(" => ", " ⇒ ")
+    value = value.replace("->", "→").replace("=>", "⇒")
+    value = re.sub(r"\\left\s*([\(\[\{])", r"\1", value)
+    value = re.sub(r"\\right\s*([\)\]\}])", r"\1", value)
+    value = re.sub(r"\\(?:mathrm|text|mathbf|operatorname)\{([^{}]+)\}", r"\1", value)
+    value = re.sub(r"\\ce\{([^{}]+)\}", r"\1", value)
+
+    # Pecahan/akar tetap memakai KaTeX agar tampil sebagai notasi matematika,
+    # tetapi hanya bagian rumusnya yang dibungkus, bukan seluruh paragraf.
+    def wrap_formula(match):
+        expr = match.group(0)
+        return f"${expr}$"
+
+    value = re.sub(r"\\frac\{[^{}]+\}\{[^{}]+\}", wrap_formula, value)
+    value = re.sub(r"\\sqrt(?:\{[^{}]+\}|[A-Za-z0-9]+)", wrap_formula, value)
+
+    # Pangkat/indeks sederhana tanpa delimiter: ubah ke Unicode agar tidak mentah.
+    sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
+    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
+    value = re.sub(r"\^\{([^}]+)\}|\^([A-Za-z0-9])", lambda m: (m.group(1) or m.group(2)).translate(sup_map), value)
+    value = re.sub(r"_\{([^}]+)\}|_([A-Za-z0-9])", lambda m: (m.group(1) or m.group(2)).translate(sub_map), value)
+
+    # Hapus delimiter math kosong yang kadang ditinggalkan generator.
+    value = value.replace("$$$$", "")
+    value = re.sub(r"\$\s*\$", "", value)
+    return value.strip()
+
+
 def contains_arabic(text: str) -> bool:
     return bool(re.search(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]", str(text or "")))
 
@@ -1080,7 +1145,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     meta_items = [
         ("Jenjang / Kelas", f"{config.get('jenjang', '-')} ({config.get('kelas', '-')})"),
         ("Materi Utama", f"{clean_math_string(config.get('materi', '-'))}"),
-        ("Jumlah Soal", f"{len(quiz_list)} Soal | Opsi: {'A-D' if option_count_for_jenjang(config.get('jenjang', 'MTs')) == 4 else 'A-E'} | Durasi: {config.get('timer_h', 0)}j {config.get('timer_m', 0)}m"),
+        ("Jumlah Soal", f"{len(quiz_list)} Soal | Opsi: {'A-D' if option_count_for_jenjang(config.get('jenjang', 'MTs')) == 4 else 'A-E'} | Durasi: {timedelta(seconds=int(normalize_custom_timer_config(config).get('timer_seconds', 0)))}"),
         ("Masa Aktif Kuis", f"{config.get('time_start_str', '--:--')} hingga {config.get('time_end_str', '--:--')} WIB")
     ]
 
@@ -2645,7 +2710,7 @@ elif st.session_state.page == "guru_dashboard":
                     if cq.get("source_locator"):
                         st.caption(f"🔎 Grounded source: {cq.get('source_locator')}")
                     with st.expander("Lihat Solution Basis"):
-                        st.markdown(cq.get("solution_basis", "Belum tersedia."))
+                        st.markdown(clean_solution_preview(cq.get("solution_basis", "Belum tersedia.")))
 
             docx_data = generate_quiz_docx(custom_cfg, custom_quiz)
             clean_mapel_name = custom_cfg.get('mapel', 'Quiz').replace(' ', '_')
@@ -2984,7 +3049,7 @@ elif st.session_state.page == "setup":
 # ==============================================================================
 elif st.session_state.page == "setup_custom":
     pkg = st.session_state.get("custom_pkg", {})
-    cfg = pkg.get("config", {})
+    cfg = normalize_custom_timer_config(pkg.get("config", {}) or {})
     
     st.markdown(f"""
     <div style="font-size: 23px; font-weight: bold; line-height: 1.4; margin-bottom: 10px;">
