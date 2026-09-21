@@ -63,7 +63,7 @@ if "review_session" in st.query_params:
 
 st.set_page_config(
     page_title="RoboMANTAP-Intelligence",
-    page_icon="LOGO/dark_new no bg_favicon_nexus.png",
+    page_icon="logo.png",
     layout="wide",
     initial_sidebar_state="auto"
 )
