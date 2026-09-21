@@ -72,7 +72,7 @@
             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
                 <p class="text-xs text-slate-400">Jumlah Soal & Durasi</p>
                 <p class="font-semibold text-emerald-300 mt-1">{{ jumlah_soal if jumlah_soal is defined else (sess.quiz|length if sess and sess.quiz else 0) }} Soal</p>
-                <p class="text-xs text-slate-500 mt-0.5">Waktu: {{ durasi_menit if durasi_menit is defined else (sess.config.timer_m if sess and sess.config else 30) }} Menit</p>
+                <p class="text-xs text-slate-500 mt-0.5">Waktu: {{ durasi_label if durasi_label is defined else (((sess.config.timer_seconds // 3600) ~ " jam " ~ ((sess.config.timer_seconds % 3600) // 60) ~ " menit") if sess and sess.config and sess.config.timer_seconds and sess.config.timer_seconds >= 3600 else (((sess.config.timer_seconds // 60) ~ " menit") if sess and sess.config and sess.config.timer_seconds else "Tanpa batas waktu")) }}</p>
             </div>
         </div>
 
@@ -712,10 +712,14 @@
                     return;
                 }
 
-                const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                const s = Math.floor((diff % (1000 * 60)) / 1000);
-                document.getElementById("timer-display").textContent = 
-                    `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
+                const totalSec = Math.floor(diff / 1000);
+                const h = Math.floor(totalSec / 3600);
+                const m = Math.floor((totalSec % 3600) / 60);
+                const s = totalSec % 60;
+                const hh = h < 10 ? '0' + h : String(h);
+                const mm = m < 10 ? '0' + m : String(m);
+                const ss = s < 10 ? '0' + s : String(s);
+                document.getElementById("timer-display").textContent = h > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
             }, 1000);
         }
 
