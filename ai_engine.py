@@ -226,6 +226,36 @@ def option_count_for_jenjang(jenjang: str) -> int:
     return len(option_labels_for_jenjang(jenjang))
 
 
+def normalize_custom_timer_config(config: dict | None) -> dict:
+    """Normalisasi durasi kuis custom ke satu sumber kebenaran: timer_seconds.
+
+    Tetap mempertahankan timer_h/timer_m/timer_s untuk kompatibilitas UI lama,
+    tetapi engine CBT harus membaca total detik agar durasi 1-23 jam tidak
+    terpotong menjadi timer_m saja.
+    """
+    cfg = dict(config or {})
+    try:
+        stored_seconds = cfg.get("timer_seconds")
+        stored_total = int(stored_seconds or 0) if stored_seconds is not None else 0
+        h = max(0, int(cfg.get("timer_h", 0) or 0))
+        m = max(0, int(cfg.get("timer_m", 0) or 0))
+        sec = max(0, int(cfg.get("timer_s", 0) or 0))
+        component_total = h * 3600 + m * 60 + sec
+        # timer_seconds menjadi sumber utama bila bernilai positif. Bila 0
+        # tetapi komponen jam/menit/detik berisi nilai, pulihkan dari komponen
+        # agar konfigurasi lama yang tidak konsisten tidak berubah menjadi
+        # "tanpa batas waktu".
+        total = stored_total if stored_total > 0 else component_total
+    except (TypeError, ValueError):
+        total = 0
+
+    cfg["timer_seconds"] = total
+    cfg["timer_h"] = total // 3600
+    cfg["timer_m"] = (total % 3600) // 60
+    cfg["timer_s"] = total % 60
+    return cfg
+
+
 def _split_option_label(value: str, fallback_index: int = 0):
     text = str(value or "").strip()
     match = re.match(r"^\s*([A-Ea-e])\s*[\.\)\:\-]\s*(.*)$", text, flags=re.DOTALL)
@@ -1056,6 +1086,7 @@ def create_table_if_not_exists():
         print(f"Error create_table_if_not_exists: {e}")
 
 def publish_custom_quiz_to_db(kode_kuis: str, config: dict, quiz_data: list) -> bool:
+    config = normalize_custom_timer_config(config)
     conn = init_db_connection()
     if not conn: 
         return False
@@ -1091,6 +1122,7 @@ def get_custom_quiz_from_db(kode_kuis: str):
             result = s.execute(text(query), {"kode": kode_kuis.strip()}).fetchone()
             if result:
                 cfg = result[0] if isinstance(result[0], dict) else json.loads(result[0])
+                cfg = normalize_custom_timer_config(cfg)
                 quiz = result[1] if isinstance(result[1], list) else json.loads(result[1])
                 return {"config": cfg, "quiz": quiz}
     except Exception as e:
