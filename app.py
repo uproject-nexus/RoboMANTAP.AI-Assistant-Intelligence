@@ -2940,7 +2940,7 @@ elif st.session_state.page == "guru_dashboard":
                     for opt_idx, option in enumerate(cq.get("options", [])):
                         raw_option = str(option).strip()
                     
-                        # Pisahkan label A. / B. / C. / D. / E.
+                        # Pisahkan A. / B. / C. / D. / E.
                         match = re.match(r"^\s*([A-Ea-e])[\.\)]\s*(.*)$", raw_option)
                     
                         if match:
@@ -2950,18 +2950,14 @@ elif st.session_state.page == "guru_dashboard":
                             option_label = chr(65 + opt_idx)
                             option_text = raw_option
                     
-                        # Bersihkan notasi matematika / ilmiah
+                        # Cleaner matematika & ilmiah
                         option_text = clean_preview_math_scientific(option_text)
                     
                         with opt_cols[opt_idx % 2]:
                             st.markdown(
-                                f"""
-                                <div class="answer-card">
-                                    <b>{option_label}.</b> {option_text}
-                                </div>
-                                """,
-                                unsafe_allow_html=True
+                                f"**{option_label}.** {option_text}"
                             )
+
                             
                     st.success(f"Kunci terencana: **{cq.get('correct_answer','-')}**")
                     if cq.get("source_locator"):
