@@ -1082,12 +1082,12 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     # Kolom Kiri: Logo Instansi
     p_logo = cells[0].paragraphs[0]
     p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    logo_path = logo_mantap_b64
+    logo_path = "logo.png"  # File logo.png di root directory
     if os.path.exists(logo_path):
         p_logo.add_run().add_picture(logo_path, width=Inches(1.5))
     else:
         # Fallback jika file logo belum diunggah
-        r_logo = p_logo.add_run("logo.png")
+        r_logo = p_logo.add_run("[LOGO MANTAP]")
         r_logo.bold = True
         r_logo.font.size = Pt(12)
         r_logo.font.color.rgb = RGBColor(6, 78, 59)
