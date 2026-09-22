@@ -778,7 +778,7 @@ with st.sidebar:
 
         st.markdown("""
         <div style="background: var(--secondary-background-color); border: 1px solid rgba(128,128,128,0.2); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
-            <div style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 8px;">📋 ATURAN SKORING CBT</div>
+            <div style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 8px;">📋 ATURAN SKORING CBT OMI</div>
             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
                 <span>✅ Jawaban Benar</span>
                 <b style="color: #059669;">+4 Poin</b>
@@ -1866,7 +1866,7 @@ if st.session_state.page == "landing":
     st.markdown("""
     <div class="guru-card">
         <h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
-        <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp</p>
+        <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal dan fitur automation</p>
     </div>
     """, unsafe_allow_html=True)
     if st.button("🔒 Masuk Portal Guru ➔", use_container_width=True):
@@ -1893,7 +1893,7 @@ elif st.session_state.page == "guru_login":
             st.session_state.page = "guru_dashboard"
             st.rerun()
         else:
-            st.error("PIN Salah. Silakan coba lagi.")
+            st.error("PIN Salah. Silakhan coba lagi!")
 
 elif st.session_state.page == "guru_dashboard":
     if not st.session_state.guru_auth:
@@ -1921,13 +1921,13 @@ elif st.session_state.page == "guru_dashboard":
             st.markdown(
                 '<p style="font-size: 12px; opacity: 0.82;">'
                 '<span class="blinking-dot-green">🟢</span> '
-                '<b>Live aktif!</b> · memperbarui data secara real time, matikan Live bila Hp/Perangkat terasa Lemot'
+                '<b>LIVE AKTIF!</b> · memperbarui data secara real time, matikan Live bila Hp/Perangkat terasa Lemot.'
                 '</p>',
                 unsafe_allow_html=True
             )
         else:
             st.caption(
-                "⏸️ **Live dimatikan** · tampilan stabil dan nyaman untuk membaca laporan RoboMANTAP."
+                "⏸️ **Live Dimatikan** · tampilan stabil dan nyaman untuk membaca laporan RoboMANTAP."
             )
         
         # Kondisi Dasar: Abaikan status uji coba internal jika ada
