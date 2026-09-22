@@ -1579,217 +1579,6 @@ def create_5_quiz_packages(master_quiz):
         
     return packages
 
-
-# HELPER PEMBERSIH NOTASI MATEMATIKA
-def clean_preview_math_scientific(text):
-    """
-    Cleaner khusus tampilan Preview Quiz Custom.
-    Tidak mengubah data asli quiz/database.
-    Fokus pada matematika, sains, notasi ilmiah, dan simbol umum.
-    """
-    if text is None:
-        return ""
-
-    text = str(text)
-
-    # ---------------------------------------------------------
-    # 1. NORMALISASI NOTASI LATEX UMUM
-    # ---------------------------------------------------------
-    replacements = {
-        r"\rightarrow": "→",
-        r"\to": "→",
-        r"\Rightarrow": "⇒",
-        r"\Longrightarrow": "⟹",
-        r"\leftarrow": "←",
-        r"\Leftarrow": "⇐",
-        r"\leftrightarrow": "↔",
-        r"\Leftrightarrow": "⇔",
-
-        r"\circ": "∘",
-        r"circl": "∘",
-
-        r"\times": "×",
-        r"\cdot": "·",
-        r"\div": "÷",
-        r"\pm": "±",
-        r"\mp": "∓",
-
-        r"\leq": "≤",
-        r"\le": "≤",
-        r"\geq": "≥",
-        r"\ge": "≥",
-        r"\neq": "≠",
-        r"\ne": "≠",
-        r"\approx": "≈",
-        r"\equiv": "≡",
-
-        r"\infty": "∞",
-        r"\degree": "°",
-        r"\angle": "∠",
-        r"\perp": "⊥",
-        r"\parallel": "∥",
-
-        r"\therefore": "∴",
-        r"\because": "∵",
-
-        r"\sum": "Σ",
-        r"\prod": "Π",
-        r"\int": "∫",
-        r"\partial": "∂",
-        r"\nabla": "∇",
-
-        r"\in": "∈",
-        r"\notin": "∉",
-        r"\subset": "⊂",
-        r"\subseteq": "⊆",
-        r"\supset": "⊃",
-        r"\supseteq": "⊇",
-        r"\cup": "∪",
-        r"\cap": "∩",
-        r"\emptyset": "∅",
-
-        r"\alpha": "α",
-        r"\beta": "β",
-        r"\gamma": "γ",
-        r"\delta": "δ",
-        r"\epsilon": "ε",
-        r"\theta": "θ",
-        r"\lambda": "λ",
-        r"\mu": "μ",
-        r"\pi": "π",
-        r"\sigma": "σ",
-        r"\phi": "φ",
-        r"\omega": "ω",
-    }
-
-    for old, new in replacements.items():
-        text = text.replace(old, new)
-
-    # ---------------------------------------------------------
-    # 2. BERSIHKAN COMMAND FORMAT LATEX
-    # ---------------------------------------------------------
-    text = re.sub(r"\\mathrm\{([^{}]*)\}", r"\1", text)
-    text = re.sub(r"\\mathbf\{([^{}]*)\}", r"\1", text)
-    text = re.sub(r"\\text\{([^{}]*)\}", r"\1", text)
-    text = re.sub(r"\\operatorname\{([^{}]*)\}", r"\1", text)
-
-    # ---------------------------------------------------------
-    # 3. \frac{a}{b}
-    # Dibuat menjadi bentuk linear yang tetap terbaca.
-    # ---------------------------------------------------------
-    def replace_frac(match):
-        numerator = match.group(1).strip()
-        denominator = match.group(2).strip()
-        return f"({numerator})/({denominator})"
-
-    text = re.sub(
-        r"\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}",
-        replace_frac,
-        text
-    )
-
-    # ---------------------------------------------------------
-    # 4. \sqrt{x}
-    # ---------------------------------------------------------
-    text = re.sub(
-        r"\\sqrt\s*\{([^{}]*)\}",
-        r"√(\1)",
-        text
-    )
-
-    # ---------------------------------------------------------
-    # 5. SUPERSCRIPT ANGKA / HURUF
-    # x^2 -> x²
-    # x^{-1} -> x⁻¹
-    # ---------------------------------------------------------
-    superscript_map = str.maketrans(
-        "0123456789+-=()nixy",
-        "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱˣʸ"
-    )
-
-    def superscript_replace(match):
-        value = match.group(1)
-        return value.translate(superscript_map)
-
-    text = re.sub(
-        r"\^\{([^{}]+)\}",
-        superscript_replace,
-        text
-    )
-
-    text = re.sub(
-        r"\^([0-9+\-=()nixy]+)",
-        lambda m: m.group(1).translate(superscript_map),
-        text
-    )
-
-    # ---------------------------------------------------------
-    # 6. SUBSCRIPT
-    # H_2O -> H₂O
-    # x_{1} -> x₁
-    # ---------------------------------------------------------
-    subscript_map = str.maketrans(
-        "0123456789+-=()aeinorstu",
-        "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑᵢₙₒᵣₛₜᵤ"
-    )
-
-    def subscript_replace(match):
-        value = match.group(1)
-        return value.translate(subscript_map)
-
-    text = re.sub(
-        r"_\{([^{}]+)\}",
-        subscript_replace,
-        text
-    )
-
-    text = re.sub(
-        r"_([0-9]+)",
-        lambda m: m.group(1).translate(subscript_map),
-        text
-    )
-
-    # ---------------------------------------------------------
-    # 7. NOTASI ILMIAH
-    # 3 x 10^-8 / 3 × 10^{-8}
-    # ---------------------------------------------------------
-    text = re.sub(
-        r"(\d+(?:[.,]\d+)?)\s*[x×]\s*10\s*([⁻⁺]?\d+)",
-        lambda m: f"{m.group(1)} × 10{m.group(2)}",
-        text,
-        flags=re.IGNORECASE
-    )
-
-    # ---------------------------------------------------------
-    # 8. SIMBOL RAW YANG SERING MUNCUL DARI AI
-    # ---------------------------------------------------------
-    raw_symbols = {
-        "->": "→",
-        "=>": "⇒",
-        "<->": "↔",
-        "<=": "≤",
-        ">=": "≥",
-        "!=": "≠",
-        "+/-": "±",
-        "inf": "∞",
-    }
-
-    for old, new in raw_symbols.items():
-        text = text.replace(old, new)
-
-    # ---------------------------------------------------------
-    # 9. BERSIHKAN BACKSLASH YANG TERSISA
-    # Jangan menghapus backslash pada escape yang tidak perlu.
-    # ---------------------------------------------------------
-
-    # ---------------------------------------------------------
-    # 10. RAPATKAN SPASI BERLEBIH
-    # ---------------------------------------------------------
-    text = re.sub(r"[ \t]{2,}", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-
-    return text.strip()
-
 # ==============================================================================
 # 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
 # ==============================================================================
@@ -2930,146 +2719,6 @@ elif st.session_state.page == "guru_dashboard":
 
         if custom_quiz:
             st.markdown("---")
-
-            # ============================================================
-            # PREVIEW CLEANER LAYER
-            # ============================================================
-            def _preview_clean(value):
-                if value is None:
-                    return ""
-
-                text = str(value)
-
-                # --------------------------------------------------------
-                # 1. TOKEN MATEMATIKA MENTAH DARI OUTPUT AI
-                # --------------------------------------------------------
-                raw_preview_replacements = {
-                    "fracx": r"\frac",
-                    "implies": "⇒",
-                    "rightarrow": "→",
-                    "Rightarrow": "⇒",
-                    "Longrightarrow": "⟹",
-                    "leftarrow": "←",
-                    "Leftarrow": "⇐",
-                    "leftrightarrow": "↔",
-                    "Leftrightarrow": "⇔",
-                    "times": "×",
-                    "cdot": "·",
-                    "div": "÷",
-                    "pm": "±",
-                    "mp": "∓",
-                    "leq": "≤",
-                    "le": "≤",
-                    "geq": "≥",
-                    "ge": "≥",
-                    "neq": "≠",
-                    "ne": "≠",
-                    "approx": "≈",
-                    "equiv": "≡",
-                    "infty": "∞",
-                    "degree": "°",
-                    "angle": "∠",
-                    "perp": "⊥",
-                    "parallel": "∥",
-                    "therefore": "∴",
-                    "because": "∵",
-                }
-
-                for old, new in raw_preview_replacements.items():
-                    text = re.sub(
-                        rf"(?<![A-Za-z]){re.escape(old)}(?![A-Za-z])",
-                        new,
-                        text
-                    )
-
-                # --------------------------------------------------------
-                # 2. NORMALISASI DELIMITER LATEX
-                # --------------------------------------------------------
-                text = text.replace("$$", "")
-                text = text.replace("$", "")
-                text = text.replace(r"\(", "")
-                text = text.replace(r"\)", "")
-                text = text.replace(r"\[", "")
-                text = text.replace(r"\]", "")
-
-                # --------------------------------------------------------
-                # 3. GUNAKAN CLEANER UTAMA YANG SUDAH ADA
-                # --------------------------------------------------------
-                text = clean_preview_math_scientific(text)
-
-                # --------------------------------------------------------
-                # 4. HANDLE fracx / \fracx
-                # --------------------------------------------------------
-                def _replace_fracx(match):
-                    numerator = match.group(1).strip()
-                    denominator = match.group(2).strip()
-                    return f"({numerator})/({denominator})"
-
-                text = re.sub(
-                    r"\\?fracx\s*\{([^{}]*)\}\s*\{([^{}]*)\}",
-                    _replace_fracx,
-                    text,
-                    flags=re.IGNORECASE
-                )
-
-                # --------------------------------------------------------
-                # 5. HANDLE COMMAND LATEX YANG MASIH TERSISA
-                # --------------------------------------------------------
-                remaining_commands = {
-                    r"\implies": "⇒",
-                    r"\Rightarrow": "⇒",
-                    r"\Longrightarrow": "⟹",
-                    r"\rightarrow": "→",
-                    r"\leftarrow": "←",
-                    r"\leftrightarrow": "↔",
-                    r"\times": "×",
-                    r"\cdot": "·",
-                    r"\div": "÷",
-                    r"\pm": "±",
-                    r"\mp": "∓",
-                    r"\leq": "≤",
-                    r"\le": "≤",
-                    r"\geq": "≥",
-                    r"\ge": "≥",
-                    r"\neq": "≠",
-                    r"\ne": "≠",
-                    r"\approx": "≈",
-                    r"\equiv": "≡",
-                    r"\infty": "∞",
-                    r"\degree": "°",
-                    r"\therefore": "∴",
-                    r"\because": "∵",
-                }
-
-                for old, new in remaining_commands.items():
-                    text = text.replace(old, new)
-
-                # --------------------------------------------------------
-                # 6. HANDLE NOTASI RAW SEDERHANA
-                # --------------------------------------------------------
-                text = text.replace("=>", "⇒")
-                text = text.replace("<->", "↔")
-                text = text.replace("->", "→")
-                text = text.replace("<=", "≤")
-                text = text.replace(">=", "≥")
-                text = text.replace("!=", "≠")
-                text = text.replace("+/-", "±")
-
-                # --------------------------------------------------------
-                # 7. HAPUS DELIMITER YANG MUNGKIN TERSISA
-                # --------------------------------------------------------
-                text = text.replace("$$", "")
-                text = text.replace("$", "")
-                text = text.replace(r"\(", "")
-                text = text.replace(r"\)", "")
-                text = text.replace(r"\[", "")
-                text = text.replace(r"\]", "")
-
-                return text.strip()
-
-            # ============================================================
-            # PREVIEW HEADER
-            # ============================================================
             source_mode = custom_cfg.get("source_mode", "manual_topic")
             source_chip = (
                 f"<span class='chip chip-green'>📚 Source Grounding • {html.escape(custom_cfg.get('material_bundle_code','-'))}</span>"
@@ -3086,104 +2735,122 @@ elif st.session_state.page == "guru_dashboard":
             # ============================================================
             # QUESTION PREVIEW
             # ============================================================
-
+            
             total_q = len(custom_quiz)
-
+            
             for q_idx, cq in enumerate(
                 custom_quiz,
                 start=1
             ):
-
+            
                 # --------------------------------------------------------
                 # SOAL
                 # --------------------------------------------------------
+            
                 raw_question = cq.get(
                     "question",
                     "Soal"
                 )
-
-                clean_question = _preview_clean(
+            
+                # Gunakan CLEANER UTAMA yang sama
+                # dengan generator DOCX.
+                clean_question = clean_math_string(
                     raw_question
                 )
-
+            
                 # Hindari title expander terlalu panjang / multiline
                 expander_title = (
                     clean_question
                     .replace("\n", " ")
                     .strip()
                 )
-
+            
                 with st.expander(
                     f"{q_idx:02d} • {expander_title[:88]}",
                     expanded=(q_idx == 1)
                 ):
-
+            
                     st.markdown(
                         f"**Soal {q_idx}**"
                     )
-
+            
+                    # ----------------------------------------------------
+                    # TAMPILKAN SOAL
+                    # ----------------------------------------------------
+            
                     st.markdown(
                         clean_question
                     )
-
+            
                     # ====================================================
                     # OPSI JAWABAN
                     # ====================================================
-
+            
                     options = cq.get(
                         "options",
                         []
                     ) or []
-
+            
                     opt_cols = st.columns(2)
-
+            
                     for opt_idx, option in enumerate(
                         options
                     ):
-
+            
                         raw_option = str(
                             option
                         ).strip()
-
+            
                         # ------------------------------------------------
-                        # Parsing label opsi yang aman.
+                        # Parsing label opsi yang aman
+                        #
+                        # Mendukung:
+                        # A. ...
+                        # A) ...
+                        # a. ...
+                        # a) ...
                         # ------------------------------------------------
+            
                         match_label = re.match(
                             r"^([A-Ea-e])[\.\)]\s*(.*)$",
                             raw_option,
                             flags=re.DOTALL
                         )
-
+            
                         if match_label:
+            
                             option_label = (
                                 match_label
                                 .group(1)
                                 .upper()
                             )
-
+            
                             option_text = (
                                 match_label
                                 .group(2)
                                 .strip()
                             )
+            
                         else:
+            
                             option_label = chr(
                                 65 + opt_idx
                             )
-
+            
                             option_text = raw_option
-
+            
                         # ------------------------------------------------
-                        # CLEANER
+                        # Gunakan CLEANER UTAMA
                         # ------------------------------------------------
-                        option_text = _preview_clean(
+            
+                        option_text = clean_math_string(
                             option_text
                         )
-
+            
                         with opt_cols[
                             opt_idx % 2
                         ]:
-
+            
                             st.markdown(
                                 f"""
                                 <div class="answer-card">
@@ -3199,55 +2866,63 @@ elif st.session_state.page == "guru_dashboard":
                                 """,
                                 unsafe_allow_html=True
                             )
-
+            
                     # ====================================================
                     # KUNCI JAWABAN
                     # ====================================================
-
-                    correct_answer = _preview_clean(
+            
+                    correct_answer = clean_math_string(
                         cq.get(
                             "correct_answer",
                             "-"
                         )
                     )
-
+            
                     st.success(
                         f"Kunci terencana: "
                         f"**{html.escape(correct_answer)}**"
                     )
-
+            
                     # ====================================================
                     # SOURCE LOCATOR
                     # ====================================================
-
+            
                     if cq.get(
                         "source_locator"
                     ):
+            
                         st.caption(
                             "🔎 Grounded source: "
                             f"{cq.get('source_locator')}"
                         )
-
+            
                     # ====================================================
                     # SOLUTION BASIS
                     # ====================================================
-
+            
                     with st.expander(
                         "Lihat Solution Basis"
                     ):
-
+            
                         solution_basis = cq.get(
                             "solution_basis",
                             "Belum tersedia."
                         )
-
-                        solution_basis = _preview_clean(
+            
+                        # Gunakan CLEANER UTAMA yang sama
+                        # dengan soal dan opsi.
+                        solution_basis = clean_math_string(
                             solution_basis
                         )
-
+            
                         st.markdown(
                             solution_basis
                         )
+
+                # --------------------------------------------------------
+                # SOAL
+                # --------------------------------------------------------
+
 
             docx_data = generate_quiz_docx(custom_cfg, custom_quiz)
             clean_mapel_name = custom_cfg.get('mapel', 'Quiz').replace(' ', '_')
