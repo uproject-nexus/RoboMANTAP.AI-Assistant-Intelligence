@@ -2743,22 +2743,8 @@ elif st.session_state.page == "guru_dashboard":
                     for option in cq["options"]:
                         st.markdown(f"- {option}")
                     st.success(f"Kunci terencana: **{cq['correct_answer']}**")
-                    with st.expander(
-                        "Lihat Solution Basis"
-                    ):
-            
-                        solution_basis = cq.get(
-                            "solution_basis",
-                            "Belum tersedia."
-                        )
-
-                        solution_basis = clean_math_string(
-                            solution_basis
-                        )
-            
-                        st.markdown(
-                            solution_basis
-                        )
+                    with st.expander("Lihat Solution Basis"):
+                        st.markdown(cq.get("solution_basis", "Belum tersedia."))
 
             docx_data = generate_quiz_docx(custom_cfg, custom_quiz)
             clean_mapel_name = custom_cfg.get('mapel', 'Quiz').replace(' ', '_')
