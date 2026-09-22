@@ -1579,11 +1579,8 @@ def create_5_quiz_packages(master_quiz):
         
     return packages
 
+
 # HELPER PEMBERSIH NOTASI MATEMATIKA
-import re
-import html
-
-
 def clean_preview_math_scientific(text):
     """
     Cleaner khusus tampilan Preview Quiz Custom.
@@ -2934,79 +2931,371 @@ elif st.session_state.page == "guru_dashboard":
 
         if custom_quiz:
             st.markdown("---")
-            source_mode = custom_cfg.get("source_mode", "manual_topic")
-            source_chip = (
-                f"<span class='chip chip-green'>📚 Source Grounding • {html.escape(custom_cfg.get('material_bundle_code','-'))}</span>"
-                if source_mode == "teacher_material" else
-                "<span class='chip chip-blue'>🧠 Topic Architect • manual</span>"
+
+            # ============================================================
+            # PREVIEW CLEANER LAYER
+            # ============================================================
+            def _preview_clean(value):
+                if value is None:
+                    return ""
+
+                text = str(value)
+
+                # --------------------------------------------------------
+                # 1. TOKEN MATEMATIKA MENTAH DARI OUTPUT AI
+                # --------------------------------------------------------
+                raw_preview_replacements = {
+                    "fracx": r"\frac",
+                    "implies": "⇒",
+                    "rightarrow": "→",
+                    "Rightarrow": "⇒",
+                    "Longrightarrow": "⟹",
+                    "leftarrow": "←",
+                    "Leftarrow": "⇐",
+                    "leftrightarrow": "↔",
+                    "Leftrightarrow": "⇔",
+                    "times": "×",
+                    "cdot": "·",
+                    "div": "÷",
+                    "pm": "±",
+                    "mp": "∓",
+                    "leq": "≤",
+                    "le": "≤",
+                    "geq": "≥",
+                    "ge": "≥",
+                    "neq": "≠",
+                    "ne": "≠",
+                    "approx": "≈",
+                    "equiv": "≡",
+                    "infty": "∞",
+                    "degree": "°",
+                    "angle": "∠",
+                    "perp": "⊥",
+                    "parallel": "∥",
+                    "therefore": "∴",
+                    "because": "∵",
+                }
+
+                for old, new in raw_preview_replacements.items():
+                    text = re.sub(
+                        rf"(?<![A-Za-z]){re.escape(old)}(?![A-Za-z])",
+                        new,
+                        text
+                    )
+
+                # --------------------------------------------------------
+                # 2. NORMALISASI DELIMITER LATEX
+                # --------------------------------------------------------
+                text = text.replace("$$", "")
+                text = text.replace("$", "")
+                text = text.replace(r"\(", "")
+                text = text.replace(r"\)", "")
+                text = text.replace(r"\[", "")
+                text = text.replace(r"\]", "")
+
+                # --------------------------------------------------------
+                # 3. GUNAKAN CLEANER UTAMA YANG SUDAH ADA
+                # --------------------------------------------------------
+                text = clean_preview_math_scientific(text)
+
+                # --------------------------------------------------------
+                # 4. HANDLE fracx / \fracx
+                # --------------------------------------------------------
+                def _replace_fracx(match):
+                    numerator = match.group(1).strip()
+                    denominator = match.group(2).strip()
+                    return f"({numerator})/({denominator})"
+
+                text = re.sub(
+                    r"\\?fracx\s*\{([^{}]*)\}\s*\{([^{}]*)\}",
+                    _replace_fracx,
+                    text,
+                    flags=re.IGNORECASE
+                )
+
+                # --------------------------------------------------------
+                # 5. HANDLE COMMAND LATEX YANG MASIH TERSISA
+                # --------------------------------------------------------
+                remaining_commands = {
+                    r"\implies": "⇒",
+                    r"\Rightarrow": "⇒",
+                    r"\Longrightarrow": "⟹",
+                    r"\rightarrow": "→",
+                    r"\leftarrow": "←",
+                    r"\leftrightarrow": "↔",
+                    r"\times": "×",
+                    r"\cdot": "·",
+                    r"\div": "÷",
+                    r"\pm": "±",
+                    r"\mp": "∓",
+                    r"\leq": "≤",
+                    r"\le": "≤",
+                    r"\geq": "≥",
+                    r"\ge": "≥",
+                    r"\neq": "≠",
+                    r"\ne": "≠",
+                    r"\approx": "≈",
+                    r"\equiv": "≡",
+                    r"\infty": "∞",
+                    r"\degree": "°",
+                    r"\therefore": "∴",
+                    r"\because": "∵",
+                }
+
+                for old, new in remaining_commands.items():
+                    text = text.replace(old, new)
+
+                # --------------------------------------------------------
+                # 6. HANDLE NOTASI RAW SEDERHANA
+                # --------------------------------------------------------
+                text = text.replace("=>", "⇒")
+                text = text.replace("<->", "↔")
+                text = text.replace("->", "→")
+                text = text.replace("<=", "≤")
+                text = text.replace(">=", "≥")
+                text = text.replace("!=", "≠")
+                text = text.replace("+/-", "±")
+
+                # --------------------------------------------------------
+                # 7. HAPUS DELIMITER YANG MUNGKIN TERSISA
+                # --------------------------------------------------------
+                text = text.replace("$$", "")
+                text = text.replace("$", "")
+                text = text.replace(r"\(", "")
+                text = text.replace(r"\)", "")
+                text = text.replace(r"\[", "")
+                text = text.replace(r"\]", "")
+
+                return text.strip()
+
+            # ============================================================
+            # PREVIEW HEADER
+            # ============================================================
+
+            source_mode = custom_cfg.get(
+                "source_mode",
+                "manual_topic"
             )
-            st.markdown(f"""
-            <div class="preview-hero">
-                <div><div class="preview-label">QUIZ PREVIEW</div><div class="preview-title">{html.escape(custom_cfg.get('mapel','Kuis'))}</div></div>
-                <div class="preview-meta">{source_chip}<span class='chip chip-purple'>{len(custom_quiz)} soal</span><span class='chip chip-blue'>Opsi {"A-D" if option_count_for_jenjang(custom_cfg.get("jenjang", "MTs")) == 4 else "A-E"}</span><span class='chip chip-gold'>{html.escape(custom_cfg.get('kesulitan','-'))}</span></div>
-            </div>
-            """, unsafe_allow_html=True)
+
+            source_chip = (
+                f"<span class='chip chip-green'>"
+                f"📚 Source Grounding • "
+                f"{html.escape(str(custom_cfg.get('material_bundle_code', '-')))}"
+                f"</span>"
+                if source_mode == "teacher_material"
+                else
+                "<span class='chip chip-blue'>"
+                "🧠 Topic Architect • manual"
+                "</span>"
+            )
+
+            option_rule = (
+                "A-D"
+                if option_count_for_jenjang(
+                    custom_cfg.get("jenjang", "MTs")
+                ) == 4
+                else "A-E"
+            )
+
+            st.markdown(
+                f"""
+                <div class="preview-hero">
+                    <div>
+                        <div class="preview-label">QUIZ PREVIEW</div>
+                        <div class="preview-title">
+                            {html.escape(
+                                str(custom_cfg.get("mapel", "Kuis"))
+                            )}
+                        </div>
+                    </div>
+
+                    <div class="preview-meta">
+                        {source_chip}
+
+                        <span class='chip chip-purple'>
+                            {len(custom_quiz)} soal
+                        </span>
+
+                        <span class='chip chip-blue'>
+                            Opsi {option_rule}
+                        </span>
+
+                        <span class='chip chip-gold'>
+                            {html.escape(
+                                str(custom_cfg.get("kesulitan", "-"))
+                            )}
+                        </span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # ============================================================
+            # QUESTION PREVIEW
+            # ============================================================
 
             total_q = len(custom_quiz)
-            for q_idx, cq in enumerate(custom_quiz, start=1):
+
+            for q_idx, cq in enumerate(
+                custom_quiz,
+                start=1
+            ):
+
+                # --------------------------------------------------------
+                # SOAL
+                # --------------------------------------------------------
+                raw_question = cq.get(
+                    "question",
+                    "Soal"
+                )
+
+                clean_question = _preview_clean(
+                    raw_question
+                )
+
+                # Hindari title expander terlalu panjang / multiline
+                expander_title = (
+                    clean_question
+                    .replace("\n", " ")
+                    .strip()
+                )
+
                 with st.expander(
-                    f"{q_idx:02d} • {clean_preview_math_scientific(str(cq.get('question', 'Soal')))[:88]}",
+                    f"{q_idx:02d} • {expander_title[:88]}",
                     expanded=(q_idx == 1)
                 ):
-                    st.markdown(f"**Soal {q_idx}**")
+
                     st.markdown(
-                        clean_preview_math_scientific(
-                            cq.get("question", "Soal")
-                        )
+                        f"**Soal {q_idx}**"
                     )
-                    # ============================================================
-                    # OPSI JAWABAN — CLEANER MATEMATIKA / ILMIAH
-                    # ============================================================
+
+                    st.markdown(
+                        clean_question
+                    )
+
+                    # ====================================================
+                    # OPSI JAWABAN
+                    # ====================================================
+
+                    options = cq.get(
+                        "options",
+                        []
+                    ) or []
+
                     opt_cols = st.columns(2)
-                    
-                    for opt_idx, option in enumerate(cq.get("options", [])):
-                    
-                        # Ambil teks opsi
-                        raw_option = str(option).strip()
-                    
-                        # Jika format AI: "A. jawaban..."
-                        if "." in raw_option:
-                            option_parts = raw_option.split(".", 1)
-                            option_label = option_parts[0].strip()
-                            option_text = option_parts[1].strip()
+
+                    for opt_idx, option in enumerate(
+                        options
+                    ):
+
+                        raw_option = str(
+                            option
+                        ).strip()
+
+                        # ------------------------------------------------
+                        # Parsing label opsi yang aman.
+                        # ------------------------------------------------
+                        match_label = re.match(
+                            r"^([A-Ea-e])[\.\)]\s*(.*)$",
+                            raw_option,
+                            flags=re.DOTALL
+                        )
+
+                        if match_label:
+                            option_label = (
+                                match_label
+                                .group(1)
+                                .upper()
+                            )
+
+                            option_text = (
+                                match_label
+                                .group(2)
+                                .strip()
+                            )
                         else:
-                            option_label = chr(65 + opt_idx)
+                            option_label = chr(
+                                65 + opt_idx
+                            )
+
                             option_text = raw_option
-                    
-                        # --------------------------------------------------------
-                        # CLEANER HARUS DILAKUKAN SEBELUM html.escape()
-                        # --------------------------------------------------------
-                        option_text = clean_preview_math_scientific(option_text)
-                    
-                        with opt_cols[opt_idx % 2]:
+
+                        # ------------------------------------------------
+                        # CLEANER
+                        # ------------------------------------------------
+                        option_text = _preview_clean(
+                            option_text
+                        )
+
+                        with opt_cols[
+                            opt_idx % 2
+                        ]:
+
                             st.markdown(
                                 f"""
                                 <div class="answer-card">
-                                    <b>{html.escape(option_label)}</b>
-                                    {html.escape(option_text)}
+                                    <b>
+                                        {html.escape(
+                                            option_label
+                                        )}
+                                    </b>
+                                    {html.escape(
+                                        option_text
+                                    )}
                                 </div>
                                 """,
                                 unsafe_allow_html=True
                             )
 
-                    st.success(f"Kunci terencana: **{cq.get('correct_answer','-')}**")
-                    if cq.get("source_locator"):
-                        st.caption(f"🔎 Grounded source: {cq.get('source_locator')}")
-                    with st.expander("Lihat Solution Basis"):
+                    # ====================================================
+                    # KUNCI JAWABAN
+                    # ====================================================
+
+                    correct_answer = _preview_clean(
+                        cq.get(
+                            "correct_answer",
+                            "-"
+                        )
+                    )
+
+                    st.success(
+                        f"Kunci terencana: "
+                        f"**{html.escape(correct_answer)}**"
+                    )
+
+                    # ====================================================
+                    # SOURCE LOCATOR
+                    # ====================================================
+
+                    if cq.get(
+                        "source_locator"
+                    ):
+                        st.caption(
+                            "🔎 Grounded source: "
+                            f"{cq.get('source_locator')}"
+                        )
+
+                    # ====================================================
+                    # SOLUTION BASIS
+                    # ====================================================
+
+                    with st.expander(
+                        "Lihat Solution Basis"
+                    ):
+
                         solution_basis = cq.get(
                             "solution_basis",
                             "Belum tersedia."
                         )
-                        
-                        solution_basis = clean_solution_preview(solution_basis)
-                        solution_basis = clean_preview_math_scientific(solution_basis)
-                        
-                        st.markdown(solution_basis)
+
+                        solution_basis = _preview_clean(
+                            solution_basis
+                        )
+
+                        st.markdown(
+                            solution_basis
+                        )
 
             docx_data = generate_quiz_docx(custom_cfg, custom_quiz)
             clean_mapel_name = custom_cfg.get('mapel', 'Quiz').replace(' ', '_')
