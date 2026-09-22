@@ -2744,7 +2744,7 @@ elif st.session_state.page == "guru_dashboard":
                         st.markdown(f"- {option}")
                     st.success(f"Kunci terencana: **{cq['correct_answer']}**")
                     with st.expander("Lihat Solution Basis"):
-                        st.markdown(cq.get("solution_basis", "Belum tersedia."))
+                        st.markdown(clean_solution_preview(cq.get("solution_basis", "Belum tersedia.")))
 
             docx_data = generate_quiz_docx(custom_cfg, custom_quiz)
             clean_mapel_name = custom_cfg.get('mapel', 'Quiz').replace(' ', '_')
