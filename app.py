@@ -3071,65 +3071,18 @@ elif st.session_state.page == "guru_dashboard":
             # ============================================================
             # PREVIEW HEADER
             # ============================================================
-
-            source_mode = custom_cfg.get(
-                "source_mode",
-                "manual_topic"
-            )
-
+            source_mode = custom_cfg.get("source_mode", "manual_topic")
             source_chip = (
-                f"<span class='chip chip-green'>"
-                f"📚 Source Grounding • "
-                f"{html.escape(str(custom_cfg.get('material_bundle_code', '-')))}"
-                f"</span>"
-                if source_mode == "teacher_material"
-                else
-                "<span class='chip chip-blue'>"
-                "🧠 Topic Architect • manual"
-                "</span>"
+                f"<span class='chip chip-green'>📚 Source Grounding • {html.escape(custom_cfg.get('material_bundle_code','-'))}</span>"
+                if source_mode == "teacher_material" else
+                "<span class='chip chip-blue'>🧠 Topic Architect • manual</span>"
             )
-
-            option_rule = (
-                "A-D"
-                if option_count_for_jenjang(
-                    custom_cfg.get("jenjang", "MTs")
-                ) == 4
-                else "A-E"
-            )
-
-            st.markdown(
-                f"""
-                <div class="preview-hero">
-                    <div>
-                        <div class="preview-label">QUIZ PREVIEW</div>
-                        <div class="preview-title">
-                            {html.escape(
-                                str(custom_cfg.get("mapel", "Kuis"))
-                            )}
-                        </div>
-                    </div>
-
-                    <div class="preview-meta">
-                        {source_chip}
-
-                        <span class='chip chip-purple'>
-                            {len(custom_quiz)} soal
-                        </span>
-
-                        <span class='chip chip-blue'>
-                            Opsi {option_rule}
-                        </span>
-
-                        <span class='chip chip-gold'>
-                            {html.escape(
-                                str(custom_cfg.get("kesulitan", "-"))
-                            )}
-                        </span>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            st.markdown(f"""
+            <div class="preview-hero">
+                <div><div class="preview-label">QUIZ PREVIEW</div><div class="preview-title">{html.escape(custom_cfg.get('mapel','Kuis'))}</div></div>
+                <div class="preview-meta">{source_chip}<span class='chip chip-purple'>{len(custom_quiz)} soal</span><span class='chip chip-blue'>Opsi {"A-D" if option_count_for_jenjang(custom_cfg.get("jenjang", "MTs")) == 4 else "A-E"}</span><span class='chip chip-gold'>{html.escape(custom_cfg.get('kesulitan','-'))}</span></div>
+            </div>
+            """, unsafe_allow_html=True)
 
             # ============================================================
             # QUESTION PREVIEW
