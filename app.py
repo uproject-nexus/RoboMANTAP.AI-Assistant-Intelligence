@@ -1781,7 +1781,6 @@ def clean_preview_math_scientific(text):
     # 9. BERSIHKAN BACKSLASH YANG TERSISA
     # Jangan menghapus backslash pada escape yang tidak perlu.
     # ---------------------------------------------------------
-    text = re.sub(r"\\([A-Za-z]+)", r"\1", text)
 
     # ---------------------------------------------------------
     # 10. RAPATKAN SPASI BERLEBIH
