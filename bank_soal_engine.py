@@ -957,9 +957,9 @@ def build_bank_soal_docx(
                 if int(q.get("variant", 0)) == variant
                 and q.get("question_type") == form
             ]
-            for variant in variant_values
             for form in FORM_ORDER
         }
+        for variant in variant_values
     }
 
     for variant_index, variant in enumerate(variant_values):
