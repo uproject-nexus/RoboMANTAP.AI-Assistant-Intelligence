@@ -13,6 +13,8 @@ import os
 import re
 import json
 import math
+import html
+import tempfile
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from typing import Any
@@ -21,11 +23,12 @@ from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
-from docx.oxml import OxmlElement, parse_xml, nsdecls
-from docx.oxml.ns import qn
+from docx.oxml import OxmlElement, parse_xml
+from docx.oxml.ns import qn, nsdecls
 from xml.sax.saxutils import escape
 
-from ai_engine import call_gemini_with_rotation, clean_json_text
+from ai_engine import call_gemini_with_rotation, clean_json_text, _call_gemini_contents
+from google.genai import types
 
 
 FORM_ORDER = ("PG", "Isian", "Uraian")
@@ -72,390 +75,169 @@ def _find_cognitive_column(rows: list[list[str]], search_upto: int) -> int | Non
 def _clean(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
-def clean_docx_math_text(text: str) -> str:
-    """
-    Pembersih teks sebelum masuk ke DOCX.
+def clean_math_string(text: str) -> str:
+    """Same math-cleaning logic used by the existing Quiz DOCX renderer.
 
-    Penting:
-    - Menghapus literal \\n / \\r / \\r\\n yang bocor dari AI.
-    - Menghapus newline aktual yang mengganggu layout.
-    - TIDAK menghapus backslash LaTeX penting seperti:
-        \\frac
-        \\dfrac
-        \\tfrac
-        \\begin
-        \\end
-        \\circ
-    - Menormalisasi token matematika sederhana.
+    Bank Soal intentionally shares this renderer so fractions, matrices,
+    inverses, composition symbols and escaped newlines behave the same way.
     """
-    if text is None:
+    if not text:
         return ""
-
     text = str(text)
 
-    # ------------------------------------------------------------
-    # 1. Bersihkan newline yang dikirim sebagai TEKS literal.
-    # ------------------------------------------------------------
-    text = text.replace("\\r\\n", " ")
-    text = text.replace("\\n", " ")
-    text = text.replace("\\r", " ")
+    # Literal and actual newlines must never leak into the Word document.
+    text = text.replace("\\r\\n", " ").replace("\\n", " ").replace("\\r", " ")
+    text = text.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
 
-    # Newline aktual dari string Python/JSON.
-    text = text.replace("\r\n", " ")
-    text = text.replace("\r", " ")
-    text = text.replace("\n", " ")
-
-    # ------------------------------------------------------------
-    # 2. Token matematika sederhana.
-    # ------------------------------------------------------------
     replacements = {
-        r"\rightarrow": "→",
-        r"\longrightarrow": "→",
-        r"\to": "→",
-        r"\Rightarrow": "⇒",
-        r"\Longrightarrow": "⇒",
-        r"\leftarrow": "←",
-        r"\leftrightarrow": "↔",
-        r"\Longleftrightarrow": "⇔",
-
-        r"\times": "×",
-        r"\cdot": "·",
-        r"\div": "÷",
-        r"\neq": "≠",
-        r"\leq": "≤",
-        r"\geq": "≥",
-        r"\le": "≤",
-        r"\ge": "≥",
-        r"\pm": "±",
-        r"\mp": "∓",
-
-        r"\infty": "∞",
-        r"\pi": "π",
-        r"\alpha": "α",
-        r"\beta": "β",
-        r"\gamma": "γ",
-        r"\delta": "δ",
-        r"\theta": "θ",
-        r"\lambda": "λ",
-        r"\mu": "μ",
-        r"\sigma": "σ",
-
-        r"\in": "∈",
-        r"\notin": "∉",
-        r"\forall": "∀",
-        r"\exists": "∃",
-        r"\emptyset": "∅",
-        r"\angle": "∠",
-        r"\perp": "⊥",
-        r"\parallel": "∥",
-
-        # Fungsi komposisi / fungsi invers.
-        r"\circ": "∘",
-        r"\circl": "∘",
-
-        r"\approx": "≈",
-        r"\equiv": "≡",
-        r"\propto": "∝",
+        r"\rightarrow": "→", r"\to": "→", r"\Rightarrow": "⇒",
+        r"\leftarrow": "←", r"\leftrightarrow": "↔",
+        r"\Longleftrightarrow": "⇔", r"\longleftrightarrow": "↔",
+        r"\Longleftarrow": "⇐", r"\Longrightarrow": "⇒",
+        r"\implies": "⇒", r"\impliedby": "⇐", r"\iff": "⇔",
+        r"\circ": "∘", r"\circl": "∘",
+        r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
+        r"\leq": "≤", r"\geq": "≥", r"\le": "≤", r"\ge": "≥",
+        r"\pm": "±", r"\mp": "∓", r"\infty": "∞", r"\pi": "π",
+        r"\alpha": "α", r"\beta": "β", r"\gamma": "γ", r"\delta": "δ",
+        r"\theta": "θ", r"\lambda": "λ", r"\mu": "μ", r"\sigma": "σ",
+        r"\in": "∈", r"\notin": "∉", r"\forall": "∀", r"\exists": "∃",
+        r"\emptyset": "∅", r"\angle": "∠", r"\perp": "⊥", r"\parallel": "∥",
+        r"\approx": "≈", r"\equiv": "≡", r"\propto": "∝",
+        r"\sum": "Σ", r"\prod": "Π", r"\int": "∫", r"\partial": "∂", r"\nabla": "∇",
+        r"\Delta": "Δ", r"\Omega": "Ω", r"\Gamma": "Γ", r"\Lambda": "Λ",
+        r"\Sigma": "Σ", r"\Phi": "Φ", r"\degree": "°",
     }
-
     for old, new in replacements.items():
         text = text.replace(old, new)
-
-    # Token rusak yang kadang muncul dari AI.
-    text = re.sub(
-        r"(?<![A-Za-z])circl(?![A-Za-z])",
-        "∘",
-        text
-    )
-
-    # ------------------------------------------------------------
-    # 3. \left dan \right
-    # Jangan menghapus seluruh ekspresi matematika.
-    # ------------------------------------------------------------
-    text = re.sub(
-        r"\\left\s*([\(\[\{])",
-        r"\1",
-        text
-    )
-
-    text = re.sub(
-        r"\\right\s*([\)\]\}])",
-        r"\1",
-        text
-    )
-
-    # ------------------------------------------------------------
-    # 4. Akar sederhana.
-    # ------------------------------------------------------------
-    text = re.sub(
-        r"\\sqrt\{([^{}]+)\}",
-        r"√(\1)",
-        text
-    )
-
-    # ------------------------------------------------------------
-    # 5. Pangkat sederhana.
-    # ------------------------------------------------------------
-    sup_map = str.maketrans(
-        "0123456789+-=()nxyi",
-        "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ"
-    )
-
-    text = re.sub(
-        r"\^\{([^{}]+)\}|\^([\-0-9a-zA-Z])",
-        lambda m: (m.group(1) or m.group(2)).translate(sup_map),
-        text
-    )
-
-    # ------------------------------------------------------------
-    # 6. Indeks sederhana.
-    # ------------------------------------------------------------
-    sub_map = str.maketrans(
-        "0123456789+-=()nixy",
-        "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ"
-    )
-
-    text = re.sub(
-        r"_\{([^{}]+)\}|_([0-9a-zA-Z])",
-        lambda m: (m.group(1) or m.group(2)).translate(sub_map),
-        text
-    )
-
-    # Delimiter matematika biasa tidak diperlukan karena
-    # pecahan/matriks akan dibuat sebagai OMML.
+    text = re.sub(r"(?<![A-Za-z])circl(?![A-Za-z])", "∘", text)
+    text = re.sub(r"\\left\b\s*[\(\[\{\.\|]?", "(", text)
+    text = re.sub(r"\\right\b\s*[\)\]\}\.\|]?", ")", text)
+    text = re.sub(r"\\(?:dots|cdots|ldots)", "…", text)
+    text = re.sub(r"\\sqrt\{([^}]+)\}", r"√(\1)", text)
+    text = re.sub(r"\\sqrt\s*([a-zA-Z0-9_]+)", r"√\1", text)
+    sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
+    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
+    text = re.sub(r"\^\{([^}]+)\}|\^([\-0-9a-zA-Z])", lambda m: (m.group(1) or m.group(2)).translate(sup_map), text)
+    text = re.sub(r"_\{([^}]+)\}|_([0-9a-zA-Z])", lambda m: (m.group(1) or m.group(2)).translate(sub_map), text)
     text = text.replace("$", "")
+    text = text.replace("left(", "(").replace("right)", ")").replace("dots", "…")
+    text = text.replace("{", "").replace("}", "")
+    text = re.sub(r"\\([a-zA-Z]+)", r"\1", text).replace("\\", "")
+    return re.sub(r"\s+", " ", text).strip()
 
-    # Jangan menghapus backslash secara global di sini.
-    # \frac dan \begin{matrix} masih harus dibaca renderer.
 
-    return re.sub(r"[ \t]+", " ", text).strip()
+def contains_arabic(text: str) -> bool:
+    return bool(re.search(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]", str(text or "")))
 
-def add_omml_fraction(paragraph, numerator: str, denominator: str):
-    """
-    Pecahan Word Equation:
-        numerator
-        ---------
-        denominator
 
-    Bukan bentuk miring a/b.
-    """
-    num = clean_docx_math_text(numerator)
-    den = clean_docx_math_text(denominator)
+def apply_arabic_paragraph_style(paragraph):
+    try:
+        ppr = paragraph._p.get_or_add_pPr()
+        bidi = parse_xml(r'<w:bidi xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="1"/>')
+        ppr.append(bidi)
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    except Exception:
+        pass
 
-    xml = (
+
+def apply_arabic_run_style(run):
+    try:
+        run.font.name = "Traditional Arabic"
+        rpr = run._r.get_or_add_rPr()
+        rfonts = rpr.rFonts
+        if rfonts is None:
+            rfonts = parse_xml(r'<w:rFonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+            rpr.append(rfonts)
+        rfonts.set('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}cs', 'Traditional Arabic')
+        rfonts.set('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}ascii', 'Aptos')
+    except Exception:
+        pass
+
+
+def add_omml_fraction(paragraph, num_text: str, den_text: str):
+    num_clean = clean_math_string(num_text)
+    den_clean = clean_math_string(den_text)
+    omml_xml = (
         f'<m:oMath {nsdecls("m")}>'
         f'<m:f>'
-        f'<m:num>'
-        f'<m:r><m:t>{escape(num)}</m:t></m:r>'
-        f'</m:num>'
-        f'<m:den>'
-        f'<m:r><m:t>{escape(den)}</m:t></m:r>'
-        f'</m:den>'
+        f'<m:num><m:r><m:t>{escape(num_clean)}</m:t></m:r></m:num>'
+        f'<m:den><m:r><m:t>{escape(den_clean)}</m:t></m:r></m:den>'
         f'</m:f>'
         f'</m:oMath>'
     )
+    paragraph._p.append(parse_xml(omml_xml))
 
-    paragraph._p.append(parse_xml(xml))
 
-
-def add_omml_matrix(
-    paragraph,
-    matrix_type: str,
-    content: str
-):
-    """
-    Render matriks sebagai Microsoft Word Equation / OMML.
-    Mendukung:
-        matrix
-        pmatrix
-        bmatrix
-        vmatrix
-        Vmatrix
-    """
-
-    delimiters = {
-        "pmatrix": ("(", ")"),
-        "bmatrix": ("[", "]"),
-        "vmatrix": ("|", "|"),
-        "Vmatrix": ("‖", "‖"),
-        "matrix": ("", ""),
-    }
-
-    begin_char, end_char = delimiters.get(
-        matrix_type,
-        ("(", ")")
-    )
-
-    # \\ = pemisah baris LaTeX.
-    rows = [
-        row.strip()
-        for row in re.split(r"\\\\|\\cr", content)
-        if row.strip()
-    ]
-
-    matrix_rows = []
-
+def add_omml_matrix(paragraph, matrix_type: str, content: str):
+    beg_chr, end_chr = "(", ")"
+    if matrix_type == "bmatrix":
+        beg_chr, end_chr = "[", "]"
+    elif matrix_type in ["vmatrix", "Vmatrix"]:
+        beg_chr, end_chr = "|", "|"
+    elif matrix_type == "matrix":
+        beg_chr, end_chr = "", ""
+    rows = [r.strip() for r in re.split(r"\\\\|\\cr", content) if r.strip()]
+    matrix_xml_rows = []
     for row in rows:
-        columns = [col.strip() for col in row.split("&")]
-
-        cells = []
-
-        for col in columns:
-            cleaned = clean_docx_math_text(col)
-
-            cells.append(
-                f'<m:e>'
-                f'<m:r>'
-                f'<m:t>{escape(cleaned)}</m:t>'
-                f'</m:r>'
-                f'</m:e>'
-            )
-
-        matrix_rows.append(
-            f'<m:mr>{"".join(cells)}</m:mr>'
-        )
-
-    matrix_xml = (
-        f'<m:m>{"".join(matrix_rows)}</m:m>'
-    )
-
-    if begin_char or end_char:
-        xml = (
-            f'<m:oMath {nsdecls("m")}>'
-            f'<m:d>'
-            f'<m:dPr>'
-            f'<m:begChr m:val="{escape(begin_char)}"/>'
-            f'<m:endChr m:val="{escape(end_char)}"/>'
-            f'</m:dPr>'
-            f'<m:e>{matrix_xml}</m:e>'
-            f'</m:d>'
-            f'</m:oMath>'
+        cols = [c.strip() for c in row.split("&")]
+        cols_xml = []
+        for col in cols:
+            cleaned = html.escape(clean_math_string(col))
+            cols_xml.append(f'<m:e><m:r><m:t>{cleaned}</m:t></m:r></m:e>')
+        matrix_xml_rows.append(f'<m:mr>{"".join(cols_xml)}</m:mr>')
+    inner_matrix = f'<m:m>{"".join(matrix_xml_rows)}</m:m>'
+    if beg_chr or end_chr:
+        omml_xml = (
+            f'<m:oMath {nsdecls("m")}><m:d><m:dPr>'
+            f'<m:begChr m:val="{escape(beg_chr)}"/><m:endChr m:val="{escape(end_chr)}"/>'
+            f'</m:dPr><m:e>{inner_matrix}</m:e></m:d></m:oMath>'
         )
     else:
-        xml = (
-            f'<m:oMath {nsdecls("m")}>'
-            f'{matrix_xml}'
-            f'</m:oMath>'
-        )
+        omml_xml = f'<m:oMath {nsdecls("m")}>{inner_matrix}</m:oMath>'
+    paragraph._p.append(parse_xml(omml_xml))
 
-    paragraph._p.append(parse_xml(xml))
 
-def append_docx_math(
-    paragraph,
-    text: str,
-    *,
-    bold: bool = False,
-    font_size: float = 10,
-):
-    """
-    Menulis teks ke Word sambil mendeteksi:
-      - \\frac
-      - \\dfrac
-      - \\tfrac
-      - matrix
-      - pmatrix
-      - bmatrix
-      - vmatrix
-      - Vmatrix
-
-    Pecahan dan matriks dibuat sebagai OMML,
-    bukan teks biasa.
-    """
-
+def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, color_rgb: RGBColor = None):
+    """Shared Quiz DOCX math renderer: plain text + vertical fractions + matrices."""
     if not text:
         return
-
     text = str(text)
-
-    # ------------------------------------------------------------
-    # Pecahan + matriks.
-    # ------------------------------------------------------------
-    pattern = re.compile(
-        r"""
-        \\begin\{
-            (?P<matrix>
-                pmatrix|
-                bmatrix|
-                vmatrix|
-                Vmatrix|
-                matrix
-            )
-        \}
-        (?P<matrix_content>.*?)
-        \\end\{(?P=matrix)\}
-
-        |
-
-        \\(?P<frac>
-            frac|
-            dfrac|
-            tfrac
-        )
-        \{
-            (?P<num>[^{}]+)
-        \}
-        \{
-            (?P<den>[^{}]+)
-        \}
-        """,
-        re.DOTALL | re.VERBOSE
+    math_pattern = re.compile(
+        r"\\begin\{(?P<mtype>[pbvV]?matrix)\}(?P<mcontent>.*?)\\end\{(?P=mtype)\}|\\(?:f|tf)rac\{(?P<num>[^}]+)\}\{(?P<den>[^}]+)\}",
+        re.DOTALL,
     )
-
-    last = 0
-
-    for match in pattern.finditer(text):
-
+    last_idx = 0
+    for match in math_pattern.finditer(text):
         start, end = match.span()
+        if start > last_idx:
+            plain_part = clean_math_string(text[last_idx:start])
+            if plain_part:
+                run = paragraph.add_run(plain_part + " ")
+                run.bold = is_bold
+                if contains_arabic(plain_part):
+                    apply_arabic_paragraph_style(paragraph)
+                    apply_arabic_run_style(run)
+                if color_rgb:
+                    run.font.color.rgb = color_rgb
+        if match.group("mtype"):
+            add_omml_matrix(paragraph, match.group("mtype"), match.group("mcontent"))
+        elif match.group("num"):
+            add_omml_fraction(paragraph, match.group("num"), match.group("den"))
+        run_space = paragraph.add_run(" ")
+        run_space.bold = is_bold
+        last_idx = end
+    if last_idx < len(text):
+        plain_part = clean_math_string(text[last_idx:])
+        if plain_part:
+            run = paragraph.add_run(plain_part)
+            run.bold = is_bold
+            if contains_arabic(plain_part):
+                apply_arabic_paragraph_style(paragraph)
+                apply_arabic_run_style(run)
+            if color_rgb:
+                run.font.color.rgb = color_rgb
 
-        # --------------------------------------------------------
-        # Teks biasa sebelum matematika.
-        # --------------------------------------------------------
-        if start > last:
-            plain = clean_docx_math_text(
-                text[last:start]
-            )
-
-            if plain:
-                run = paragraph.add_run(plain)
-                run.bold = bold
-                run.font.size = Pt(font_size)
-
-        # --------------------------------------------------------
-        # Matriks.
-        # --------------------------------------------------------
-        if match.group("matrix"):
-            add_omml_matrix(
-                paragraph,
-                match.group("matrix"),
-                match.group("matrix_content")
-            )
-
-        # --------------------------------------------------------
-        # Pecahan.
-        # --------------------------------------------------------
-        elif match.group("frac"):
-            add_omml_fraction(
-                paragraph,
-                match.group("num"),
-                match.group("den")
-            )
-
-        last = end
-
-        # Jarak kecil setelah equation.
-        spacer = paragraph.add_run(" ")
-        spacer.font.size = Pt(font_size)
-
-    # ------------------------------------------------------------
-    # Teks setelah rumus terakhir.
-    # ------------------------------------------------------------
-    if last < len(text):
-        plain = clean_docx_math_text(text[last:])
-
-        if plain:
-            run = paragraph.add_run(plain)
-            run.bold = bold
-            run.font.size = Pt(font_size)
 
 def _cell_clean(value: Any) -> str:
     text = str(value or "").replace("\xa0", " ")
@@ -671,6 +453,146 @@ def extract_blueprint_from_docx(file_bytes: bytes) -> dict:
     }
 
 
+def _vision_blueprint_from_parts(parts: list[Any], source_label: str) -> dict:
+    prompt = f"""
+Anda adalah Blueprint Reader RoboMANTAP. Sumber: {source_label}.
+Baca seluruh isi visual dengan teliti. Tujuan utama adalah mengambil KISI-KISI, bukan membuat soal.
+Pertahankan hubungan baris/kolom antara NO, BAB, ATP, INDIKATOR SOAL, LEVEL KOGNITIF, PG, ISIAN, URAIAN.
+Jika tabel berlanjut ke halaman berikutnya, gabungkan barisnya. Jangan mengarang nilai yang tidak terlihat.
+Level kognitif C1-C6 harus dipertahankan bila terlihat. Nomor seperti 1-2 harus menjadi [1,2].
+Kembalikan JSON murni dengan schema:
+{{
+  "metadata": {{"subject":"","grade":"","assessment":"","school_year":"","title":""}},
+  "blueprints": [
+    {{"chapter":"","no":"","atp":"","indicator":"","cognitive_level":"C4","forms":{{"PG":[1,2],"Isian":[1],"Uraian":[]}}}}
+  ],
+  "warnings": []
+}}
+Jika kolom Level Kognitif tidak ada, gunakan "". Jangan menebak level dari indikator.
+"""
+    raw = _call_gemini_contents([prompt, *parts], is_json=True, max_output_tokens=16000)
+    data = _parse_ai_json(raw)
+    if not isinstance(data, dict) or not isinstance(data.get("blueprints"), list):
+        raise ValueError("Vision AI tidak mengembalikan struktur blueprint yang valid.")
+    normalized = []
+    for idx, bp in enumerate(data.get("blueprints", []), start=1):
+        if not isinstance(bp, dict):
+            continue
+        forms = bp.get("forms") if isinstance(bp.get("forms"), dict) else {}
+        form_map = {form: _parse_question_numbers(",".join(map(str, forms.get(form, []) if isinstance(forms.get(form, []), list) else [forms.get(form, "")]))) for form in FORM_ORDER}
+        if not _clean(bp.get("indicator")) and not _clean(bp.get("atp")):
+            continue
+        normalized.append({
+            "id": f"BP-{idx:03d}", "chapter": _clean(bp.get("chapter")), "source_row": idx,
+            "no": _clean(bp.get("no")), "atp": _clean(bp.get("atp")),
+            "indicator": _clean(bp.get("indicator")),
+            "cognitive_level": _normalize_cognitive_level(bp.get("cognitive_level")),
+            "cognitive_level_source": _clean(bp.get("cognitive_level")),
+            "forms": form_map, "raw_cells": [],
+        })
+    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    total_slots = sum(len(bp["forms"].get(form, [])) for bp in normalized for form in FORM_ORDER)
+    return {
+        "metadata": {k: _clean(metadata.get(k)) for k in ["subject","grade","assessment","school_year","title"]},
+        "blueprints": normalized, "total_slots": total_slots,
+        "blueprint_count": len(normalized), "cognitive_level_column": None,
+        "warnings": data.get("warnings", []) or [], "source_type": "vision",
+    }
+
+
+def _merge_vision_blueprints(results: list[dict]) -> dict:
+    """Merge page/chunk Vision results without losing form-number information."""
+    if not results:
+        raise ValueError("Tidak ada hasil Vision yang dapat digabungkan.")
+    metadata = {}
+    merged = []
+    warnings = []
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        for key, value in (result.get("metadata") or {}).items():
+            if _clean(value) and not _clean(metadata.get(key)):
+                metadata[key] = _clean(value)
+        warnings.extend(result.get("warnings") or [])
+        for bp in result.get("blueprints", []):
+            if not isinstance(bp, dict):
+                continue
+            chapter = _clean(bp.get("chapter"))
+            atp = _clean(bp.get("atp"))
+            indicator = _clean(bp.get("indicator"))
+            key = (chapter.lower(), atp.lower(), indicator.lower(), _clean(bp.get("no")).lower())
+            existing = next((x for x in merged if (x.get("chapter","").lower(), x.get("atp","").lower(), x.get("indicator","").lower(), _clean(x.get("no")).lower()) == key), None)
+            if existing is None:
+                existing = {
+                    "id": "", "chapter": chapter, "source_row": 0, "no": _clean(bp.get("no")),
+                    "atp": atp, "indicator": indicator,
+                    "cognitive_level": _normalize_cognitive_level(bp.get("cognitive_level")),
+                    "cognitive_level_source": _clean(bp.get("cognitive_level_source") or bp.get("cognitive_level")),
+                    "forms": {form: [] for form in FORM_ORDER}, "raw_cells": [],
+                }
+                merged.append(existing)
+            elif not existing.get("cognitive_level") and bp.get("cognitive_level"):
+                existing["cognitive_level"] = _normalize_cognitive_level(bp.get("cognitive_level"))
+            for form in FORM_ORDER:
+                existing["forms"][form] = sorted(set(existing["forms"].get(form, []) + bp.get("forms", {}).get(form, [])))
+    for idx, bp in enumerate(merged, start=1):
+        bp["id"] = f"BP-{idx:03d}"
+        bp["source_row"] = idx
+    total_slots = sum(len(bp["forms"].get(form, [])) for bp in merged for form in FORM_ORDER)
+    return {
+        "metadata": {k: _clean(metadata.get(k)) for k in ["subject","grade","assessment","school_year","title"]},
+        "blueprints": merged, "total_slots": total_slots,
+        "blueprint_count": len(merged), "cognitive_level_column": None,
+        "warnings": list(dict.fromkeys(warnings)), "source_type": "vision",
+    }
+
+
+def extract_blueprint_from_source(file_bytes: bytes, filename: str) -> dict:
+    """Read DOCX deterministically; PDF/image via Vision while preserving table semantics."""
+    name = str(filename or "source").lower()
+    ext = os.path.splitext(name)[1]
+    if ext == ".docx":
+        return extract_blueprint_from_docx(file_bytes)
+    if ext in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"}:
+        mime = {
+            ".jpg":"image/jpeg", ".jpeg":"image/jpeg", ".png":"image/png", ".webp":"image/webp",
+            ".gif":"image/gif", ".bmp":"image/bmp", ".tif":"image/tiff", ".tiff":"image/tiff",
+        }[ext]
+        part = types.Part.from_bytes(data=file_bytes, mime_type=mime)
+        return _vision_blueprint_from_parts([part], filename)
+    if ext == ".pdf":
+        import fitz
+        pdf = fitz.open(stream=file_bytes, filetype="pdf")
+        if len(pdf) == 0:
+            raise ValueError("PDF kosong.")
+        chunk_size = 5
+        overlap = 1
+        results = []
+        starts = list(range(0, len(pdf), chunk_size - overlap))
+        for chunk_no, start_page in enumerate(starts, start=1):
+            end_page = min(len(pdf), start_page + chunk_size)
+            parts = []
+            text_blocks = []
+            for page_no in range(start_page, end_page):
+                page = pdf[page_no]
+                txt = page.get_text("text").strip()
+                if txt:
+                    text_blocks.append(f"[HALAMAN {page_no+1}]\n{txt[:9000]}")
+                pix = page.get_pixmap(matrix=fitz.Matrix(1.35, 1.35), alpha=False)
+                parts.append(types.Part.from_bytes(data=pix.tobytes("png"), mime_type="image/png"))
+            if text_blocks:
+                parts.insert(0, "\n\n".join(text_blocks))
+            result = _vision_blueprint_from_parts(parts, f"{filename} • halaman {start_page+1}-{end_page} • chunk {chunk_no}")
+            results.append(result)
+        merged = _merge_vision_blueprints(results)
+        if len(pdf) > chunk_size:
+            merged.setdefault("warnings", []).append(
+                f"PDF dibaca lengkap dalam {len(results)} kelompok halaman dengan overlap 1 halaman untuk menjaga kesinambungan tabel."
+            )
+        return merged
+    raise ValueError(f"Format {ext or '(tanpa ekstensi)'} belum didukung.")
+
+
 def blueprint_summary(blueprint: dict) -> dict:
     counts = {
         form: sum(len(bp.get("forms", {}).get(form, [])) for bp in blueprint.get("blueprints", []))
@@ -777,6 +699,11 @@ ATURAN PRESISI:
 12. Jangan menurunkan tuntutan kognitif target. Jika target C5, soal hafalan/perhitungan
     rutin tidak boleh diklaim sebagai C5.
 
+JIKA INDIKATOR ATAU SOAL MEMBUTUHKAN GAMBAR/DIAGRAM, field `diagram` WAJIB diisi.
+Gunakan hanya tipe: layang_layang, persegi, persegi_panjang, segitiga, lingkaran, jajargenjang, trapesium, belah_ketupat, gabungan_jajargenjang_segitiga.
+`measurements` harus berisi angka yang sama persis dengan data soal. Jangan mengarang ukuran. Jika tidak membutuhkan gambar, set `diagram` menjadi null.
+Format contoh: required=true; type=layang_layang; measurements d1=30, d2=20; labels vertical=30 cm, horizontal=20 cm; caption kosong.
+
 OUTPUT JSON MURNI:
 {{
   "questions": [
@@ -789,7 +716,8 @@ OUTPUT JSON MURNI:
       "question": "...",
       "options": ["A. ...", "B. ...", "C. ...", "D. ...", "E. ..."],
       "correct_answer": "A. ...",
-      "solution_basis": "..."
+      "solution_basis": "...",
+      "diagram": null
     }}
   ]
 }}
@@ -813,6 +741,139 @@ def _parse_ai_json(raw: str) -> dict | None:
             except Exception:
                 return None
     return None
+
+
+SUPPORTED_DIAGRAM_TYPES = {
+    "layang_layang", "persegi", "persegi_panjang", "segitiga", "lingkaran",
+    "jajargenjang", "trapesium", "belah_ketupat", "gabungan_jajargenjang_segitiga",
+}
+
+
+def _diagram_type_normalize(value: Any) -> str:
+    text = _clean(value).lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "layanglayang": "layang_layang", "kite": "layang_layang",
+        "square": "persegi", "rectangle": "persegi_panjang",
+        "triangle": "segitiga", "parallelogram": "jajargenjang",
+        "trapezoid": "trapesium", "rhombus": "belah_ketupat", "circle": "lingkaran", "circle_shape": "lingkaran",
+        "gabungan": "gabungan_jajargenjang_segitiga",
+    }
+    return aliases.get(text, text)
+
+
+def _normalize_diagram_spec(raw: Any) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    dtype = _diagram_type_normalize(raw.get("type"))
+    if dtype not in SUPPORTED_DIAGRAM_TYPES:
+        return None
+    measurements = raw.get("measurements") if isinstance(raw.get("measurements"), dict) else {}
+    clean_measurements = {}
+    for key, value in measurements.items():
+        try:
+            if isinstance(value, str):
+                m = re.search(r"-?\d+(?:[.,]\d+)?", value)
+                if m:
+                    clean_measurements[str(key)] = float(m.group(0).replace(",", "."))
+            elif isinstance(value, (int, float)):
+                clean_measurements[str(key)] = float(value)
+        except Exception:
+            continue
+    labels = raw.get("labels") if isinstance(raw.get("labels"), dict) else {}
+    return {
+        "required": bool(raw.get("required", True)),
+        "type": dtype,
+        "measurements": clean_measurements,
+        "labels": {str(k): _clean(v) for k, v in labels.items() if _clean(v)},
+        "caption": _clean(raw.get("caption")),
+    }
+
+
+def _needs_diagram(indicator: str, question: str) -> bool:
+    text = f"{indicator} {question}".lower()
+    return bool(re.search(r"disajikan\s+(?:sebuah\s+)?gambar|perhatikan\s+gambar|dari\s+gambar|berdasarkan\s+gambar", text))
+
+
+def render_math_diagram(spec: dict) -> bytes | None:
+    """Create a clean deterministic PNG diagram from validated numeric data."""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from matplotlib.patches import Polygon
+    except Exception:
+        return None
+
+    dtype = spec.get("type")
+    m = spec.get("measurements", {})
+    fig, ax = plt.subplots(figsize=(5.8, 3.2), dpi=180)
+    ax.set_aspect("equal")
+    ax.axis("off")
+
+    def label(x, y, text, **kwargs):
+        ax.text(x, y, text, fontsize=9, ha="center", va="center", **kwargs)
+
+    def dim(a, b, text, offset=(0, 0.18)):
+        ax.annotate("", xy=b, xytext=a, arrowprops=dict(arrowstyle="<->", lw=1.1))
+        mx, my = (a[0]+b[0])/2, (a[1]+b[1])/2
+        label(mx+offset[0], my+offset[1], text)
+
+    if dtype == "layang_layang":
+        d1, d2 = m.get("d1", m.get("diagonal_vertical")), m.get("d2", m.get("diagonal_horizontal"))
+        if not d1 or not d2: return None
+        w, h = d2/2, d1/2
+        pts = np.array([[0,h], [w,0], [0,-h], [-w,0]])
+        ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.8))
+        ax.plot([-w,w],[0,0],linewidth=1.0,linestyle="--")
+        ax.plot([0,0],[-h,h],linewidth=1.0,linestyle="--")
+        dim((0,-h),(0,h), f"{d1:g} cm", offset=(0.38,0))
+        dim((-w,0),(w,0), f"{d2:g} cm", offset=(0,-0.28))
+    elif dtype == "persegi":
+        s=m.get("sisi",m.get("side"));
+        if not s: return None
+        pts=np.array([[0,0],[s,0],[s,s],[0,s]])
+        ax.add_patch(Polygon(pts,closed=True,fill=False,linewidth=1.8)); dim((0,0),(s,0),f"{s:g} cm",(0,-0.22)); dim((s,0),(s,s),f"{s:g} cm",(0.28,0))
+    elif dtype == "persegi_panjang":
+        p=m.get("panjang",m.get("length")); l=m.get("lebar",m.get("width"));
+        if not p or not l: return None
+        pts=np.array([[0,0],[p,0],[p,l],[0,l]])
+        ax.add_patch(Polygon(pts,closed=True,fill=False,linewidth=1.8)); dim((0,0),(p,0),f"{p:g} cm",(0,-0.22)); dim((p,0),(p,l),f"{l:g} cm",(0.3,0))
+    elif dtype == "segitiga":
+        b=m.get("alas",m.get("base")); h=m.get("tinggi",m.get("height"));
+        if not b or not h: return None
+        x0=-b/2; pts=np.array([[x0,0],[x0+b,0],[0,h]])
+        ax.add_patch(Polygon(pts,closed=True,fill=False,linewidth=1.8)); ax.plot([0,0],[0,h],linestyle="--",linewidth=1); dim((x0,0),(x0+b,0),f"{b:g} cm",(0,-0.22)); dim((0,0),(0,h),f"{h:g} cm",(0.3,0))
+    elif dtype == "lingkaran":
+        radius=m.get("r",m.get("radius")); diameter=m.get("d",m.get("diameter"))
+        if not radius and diameter: radius=diameter/2
+        if not radius: return None
+        theta=np.linspace(0,2*np.pi,200); ax.plot(radius*np.cos(theta), radius*np.sin(theta), linewidth=1.8); ax.plot([0,radius],[0,0],linestyle="--",linewidth=1); label(radius/2,0.22,f"r = {radius:g} cm");
+    elif dtype == "jajargenjang":
+        b=m.get("alas",m.get("base")); h=m.get("tinggi",m.get("height")); s=m.get("sisi",m.get("side",h))
+        if not b or not h: return None
+        skew=min(max(float(s)*0.35,0.2), b*0.45); pts=np.array([[0,0],[b,0],[b+skew,h],[skew,h]])
+        ax.add_patch(Polygon(pts,closed=True,fill=False,linewidth=1.8)); ax.plot([skew,skew],[0,h],linestyle="--",linewidth=1); dim((0,0),(b,0),f"{b:g} cm",(0,-0.22)); dim((skew,0),(skew,h),f"{h:g} cm",(0.35,0))
+    elif dtype == "trapesium":
+        a=m.get("sisi_atas",m.get("atas",m.get("a"))); b=m.get("sisi_bawah",m.get("bawah",m.get("b"))); h=m.get("tinggi",m.get("height"));
+        if not a or not b or not h: return None
+        x=(b-a)/2; pts=np.array([[0,0],[b,0],[b-x,h],[x,h]])
+        ax.add_patch(Polygon(pts,closed=True,fill=False,linewidth=1.8)); ax.plot([x,x],[0,h],linestyle="--",linewidth=1); dim((0,0),(b,0),f"{b:g} cm",(0,-0.22)); dim((x,0),(x,h),f"{h:g} cm",(0.3,0)); label(b/2,h+0.2,f"{a:g} cm")
+    elif dtype == "belah_ketupat":
+        d1=m.get("d1",m.get("diagonal_vertical")); d2=m.get("d2",m.get("diagonal_horizontal"));
+        if not d1 or not d2: return None
+        w,h=d2/2,d1/2; pts=np.array([[0,h],[w,0],[0,-h],[-w,0]])
+        ax.add_patch(Polygon(pts,closed=True,fill=False,linewidth=1.8)); ax.plot([-w,w],[0,0],linestyle="--",linewidth=1); ax.plot([0,0],[-h,h],linestyle="--",linewidth=1); dim((0,-h),(0,h),f"{d1:g} cm",(0.38,0)); dim((-w,0),(w,0),f"{d2:g} cm",(0,-0.28))
+    elif dtype == "gabungan_jajargenjang_segitiga":
+        b=m.get("alas",m.get("base")); h=m.get("tinggi_jajargenjang",m.get("height_parallelogram")); ht=m.get("tinggi_segitiga",m.get("height_triangle"));
+        if not b or not h or not ht: return None
+        skew=min(max(b*0.12,0.4),b*0.3); poly1=np.array([[0,0],[b,0],[b+skew,h],[skew,h]]); poly2=np.array([[skew,h],[b+skew,h],[b/2+skew,h+ht]])
+        ax.add_patch(Polygon(poly1,closed=True,fill=False,linewidth=1.8)); ax.add_patch(Polygon(poly2,closed=True,fill=False,linewidth=1.8)); ax.plot([skew,skew],[0,h],linestyle="--",linewidth=1); ax.plot([b/2+skew,b/2+skew],[h,h+ht],linestyle="--",linewidth=1); dim((0,0),(b,0),f"{b:g} cm",(0,-0.22)); dim((skew,0),(skew,h),f"{h:g} cm",(0.35,0)); dim((b/2+skew,h),(b/2+skew,h+ht),f"{ht:g} cm",(0.35,0))
+    else:
+        plt.close(fig); return None
+
+    fig.tight_layout(pad=0.8)
+    output=io.BytesIO(); fig.savefig(output,format="png",bbox_inches="tight",transparent=False); plt.close(fig); return output.getvalue()
 
 
 def _normalize_generated_question(item: dict, jenjang: str) -> dict | None:
@@ -870,6 +931,7 @@ def _normalize_generated_question(item: dict, jenjang: str) -> dict | None:
     else:
         options = []
 
+    diagram = _normalize_diagram_spec(item.get("diagram"))
     return {
         "blueprint_id": _clean(item.get("blueprint_id")),
         "variant": variant,
@@ -880,6 +942,7 @@ def _normalize_generated_question(item: dict, jenjang: str) -> dict | None:
         "options": options,
         "correct_answer": answer,
         "solution_basis": solution,
+        "diagram": diagram,
     }
 
 
@@ -997,6 +1060,23 @@ def _generate_blueprint_batch(
             expected_count = _option_count(jenjang)
             if any(q.get("question_type") == "PG" and len(q.get("options", [])) != expected_count for q in normalized):
                 continue
+            diagram_invalid = False
+            for q in normalized:
+                needs_diagram = _needs_diagram(bp.get("indicator", ""), q.get("question", ""))
+                if needs_diagram and not q.get("diagram"):
+                    diagram_invalid = True
+                    break
+                if q.get("diagram"):
+                    qtext = str(q.get("question", ""))
+                    for measurement in q["diagram"].get("measurements", {}).values():
+                        token = str(measurement).rstrip("0").rstrip(".") if isinstance(measurement, float) else str(measurement)
+                        if token and token not in qtext:
+                            diagram_invalid = True
+                            break
+                    if diagram_invalid:
+                        break
+            if diagram_invalid:
+                continue
 
             combined.extend(normalized)
             variant_ok = True
@@ -1036,6 +1116,7 @@ def _ai_validate_alignment(questions: list[dict], blueprint: dict, jenjang: str)
             "cognitive_level": q.get("cognitive_level", ""),
             "options": q.get("options", []),
             "correct_answer": q.get("correct_answer", ""),
+            "diagram": q.get("diagram"),
         }
         for q in questions
     ]
@@ -1058,7 +1139,8 @@ Tandai hanya pertanyaan yang:
 - salah nomor/form/variant,
 - memiliki jawaban benar yang tidak konsisten,
 - memiliki opsi PG yang tidak sesuai,
-- atau secara substantif tidak memenuhi level kognitif C1–C6 yang ditetapkan blueprint.
+- atau secara substantif tidak memenuhi level kognitif C1–C6 yang ditetapkan blueprint,
+- atau memiliki diagram yang ukuran/jenisnya tidak konsisten dengan soal.
 
 Jika blueprint menetapkan C4, soal harus benar-benar menuntut analisis; C5 menuntut evaluasi;
 C6 menuntut penciptaan/perancangan. Jangan menerima soal rutin hanya karena diberi label C4/C5/C6.
@@ -1417,22 +1499,29 @@ def build_bank_soal_docx(
                 r.bold = True
                 r.font.size = Pt(10)
 
-                append_docx_math(
-                    p,
-                    q.get("question", ""),
-                    font_size=10,
-                )
+                append_text_with_fractions(p, q.get("question", ""))
+
+                diagram_bytes = render_math_diagram(q.get("diagram")) if q.get("diagram") else None
+                if diagram_bytes:
+                    dp = doc.add_paragraph()
+                    dp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    dp.paragraph_format.space_before = Pt(3)
+                    dp.paragraph_format.space_after = Pt(5)
+                    dp.add_run().add_picture(io.BytesIO(diagram_bytes), width=Inches(4.9))
+                    if q.get("diagram", {}).get("caption"):
+                        cp = doc.add_paragraph()
+                        cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        cr = cp.add_run(q["diagram"]["caption"])
+                        cr.italic = True
+                        cr.font.size = Pt(8)
+                        cr.font.color.rgb = RGBColor(107, 114, 128)
 
                 if form == "PG":
                     for opt in q.get("options", []):
                         po = doc.add_paragraph()
                         po.paragraph_format.left_indent = Inches(0.22)
                         po.paragraph_format.space_after = Pt(1)
-                        append_docx_math(
-                            po,
-                            opt,
-                            font_size=9.5,
-                        )
+                        append_text_with_fractions(po, opt)
 
                 if include_answer_key:
                     pa = doc.add_paragraph()
@@ -1441,12 +1530,7 @@ def build_bank_soal_docx(
                     ra.bold = True
                     ra.font.size = Pt(8.5)
  
-                    append_docx_math(
-                        pa,
-                        q.get("correct_answer", ""),
-                        font_size=8.5,
-                    )
-                    rb.font.color.rgb = RGBColor(5, 150, 105)
+                    append_text_with_fractions(pa, q.get("correct_answer", ""), color_rgb=RGBColor(5, 150, 105))
 
                     ps = doc.add_paragraph()
                     ps.paragraph_format.left_indent = Inches(0.22)
@@ -1454,11 +1538,7 @@ def build_bank_soal_docx(
                     rs.bold = True
                     rs.font.size = Pt(8.5)
 
-                    append_docx_math(
-                        ps,
-                        q.get("solution_basis", ""),
-                        font_size=8.5,
-                    )
+                    append_text_with_fractions(ps, q.get("solution_basis", ""))
                     ps.paragraph_format.space_after = Pt(7)
 
     # ------------------------------------------------------------------
