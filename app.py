@@ -3124,7 +3124,7 @@ elif st.session_state.page == "guru_dashboard":
                 elif not blueprint.get("blueprints"):
                     st.error("Blueprint belum terbaca.")
                 else:
-                    with st.spinner(f"RoboMANTAP membuat {estimated} soal dan menjalankan QA blueprint..."):
+                    with st.spinner(f"RoboMANTAP membuat {estimated} soal • mode generate cepat per blueprint + QA..."):
                         questions, report = generate_bank_soal(
                             blueprint, variants=int(bank_variants), jenjang=bank_jenjang,
                             mapel=bank_mapel.strip(), kelas=bank_kelas.strip(), language=bank_language,
