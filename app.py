@@ -3017,7 +3017,7 @@ elif st.session_state.page == "guru_dashboard":
             "📥 Upload Kisi-Kisi Ujian (.docx)",
             type=["docx"],
             key="bank_blueprint_upload",
-            help="Gunakan DOCX dengan tabel NO • ATP • INDIKATOR SOAL • PG • Isian • Uraian.",
+            help="Gunakan DOCX dengan tabel NO • ATP • INDIKATOR SOAL • [Level Kognitif/C1–C6] • PG • Isian • Uraian. Level C1–C6 akan menjadi constraint generator dan QA bila tersedia.",
         )
 
         if bank_file is not None:
@@ -3049,6 +3049,10 @@ elif st.session_state.page == "guru_dashboard":
                 f"📄 {bank_file.name if bank_file else 'Kisi-kisi tersimpan'} • "
                 f"{metadata.get('assessment') or 'Asesmen'} • Tahun {metadata.get('school_year') or '-'}"
             )
+            cognitive_counts = summary.get("cognitive_levels", {})
+            if cognitive_counts:
+                level_text = " • ".join(f"{level}: {count}" for level, count in cognitive_counts.items())
+                st.info(f"🧠 Level kognitif terbaca: **{level_text}**. Level ini menjadi constraint generator dan QA.")
 
             if blueprint.get("warnings"):
                 for warning in blueprint["warnings"]:
@@ -3058,7 +3062,7 @@ elif st.session_state.page == "guru_dashboard":
                 rows = extract_blueprint_preview_rows(blueprint)
                 if rows:
                     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-                st.caption("Ekstraksi menggunakan struktur tabel DOCX, bukan teks paragraf yang sudah diratakan.")
+                st.caption("Ekstraksi menggunakan struktur tabel DOCX. Jika tersedia, Level Kognitif C1–C6 ikut menjadi constraint generator dan QA.")
 
             st.markdown("#### 2. Konfigurasi Generator")
             c1, c2, c3 = st.columns(3)
@@ -3135,7 +3139,7 @@ elif st.session_state.page == "guru_dashboard":
                                 f"{icon} {i:02d} • {q.get('blueprint_id')} • V{q.get('variant')} • No. {q.get('source_number')}",
                                 expanded=(i == 1),
                             ):
-                                st.caption(f"Blueprint {q.get('blueprint_id')} • Variasi {q.get('variant')} • Bentuk {q.get('question_type')}")
+                                st.caption(f"Blueprint {q.get('blueprint_id')} • Variasi {q.get('variant')} • Level {q.get('cognitive_level') or '—'} • Bentuk {q.get('question_type')}")
                                 st.markdown(q.get("question", ""))
                                 for opt in q.get("options", []):
                                     st.markdown(f"- {opt}")
@@ -3208,7 +3212,7 @@ elif st.session_state.page == "guru_dashboard":
             <div class="premium-footer-card">
                 <div class="footer-kicker">ROBO MANTAP • U.PROJECT NEXUS</div>
                 <div class="footer-title">Blueprint → Variants → QA → Exam-Ready Document.</div>
-                <div class="footer-copy">Setiap soal dapat ditelusuri kembali ke blueprint, variasi, bentuk, dan nomor sumber.</div>
+                <div class="footer-copy">Setiap soal dapat ditelusuri kembali ke blueprint, variasi, level kognitif, bentuk, dan nomor sumber.</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -3847,4 +3851,3 @@ elif st.session_state.page == "result":
 
                     if streamed_solution and "⚠️" not in str(streamed_solution):
                         st.session_state.ai_solution_cache[solution_key] = str(streamed_solution)
-
