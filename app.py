@@ -542,6 +542,7 @@ if "bank_blueprint" not in st.session_state: st.session_state.bank_blueprint = N
 if "bank_questions" not in st.session_state: st.session_state.bank_questions = []
 if "bank_report" not in st.session_state: st.session_state.bank_report = None
 if "bank_docx_bytes" not in st.session_state: st.session_state.bank_docx_bytes = None
+if "bank_docx_config_signature" not in st.session_state: st.session_state.bank_docx_config_signature = None
 
 # ------------------------------------------------------------------------------
 # RANDOMISASI PRODUCTION: URUTAN SOAL UNIK PER SESI SISWA
@@ -3030,6 +3031,7 @@ elif st.session_state.page == "guru_dashboard":
                 st.session_state.bank_questions = []
                 st.session_state.bank_report = None
                 st.session_state.bank_docx_bytes = None
+                st.session_state.bank_docx_config_signature = None
 
         blueprint = st.session_state.get("bank_blueprint")
 
@@ -3097,6 +3099,7 @@ elif st.session_state.page == "guru_dashboard":
                     st.session_state.bank_questions = questions
                     st.session_state.bank_report = report
                     st.session_state.bank_docx_bytes = None
+                    st.session_state.bank_docx_config_signature = None
                     if report.get("deterministic_ok") and report.get("review_count", 0) == 0:
                         st.success(f"✅ Bank soal selesai: {len(questions)} soal.")
                     elif questions:
@@ -3141,18 +3144,56 @@ elif st.session_state.page == "guru_dashboard":
                                     st.markdown(q.get("solution_basis", "Belum tersedia."))
 
                 st.markdown("#### 4. Download Word")
-                include_key = st.checkbox("Sertakan kunci jawaban & pembahasan", value=True, key="bank_include_key")
-                include_map = st.checkbox("Sertakan Peta Blueprint / Traceability", value=True, key="bank_include_map")
+                include_key = st.checkbox(
+                    "Sertakan kunci jawaban & pembahasan",
+                    value=True,
+                    key="bank_include_key",
+                    help="Jika dicentang, bagian Kunci dan Pembahasan ikut dimasukkan ke DOCX.",
+                )
+                include_map = st.checkbox(
+                    "Sertakan Peta Blueprint / Traceability",
+                    value=True,
+                    key="bank_include_map",
+                    help="Jika dicentang, Peta Blueprint dan Lampiran Traceability ikut dimasukkan ke DOCX.",
+                )
+
+                # A DOCX is tied to the exact checkbox/configuration used when it
+                # was built. This prevents Streamlit reruns from offering an old
+                # file after the teacher changes a checkbox.
+                current_docx_signature = (
+                    bool(include_key),
+                    bool(include_map),
+                    int(bank_variants),
+                    str(bank_jenjang),
+                    str(bank_mapel.strip()),
+                    str(bank_kelas.strip()),
+                    len(questions),
+                )
+                built_signature = st.session_state.get("bank_docx_config_signature")
+                if st.session_state.get("bank_docx_bytes") and built_signature != current_docx_signature:
+                    st.session_state.bank_docx_bytes = None
+                    st.session_state.bank_docx_config_signature = None
+                    st.info("ℹ️ Pilihan download berubah. Klik **BUILD BANK SOAL (.DOCX)** kembali agar dokumen mengikuti centang terbaru.")
+
                 if st.button("📄 BUILD BANK SOAL (.DOCX)", type="primary", use_container_width=True, key="build_bank_docx"):
                     with st.spinner("Menata Bank Soal ke Word..."):
                         st.session_state.bank_docx_bytes = build_bank_soal_docx(
                             blueprint, questions, jenjang=bank_jenjang, mapel=bank_mapel.strip(),
                             kelas=bank_kelas.strip(), variants=int(bank_variants),
-                            include_answer_key=include_key, include_blueprint_map=include_map,
+                            include_answer_key=bool(include_key), include_blueprint_map=bool(include_map),
                             logo_path=(os.path.join(os.path.dirname(__file__), "logo.png") if os.path.exists(os.path.join(os.path.dirname(__file__), "logo.png")) else None),
                         )
-                    st.success("✅ Dokumen Bank Soal siap.")
-                if st.session_state.get("bank_docx_bytes"):
+                    st.session_state.bank_docx_config_signature = current_docx_signature
+                    st.success(
+                        "✅ Dokumen Bank Soal siap dengan konfigurasi: "
+                        f"kunci/pembahasan={'YA' if include_key else 'TIDAK'} • "
+                        f"peta/traceability={'YA' if include_map else 'TIDAK'}."
+                    )
+
+                if (
+                    st.session_state.get("bank_docx_bytes")
+                    and st.session_state.get("bank_docx_config_signature") == current_docx_signature
+                ):
                     safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", bank_mapel.strip() or "Bank_Soal")
                     st.download_button(
                         "⬇️ DOWNLOAD BANK SOAL WORD",
