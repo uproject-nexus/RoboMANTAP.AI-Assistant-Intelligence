@@ -992,103 +992,104 @@ def _generate_blueprint_batch(
     mapel: str,
     kelas: str,
     language: str,
-    attempts: int = 2,
+    attempts: int = 1,
 ) -> list[dict]:
-    """Generate each variant as an independent batch.
+    """Generate all variants for one blueprint in as few AI calls as possible.
 
-    The previous implementation asked one AI response to produce all variants
-    at once. That made the requested Variant identity dependent on the model
-    faithfully repeating variant=1..N in every object. Here each variant is a
-    separate generation/validation unit, so the variant identity is explicit
-    and cannot collapse into one package.
+    Performance rule:
+    - One AI request generates every variant belonging to this blueprint.
+    - Only a failed/incomplete blueprint is retried.
+    - Variant identity is still deterministic: the returned set must exactly
+      match every (variant, form, source_number) slot before it is accepted.
+
+    This replaces the previous variant-by-variant loop, which could multiply
+    Gemini calls by variants * attempts * model/key rotation.
     """
-    combined: list[dict] = []
+    expected = _expected_keys(bp, variants)
+    max_attempts = max(1, int(attempts))
 
-    for variant_number in range(1, variants + 1):
-        variant_ok = False
-        for _ in range(max(1, attempts)):
-            prompt = _generation_prompt(bp, 1, jenjang, mapel, kelas, language)
-            prompt += f"\n\nVARIANT WAJIB UNTUK BATCH INI: {variant_number}\n"
-            prompt += (
-                "Keluaran batch ini HANYA untuk variant tersebut. "
-                f"Semua objek harus memiliki \"variant\": {variant_number}. "
-                "Jangan menghasilkan variant lain."
-            )
+    for attempt_no in range(1, max_attempts + 1):
+        prompt = _generation_prompt(bp, variants, jenjang, mapel, kelas, language)
+        prompt += (
+            "\n\nVARIANT ID WAJIB:\n"
+            f"Gunakan variant 1 sampai {variants}. "
+            "Setiap kombinasi variant + question_type + source_number harus unik "
+            "dan lengkap. Jangan menggabungkan beberapa variant menjadi satu soal."
+        )
 
-            raw = call_gemini_with_rotation(prompt, is_json=True)
-            data = _parse_ai_json(raw)
-            if not data or not isinstance(data.get("questions"), list):
-                continue
+        raw = call_gemini_with_rotation(
+            prompt,
+            is_json=True,
+            thinking_level="low",
+            max_output_tokens=16000,
+        )
+        data = _parse_ai_json(raw)
+        if not data or not isinstance(data.get("questions"), list):
+            continue
 
-            normalized = []
-            for item in data["questions"]:
-                q = _normalize_generated_question(item, jenjang)
-                if q:
-                    # The batch identity is authoritative; do not trust a
-                    # malformed/missing variant value returned by the model.
-                    q["variant"] = variant_number
-                    q["blueprint_id"] = bp["id"]
-                    normalized.append(q)
+        normalized = []
+        for item in data["questions"]:
+            q = _normalize_generated_question(item, jenjang)
+            if q:
+                q["blueprint_id"] = bp["id"]
+                normalized.append(q)
 
-            # Validate against exactly one variant's slots.
-            expected = {
-                (variant_number, slot["question_type"], slot["source_number"])
-                for slot in _slot_list(bp)
-            }
-            actual = {
-                (int(q.get("variant", 0)), q.get("question_type"), int(q.get("source_number", -1)))
+        # Hard structural gate: never accept a partial/mixed bank.
+        actual = {
+            (int(q.get("variant", 0)), q.get("question_type"), int(q.get("source_number", -1)))
+            for q in normalized
+        }
+        if actual != expected:
+            continue
+
+        issues = _deterministic_alignment_issues(normalized, bp, variants, jenjang)
+        if issues:
+            continue
+
+        target_levels = _cognitive_levels(bp.get("cognitive_level"))
+        if target_levels:
+            if any(
+                not _cognitive_levels(q.get("cognitive_level"))
+                or not any(level in target_levels for level in _cognitive_levels(q.get("cognitive_level")))
                 for q in normalized
-            }
-            if actual != expected:
+            ):
                 continue
 
-            issues = _deterministic_alignment_issues(normalized, bp, variants, jenjang)
-            # The full-variants validator expects all variants, so validate
-            # this batch's structural properties directly and cognitive level
-            # explicitly here.
-            target_levels = _cognitive_levels(bp.get("cognitive_level"))
-            if target_levels:
-                bad_level = False
-                for q in normalized:
-                    generated_levels = _cognitive_levels(q.get("cognitive_level"))
-                    if not generated_levels or not any(level in target_levels for level in generated_levels):
-                        bad_level = True
+        expected_count = _option_count(jenjang)
+        if any(
+            q.get("question_type") == "PG"
+            and len(q.get("options", [])) != expected_count
+            for q in normalized
+        ):
+            continue
+
+        # Diagram gate remains local/deterministic; no extra AI call.
+        diagram_invalid = False
+        for q in normalized:
+            needs_diagram = _needs_diagram(bp.get("indicator", ""), q.get("question", ""))
+            if needs_diagram and not q.get("diagram"):
+                diagram_invalid = True
+                break
+            if q.get("diagram"):
+                qtext = str(q.get("question", ""))
+                for measurement in q["diagram"].get("measurements", {}).values():
+                    token = (
+                        str(measurement).rstrip("0").rstrip(".")
+                        if isinstance(measurement, float)
+                        else str(measurement)
+                    )
+                    if token and token not in qtext:
+                        diagram_invalid = True
                         break
-                if bad_level:
-                    continue
-
-            expected_count = _option_count(jenjang)
-            if any(q.get("question_type") == "PG" and len(q.get("options", [])) != expected_count for q in normalized):
-                continue
-            diagram_invalid = False
-            for q in normalized:
-                needs_diagram = _needs_diagram(bp.get("indicator", ""), q.get("question", ""))
-                if needs_diagram and not q.get("diagram"):
-                    diagram_invalid = True
+                if diagram_invalid:
                     break
-                if q.get("diagram"):
-                    qtext = str(q.get("question", ""))
-                    for measurement in q["diagram"].get("measurements", {}).values():
-                        token = str(measurement).rstrip("0").rstrip(".") if isinstance(measurement, float) else str(measurement)
-                        if token and token not in qtext:
-                            diagram_invalid = True
-                            break
-                    if diagram_invalid:
-                        break
-            if diagram_invalid:
-                continue
 
-            combined.extend(normalized)
-            variant_ok = True
-            break
+        if diagram_invalid:
+            continue
 
-        if not variant_ok:
-            # One failed variant makes this blueprint incomplete; the caller
-            # can report it instead of silently producing a mixed/partial bank.
-            return []
+        return normalized
 
-    return combined
-
+    return []
 
 def _ai_validate_alignment(questions: list[dict], blueprint: dict, jenjang: str) -> dict:
     """
@@ -1160,7 +1161,9 @@ OUTPUT JSON MURNI:
   "notes": ["..."]
 }}
 """
-    raw = call_gemini_with_rotation(prompt, is_json=True)
+    raw = call_gemini_with_rotation(
+        prompt, is_json=True, thinking_level="low", max_output_tokens=8000
+    )
     data = _parse_ai_json(raw)
     if not isinstance(data, dict):
         return {"valid": False, "invalid": [], "notes": ["QA AI tidak mengembalikan JSON valid."]}
@@ -1189,7 +1192,7 @@ def generate_bank_soal(
 
     for bp in blueprint.get("blueprints", []):
         batch = _generate_blueprint_batch(
-            bp, variants, jenjang, mapel, kelas, language, attempts=2
+            bp, variants, jenjang, mapel, kelas, language, attempts=1
         )
         if not batch:
             row_reports.append({
