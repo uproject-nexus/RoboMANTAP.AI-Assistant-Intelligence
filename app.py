@@ -33,6 +33,7 @@ from reportlab.platypus import (
 
 from bank_soal_engine import (
     extract_blueprint_from_docx,
+    extract_blueprint_from_source,
     blueprint_summary,
     generate_bank_soal,
     build_bank_soal_docx,
@@ -3013,25 +3014,53 @@ elif st.session_state.page == "guru_dashboard":
         </div>
         """, unsafe_allow_html=True)
 
-        bank_file = st.file_uploader(
-            "📥 Upload Kisi-Kisi Ujian (.docx)",
-            type=["docx"],
-            key="bank_blueprint_upload",
-            help="Gunakan DOCX dengan tabel NO • ATP • INDIKATOR SOAL • [Level Kognitif/C1–C6] • PG • Isian • Uraian. Level C1–C6 akan menjadi constraint generator dan QA bila tersedia.",
-        )
+        st.markdown("### 📥 Sumber Kisi-Kisi")
+        st.caption("Gunakan DOCX, PDF, foto/screenshot JPG/PNG/WEBP, atau kamera. Untuk foto/PDF, RoboMANTAP menggunakan Vision AI untuk membaca tabel dan mempertahankan hubungan No • ATP • Indikator • Level C1–C6 • PG • Isian • Uraian.")
+        upload_col, camera_col = st.columns([1.65, 1], gap="large")
+        with upload_col:
+            bank_file = st.file_uploader(
+                "Upload Kisi-Kisi",
+                type=["docx", "pdf", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"],
+                key="bank_blueprint_upload",
+                help="Format: DOCX, PDF, JPG, JPEG, PNG, WEBP.",
+            )
+        with camera_col:
+            bank_camera = st.camera_input(
+                "📷 Foto Kisi-Kisi dengan Kamera",
+                key="bank_blueprint_camera",
+            )
 
-        if bank_file is not None:
-            raw_bank_bytes = bank_file.getvalue()
-            current_hash = hashlib.sha256(raw_bank_bytes).hexdigest()
-            if st.session_state.get("bank_blueprint_hash") != current_hash:
-                with st.spinner("RoboMANTAP membaca struktur tabel kisi-kisi..."):
-                    parsed_blueprint = extract_blueprint_from_docx(raw_bank_bytes)
-                st.session_state.bank_blueprint = parsed_blueprint
-                st.session_state.bank_blueprint_hash = current_hash
-                st.session_state.bank_questions = []
-                st.session_state.bank_report = None
-                st.session_state.bank_docx_bytes = None
-                st.session_state.bank_docx_config_signature = None
+        selected_source = bank_camera if bank_camera is not None else bank_file
+        selected_source_name = "kamera.jpg" if bank_camera is not None else (getattr(bank_file, "name", "") if bank_file is not None else "")
+        if bank_camera is not None and bank_file is not None:
+            st.info("📷 Sumber kamera diprioritaskan karena foto kamera tersedia. Jika ingin memakai file, kosongkan input kamera lalu upload file.")
+
+        if selected_source is not None:
+            raw_bank_bytes = selected_source.getvalue()
+            source_hash = hashlib.sha256((selected_source_name + "::").encode("utf-8") + raw_bank_bytes).hexdigest()
+            if st.session_state.get("bank_blueprint_hash") != source_hash:
+                try:
+                    with st.spinner(f"RoboMANTAP membaca kisi-kisi dari {selected_source_name}..."):
+                        parsed_blueprint = extract_blueprint_from_source(raw_bank_bytes, selected_source_name)
+                    st.session_state.bank_blueprint = parsed_blueprint
+                    st.session_state.bank_blueprint_hash = source_hash
+                    st.session_state.bank_blueprint_source_name = selected_source_name
+                    st.session_state.bank_questions = []
+                    st.session_state.bank_report = None
+                    st.session_state.bank_docx_bytes = None
+                    st.session_state.bank_docx_config_signature = None
+                except Exception as exc:
+                    st.session_state.bank_blueprint = None
+                    st.session_state.bank_blueprint_hash = source_hash
+                    st.error(f"❌ Kisi-kisi belum berhasil dibaca: {exc}")
+
+        # Preview the actual uploaded/captured source so the teacher can verify
+        # that the intended page/photo is being analyzed.
+        if selected_source is not None:
+            source_ext = os.path.splitext(selected_source_name.lower())[1]
+            if source_ext in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"} or bank_camera is not None:
+                with st.expander("👁️ Lihat foto/sumber gambar", expanded=False):
+                    st.image(raw_bank_bytes, caption=selected_source_name, use_container_width=True)
 
         blueprint = st.session_state.get("bank_blueprint")
 
@@ -3046,7 +3075,7 @@ elif st.session_state.page == "guru_dashboard":
             with c3: st.metric("PG", summary["slots_by_form"].get("PG", 0))
             with c4: st.metric("Isian + Uraian", summary["slots_by_form"].get("Isian", 0) + summary["slots_by_form"].get("Uraian", 0))
             st.caption(
-                f"📄 {bank_file.name if bank_file else 'Kisi-kisi tersimpan'} • "
+                f"📄 {st.session_state.get('bank_blueprint_source_name', 'Kisi-kisi tersimpan')} • "
                 f"{metadata.get('assessment') or 'Asesmen'} • Tahun {metadata.get('school_year') or '-'}"
             )
             cognitive_counts = summary.get("cognitive_levels", {})
@@ -3062,7 +3091,7 @@ elif st.session_state.page == "guru_dashboard":
                 rows = extract_blueprint_preview_rows(blueprint)
                 if rows:
                     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-                st.caption("Ekstraksi menggunakan struktur tabel DOCX. Jika tersedia, Level Kognitif C1–C6 ikut menjadi constraint generator dan QA.")
+                st.caption("DOCX dibaca dari struktur tabel; PDF dan image/camera dibaca dengan Vision AI. Jika tersedia, Level C1–C6 ikut menjadi constraint generator dan QA.")
 
             st.markdown("#### 2. Konfigurasi Generator")
             c1, c2, c3 = st.columns(3)
