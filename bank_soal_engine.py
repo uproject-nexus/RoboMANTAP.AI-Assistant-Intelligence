@@ -546,22 +546,83 @@ def _generate_blueprint_batch(
     language: str,
     attempts: int = 2,
 ) -> list[dict]:
-    prompt = _generation_prompt(bp, variants, jenjang, mapel, kelas, language)
-    for _ in range(max(1, attempts)):
-        raw = call_gemini_with_rotation(prompt, is_json=True)
-        data = _parse_ai_json(raw)
-        if not data or not isinstance(data.get("questions"), list):
-            continue
-        normalized = []
-        for item in data["questions"]:
-            q = _normalize_generated_question(item, jenjang)
-            if q:
-                q["blueprint_id"] = bp["id"]
-                normalized.append(q)
-        issues = _deterministic_alignment_issues(normalized, bp, variants, jenjang)
-        if not issues:
-            return normalized
-    return []
+    """Generate each variant as an independent batch.
+
+    The previous implementation asked one AI response to produce all variants
+    at once. That made the requested Variant identity dependent on the model
+    faithfully repeating variant=1..N in every object. Here each variant is a
+    separate generation/validation unit, so the variant identity is explicit
+    and cannot collapse into one package.
+    """
+    combined: list[dict] = []
+
+    for variant_number in range(1, variants + 1):
+        variant_ok = False
+        for _ in range(max(1, attempts)):
+            prompt = _generation_prompt(bp, 1, jenjang, mapel, kelas, language)
+            prompt += f"\n\nVARIANT WAJIB UNTUK BATCH INI: {variant_number}\n"
+            prompt += (
+                "Keluaran batch ini HANYA untuk variant tersebut. "
+                f"Semua objek harus memiliki \"variant\": {variant_number}. "
+                "Jangan menghasilkan variant lain."
+            )
+
+            raw = call_gemini_with_rotation(prompt, is_json=True)
+            data = _parse_ai_json(raw)
+            if not data or not isinstance(data.get("questions"), list):
+                continue
+
+            normalized = []
+            for item in data["questions"]:
+                q = _normalize_generated_question(item, jenjang)
+                if q:
+                    # The batch identity is authoritative; do not trust a
+                    # malformed/missing variant value returned by the model.
+                    q["variant"] = variant_number
+                    q["blueprint_id"] = bp["id"]
+                    normalized.append(q)
+
+            # Validate against exactly one variant's slots.
+            expected = {
+                (variant_number, slot["question_type"], slot["source_number"])
+                for slot in _slot_list(bp)
+            }
+            actual = {
+                (int(q.get("variant", 0)), q.get("question_type"), int(q.get("source_number", -1)))
+                for q in normalized
+            }
+            if actual != expected:
+                continue
+
+            issues = _deterministic_alignment_issues(normalized, bp, variants, jenjang)
+            # The full-variants validator expects all variants, so validate
+            # this batch's structural properties directly and cognitive level
+            # explicitly here.
+            target_levels = _cognitive_levels(bp.get("cognitive_level"))
+            if target_levels:
+                bad_level = False
+                for q in normalized:
+                    generated_levels = _cognitive_levels(q.get("cognitive_level"))
+                    if not generated_levels or not any(level in target_levels for level in generated_levels):
+                        bad_level = True
+                        break
+                if bad_level:
+                    continue
+
+            expected_count = _option_count(jenjang)
+            if any(q.get("question_type") == "PG" and len(q.get("options", [])) != expected_count for q in normalized):
+                continue
+
+            combined.extend(normalized)
+            variant_ok = True
+            break
+
+        if not variant_ok:
+            # One failed variant makes this blueprint incomplete; the caller
+            # can report it instead of silently producing a mixed/partial bank.
+            return []
+
+    return combined
 
 
 def _ai_validate_alignment(questions: list[dict], blueprint: dict, jenjang: str) -> dict:
@@ -876,11 +937,10 @@ def build_bank_soal_docx(
     #   C. URAIAN
     # followed by a page break before the next variant.
     # ------------------------------------------------------------------
-    variant_values = sorted({
-        int(q.get("variant", 0))
-        for q in questions
-        if q.get("variant") is not None
-    })
+    # Render the configured number of packages explicitly. This prevents a
+    # missing/empty variant from being silently merged into another variant.
+    requested_variants = max(1, int(variants or blueprint.get("variants_per_blueprint", 1) or 1))
+    variant_values = list(range(1, requested_variants + 1))
 
     form_titles = {
         "PG": "A. PILIHAN GANDA",
