@@ -21,8 +21,9 @@ from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
-from docx.oxml import OxmlElement
+from docx.oxml import OxmlElement, parse_xml, nsdecls
 from docx.oxml.ns import qn
+from xml.sax.saxutils import escape
 
 from ai_engine import call_gemini_with_rotation, clean_json_text
 
@@ -71,6 +72,390 @@ def _find_cognitive_column(rows: list[list[str]], search_upto: int) -> int | Non
 def _clean(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
+def clean_docx_math_text(text: str) -> str:
+    """
+    Pembersih teks sebelum masuk ke DOCX.
+
+    Penting:
+    - Menghapus literal \\n / \\r / \\r\\n yang bocor dari AI.
+    - Menghapus newline aktual yang mengganggu layout.
+    - TIDAK menghapus backslash LaTeX penting seperti:
+        \\frac
+        \\dfrac
+        \\tfrac
+        \\begin
+        \\end
+        \\circ
+    - Menormalisasi token matematika sederhana.
+    """
+    if text is None:
+        return ""
+
+    text = str(text)
+
+    # ------------------------------------------------------------
+    # 1. Bersihkan newline yang dikirim sebagai TEKS literal.
+    # ------------------------------------------------------------
+    text = text.replace("\\r\\n", " ")
+    text = text.replace("\\n", " ")
+    text = text.replace("\\r", " ")
+
+    # Newline aktual dari string Python/JSON.
+    text = text.replace("\r\n", " ")
+    text = text.replace("\r", " ")
+    text = text.replace("\n", " ")
+
+    # ------------------------------------------------------------
+    # 2. Token matematika sederhana.
+    # ------------------------------------------------------------
+    replacements = {
+        r"\rightarrow": "→",
+        r"\longrightarrow": "→",
+        r"\to": "→",
+        r"\Rightarrow": "⇒",
+        r"\Longrightarrow": "⇒",
+        r"\leftarrow": "←",
+        r"\leftrightarrow": "↔",
+        r"\Longleftrightarrow": "⇔",
+
+        r"\times": "×",
+        r"\cdot": "·",
+        r"\div": "÷",
+        r"\neq": "≠",
+        r"\leq": "≤",
+        r"\geq": "≥",
+        r"\le": "≤",
+        r"\ge": "≥",
+        r"\pm": "±",
+        r"\mp": "∓",
+
+        r"\infty": "∞",
+        r"\pi": "π",
+        r"\alpha": "α",
+        r"\beta": "β",
+        r"\gamma": "γ",
+        r"\delta": "δ",
+        r"\theta": "θ",
+        r"\lambda": "λ",
+        r"\mu": "μ",
+        r"\sigma": "σ",
+
+        r"\in": "∈",
+        r"\notin": "∉",
+        r"\forall": "∀",
+        r"\exists": "∃",
+        r"\emptyset": "∅",
+        r"\angle": "∠",
+        r"\perp": "⊥",
+        r"\parallel": "∥",
+
+        # Fungsi komposisi / fungsi invers.
+        r"\circ": "∘",
+        r"\circl": "∘",
+
+        r"\approx": "≈",
+        r"\equiv": "≡",
+        r"\propto": "∝",
+    }
+
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    # Token rusak yang kadang muncul dari AI.
+    text = re.sub(
+        r"(?<![A-Za-z])circl(?![A-Za-z])",
+        "∘",
+        text
+    )
+
+    # ------------------------------------------------------------
+    # 3. \left dan \right
+    # Jangan menghapus seluruh ekspresi matematika.
+    # ------------------------------------------------------------
+    text = re.sub(
+        r"\\left\s*([\(\[\{])",
+        r"\1",
+        text
+    )
+
+    text = re.sub(
+        r"\\right\s*([\)\]\}])",
+        r"\1",
+        text
+    )
+
+    # ------------------------------------------------------------
+    # 4. Akar sederhana.
+    # ------------------------------------------------------------
+    text = re.sub(
+        r"\\sqrt\{([^{}]+)\}",
+        r"√(\1)",
+        text
+    )
+
+    # ------------------------------------------------------------
+    # 5. Pangkat sederhana.
+    # ------------------------------------------------------------
+    sup_map = str.maketrans(
+        "0123456789+-=()nxyi",
+        "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ"
+    )
+
+    text = re.sub(
+        r"\^\{([^{}]+)\}|\^([\-0-9a-zA-Z])",
+        lambda m: (m.group(1) or m.group(2)).translate(sup_map),
+        text
+    )
+
+    # ------------------------------------------------------------
+    # 6. Indeks sederhana.
+    # ------------------------------------------------------------
+    sub_map = str.maketrans(
+        "0123456789+-=()nixy",
+        "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ"
+    )
+
+    text = re.sub(
+        r"_\{([^{}]+)\}|_([0-9a-zA-Z])",
+        lambda m: (m.group(1) or m.group(2)).translate(sub_map),
+        text
+    )
+
+    # Delimiter matematika biasa tidak diperlukan karena
+    # pecahan/matriks akan dibuat sebagai OMML.
+    text = text.replace("$", "")
+
+    # Jangan menghapus backslash secara global di sini.
+    # \frac dan \begin{matrix} masih harus dibaca renderer.
+
+    return re.sub(r"[ \t]+", " ", text).strip()
+
+def add_omml_fraction(paragraph, numerator: str, denominator: str):
+    """
+    Pecahan Word Equation:
+        numerator
+        ---------
+        denominator
+
+    Bukan bentuk miring a/b.
+    """
+    num = clean_docx_math_text(numerator)
+    den = clean_docx_math_text(denominator)
+
+    xml = (
+        f'<m:oMath {nsdecls("m")}>'
+        f'<m:f>'
+        f'<m:num>'
+        f'<m:r><m:t>{escape(num)}</m:t></m:r>'
+        f'</m:num>'
+        f'<m:den>'
+        f'<m:r><m:t>{escape(den)}</m:t></m:r>'
+        f'</m:den>'
+        f'</m:f>'
+        f'</m:oMath>'
+    )
+
+    paragraph._p.append(parse_xml(xml))
+
+
+def add_omml_matrix(
+    paragraph,
+    matrix_type: str,
+    content: str
+):
+    """
+    Render matriks sebagai Microsoft Word Equation / OMML.
+    Mendukung:
+        matrix
+        pmatrix
+        bmatrix
+        vmatrix
+        Vmatrix
+    """
+
+    delimiters = {
+        "pmatrix": ("(", ")"),
+        "bmatrix": ("[", "]"),
+        "vmatrix": ("|", "|"),
+        "Vmatrix": ("‖", "‖"),
+        "matrix": ("", ""),
+    }
+
+    begin_char, end_char = delimiters.get(
+        matrix_type,
+        ("(", ")")
+    )
+
+    # \\ = pemisah baris LaTeX.
+    rows = [
+        row.strip()
+        for row in re.split(r"\\\\|\\cr", content)
+        if row.strip()
+    ]
+
+    matrix_rows = []
+
+    for row in rows:
+        columns = [col.strip() for col in row.split("&")]
+
+        cells = []
+
+        for col in columns:
+            cleaned = clean_docx_math_text(col)
+
+            cells.append(
+                f'<m:e>'
+                f'<m:r>'
+                f'<m:t>{escape(cleaned)}</m:t>'
+                f'</m:r>'
+                f'</m:e>'
+            )
+
+        matrix_rows.append(
+            f'<m:mr>{"".join(cells)}</m:mr>'
+        )
+
+    matrix_xml = (
+        f'<m:m>{"".join(matrix_rows)}</m:m>'
+    )
+
+    if begin_char or end_char:
+        xml = (
+            f'<m:oMath {nsdecls("m")}>'
+            f'<m:d>'
+            f'<m:dPr>'
+            f'<m:begChr m:val="{escape(begin_char)}"/>'
+            f'<m:endChr m:val="{escape(end_char)}"/>'
+            f'</m:dPr>'
+            f'<m:e>{matrix_xml}</m:e>'
+            f'</m:d>'
+            f'</m:oMath>'
+        )
+    else:
+        xml = (
+            f'<m:oMath {nsdecls("m")}>'
+            f'{matrix_xml}'
+            f'</m:oMath>'
+        )
+
+    paragraph._p.append(parse_xml(xml))
+
+def append_docx_math(
+    paragraph,
+    text: str,
+    *,
+    bold: bool = False,
+    font_size: float = 10,
+):
+    """
+    Menulis teks ke Word sambil mendeteksi:
+      - \\frac
+      - \\dfrac
+      - \\tfrac
+      - matrix
+      - pmatrix
+      - bmatrix
+      - vmatrix
+      - Vmatrix
+
+    Pecahan dan matriks dibuat sebagai OMML,
+    bukan teks biasa.
+    """
+
+    if not text:
+        return
+
+    text = str(text)
+
+    # ------------------------------------------------------------
+    # Pecahan + matriks.
+    # ------------------------------------------------------------
+    pattern = re.compile(
+        r"""
+        \\begin\{
+            (?P<matrix>
+                pmatrix|
+                bmatrix|
+                vmatrix|
+                Vmatrix|
+                matrix
+            )
+        \}
+        (?P<matrix_content>.*?)
+        \\end\{(?P=matrix)\}
+
+        |
+
+        \\(?P<frac>
+            frac|
+            dfrac|
+            tfrac
+        )
+        \{
+            (?P<num>[^{}]+)
+        \}
+        \{
+            (?P<den>[^{}]+)
+        \}
+        """,
+        re.DOTALL | re.VERBOSE
+    )
+
+    last = 0
+
+    for match in pattern.finditer(text):
+
+        start, end = match.span()
+
+        # --------------------------------------------------------
+        # Teks biasa sebelum matematika.
+        # --------------------------------------------------------
+        if start > last:
+            plain = clean_docx_math_text(
+                text[last:start]
+            )
+
+            if plain:
+                run = paragraph.add_run(plain)
+                run.bold = bold
+                run.font.size = Pt(font_size)
+
+        # --------------------------------------------------------
+        # Matriks.
+        # --------------------------------------------------------
+        if match.group("matrix"):
+            add_omml_matrix(
+                paragraph,
+                match.group("matrix"),
+                match.group("matrix_content")
+            )
+
+        # --------------------------------------------------------
+        # Pecahan.
+        # --------------------------------------------------------
+        elif match.group("frac"):
+            add_omml_fraction(
+                paragraph,
+                match.group("num"),
+                match.group("den")
+            )
+
+        last = end
+
+        # Jarak kecil setelah equation.
+        spacer = paragraph.add_run(" ")
+        spacer.font.size = Pt(font_size)
+
+    # ------------------------------------------------------------
+    # Teks setelah rumus terakhir.
+    # ------------------------------------------------------------
+    if last < len(text):
+        plain = clean_docx_math_text(text[last:])
+
+        if plain:
+            run = paragraph.add_run(plain)
+            run.bold = bold
+            run.font.size = Pt(font_size)
 
 def _cell_clean(value: Any) -> str:
     text = str(value or "").replace("\xa0", " ")
@@ -1031,16 +1416,23 @@ def build_bank_soal_docx(
                 r = p.add_run(f"{idx}. ")
                 r.bold = True
                 r.font.size = Pt(10)
-                r2 = p.add_run(q.get("question", ""))
-                r2.font.size = Pt(10)
+
+                append_docx_math(
+                    p,
+                    q.get("question", ""),
+                    font_size=10,
+                )
 
                 if form == "PG":
                     for opt in q.get("options", []):
                         po = doc.add_paragraph()
                         po.paragraph_format.left_indent = Inches(0.22)
                         po.paragraph_format.space_after = Pt(1)
-                        ro = po.add_run(opt)
-                        ro.font.size = Pt(9.5)
+                        append_docx_math(
+                            po,
+                            opt,
+                            font_size=9.5,
+                        )
 
                 if include_answer_key:
                     pa = doc.add_paragraph()
@@ -1048,8 +1440,12 @@ def build_bank_soal_docx(
                     ra = pa.add_run("Kunci: ")
                     ra.bold = True
                     ra.font.size = Pt(8.5)
-                    rb = pa.add_run(q.get("correct_answer", ""))
-                    rb.font.size = Pt(8.5)
+ 
+                    append_docx_math(
+                        pa,
+                        q.get("correct_answer", ""),
+                        font_size=8.5,
+                    )
                     rb.font.color.rgb = RGBColor(5, 150, 105)
 
                     ps = doc.add_paragraph()
@@ -1057,8 +1453,12 @@ def build_bank_soal_docx(
                     rs = ps.add_run("Pembahasan: ")
                     rs.bold = True
                     rs.font.size = Pt(8.5)
-                    rt = ps.add_run(q.get("solution_basis", ""))
-                    rt.font.size = Pt(8.5)
+
+                    append_docx_math(
+                        ps,
+                        q.get("solution_basis", ""),
+                        font_size=8.5,
+                    )
                     ps.paragraph_format.space_after = Pt(7)
 
     # ------------------------------------------------------------------
