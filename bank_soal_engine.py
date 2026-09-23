@@ -28,6 +28,44 @@ from ai_engine import call_gemini_with_rotation, clean_json_text
 
 
 FORM_ORDER = ("PG", "Isian", "Uraian")
+COGNITIVE_LEVELS = ("C1", "C2", "C3", "C4", "C5", "C6")
+
+
+def _normalize_cognitive_level(value: Any) -> str:
+    """Normalize explicit Bloom/cognitive labels such as C4, C-4, C4 (Analisis).
+
+    Multiple levels are preserved as a slash-separated value so the source
+    blueprint is not silently rewritten.
+    """
+    text = _clean(value).upper()
+    if not text:
+        return ""
+    found = []
+    for n in re.findall(r"\bC\s*[-–]?\s*([1-6])\b", text):
+        label = f"C{n}"
+        if label not in found:
+            found.append(label)
+    return "/".join(found)
+
+
+def _cognitive_levels(value: Any) -> list[str]:
+    normalized = _normalize_cognitive_level(value)
+    return [x for x in normalized.split("/") if x in COGNITIVE_LEVELS]
+
+
+def _find_cognitive_column(rows: list[list[str]], search_upto: int) -> int | None:
+    """Find an explicit cognitive-level column without guessing from content."""
+    labels = (
+        "LEVEL KOGNITIF", "TINGKAT KOGNITIF", "KOGNITIF",
+        "TAKSONOMI BLOOM", "TAKSONOMI", "LEVEL KOGNISI", "LEVEL SOAL",
+        "TINGKAT KESULITAN", "LEVEL KESULITAN", "LEVEL",
+    )
+    for row in rows[: max(1, search_upto + 1)]:
+        for idx, cell in enumerate(row):
+            value = _clean(cell).upper()
+            if any(label in value for label in labels):
+                return idx
+    return None
 
 
 def _clean(value: Any) -> str:
@@ -130,6 +168,12 @@ def extract_blueprint_from_docx(file_bytes: bytes) -> dict:
     if form_idx is None:
         form_idx = min(header_idx + 1, len(table.rows) - 1)
 
+    header_rows = [
+        [_cell_clean(c.text) for c in table.rows[idx].cells]
+        for idx in range(min(len(table.rows), max(6, form_idx + 1)))
+    ]
+    cognitive_col = _find_cognitive_column(header_rows, form_idx)
+
     header_cells = [_cell_clean(c.text).upper() for c in table.rows[form_idx].cells]
     form_columns: dict[int, str] = {}
     for col, value in enumerate(header_cells):
@@ -146,6 +190,7 @@ def extract_blueprint_from_docx(file_bytes: bytes) -> dict:
         form_columns = {3: "PG", 4: "Isian", 5: "Uraian"}
 
     current_chapter = ""
+    current_cognitive_level = ""
     blueprints: list[dict] = []
     bp_counter = 0
 
@@ -167,6 +212,17 @@ def extract_blueprint_from_docx(file_bytes: bytes) -> dict:
         no = _clean(cells[0]) if len(cells) > 0 else ""
         atp = _clean(cells[1]) if len(cells) > 1 else ""
         indicator = _clean(cells[2]) if len(cells) > 2 else ""
+
+        cognitive_level = ""
+        if cognitive_col is not None and cognitive_col < len(cells):
+            cognitive_level = _normalize_cognitive_level(cells[cognitive_col])
+            if cognitive_level:
+                current_cognitive_level = cognitive_level
+            elif current_cognitive_level:
+                # Supports vertically merged Word cells represented as blank
+                # values on continuation rows. This is only used when an
+                # explicit cognitive-level column was detected.
+                cognitive_level = current_cognitive_level
 
         if not indicator and not atp:
             continue
@@ -190,6 +246,8 @@ def extract_blueprint_from_docx(file_bytes: bytes) -> dict:
             "no": no,
             "atp": atp,
             "indicator": indicator,
+            "cognitive_level": cognitive_level,
+            "cognitive_level_source": _clean(cells[cognitive_col]) if cognitive_col is not None and cognitive_col < len(cells) else "",
             "forms": forms,
             "raw_cells": cells,
         })
@@ -208,12 +266,22 @@ def extract_blueprint_from_docx(file_bytes: bytes) -> dict:
         for form in FORM_ORDER
     )
 
+    warnings = []
+    if cognitive_col is not None:
+        missing_levels = [bp["id"] for bp in blueprints if not bp.get("cognitive_level")]
+        if missing_levels:
+            warnings.append(
+                "Kolom level kognitif terdeteksi, tetapi belum ada level C1–C6 pada: "
+                + ", ".join(missing_levels[:12])
+            )
+
     return {
         "metadata": metadata,
         "blueprints": blueprints,
         "total_slots": total_slots,
         "blueprint_count": len(blueprints),
-        "warnings": [],
+        "cognitive_level_column": cognitive_col,
+        "warnings": warnings,
         "source_type": "docx_table",
     }
 
@@ -224,10 +292,15 @@ def blueprint_summary(blueprint: dict) -> dict:
         for form in FORM_ORDER
     }
     variants = int(blueprint.get("variants_per_blueprint", 1) or 1)
+    cognitive_counts = Counter(
+        bp.get("cognitive_level") for bp in blueprint.get("blueprints", [])
+        if bp.get("cognitive_level")
+    )
     return {
         "blueprint_count": len(blueprint.get("blueprints", [])),
         "base_slots": sum(counts.values()),
         "slots_by_form": counts,
+        "cognitive_levels": dict(cognitive_counts),
         "estimated_questions": sum(counts.values()) * variants,
     }
 
@@ -281,6 +354,7 @@ KISI-KISI SUMBER KEBENARAN:
 - Chapter/Bab: {bp.get('chapter','')}
 - ATP: {bp.get('atp','')}
 - Indikator soal: {bp.get('indicator','')}
+- Level kognitif: {bp.get('cognitive_level') or 'Tidak dicantumkan'}
 - Nomor/form yang diwajibkan: {slot_text}
 
 JUMLAH VARIASI:
@@ -312,6 +386,11 @@ ATURAN PRESISI:
 8. Bahasa harus natural dan sesuai tingkat {jenjang}.
 9. Untuk materi Arab/religius, gunakan bahasa yang sesuai bidang dan jangan mengarang kutipan agama.
 10. Jika menggunakan notasi matematika, gunakan Unicode/LaTeX yang valid.
+11. Jika Level Kognitif dicantumkan pada blueprint, level tersebut adalah CONSTRAINT WAJIB.
+    Soal harus menuntut proses berpikir sesuai level target, bukan hanya menggunakan
+    materi yang lebih sulit. C4 = menganalisis, C5 = mengevaluasi, C6 = mencipta.
+12. Jangan menurunkan tuntutan kognitif target. Jika target C5, soal hafalan/perhitungan
+    rutin tidak boleh diklaim sebagai C5.
 
 OUTPUT JSON MURNI:
 {{
@@ -320,6 +399,7 @@ OUTPUT JSON MURNI:
       "blueprint_id": "{bp.get('id')}",
       "variant": 1,
       "question_type": "PG",
+      "cognitive_level": "{bp.get('cognitive_level','')}",
       "source_number": 1,
       "question": "...",
       "options": ["A. ...", "B. ...", "C. ...", "D. ...", "E. ..."],
@@ -366,6 +446,7 @@ def _normalize_generated_question(item: dict, jenjang: str) -> dict | None:
     question = _clean(item.get("question"))
     answer = _clean(item.get("correct_answer"))
     solution = _clean(item.get("solution_basis"))
+    cognitive_level = _normalize_cognitive_level(item.get("cognitive_level"))
     try:
         variant = int(item.get("variant"))
         source_number = int(item.get("source_number"))
@@ -408,6 +489,7 @@ def _normalize_generated_question(item: dict, jenjang: str) -> dict | None:
         "blueprint_id": _clean(item.get("blueprint_id")),
         "variant": variant,
         "question_type": qtype,
+        "cognitive_level": cognitive_level,
         "source_number": source_number,
         "question": question,
         "options": options,
@@ -440,9 +522,18 @@ def _deterministic_alignment_issues(questions: list[dict], bp: dict, variants: i
             issues.append(f"extra={extra[:8]}")
 
     expected_count = _option_count(jenjang)
+    target_levels = _cognitive_levels(bp.get("cognitive_level"))
     for q in questions:
         if q.get("question_type") == "PG" and len(q.get("options", [])) != expected_count:
             issues.append(f"invalid_options={q.get('variant')}/{q.get('source_number')}")
+        if target_levels:
+            generated_level = _normalize_cognitive_level(q.get("cognitive_level"))
+            generated_levels = _cognitive_levels(generated_level)
+            if not generated_levels or not any(level in target_levels for level in generated_levels):
+                issues.append(
+                    f"invalid_cognitive_level={q.get('variant')}/{q.get('question_type')}/"
+                    f"{q.get('source_number')} expected={target_levels} got={generated_level or '-'}"
+                )
     return issues
 
 
@@ -488,6 +579,7 @@ def _ai_validate_alignment(questions: list[dict], blueprint: dict, jenjang: str)
             "chapter": bp.get("chapter", ""),
             "atp": bp.get("atp", ""),
             "indicator": bp.get("indicator", ""),
+            "cognitive_level": bp.get("cognitive_level", ""),
             "forms": bp.get("forms", {}),
         })
 
@@ -495,6 +587,7 @@ def _ai_validate_alignment(questions: list[dict], blueprint: dict, jenjang: str)
         {
             "key": f"{q.get('blueprint_id')}|V{q.get('variant')}|{q.get('question_type')}|N{q.get('source_number')}",
             "question": q.get("question", ""),
+            "cognitive_level": q.get("cognitive_level", ""),
             "options": q.get("options", []),
             "correct_answer": q.get("correct_answer", ""),
         }
@@ -518,7 +611,11 @@ Tandai hanya pertanyaan yang:
 - memakai bentuk soal berbeda dari blueprint,
 - salah nomor/form/variant,
 - memiliki jawaban benar yang tidak konsisten,
-- atau memiliki opsi PG yang tidak sesuai.
+- memiliki opsi PG yang tidak sesuai,
+- atau secara substantif tidak memenuhi level kognitif C1–C6 yang ditetapkan blueprint.
+
+Jika blueprint menetapkan C4, soal harus benar-benar menuntut analisis; C5 menuntut evaluasi;
+C6 menuntut penciptaan/perancangan. Jangan menerima soal rutin hanya karena diberi label C4/C5/C6.
 
 Jangan menandai hanya karena redaksi/konteks berbeda. Variasi memang WAJIB berbeda konteks
 selama kompetensi tetap sama.
@@ -742,9 +839,9 @@ def build_bank_soal_docx(
 
     if include_blueprint_map:
         _add_heading(doc, "Peta Blueprint", 1)
-        t = doc.add_table(rows=1, cols=5)
+        t = doc.add_table(rows=1, cols=6)
         t.alignment = WD_TABLE_ALIGNMENT.CENTER
-        headers = ["ID", "Bab", "ATP", "Indikator", "Bentuk / Nomor"]
+        headers = ["ID", "Bab", "ATP", "Indikator", "Level", "Bentuk / Nomor"]
         for i, h in enumerate(headers):
             cell = t.rows[0].cells[i]
             cell.text = h
@@ -761,7 +858,7 @@ def build_bank_soal_docx(
             cells = t.add_row().cells
             vals = [
                 bp["id"], bp.get("chapter", ""), bp.get("atp", ""),
-                bp.get("indicator", ""), forms_text
+                bp.get("indicator", ""), bp.get("cognitive_level") or "—", forms_text
             ]
             for i, val in enumerate(vals):
                 cells[i].text = str(val)
@@ -770,11 +867,20 @@ def build_bank_soal_docx(
         doc.add_page_break()
 
     # ------------------------------------------------------------------
-    # Final document layout: Variant -> PG -> Isian -> Uraian.
-    # Each variant is a self-contained package so a teacher can immediately
-    # identify which questions belong to V1, V2, etc.
+    # Final document layout: one complete package per Variant.
+    # IMPORTANT: never mix questions from different variants on the same
+    # package/page. Each variant is rendered as:
+    #   VARIAN N
+    #   A. PILIHAN GANDA
+    #   B. ISIAN SINGKAT
+    #   C. URAIAN
+    # followed by a page break before the next variant.
     # ------------------------------------------------------------------
-    variant_values = sorted({int(q.get("variant", 0)) for q in questions if q.get("variant") is not None})
+    variant_values = sorted({
+        int(q.get("variant", 0))
+        for q in questions
+        if q.get("variant") is not None
+    })
 
     form_titles = {
         "PG": "A. PILIHAN GANDA",
@@ -782,32 +888,81 @@ def build_bank_soal_docx(
         "Uraian": "C. URAIAN",
     }
 
-    for variant in variant_values:
-        variant_questions = [q for q in questions if int(q.get("variant", 0)) == variant]
-        if not variant_questions:
-            continue
+    # Build explicit buckets first. This avoids relying on the incoming
+    # question order and guarantees V1 is completed before V2 starts.
+    variant_buckets = {
+        variant: {
+            form: [
+                q for q in questions
+                if int(q.get("variant", 0)) == variant
+                and q.get("question_type") == form
+            ]
+            for variant in variant_values
+            for form in FORM_ORDER
+        }
+    }
 
-        # Strong visual divider between packages.
-        vp = doc.add_paragraph()
-        vp.paragraph_format.space_before = Pt(12)
-        vp.paragraph_format.space_after = Pt(8)
-        vp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        vr = vp.add_run(f"VARIAN {variant}")
-        vr.bold = True
-        vr.font.size = Pt(15)
-        vr.font.color.rgb = RGBColor(6, 78, 59)
+    for variant_index, variant in enumerate(variant_values):
+        # Every variant starts on a fresh page. This makes each variant a
+        # genuinely separate package when the DOCX is printed or distributed.
+        if variant_index > 0:
+            doc.add_page_break()
+
+        # Variant banner.
+        banner = doc.add_table(rows=1, cols=1)
+        banner.alignment = WD_TABLE_ALIGNMENT.CENTER
+        banner.autofit = False
+        banner.columns[0].width = Inches(6.9)
+        bc = banner.cell(0, 0)
+        bc.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        _set_cell_shading(bc, "064E3B")
+        _set_cell_border(
+            bc,
+            top={"val": "single", "sz": 8, "color": "064E3B"},
+            bottom={"val": "single", "sz": 8, "color": "064E3B"},
+            left={"val": "single", "sz": 8, "color": "064E3B"},
+            right={"val": "single", "sz": 8, "color": "064E3B"},
+        )
+        bp = bc.paragraphs[0]
+        bp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        bp.paragraph_format.space_before = Pt(7)
+        bp.paragraph_format.space_after = Pt(7)
+        br = bp.add_run(f"VARIAN {variant}")
+        br.bold = True
+        br.font.size = Pt(16)
+        br.font.color.rgb = RGBColor(255, 255, 255)
+
+        # Small package label makes the purpose unambiguous in print/preview.
+        cp = doc.add_paragraph()
+        cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        cp.paragraph_format.space_before = Pt(3)
+        cp.paragraph_format.space_after = Pt(10)
+        cr = cp.add_run("PAKET SOAL • SEMUA BENTUK SOAL DALAM VARIAN INI")
+        cr.bold = True
+        cr.font.size = Pt(7.5)
+        cr.font.color.rgb = RGBColor(107, 114, 128)
 
         for form in FORM_ORDER:
-            form_questions = [q for q in variant_questions if q.get("question_type") == form]
-            if not form_questions:
-                continue
+            form_questions = variant_buckets.get(variant, {}).get(form, [])
 
+            # Always keep the three planned section labels in the same order.
+            # If a blueprint has no slot for a form, show a compact note rather
+            # than silently merging the next form into the current section.
             _add_heading(doc, form_titles[form], 1)
 
-            # Number resets for each form inside each variant. This keeps the
-            # printed exam familiar while the traceability table disambiguates
-            # the same number across forms using Variant + Bentuk.
+            if not form_questions:
+                empty = doc.add_paragraph()
+                empty.paragraph_format.left_indent = Inches(0.18)
+                empty.paragraph_format.space_after = Pt(7)
+                er = empty.add_run("Tidak ada soal untuk bentuk ini pada varian ini.")
+                er.italic = True
+                er.font.size = Pt(8.5)
+                er.font.color.rgb = RGBColor(107, 114, 128)
+                continue
+
             for idx, q in enumerate(form_questions, start=1):
+                # The printed number is local to Variant + Bentuk.
+                # Traceability stores the same number together with V/form.
                 q["_document_number"] = idx
 
                 p = doc.add_paragraph()
@@ -846,11 +1001,6 @@ def build_bank_soal_docx(
                     rt.font.size = Pt(8.5)
                     ps.paragraph_format.space_after = Pt(7)
 
-        # Page break between variants makes each generated package easy to
-        # print or distribute independently. Avoid an extra trailing blank page.
-        if variant != variant_values[-1]:
-            doc.add_page_break()
-
     # ------------------------------------------------------------------
     # Blueprint traceability appendix. The rows deliberately follow the same
     # human-readable order as the document: V1 PG -> Isian -> Uraian, then V2...
@@ -869,11 +1019,11 @@ def build_bank_soal_docx(
             "menunjukkan sumber kisi-kisi yang menjadi dasar soal."
         ).font.size = Pt(8.5)
 
-        trace = doc.add_table(rows=1, cols=7)
+        trace = doc.add_table(rows=1, cols=8)
         trace.alignment = WD_TABLE_ALIGNMENT.CENTER
         trace.autofit = False
-        headers = ["Varian", "No. Soal", "Blueprint", "Bentuk", "No. Kisi", "QA", "Kode"]
-        widths = [0.62, 0.70, 0.82, 0.75, 0.70, 0.55, 1.35]
+        headers = ["Varian", "No. Soal", "Blueprint", "Level", "Bentuk", "No. Kisi", "QA", "Kode"]
+        widths = [0.58, 0.62, 0.72, 0.55, 0.68, 0.62, 0.52, 1.28]
         for i, h in enumerate(headers):
             cell = trace.rows[0].cells[i]
             cell.width = Inches(widths[i])
@@ -905,8 +1055,9 @@ def build_bank_soal_docx(
             source_no = q.get("source_number", "")
             form_code = {"PG": "PG", "Isian": "IS", "Uraian": "UR"}.get(form, re.sub(r"[^A-Za-z0-9]+", "", str(form)).upper()[:3])
             code = f"{bp_id}-V{variant}-{form_code}-{no_soal:02d}" if isinstance(no_soal, int) else f"{bp_id}-V{variant}-{form_code}-{no_soal}"
+            bp_lookup = next((bp for bp in blueprint.get("blueprints", []) if bp.get("id") == bp_id), {})
             vals = [
-                f"V{variant}", no_soal, bp_id, form, source_no,
+                f"V{variant}", no_soal, bp_id, bp_lookup.get("cognitive_level") or "—", form, source_no,
                 "PASS" if q.get("_qa_status") == "pass" else "REVIEW",
                 code,
             ]
@@ -935,6 +1086,7 @@ def extract_blueprint_preview_rows(blueprint: dict) -> list[dict]:
             "Bab": bp.get("chapter"),
             "ATP": bp.get("atp"),
             "Indikator Soal": bp.get("indicator"),
+            "Level Kognitif": bp.get("cognitive_level") or "—",
             "PG": ", ".join(map(str, forms.get("PG", []))) or "—",
             "Isian": ", ".join(map(str, forms.get("Isian", []))) or "—",
             "Uraian": ", ".join(map(str, forms.get("Uraian", []))) or "—",
