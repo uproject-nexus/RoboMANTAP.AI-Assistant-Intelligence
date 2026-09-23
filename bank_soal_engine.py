@@ -769,75 +769,157 @@ def build_bank_soal_docx(
                     run.font.size = Pt(7.5)
         doc.add_page_break()
 
-    # Number questions sequentially in the final document.
-    for form in FORM_ORDER:
-        form_questions = [q for q in questions if q.get("question_type") == form]
-        if not form_questions:
+    # ------------------------------------------------------------------
+    # Final document layout: Variant -> PG -> Isian -> Uraian.
+    # Each variant is a self-contained package so a teacher can immediately
+    # identify which questions belong to V1, V2, etc.
+    # ------------------------------------------------------------------
+    variant_values = sorted({int(q.get("variant", 0)) for q in questions if q.get("variant") is not None})
+
+    form_titles = {
+        "PG": "A. PILIHAN GANDA",
+        "Isian": "B. ISIAN SINGKAT",
+        "Uraian": "C. URAIAN",
+    }
+
+    for variant in variant_values:
+        variant_questions = [q for q in questions if int(q.get("variant", 0)) == variant]
+        if not variant_questions:
             continue
-        _add_heading(doc, {"PG": "A. PILIHAN GANDA", "Isian": "B. ISIAN SINGKAT", "Uraian": "C. URAIAN"}[form], 1)
 
-        for idx, q in enumerate(form_questions, start=1):
-            p = doc.add_paragraph()
-            p.paragraph_format.space_before = Pt(5)
-            p.paragraph_format.space_after = Pt(3)
-            r = p.add_run(f"{idx}. ")
-            r.bold = True
-            r.font.size = Pt(10)
-            r2 = p.add_run(q.get("question", ""))
-            r2.font.size = Pt(10)
+        # Strong visual divider between packages.
+        vp = doc.add_paragraph()
+        vp.paragraph_format.space_before = Pt(12)
+        vp.paragraph_format.space_after = Pt(8)
+        vp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        vr = vp.add_run(f"VARIAN {variant}")
+        vr.bold = True
+        vr.font.size = Pt(15)
+        vr.font.color.rgb = RGBColor(6, 78, 59)
 
-            if form == "PG":
-                for opt in q.get("options", []):
-                    po = doc.add_paragraph()
-                    po.paragraph_format.left_indent = Inches(0.22)
-                    po.paragraph_format.space_after = Pt(1)
-                    ro = po.add_run(opt)
-                    ro.font.size = Pt(9.5)
+        for form in FORM_ORDER:
+            form_questions = [q for q in variant_questions if q.get("question_type") == form]
+            if not form_questions:
+                continue
 
-            if include_answer_key:
-                pa = doc.add_paragraph()
-                pa.paragraph_format.left_indent = Inches(0.22)
-                ra = pa.add_run("Kunci: ")
-                ra.bold = True
-                ra.font.size = Pt(8.5)
-                rb = pa.add_run(q.get("correct_answer", ""))
-                rb.font.size = Pt(8.5)
-                rb.font.color.rgb = RGBColor(5, 150, 105)
+            _add_heading(doc, form_titles[form], 1)
 
-            ps = doc.add_paragraph()
-            ps.paragraph_format.left_indent = Inches(0.22)
-            rs = ps.add_run("Pembahasan: ")
-            rs.bold = True
-            rs.font.size = Pt(8.5)
-            rt = ps.add_run(q.get("solution_basis", ""))
-            rt.font.size = Pt(8.5)
-            ps.paragraph_format.space_after = Pt(7)
+            # Number resets for each form inside each variant. This keeps the
+            # printed exam familiar while the traceability table disambiguates
+            # the same number across forms using Variant + Bentuk.
+            for idx, q in enumerate(form_questions, start=1):
+                q["_document_number"] = idx
 
-    # Blueprint traceability appendix.
-    doc.add_page_break()
-    _add_heading(doc, "Lampiran • Traceability Bank Soal", 1)
-    trace = doc.add_table(rows=1, cols=6)
-    headers = ["No", "Blueprint", "Var.", "Bentuk", "No. Kisi", "QA"]
-    for i, h in enumerate(headers):
-        cell = trace.rows[0].cells[i]
-        cell.text = h
-        _set_cell_shading(cell, "064E3B")
-        for run in cell.paragraphs[0].runs:
-            run.bold = True
-            run.font.color.rgb = RGBColor(255, 255, 255)
-            run.font.size = Pt(8)
+                p = doc.add_paragraph()
+                p.paragraph_format.space_before = Pt(5)
+                p.paragraph_format.space_after = Pt(3)
+                r = p.add_run(f"{idx}. ")
+                r.bold = True
+                r.font.size = Pt(10)
+                r2 = p.add_run(q.get("question", ""))
+                r2.font.size = Pt(10)
 
-    for idx, q in enumerate(questions, start=1):
-        cells = trace.add_row().cells
-        vals = [
-            idx, q.get("blueprint_id", ""), q.get("variant", ""),
-            q.get("question_type", ""), q.get("source_number", ""),
-            "PASS" if q.get("_qa_status") == "pass" else "REVIEW",
-        ]
-        for i, val in enumerate(vals):
-            cells[i].text = str(val)
-            for run in cells[i].paragraphs[0].runs:
+                if form == "PG":
+                    for opt in q.get("options", []):
+                        po = doc.add_paragraph()
+                        po.paragraph_format.left_indent = Inches(0.22)
+                        po.paragraph_format.space_after = Pt(1)
+                        ro = po.add_run(opt)
+                        ro.font.size = Pt(9.5)
+
+                if include_answer_key:
+                    pa = doc.add_paragraph()
+                    pa.paragraph_format.left_indent = Inches(0.22)
+                    ra = pa.add_run("Kunci: ")
+                    ra.bold = True
+                    ra.font.size = Pt(8.5)
+                    rb = pa.add_run(q.get("correct_answer", ""))
+                    rb.font.size = Pt(8.5)
+                    rb.font.color.rgb = RGBColor(5, 150, 105)
+
+                    ps = doc.add_paragraph()
+                    ps.paragraph_format.left_indent = Inches(0.22)
+                    rs = ps.add_run("Pembahasan: ")
+                    rs.bold = True
+                    rs.font.size = Pt(8.5)
+                    rt = ps.add_run(q.get("solution_basis", ""))
+                    rt.font.size = Pt(8.5)
+                    ps.paragraph_format.space_after = Pt(7)
+
+        # Page break between variants makes each generated package easy to
+        # print or distribute independently. Avoid an extra trailing blank page.
+        if variant != variant_values[-1]:
+            doc.add_page_break()
+
+    # ------------------------------------------------------------------
+    # Blueprint traceability appendix. The rows deliberately follow the same
+    # human-readable order as the document: V1 PG -> Isian -> Uraian, then V2...
+    # ------------------------------------------------------------------
+    if include_blueprint_map:
+        doc.add_page_break()
+        _add_heading(doc, "Lampiran • Traceability Bank Soal", 1)
+        p = doc.add_paragraph()
+        p.paragraph_format.space_after = Pt(7)
+        r = p.add_run("Cara membaca: ")
+        r.bold = True
+        r.font.size = Pt(8.5)
+        p.add_run(
+            "No. Soal mengikuti nomor pada bagian Variant dan Bentuk. "
+            "Variant membedakan paket soal, sedangkan Blueprint dan No. Kisi "
+            "menunjukkan sumber kisi-kisi yang menjadi dasar soal."
+        ).font.size = Pt(8.5)
+
+        trace = doc.add_table(rows=1, cols=7)
+        trace.alignment = WD_TABLE_ALIGNMENT.CENTER
+        trace.autofit = False
+        headers = ["Varian", "No. Soal", "Blueprint", "Bentuk", "No. Kisi", "QA", "Kode"]
+        widths = [0.62, 0.70, 0.82, 0.75, 0.70, 0.55, 1.35]
+        for i, h in enumerate(headers):
+            cell = trace.rows[0].cells[i]
+            cell.width = Inches(widths[i])
+            cell.text = h
+            _set_cell_shading(cell, "064E3B")
+            for run in cell.paragraphs[0].runs:
+                run.bold = True
+                run.font.color.rgb = RGBColor(255, 255, 255)
                 run.font.size = Pt(7.5)
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
+        form_rank = {form: idx for idx, form in enumerate(FORM_ORDER)}
+        trace_questions = sorted(
+            questions,
+            key=lambda q: (
+                int(q.get("variant", 0)),
+                form_rank.get(q.get("question_type"), 99),
+                int(q.get("_document_number", 0)),
+                q.get("blueprint_id", ""),
+                int(q.get("source_number", 0)),
+            ),
+        )
+        for q in trace_questions:
+            cells = trace.add_row().cells
+            variant = int(q.get("variant", 0))
+            form = q.get("question_type", "")
+            no_soal = q.get("_document_number", "")
+            bp_id = q.get("blueprint_id", "")
+            source_no = q.get("source_number", "")
+            form_code = {"PG": "PG", "Isian": "IS", "Uraian": "UR"}.get(form, re.sub(r"[^A-Za-z0-9]+", "", str(form)).upper()[:3])
+            code = f"{bp_id}-V{variant}-{form_code}-{no_soal:02d}" if isinstance(no_soal, int) else f"{bp_id}-V{variant}-{form_code}-{no_soal}"
+            vals = [
+                f"V{variant}", no_soal, bp_id, form, source_no,
+                "PASS" if q.get("_qa_status") == "pass" else "REVIEW",
+                code,
+            ]
+            for i, val in enumerate(vals):
+                cells[i].width = Inches(widths[i])
+                cells[i].text = str(val)
+                cells[i].vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+                for run in cells[i].paragraphs[0].runs:
+                    run.font.size = Pt(7)
+                if i == 5:
+                    for run in cells[i].paragraphs[0].runs:
+                        run.bold = True
+                        run.font.color.rgb = (RGBColor(5, 150, 105) if q.get("_qa_status") == "pass" else RGBColor(180, 83, 9))
 
     output = io.BytesIO()
     doc.save(output)
