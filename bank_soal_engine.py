@@ -728,18 +728,26 @@ Gunakan question_type dan source_number PERSIS sesuai slot.
 """
 
 
-def _parse_ai_json(raw: str) -> dict | None:
+def _parse_ai_json(raw: str) -> dict | list | None:
+    """Parse Gemini JSON while tolerating either the documented object shape
+    or a bare list of question objects returned by some model responses.
+    """
     if not raw:
         return None
+    cleaned = clean_json_text(raw)
     try:
-        return json.loads(clean_json_text(raw), strict=False)
+        return json.loads(cleaned, strict=False)
     except Exception:
-        match = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+        pass
+
+    # Fallback: first try a JSON object, then a JSON array.
+    for pattern in (r"\{.*\}", r"\[.*\]"):
+        match = re.search(pattern, raw, flags=re.DOTALL)
         if match:
             try:
                 return json.loads(match.group(0), strict=False)
             except Exception:
-                return None
+                continue
     return None
 
 
@@ -1024,7 +1032,15 @@ def _generate_blueprint_batch(
             max_output_tokens=16000,
         )
         data = _parse_ai_json(raw)
-        if not data or not isinstance(data.get("questions"), list):
+
+        # Gemini occasionally returns the requested question array directly
+        # instead of wrapping it in {"questions": [...]}. Normalize both
+        # shapes before validation so a valid response is not discarded or
+        # crashes the generator with list.get(...).
+        if isinstance(data, list):
+            data = {"questions": data}
+
+        if not isinstance(data, dict) or not isinstance(data.get("questions"), list):
             continue
 
         normalized = []
