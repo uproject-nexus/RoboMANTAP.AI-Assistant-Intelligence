@@ -37,7 +37,7 @@ from bank_soal_engine import (
     blueprint_summary,
     generate_bank_soal,
     build_bank_soal_docx,
-    extract_blueprint_preview_rows,
+    extract_blueprint_preview_rows
 )
 
 from ai_engine import (
