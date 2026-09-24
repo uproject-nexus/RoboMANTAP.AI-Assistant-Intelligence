@@ -633,6 +633,31 @@ def _slot_list(bp: dict) -> list[dict]:
     return slots
 
 
+def _infer_diagram_type(*texts: Any) -> str | None:
+    """Infer an explicit geometric shape deterministically from source text."""
+    patterns = [
+        ("gabungan_jajargenjang_segitiga", r"gabungan\s+(?:antara\s+)?jajar\s*genjang\s+(?:dan|dengan)\s+segitiga|jajar\s*genjang\s+dan\s+segitiga"),
+        ("persegi_panjang", r"persegi\s*panjang|rectangle"),
+        ("layang_layang", r"layang\s*-?\s*layang|kite"),
+        ("belah_ketupat", r"belah\s+ketupat|rhombus"),
+        ("jajargenjang", r"jajar\s*genjang|parallelogram"),
+        ("trapesium", r"trapes(?:ium|oid)|trapezoid"),
+        ("segitiga", r"segitiga|triangle"),
+        ("lingkaran", r"lingkaran|circle"),
+        ("persegi", r"\bpersegi\b|square"),
+    ]
+    # Prefer the indicator/ATP/chapter order supplied by the caller, rather
+    # than accidentally matching an unrelated shape mentioned later.
+    for value in texts:
+        text = _clean(value).lower()
+        if not text:
+            continue
+        for dtype, pattern in patterns:
+            if re.search(pattern, text, flags=re.IGNORECASE):
+                return dtype
+    return None
+
+
 def _generation_prompt(
     bp: dict,
     variants: int,
@@ -640,11 +665,29 @@ def _generation_prompt(
     mapel: str,
     kelas: str,
     language: str,
+    requested_keys: list[tuple[int, str, int]] | None = None,
 ) -> str:
     labels = _option_labels(jenjang)
-    slots = _slot_list(bp)
+    if requested_keys is None:
+        slots = [
+            {"variant": v, "question_type": slot["question_type"], "source_number": slot["source_number"]}
+            for v in range(1, variants + 1)
+            for slot in _slot_list(bp)
+        ]
+    else:
+        slots = [
+            {"variant": int(v), "question_type": form, "source_number": int(number)}
+            for v, form, number in requested_keys
+        ]
     slot_text = json.dumps(slots, ensure_ascii=False)
-    total = len(slots) * variants
+    total = len(slots)
+    explicit_shape = _infer_diagram_type(bp.get("indicator", ""), bp.get("atp", ""), bp.get("chapter", ""))
+    shape_rule = (
+        f"BENTUK DIAGRAM YANG DIWAJIBKAN OLEH SUMBER: {explicit_shape}. "
+        "Jika soal membutuhkan gambar, diagram.type WAJIB sama dengan bentuk ini."
+        if explicit_shape else
+        "Sumber tidak menyebut bentuk secara eksplisit. Jika soal memang membutuhkan diagram, pilih tipe yang benar-benar sesuai dengan konteks soal."
+    )
 
     return f"""
 Anda adalah Blueprint Question Architect RoboMANTAP.
@@ -668,12 +711,11 @@ JUMLAH VARIASI:
 {variants} variasi per blueprint.
 Setiap variasi harus berbeda konteks, angka, tokoh, atau stimulus jika memungkinkan,
 tetapi mengukur kompetensi/indikator yang SAMA.
-Jangan membuat variasi yang sebenarnya menguji materi lain.
 
 SLOT:
 Total target keluaran = {total} pertanyaan.
-Untuk SETIAP variasi, buat tepat satu pertanyaan untuk setiap slot di daftar.
-Jangan menghilangkan slot dan jangan menambah slot.
+Buat TEPAT satu pertanyaan untuk setiap kombinasi variant/question_type/source_number
+yang tercantum pada daftar SLOT TARGET. Jangan menghilangkan atau menambah kombinasi.
 
 ATURAN TIPE:
 - PG: tepat {_option_count(jenjang)} pilihan: {", ".join(labels)}. Hanya satu jawaban benar.
@@ -684,8 +726,7 @@ ATURAN TIPE:
 ATURAN PRESISI:
 1. Indikator harus tercermin langsung pada stimulus dan tuntutan jawaban.
 2. Bila indikator mengatakan "disajikan soal cerita", gunakan soal cerita.
-3. Bila indikator mengatakan "disajikan gambar", buat stimulus yang dapat diwujudkan
-   melalui deskripsi teks yang jelas; jangan mengklaim gambar tersedia bila tidak ada.
+3. Bila indikator mengatakan "disajikan gambar", buat stimulus yang dapat diwujudkan melalui diagram.
 4. Jangan mengarang fakta yang tidak diperlukan.
 5. Untuk Matematika, hitung ulang angka dan pastikan jawabannya benar.
 6. Setiap variasi harus benar-benar berbeda, bukan sekadar mengganti nama.
@@ -693,16 +734,34 @@ ATURAN PRESISI:
 8. Bahasa harus natural dan sesuai tingkat {jenjang}.
 9. Untuk materi Arab/religius, gunakan bahasa yang sesuai bidang dan jangan mengarang kutipan agama.
 10. Jika menggunakan notasi matematika, gunakan Unicode/LaTeX yang valid.
-11. Jika Level Kognitif dicantumkan pada blueprint, level tersebut adalah CONSTRAINT WAJIB.
-    Soal harus menuntut proses berpikir sesuai level target, bukan hanya menggunakan
-    materi yang lebih sulit. C4 = menganalisis, C5 = mengevaluasi, C6 = mencipta.
-12. Jangan menurunkan tuntutan kognitif target. Jika target C5, soal hafalan/perhitungan
-    rutin tidak boleh diklaim sebagai C5.
+11. Level kognitif blueprint adalah CONSTRAINT WAJIB.
 
-JIKA INDIKATOR ATAU SOAL MEMBUTUHKAN GAMBAR/DIAGRAM, field `diagram` WAJIB diisi.
-Gunakan hanya tipe: layang_layang, persegi, persegi_panjang, segitiga, lingkaran, jajargenjang, trapesium, belah_ketupat, gabungan_jajargenjang_segitiga.
-`measurements` harus berisi angka yang sama persis dengan data soal. Jangan mengarang ukuran. Jika tidak membutuhkan gambar, set `diagram` menjadi null.
-Format contoh: required=true; type=layang_layang; measurements d1=30, d2=20; labels vertical=30 cm, horizontal=20 cm; caption kosong.
+ATURAN DIAGRAM — SANGAT KETAT:
+{shape_rule}
+Jika indikator/question tidak membutuhkan gambar, diagram = null.
+Jika membutuhkan gambar, diagram WAJIB berupa objek dengan:
+- required: true
+- type: salah satu tipe yang BENAR-BENAR sesuai dengan bentuk soal
+- measurements: hanya angka yang memang disebut/digunakan dalam soal
+- unit: satuan ukuran, misalnya "cm"; jangan mengubah satuan soal
+- labels: label ukuran yang tampil pada gambar
+- caption: singkat atau kosong
+
+TIPE YANG DIDUKUNG DAN DATA WAJIB:
+- persegi: sisi
+- persegi_panjang: panjang + lebar
+- segitiga: alas + tinggi
+- lingkaran: radius (r) atau diameter (d)
+- jajargenjang: alas + tinggi; sisi boleh ditambahkan jika memang dipakai soal
+- trapesium: sisi_atas + sisi_bawah + tinggi
+- belah_ketupat: d1 + d2
+- layang_layang: d1 + d2
+- gabungan_jajargenjang_segitiga: alas + tinggi_jajargenjang + tinggi_segitiga
+
+JANGAN menggunakan diagram layang-layang hanya karena contoh. Jangan mengganti persegi,
+persegi panjang, segitiga, trapesium, jajargenjang, atau belah ketupat menjadi layang-layang.
+Untuk setiap diagram, angka pada measurements harus muncul sebagai data numerik yang sama
+pada soal/stimulus, dan unit harus sama.
 
 OUTPUT JSON MURNI:
 {{
@@ -717,16 +776,21 @@ OUTPUT JSON MURNI:
       "options": ["A. ...", "B. ...", "C. ...", "D. ...", "E. ..."],
       "correct_answer": "A. ...",
       "solution_basis": "...",
-      "diagram": null
+      "diagram": {{
+        "required": true,
+        "type": "persegi",
+        "measurements": {{"sisi": 12}},
+        "unit": "cm",
+        "labels": {{"side": "12 cm"}},
+        "caption": ""
+      }}
     }}
   ]
 }}
 
 Keluaran HARUS berisi tepat {total} objek.
-Gunakan variant 1..{variants}.
-Gunakan question_type dan source_number PERSIS sesuai slot.
+Gunakan variant, question_type, dan source_number PERSIS sesuai SLOT TARGET.
 """
-
 
 def _parse_ai_json(raw: str) -> dict | list | None:
     """Parse Gemini JSON while tolerating either the documented object shape
@@ -760,13 +824,31 @@ SUPPORTED_DIAGRAM_TYPES = {
 def _diagram_type_normalize(value: Any) -> str:
     text = _clean(value).lower().replace("-", "_").replace(" ", "_")
     aliases = {
-        "layanglayang": "layang_layang", "kite": "layang_layang",
-        "square": "persegi", "rectangle": "persegi_panjang",
-        "triangle": "segitiga", "parallelogram": "jajargenjang",
-        "trapezoid": "trapesium", "rhombus": "belah_ketupat", "circle": "lingkaran", "circle_shape": "lingkaran",
+        "layanglayang": "layang_layang", "layang_layang": "layang_layang", "kite": "layang_layang",
+        "square": "persegi", "persegi": "persegi",
+        "rectangle": "persegi_panjang", "persegi_panjang": "persegi_panjang",
+        "triangle": "segitiga", "segitiga": "segitiga",
+        "parallelogram": "jajargenjang", "jajargenjang": "jajargenjang", "jajar_genjang": "jajargenjang",
+        "trapezoid": "trapesium", "trapesium": "trapesium",
+        "rhombus": "belah_ketupat", "belah_ketupat": "belah_ketupat",
+        "circle": "lingkaran", "circle_shape": "lingkaran", "lingkaran": "lingkaran",
         "gabungan": "gabungan_jajargenjang_segitiga",
+        "gabungan_jajargenjang_segitiga": "gabungan_jajargenjang_segitiga",
     }
     return aliases.get(text, text)
+
+
+DIAGRAM_REQUIREMENTS = {
+    "persegi": (("sisi",),),
+    "persegi_panjang": (("panjang",), ("lebar",)),
+    "segitiga": (("alas",), ("tinggi",)),
+    "lingkaran": (("r", "radius", "jari_jari", "d"),),
+    "jajargenjang": (("alas",), ("tinggi",)),
+    "trapesium": (("sisi_atas",), ("sisi_bawah",), ("tinggi",)),
+    "belah_ketupat": (("d1",), ("d2",)),
+    "layang_layang": (("d1",), ("d2",)),
+    "gabungan_jajargenjang_segitiga": (("alas",), ("tinggi_jajargenjang",), ("tinggi_segitiga",)),
+}
 
 
 def _normalize_diagram_spec(raw: Any) -> dict | None:
@@ -782,16 +864,26 @@ def _normalize_diagram_spec(raw: Any) -> dict | None:
             if isinstance(value, str):
                 m = re.search(r"-?\d+(?:[.,]\d+)?", value)
                 if m:
-                    clean_measurements[str(key)] = float(m.group(0).replace(",", "."))
+                    clean_measurements[str(key).strip().lower()] = float(m.group(0).replace(",", "."))
             elif isinstance(value, (int, float)):
-                clean_measurements[str(key)] = float(value)
+                clean_measurements[str(key).strip().lower()] = float(value)
         except Exception:
             continue
     labels = raw.get("labels") if isinstance(raw.get("labels"), dict) else {}
+    unit = _clean(raw.get("unit"))
+    if not unit:
+        # Preserve a unit if the model put it in one of its labels.
+        for value in labels.values():
+            match = re.search(r"\d+(?:[.,]\d+)?\s*(mm|cm|m|km)\b", _clean(value), re.I)
+            if match:
+                unit = match.group(1).lower()
+                break
+    unit = unit or "cm"
     return {
         "required": bool(raw.get("required", True)),
         "type": dtype,
         "measurements": clean_measurements,
+        "unit": unit,
         "labels": {str(k): _clean(v) for k, v in labels.items() if _clean(v)},
         "caption": _clean(raw.get("caption")),
     }
@@ -799,8 +891,81 @@ def _normalize_diagram_spec(raw: Any) -> dict | None:
 
 def _needs_diagram(indicator: str, question: str) -> bool:
     text = f"{indicator} {question}".lower()
-    return bool(re.search(r"disajikan\s+(?:sebuah\s+)?gambar|perhatikan\s+gambar|dari\s+gambar|berdasarkan\s+gambar", text))
+    return bool(re.search(
+        r"disajikan\s+(?:sebuah\s+)?gambar|perhatikan\s+gambar|dari\s+gambar|berdasarkan\s+gambar|lihat\s+gambar|pada\s+gambar",
+        text,
+    ))
 
+
+def _extract_units(text: str) -> set[str]:
+    return {u.lower() for u in re.findall(r"\b(?:mm|cm|m|km)\b", str(text or ""), flags=re.I)}
+
+
+def _measurement_present_in_text(value: float, text: str) -> bool:
+    """Check the numeric value without relying on exact decimal formatting."""
+    normalized = str(text).replace(",", ".")
+    candidates = {f"{float(value):g}", f"{float(value):.10g}"}
+    for candidate in candidates:
+        if re.search(rf"(?<!\d){re.escape(candidate)}(?!\d)", normalized):
+            return True
+    # Accept integer representation for a mathematically integral float.
+    if float(value).is_integer():
+        iv = str(int(value))
+        return bool(re.search(rf"(?<!\d){re.escape(iv)}(?!\d)", normalized))
+    return False
+
+
+def _diagram_validation_error(q: dict, bp: dict) -> str | None:
+    indicator = bp.get("indicator", "")
+    question = q.get("question", "")
+    needs = _needs_diagram(indicator, question)
+    diagram = q.get("diagram")
+    if not needs:
+        return None
+    if not isinstance(diagram, dict):
+        return "diagram_missing"
+
+    expected = _infer_diagram_type(indicator, question, bp.get("atp", ""), bp.get("chapter", ""))
+    dtype = _diagram_type_normalize(diagram.get("type"))
+    if expected and dtype != expected:
+        return f"diagram_type_mismatch expected={expected} got={dtype}"
+
+    measurements = diagram.get("measurements") or {}
+    if not isinstance(measurements, dict):
+        return "diagram_measurements_invalid"
+
+    # Normalize common aliases to the canonical renderer keys.
+    aliases = {
+        "side": "sisi", "length": "panjang", "width": "lebar", "base": "alas", "height": "tinggi",
+        "top": "sisi_atas", "top_base": "sisi_atas", "bottom": "sisi_bawah", "bottom_base": "sisi_bawah",
+        "vertical_diagonal": "d1", "diagonal_vertical": "d1", "horizontal_diagonal": "d2", "diagonal_horizontal": "d2",
+        "radius": "r", "jari_jari": "r", "diameter": "d",
+        "height_parallelogram": "tinggi_jajargenjang", "height_triangle": "tinggi_segitiga",
+    }
+    canonical = {}
+    for key, value in measurements.items():
+        canonical[aliases.get(str(key).lower(), str(key).lower())] = value
+
+    required_groups = DIAGRAM_REQUIREMENTS.get(dtype, ())
+    for group in required_groups:
+        if not any(k in canonical and isinstance(canonical[k], (int, float)) and float(canonical[k]) > 0 for k in group):
+            return f"diagram_measurement_missing type={dtype} requires={group}"
+
+    source_text = f"{indicator} {question}"
+    for value in canonical.values():
+        try:
+            if not _measurement_present_in_text(float(value), source_text):
+                return f"diagram_measurement_not_in_question value={value}"
+        except Exception:
+            return "diagram_measurement_invalid_value"
+
+    unit = _clean(diagram.get("unit")) or "cm"
+    if not re.fullmatch(r"(?:mm|cm|m|km)", unit, flags=re.I):
+        return f"diagram_unit_invalid={unit}"
+    source_units = _extract_units(source_text)
+    if source_units and unit.lower() not in source_units:
+        return f"diagram_unit_mismatch expected={sorted(source_units)} got={unit}"
+    return None
 
 def render_math_diagram(spec: dict) -> bytes | None:
     """Render a compact, deterministic math diagram with precise labels.
@@ -820,6 +985,7 @@ def render_math_diagram(spec: dict) -> bytes | None:
 
     dtype = spec.get("type")
     m = spec.get("measurements", {}) or {}
+    unit = _clean(spec.get("unit")) or "cm"
 
     # Compact canvas; DOCX controls the final physical size.
     fig, ax = plt.subplots(figsize=(3.4, 2.25), dpi=180)
@@ -875,8 +1041,8 @@ def render_math_diagram(spec: dict) -> bytes | None:
         ax.plot([-w, w], [0, 0], linewidth=0.65, linestyle="--")
         ax.plot([0, 0], [-h, h], linewidth=0.65, linestyle="--")
         gap = max(w, h) * 0.18
-        dim((w + gap, -h), (w + gap, h), f"{_fmt(d1)} cm", (w + gap + max(w, h)*0.10, 0))
-        dim((-w, -h-gap), (w, -h-gap), f"{_fmt(d2)} cm", (0, -h-gap-max(w,h)*0.10))
+        dim((w + gap, -h), (w + gap, h), f"{_fmt(d1)} {unit}", (w + gap + max(w, h)*0.10, 0))
+        dim((-w, -h-gap), (w, -h-gap), f"{_fmt(d2)} {unit}", (0, -h-gap-max(w,h)*0.10))
 
     elif dtype == "persegi":
         s = num("sisi", "side", "panjang", "length")
@@ -885,8 +1051,8 @@ def render_math_diagram(spec: dict) -> bytes | None:
         pts = np.array([[0, 0], [s, 0], [s, s], [0, s]])
         ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.25))
         gap = s * 0.14
-        dim((0, -gap), (s, -gap), f"{_fmt(s)} cm", (s/2, -gap*1.55))
-        dim((s+gap, 0), (s+gap, s), f"{_fmt(s)} cm", (s+gap*1.55, s/2))
+        dim((0, -gap), (s, -gap), f"{_fmt(s)} {unit}", (s/2, -gap*1.55))
+        dim((s+gap, 0), (s+gap, s), f"{_fmt(s)} {unit}", (s+gap*1.55, s/2))
 
     elif dtype == "persegi_panjang":
         p, l = num("panjang", "length", "p", "base", "alas"), num("lebar", "width", "l", "height", "tinggi")
@@ -895,8 +1061,8 @@ def render_math_diagram(spec: dict) -> bytes | None:
         pts = np.array([[0, 0], [p, 0], [p, l], [0, l]])
         ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.25))
         gap = max(p, l) * 0.12
-        dim((0, -gap), (p, -gap), f"{_fmt(p)} cm", (p/2, -gap*1.55))
-        dim((p+gap, 0), (p+gap, l), f"{_fmt(l)} cm", (p+gap*1.55, l/2))
+        dim((0, -gap), (p, -gap), f"{_fmt(p)} {unit}", (p/2, -gap*1.55))
+        dim((p+gap, 0), (p+gap, l), f"{_fmt(l)} {unit}", (p+gap*1.55, l/2))
 
     elif dtype == "segitiga":
         b, h = num("alas", "base", "b", "panjang_alas"), num("tinggi", "height", "h")
@@ -907,8 +1073,9 @@ def render_math_diagram(spec: dict) -> bytes | None:
         ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.25))
         ax.plot([0, 0], [0, h], linestyle="--", linewidth=0.65)
         gap = max(b, h) * 0.12
-        dim((x0, -gap), (x0+b, -gap), f"{_fmt(b)} cm", (0, -gap*1.55))
-        dim((gap, 0), (gap, h), f"{_fmt(h)} cm", (gap*1.55, h/2))
+        dim((x0, -gap), (x0+b, -gap), f"{_fmt(b)} {unit}", (0, -gap*1.55))
+        xdim = x0 + b + gap
+        dim((xdim, 0), (xdim, h), f"{_fmt(h)} {unit}", (xdim + gap*0.45, h/2))
 
     elif dtype == "lingkaran":
         radius = num("r", "radius", "jari_jari")
@@ -920,7 +1087,7 @@ def render_math_diagram(spec: dict) -> bytes | None:
         theta = np.linspace(0, 2*np.pi, 240)
         ax.plot(radius*np.cos(theta), radius*np.sin(theta), linewidth=1.25)
         ax.plot([0, radius], [0, 0], linestyle="--", linewidth=0.65)
-        label(radius/2, radius*0.12, f"r = {_fmt(radius)} cm")
+        label(radius/2, radius*0.12, f"r = {_fmt(radius)} {unit}")
 
     elif dtype == "jajargenjang":
         b, h = num("alas", "base", "panjang", "length"), num("tinggi", "height", "h")
@@ -932,8 +1099,9 @@ def render_math_diagram(spec: dict) -> bytes | None:
         ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.25))
         ax.plot([skew, skew], [0, h], linestyle="--", linewidth=0.65)
         gap = max(b, h) * 0.12
-        dim((0, -gap), (b, -gap), f"{_fmt(b)} cm", (b/2, -gap*1.55))
-        dim((skew+gap, 0), (skew+gap, h), f"{_fmt(h)} cm", (skew+gap*1.55, h/2))
+        dim((0, -gap), (b, -gap), f"{_fmt(b)} {unit}", (b/2, -gap*1.55))
+        xdim = b + skew + gap
+        dim((xdim, 0), (xdim, h), f"{_fmt(h)} {unit}", (xdim + gap*0.45, h/2))
 
     elif dtype == "trapesium":
         a = num("sisi_atas", "atas", "a", "top", "top_base")
@@ -946,9 +1114,10 @@ def render_math_diagram(spec: dict) -> bytes | None:
         ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.25))
         ax.plot([x, x], [0, h], linestyle="--", linewidth=0.65)
         gap = max(b, h) * 0.12
-        dim((0, -gap), (b, -gap), f"{_fmt(b)} cm", (b/2, -gap*1.55))
-        dim((x+gap, 0), (x+gap, h), f"{_fmt(h)} cm", (x+gap*1.55, h/2))
-        label(b/2, h + gap*0.85, f"{_fmt(a)} cm")
+        dim((0, -gap), (b, -gap), f"{_fmt(b)} {unit}", (b/2, -gap*1.55))
+        xdim = b + gap
+        dim((xdim, 0), (xdim, h), f"{_fmt(h)} {unit}", (xdim + gap*0.45, h/2))
+        label(b/2, h + gap*0.85, f"{_fmt(a)} {unit}")
 
     elif dtype == "belah_ketupat":
         d1, d2 = num("d1", "diagonal_vertical", "vertical_diagonal", "tinggi", "height"), num("d2", "diagonal_horizontal", "horizontal_diagonal", "lebar", "width")
@@ -960,8 +1129,8 @@ def render_math_diagram(spec: dict) -> bytes | None:
         ax.plot([-w, w], [0, 0], linestyle="--", linewidth=0.65)
         ax.plot([0, 0], [-h, h], linestyle="--", linewidth=0.65)
         gap = max(w, h) * 0.18
-        dim((w+gap, -h), (w+gap, h), f"{_fmt(d1)} cm", (w+gap+max(w,h)*0.10, 0))
-        dim((-w, -h-gap), (w, -h-gap), f"{_fmt(d2)} cm", (0, -h-gap-max(w,h)*0.10))
+        dim((w+gap, -h), (w+gap, h), f"{_fmt(d1)} {unit}", (w+gap+max(w,h)*0.10, 0))
+        dim((-w, -h-gap), (w, -h-gap), f"{_fmt(d2)} {unit}", (0, -h-gap-max(w,h)*0.10))
 
     elif dtype == "gabungan_jajargenjang_segitiga":
         b = num("alas", "base", "panjang")
@@ -976,9 +1145,9 @@ def render_math_diagram(spec: dict) -> bytes | None:
         ax.add_patch(Polygon(poly2, closed=True, fill=False, linewidth=1.25))
         ax.plot([skew,skew],[0,h],linestyle="--",linewidth=0.65)
         gap = max(b,h,ht)*0.12
-        dim((0,-gap),(b,-gap),f"{_fmt(b)} cm",(b/2,-gap*1.55))
-        dim((skew+gap,0),(skew+gap,h),f"{_fmt(h)} cm",(skew+gap*1.55,h/2))
-        dim((b/2+skew+gap,h),(b/2+skew+gap,h+ht),f"{_fmt(ht)} cm",(b/2+skew+gap*1.55,h+ht/2))
+        dim((0,-gap),(b,-gap),f"{_fmt(b)} {unit}",(b/2,-gap*1.55))
+        dim((skew+gap,0),(skew+gap,h),f"{_fmt(h)} {unit}",(skew+gap*1.55,h/2))
+        dim((b/2+skew+gap,h),(b/2+skew+gap,h+ht),f"{_fmt(ht)} {unit}",(b/2+skew+gap*1.55,h+ht/2))
 
     else:
         plt.close(fig)
@@ -1108,29 +1277,31 @@ def _generate_blueprint_batch(
     mapel: str,
     kelas: str,
     language: str,
-    attempts: int = 1,
+    attempts: int = 2,
 ) -> list[dict]:
-    """Generate all variants for one blueprint in as few AI calls as possible.
+    """Generate one blueprint with fast full-batch generation and targeted repair.
 
-    Performance rule:
-    - One AI request generates every variant belonging to this blueprint.
-    - Only a failed/incomplete blueprint is retried.
-    - Variant identity is still deterministic: the returned set must exactly
-      match every (variant, form, source_number) slot before it is accepted.
-
-    This replaces the previous variant-by-variant loop, which could multiply
-    Gemini calls by variants * attempts * model/key rotation.
+    First call requests every expected key. If Gemini returns a partial set,
+    only the missing variant/form/number keys are requested on the repair call.
+    This avoids regenerating a successful blueprint and keeps latency bounded.
     """
     expected = _expected_keys(bp, variants)
-    max_attempts = max(1, int(attempts))
+    pending = set(expected)
+    accepted: dict[tuple[int, str, int], dict] = {}
+    max_attempts = max(1, min(int(attempts), 2))
 
     for attempt_no in range(1, max_attempts + 1):
-        prompt = _generation_prompt(bp, variants, jenjang, mapel, kelas, language)
+        target_keys = sorted(pending)
+        if not target_keys:
+            break
+        prompt = _generation_prompt(
+            bp, variants, jenjang, mapel, kelas, language,
+            requested_keys=target_keys,
+        )
         prompt += (
             "\n\nVARIANT ID WAJIB:\n"
-            f"Gunakan variant 1 sampai {variants}. "
-            "Setiap kombinasi variant + question_type + source_number harus unik "
-            "dan lengkap. Jangan menggabungkan beberapa variant menjadi satu soal."
+            "Gunakan variant/form/source_number PERSIS sesuai SLOT TARGET. "
+            "Jangan mengembalikan slot yang tidak diminta."
         )
 
         raw = call_gemini_with_rotation(
@@ -1140,14 +1311,8 @@ def _generate_blueprint_batch(
             max_output_tokens=16000,
         )
         data = _parse_ai_json(raw)
-
-        # Gemini occasionally returns the requested question array directly
-        # instead of wrapping it in {"questions": [...]}. Normalize both
-        # shapes before validation so a valid response is not discarded or
-        # crashes the generator with list.get(...).
         if isinstance(data, list):
             data = {"questions": data}
-
         if not isinstance(data, dict) or not isinstance(data.get("questions"), list):
             continue
 
@@ -1158,60 +1323,24 @@ def _generate_blueprint_batch(
                 q["blueprint_id"] = bp["id"]
                 normalized.append(q)
 
-        # Hard structural gate: never accept a partial/mixed bank.
-        actual = {
-            (int(q.get("variant", 0)), q.get("question_type"), int(q.get("source_number", -1)))
-            for q in normalized
-        }
-        if actual != expected:
-            continue
-
-        issues = _deterministic_alignment_issues(normalized, bp, variants, jenjang)
-        if issues:
-            continue
-
-        target_levels = _cognitive_levels(bp.get("cognitive_level"))
-        if target_levels:
-            if any(
-                not _cognitive_levels(q.get("cognitive_level"))
-                or not any(level in target_levels for level in _cognitive_levels(q.get("cognitive_level")))
-                for q in normalized
-            ):
-                continue
-
-        expected_count = _option_count(jenjang)
-        if any(
-            q.get("question_type") == "PG"
-            and len(q.get("options", [])) != expected_count
-            for q in normalized
-        ):
-            continue
-
-        # Diagram gate remains local/deterministic; no extra AI call.
-        diagram_invalid = False
+        # Accept only returned keys that were actually requested. Duplicates
+        # are ignored so one malformed duplicate cannot overwrite a valid key.
         for q in normalized:
-            needs_diagram = _needs_diagram(bp.get("indicator", ""), q.get("question", ""))
-            if needs_diagram and not q.get("diagram"):
-                diagram_invalid = True
-                break
-            if q.get("diagram"):
-                qtext = str(q.get("question", ""))
-                for measurement in q["diagram"].get("measurements", {}).values():
-                    token = (
-                        str(measurement).rstrip("0").rstrip(".")
-                        if isinstance(measurement, float)
-                        else str(measurement)
-                    )
-                    if token and token not in qtext:
-                        diagram_invalid = True
-                        break
-                if diagram_invalid:
-                    break
+            key = (int(q.get("variant", 0)), q.get("question_type"), int(q.get("source_number", -1)))
+            if key not in pending:
+                continue
+            if _diagram_validation_error(q, bp):
+                continue
+            accepted[key] = q
 
-        if diagram_invalid:
-            continue
+        pending = expected - set(accepted.keys())
 
-        return normalized
+        if not pending:
+            result = list(accepted.values())
+            issues = _deterministic_alignment_issues(result, bp, variants, jenjang)
+            if not issues:
+                return result
+            return []
 
     return []
 
@@ -1316,7 +1445,7 @@ def generate_bank_soal(
 
     for bp in blueprint.get("blueprints", []):
         batch = _generate_blueprint_batch(
-            bp, variants, jenjang, mapel, kelas, language, attempts=1
+            bp, variants, jenjang, mapel, kelas, language, attempts=2
         )
         if not batch:
             row_reports.append({
@@ -1365,9 +1494,11 @@ def generate_bank_soal(
         )
     )
 
+    missing_total = max(0, expected_total - len(all_questions))
     report = {
         "expected_total": expected_total,
         "generated_total": len(all_questions),
+        "missing_total": missing_total,
         "deterministic_ok": deterministic_ok,
         "ai_qa": ai_qa,
         "row_reports": row_reports,
@@ -1634,7 +1765,7 @@ def build_bank_soal_docx(
                     dp.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     dp.paragraph_format.space_before = Pt(3)
                     dp.paragraph_format.space_after = Pt(5)
-                    dp.add_run().add_picture(io.BytesIO(diagram_bytes), width=Inches(1.75))
+                    dp.add_run().add_picture(io.BytesIO(diagram_bytes), width=Inches(1.25))
                     if q.get("diagram", {}).get("caption"):
                         cp = doc.add_paragraph()
                         cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
