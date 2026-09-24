@@ -381,11 +381,11 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     """Render the additive Student Intelligence workspace."""
     st.markdown("""
     <div class="premium-hero automation-hero">
-      <div class="premium-kicker">ROBO MANTAP • STUDENT INTELLIGENCE</div>
+      <div class="premium-kicker">UPN • STUDENT INTELLIGENCE</div>
       <div class="premium-title">My Learning <span>Intelligence</span></div>
-      <div class="premium-subtitle">Bukan sekadar melihat nilai. Sistem membaca riwayat pengerjaanmu untuk membantu menentukan fokus belajar berikutnya.</div>
+      <div class="premium-subtitle">Bukan sekadar melihat nilai. Sistem membaca riwayat pengerjaan Kamu untuk membantu menentukan fokus belajar berikutnya!</div>
       <div class="premium-pills">
-        <span class="chip chip-green">🧠 Mastery</span>
+        <span class="chip chip-green">🎓 Mastery</span>
         <span class="chip chip-blue">🎯 Prioritas</span>
         <span class="chip chip-purple">🔄 Adaptive Practice</span>
         <span class="chip chip-gold">🚨 Early Signal</span>
@@ -399,10 +399,10 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
             entered_name = st.text_input("Nama siswa", value=nama_siswa, placeholder="Masukkan nama yang digunakan saat kuis")
         with c2:
             grade = st.selectbox("Jenjang", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], index=(["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"].index(jenjang) if jenjang in ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"] else 0))
-        submitted = st.form_submit_button("🧠 BUKA INTELLIGENCE SAYA", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("BUKA INTELLIGENCE SAYA", type="primary", use_container_width=True)
 
     if not submitted and not entered_name.strip():
-        st.info("Masukkan nama siswa untuk membaca riwayat belajar yang sudah tersimpan.")
+        st.info("Masukkan Nama Lengkap Kamu untuk membaca riwayat belajar yang sudah tersimpan.")
         return
 
     name = entered_name.strip()
