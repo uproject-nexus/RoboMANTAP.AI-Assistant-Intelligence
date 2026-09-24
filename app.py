@@ -3133,10 +3133,17 @@ elif st.session_state.page == "guru_dashboard":
                     st.session_state.bank_report = report
                     st.session_state.bank_docx_bytes = None
                     st.session_state.bank_docx_config_signature = None
+                    missing = int(report.get("missing_total", max(0, report.get("expected_total", estimated) - len(questions))))
                     if report.get("deterministic_ok") and report.get("review_count", 0) == 0:
-                        st.success(f"✅ Bank soal selesai: {len(questions)} soal.")
+                        st.success(f"✅ Bank soal lengkap: {len(questions)}/{report.get('expected_total', estimated)} soal.")
                     elif questions:
-                        st.warning(f"⚠️ {len(questions)} soal tersedia; {report.get('review_count', 0)} berstatus REVIEW.")
+                        if missing:
+                            st.warning(
+                                f"⚠️ {len(questions)}/{report.get('expected_total', estimated)} soal berhasil dibuat; "
+                                f"{missing} slot belum terpenuhi; {report.get('review_count', 0)} berstatus REVIEW."
+                            )
+                        else:
+                            st.warning(f"⚠️ {len(questions)} soal tersedia; {report.get('review_count', 0)} berstatus REVIEW.")
                     else:
                         st.error("❌ Bank soal belum berhasil dibuat lengkap.")
 
