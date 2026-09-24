@@ -1668,14 +1668,14 @@ if st.session_state.page == "landing":
     )
 
     st.write("---")
-    st.markdown("#### 🧠 Student Intelligence")
+    st.markdown("#### 👤 Portal SantriMANTAP")
     st.markdown("""
     <div class="guru-card" style="background: linear-gradient(135deg, #172554 0%, #312e81 100%); border-color: #6366f1;">
-        <h2 style="margin:0; font-size: 20px;">🧠 My Learning Intelligence</h2>
-        <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Pahami pola belajar, temukan area yang perlu diperkuat, dan tentukan langkah belajar berikutnya.</p>
+        <h2 style="margin:0; font-size: 20px;">🌸 My Learning Intelligence</h2>
+        <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Pahami pola belajar dan perkuat materi serta tentukan langkah belajar berikutnya</p>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("🧠 Buka Student Intelligence ➔", use_container_width=True, type="primary"):
+    if st.button("Buka Portal Santri ➔", use_container_width=True, type="primary"):
         st.session_state.page = "student_intelligence"
         st.rerun()
 
