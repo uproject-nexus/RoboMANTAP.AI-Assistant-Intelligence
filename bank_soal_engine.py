@@ -803,86 +803,194 @@ def _needs_diagram(indicator: str, question: str) -> bool:
 
 
 def render_math_diagram(spec: dict) -> bytes | None:
-    """Create a clean deterministic PNG diagram from validated numeric data."""
+    """Render a compact, deterministic math diagram with precise labels.
+
+    The PNG is intentionally compact because DOCX embeds it inline with the
+    question. Dimension labels are placed outside the shape so they do not
+    collide with diagonals/vertices when the image is scaled down.
+    """
     try:
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
-        from matplotlib.patches import Polygon
+        from matplotlib.patches import Polygon, Circle
     except Exception:
         return None
 
     dtype = spec.get("type")
-    m = spec.get("measurements", {})
-    fig, ax = plt.subplots(figsize=(5.8, 3.2), dpi=180)
+    m = spec.get("measurements", {}) or {}
+
+    # Compact canvas; DOCX controls the final physical size.
+    fig, ax = plt.subplots(figsize=(3.4, 2.25), dpi=180)
     ax.set_aspect("equal")
     ax.axis("off")
 
-    def label(x, y, text, **kwargs):
-        ax.text(x, y, text, fontsize=9, ha="center", va="center", **kwargs)
+    def _fmt(value):
+        try:
+            value = float(value)
+            return f"{value:g}"
+        except Exception:
+            return str(value)
 
-    def dim(a, b, text, offset=(0, 0.18)):
-        ax.annotate("", xy=b, xytext=a, arrowprops=dict(arrowstyle="<->", lw=1.1))
-        mx, my = (a[0]+b[0])/2, (a[1]+b[1])/2
-        label(mx+offset[0], my+offset[1], text)
+    def label(x, y, text, fontsize=7.2):
+        ax.text(
+            x, y, text,
+            fontsize=fontsize,
+            ha="center", va="center",
+            bbox=dict(boxstyle="round,pad=0.10", facecolor="white", edgecolor="none", alpha=0.92),
+            zorder=8,
+        )
+
+    def dim(a, b, text, text_xy=None):
+        ax.annotate(
+            "", xy=b, xytext=a,
+            arrowprops=dict(arrowstyle="<->", lw=0.85, shrinkA=0, shrinkB=0),
+            zorder=5,
+        )
+        if text_xy is None:
+            text_xy = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+        label(text_xy[0], text_xy[1], text)
+
+    # Accept common AI measurement aliases so all supported shapes can render.
+    def num(*keys):
+        for key in keys:
+            value = m.get(key)
+            if value is not None:
+                try:
+                    value = float(value)
+                    if value > 0:
+                        return value
+                except Exception:
+                    pass
+        return None
 
     if dtype == "layang_layang":
-        d1, d2 = m.get("d1", m.get("diagonal_vertical")), m.get("d2", m.get("diagonal_horizontal"))
-        if not d1 or not d2: return None
-        w, h = d2/2, d1/2
-        pts = np.array([[0,h], [w,0], [0,-h], [-w,0]])
-        ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.8))
-        ax.plot([-w,w],[0,0],linewidth=1.0,linestyle="--")
-        ax.plot([0,0],[-h,h],linewidth=1.0,linestyle="--")
-        dim((0,-h),(0,h), f"{d1:g} cm", offset=(0.38,0))
-        dim((-w,0),(w,0), f"{d2:g} cm", offset=(0,-0.28))
+        d1, d2 = num("d1", "diagonal_vertical", "vertical_diagonal", "tinggi", "height"), num("d2", "diagonal_horizontal", "horizontal_diagonal", "lebar", "width")
+        if not d1 or not d2:
+            return None
+        w, h = d2 / 2, d1 / 2
+        pts = np.array([[0, h], [w, 0], [0, -h], [-w, 0]])
+        ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.25))
+        ax.plot([-w, w], [0, 0], linewidth=0.65, linestyle="--")
+        ax.plot([0, 0], [-h, h], linewidth=0.65, linestyle="--")
+        gap = max(w, h) * 0.18
+        dim((w + gap, -h), (w + gap, h), f"{_fmt(d1)} cm", (w + gap + max(w, h)*0.10, 0))
+        dim((-w, -h-gap), (w, -h-gap), f"{_fmt(d2)} cm", (0, -h-gap-max(w,h)*0.10))
+
     elif dtype == "persegi":
-        s=m.get("sisi",m.get("side"));
-        if not s: return None
-        pts=np.array([[0,0],[s,0],[s,s],[0,s]])
-        ax.add_patch(Polygon(pts,closed=True,fill=False,linewidth=1.8)); dim((0,0),(s,0),f"{s:g} cm",(0,-0.22)); dim((s,0),(s,s),f"{s:g} cm",(0.28,0))
+        s = num("sisi", "side", "panjang", "length")
+        if not s:
+            return None
+        pts = np.array([[0, 0], [s, 0], [s, s], [0, s]])
+        ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.25))
+        gap = s * 0.14
+        dim((0, -gap), (s, -gap), f"{_fmt(s)} cm", (s/2, -gap*1.55))
+        dim((s+gap, 0), (s+gap, s), f"{_fmt(s)} cm", (s+gap*1.55, s/2))
+
     elif dtype == "persegi_panjang":
-        p=m.get("panjang",m.get("length")); l=m.get("lebar",m.get("width"));
-        if not p or not l: return None
-        pts=np.array([[0,0],[p,0],[p,l],[0,l]])
-        ax.add_patch(Polygon(pts,closed=True,fill=False,linewidth=1.8)); dim((0,0),(p,0),f"{p:g} cm",(0,-0.22)); dim((p,0),(p,l),f"{l:g} cm",(0.3,0))
+        p, l = num("panjang", "length", "p", "base", "alas"), num("lebar", "width", "l", "height", "tinggi")
+        if not p or not l:
+            return None
+        pts = np.array([[0, 0], [p, 0], [p, l], [0, l]])
+        ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.25))
+        gap = max(p, l) * 0.12
+        dim((0, -gap), (p, -gap), f"{_fmt(p)} cm", (p/2, -gap*1.55))
+        dim((p+gap, 0), (p+gap, l), f"{_fmt(l)} cm", (p+gap*1.55, l/2))
+
     elif dtype == "segitiga":
-        b=m.get("alas",m.get("base")); h=m.get("tinggi",m.get("height"));
-        if not b or not h: return None
-        x0=-b/2; pts=np.array([[x0,0],[x0+b,0],[0,h]])
-        ax.add_patch(Polygon(pts,closed=True,fill=False,linewidth=1.8)); ax.plot([0,0],[0,h],linestyle="--",linewidth=1); dim((x0,0),(x0+b,0),f"{b:g} cm",(0,-0.22)); dim((0,0),(0,h),f"{h:g} cm",(0.3,0))
+        b, h = num("alas", "base", "b", "panjang_alas"), num("tinggi", "height", "h")
+        if not b or not h:
+            return None
+        x0 = -b / 2
+        pts = np.array([[x0, 0], [x0+b, 0], [0, h]])
+        ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.25))
+        ax.plot([0, 0], [0, h], linestyle="--", linewidth=0.65)
+        gap = max(b, h) * 0.12
+        dim((x0, -gap), (x0+b, -gap), f"{_fmt(b)} cm", (0, -gap*1.55))
+        dim((gap, 0), (gap, h), f"{_fmt(h)} cm", (gap*1.55, h/2))
+
     elif dtype == "lingkaran":
-        radius=m.get("r",m.get("radius")); diameter=m.get("d",m.get("diameter"))
-        if not radius and diameter: radius=diameter/2
-        if not radius: return None
-        theta=np.linspace(0,2*np.pi,200); ax.plot(radius*np.cos(theta), radius*np.sin(theta), linewidth=1.8); ax.plot([0,radius],[0,0],linestyle="--",linewidth=1); label(radius/2,0.22,f"r = {radius:g} cm");
+        radius = num("r", "radius", "jari_jari")
+        diameter = num("d", "diameter")
+        if not radius and diameter:
+            radius = diameter / 2
+        if not radius:
+            return None
+        theta = np.linspace(0, 2*np.pi, 240)
+        ax.plot(radius*np.cos(theta), radius*np.sin(theta), linewidth=1.25)
+        ax.plot([0, radius], [0, 0], linestyle="--", linewidth=0.65)
+        label(radius/2, radius*0.12, f"r = {_fmt(radius)} cm")
+
     elif dtype == "jajargenjang":
-        b=m.get("alas",m.get("base")); h=m.get("tinggi",m.get("height")); s=m.get("sisi",m.get("side",h))
-        if not b or not h: return None
-        skew=min(max(float(s)*0.35,0.2), b*0.45); pts=np.array([[0,0],[b,0],[b+skew,h],[skew,h]])
-        ax.add_patch(Polygon(pts,closed=True,fill=False,linewidth=1.8)); ax.plot([skew,skew],[0,h],linestyle="--",linewidth=1); dim((0,0),(b,0),f"{b:g} cm",(0,-0.22)); dim((skew,0),(skew,h),f"{h:g} cm",(0.35,0))
+        b, h = num("alas", "base", "panjang", "length"), num("tinggi", "height", "h")
+        skew_value = num("sisi", "side", "lebar", "width") or b * 0.25 if b else None
+        if not b or not h:
+            return None
+        skew = min(max(float(skew_value) * 0.35, b * 0.08), b * 0.30)
+        pts = np.array([[0, 0], [b, 0], [b+skew, h], [skew, h]])
+        ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.25))
+        ax.plot([skew, skew], [0, h], linestyle="--", linewidth=0.65)
+        gap = max(b, h) * 0.12
+        dim((0, -gap), (b, -gap), f"{_fmt(b)} cm", (b/2, -gap*1.55))
+        dim((skew+gap, 0), (skew+gap, h), f"{_fmt(h)} cm", (skew+gap*1.55, h/2))
+
     elif dtype == "trapesium":
-        a=m.get("sisi_atas",m.get("atas",m.get("a"))); b=m.get("sisi_bawah",m.get("bawah",m.get("b"))); h=m.get("tinggi",m.get("height"));
-        if not a or not b or not h: return None
-        x=(b-a)/2; pts=np.array([[0,0],[b,0],[b-x,h],[x,h]])
-        ax.add_patch(Polygon(pts,closed=True,fill=False,linewidth=1.8)); ax.plot([x,x],[0,h],linestyle="--",linewidth=1); dim((0,0),(b,0),f"{b:g} cm",(0,-0.22)); dim((x,0),(x,h),f"{h:g} cm",(0.3,0)); label(b/2,h+0.2,f"{a:g} cm")
+        a = num("sisi_atas", "atas", "a", "top", "top_base")
+        b = num("sisi_bawah", "bawah", "b", "base", "bottom", "bottom_base")
+        h = num("tinggi", "height", "h")
+        if not a or not b or not h:
+            return None
+        x = (b-a) / 2
+        pts = np.array([[0, 0], [b, 0], [b-x, h], [x, h]])
+        ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.25))
+        ax.plot([x, x], [0, h], linestyle="--", linewidth=0.65)
+        gap = max(b, h) * 0.12
+        dim((0, -gap), (b, -gap), f"{_fmt(b)} cm", (b/2, -gap*1.55))
+        dim((x+gap, 0), (x+gap, h), f"{_fmt(h)} cm", (x+gap*1.55, h/2))
+        label(b/2, h + gap*0.85, f"{_fmt(a)} cm")
+
     elif dtype == "belah_ketupat":
-        d1=m.get("d1",m.get("diagonal_vertical")); d2=m.get("d2",m.get("diagonal_horizontal"));
-        if not d1 or not d2: return None
-        w,h=d2/2,d1/2; pts=np.array([[0,h],[w,0],[0,-h],[-w,0]])
-        ax.add_patch(Polygon(pts,closed=True,fill=False,linewidth=1.8)); ax.plot([-w,w],[0,0],linestyle="--",linewidth=1); ax.plot([0,0],[-h,h],linestyle="--",linewidth=1); dim((0,-h),(0,h),f"{d1:g} cm",(0.38,0)); dim((-w,0),(w,0),f"{d2:g} cm",(0,-0.28))
+        d1, d2 = num("d1", "diagonal_vertical", "vertical_diagonal", "tinggi", "height"), num("d2", "diagonal_horizontal", "horizontal_diagonal", "lebar", "width")
+        if not d1 or not d2:
+            return None
+        w, h = d2/2, d1/2
+        pts = np.array([[0, h], [w, 0], [0, -h], [-w, 0]])
+        ax.add_patch(Polygon(pts, closed=True, fill=False, linewidth=1.25))
+        ax.plot([-w, w], [0, 0], linestyle="--", linewidth=0.65)
+        ax.plot([0, 0], [-h, h], linestyle="--", linewidth=0.65)
+        gap = max(w, h) * 0.18
+        dim((w+gap, -h), (w+gap, h), f"{_fmt(d1)} cm", (w+gap+max(w,h)*0.10, 0))
+        dim((-w, -h-gap), (w, -h-gap), f"{_fmt(d2)} cm", (0, -h-gap-max(w,h)*0.10))
+
     elif dtype == "gabungan_jajargenjang_segitiga":
-        b=m.get("alas",m.get("base")); h=m.get("tinggi_jajargenjang",m.get("height_parallelogram")); ht=m.get("tinggi_segitiga",m.get("height_triangle"));
-        if not b or not h or not ht: return None
-        skew=min(max(b*0.12,0.4),b*0.3); poly1=np.array([[0,0],[b,0],[b+skew,h],[skew,h]]); poly2=np.array([[skew,h],[b+skew,h],[b/2+skew,h+ht]])
-        ax.add_patch(Polygon(poly1,closed=True,fill=False,linewidth=1.8)); ax.add_patch(Polygon(poly2,closed=True,fill=False,linewidth=1.8)); ax.plot([skew,skew],[0,h],linestyle="--",linewidth=1); ax.plot([b/2+skew,b/2+skew],[h,h+ht],linestyle="--",linewidth=1); dim((0,0),(b,0),f"{b:g} cm",(0,-0.22)); dim((skew,0),(skew,h),f"{h:g} cm",(0.35,0)); dim((b/2+skew,h),(b/2+skew,h+ht),f"{ht:g} cm",(0.35,0))
+        b = num("alas", "base", "panjang")
+        h = num("tinggi_jajargenjang", "height_parallelogram", "tinggi", "height")
+        ht = num("tinggi_segitiga", "height_triangle", "tinggi_seg")
+        if not b or not h or not ht:
+            return None
+        skew = min(max(b*0.10, 0.3), b*0.25)
+        poly1 = np.array([[0,0],[b,0],[b+skew,h],[skew,h]])
+        poly2 = np.array([[skew,h],[b+skew,h],[b/2+skew,h+ht]])
+        ax.add_patch(Polygon(poly1, closed=True, fill=False, linewidth=1.25))
+        ax.add_patch(Polygon(poly2, closed=True, fill=False, linewidth=1.25))
+        ax.plot([skew,skew],[0,h],linestyle="--",linewidth=0.65)
+        gap = max(b,h,ht)*0.12
+        dim((0,-gap),(b,-gap),f"{_fmt(b)} cm",(b/2,-gap*1.55))
+        dim((skew+gap,0),(skew+gap,h),f"{_fmt(h)} cm",(skew+gap*1.55,h/2))
+        dim((b/2+skew+gap,h),(b/2+skew+gap,h+ht),f"{_fmt(ht)} cm",(b/2+skew+gap*1.55,h+ht/2))
+
     else:
-        plt.close(fig); return None
+        plt.close(fig)
+        return None
 
-    fig.tight_layout(pad=0.8)
-    output=io.BytesIO(); fig.savefig(output,format="png",bbox_inches="tight",transparent=False); plt.close(fig); return output.getvalue()
-
+    # Give labels a little breathing room without making the picture large.
+    ax.margins(x=0.18, y=0.20)
+    fig.tight_layout(pad=0.15)
+    output = io.BytesIO()
+    fig.savefig(output, format="png", bbox_inches="tight", pad_inches=0.03, facecolor="white")
+    plt.close(fig)
+    return output.getvalue()
 
 def _normalize_generated_question(item: dict, jenjang: str) -> dict | None:
     if not isinstance(item, dict):
@@ -1526,7 +1634,7 @@ def build_bank_soal_docx(
                     dp.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     dp.paragraph_format.space_before = Pt(3)
                     dp.paragraph_format.space_after = Pt(5)
-                    dp.add_run().add_picture(io.BytesIO(diagram_bytes), width=Inches(4.9))
+                    dp.add_run().add_picture(io.BytesIO(diagram_bytes), width=Inches(1.75))
                     if q.get("diagram", {}).get("caption"):
                         cp = doc.add_paragraph()
                         cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
