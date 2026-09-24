@@ -335,19 +335,7 @@ def clean_json_text(text: str) -> str:
 
     return re.sub(r'\\\\|\\"|\\', replace_slash, text)
 
-def call_gemini_with_rotation(
-    prompt: str,
-    is_json: bool = False,
-    *,
-    thinking_level: str | None = None,
-    max_output_tokens: int | None = None,
-):
-    """Call Gemini with key/model fallback.
-
-    Existing callers keep the original behavior when the optional parameters
-    are omitted. Bank Soal can request a low-latency generation profile without
-    changing Quiz Custom or other AI workflows.
-    """
+def call_gemini_with_rotation(prompt: str, is_json: bool = False):
     clients = get_gemini_clients()
     if not clients:
         return None
@@ -360,12 +348,9 @@ def call_gemini_with_rotation(
                 if is_json:
                     config_kwargs["response_mime_type"] = "application/json"
 
-                if max_output_tokens is not None:
-                    config_kwargs["max_output_tokens"] = int(max_output_tokens)
-
                 if model_name.startswith("gemini-3."):
                     config_kwargs["thinking_config"] = types.ThinkingConfig(
-                        thinking_level=thinking_level or "high"
+                        thinking_level="high"
                     )
                 else:
                     config_kwargs["thinking_config"] = types.ThinkingConfig(
@@ -382,12 +367,7 @@ def call_gemini_with_rotation(
                 if response and response.text:
                     return response.text
 
-            except Exception as exc:
-                # Keep fallback rotation, but expose the reason in server logs.
-                print(
-                    f"[GEMINI] model={model_name} failed: "
-                    f"{type(exc).__name__}: {exc}"
-                )
+            except Exception:
                 continue
 
     return None
