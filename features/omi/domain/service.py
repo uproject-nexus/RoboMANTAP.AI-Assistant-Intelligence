@@ -1,7 +1,7 @@
 """Application service for the HTMX OMI CBT flow."""
 from __future__ import annotations
 
-from infrastructure.ai.quiz import generate_quiz_batch, get_ai_hint_stream, get_ai_solution_stream
+from infrastructure.ai.omi import generate_omi_quiz_batch, get_omi_hint_stream, get_omi_solution_stream
 from .config import QUESTION_COUNT, STAGES, normalize_jenjang, validate_subject
 from .scoring import score_answers
 from .session import create_session, get_session, mark_finished, public_quiz
@@ -27,7 +27,7 @@ def start_omi(nama: str, jenjang: str, mapel: str, stage: str, selected_submater
     ok, error = validate_start(nama, jenjang, mapel, stage, selected_submateri)
     if not ok:
         return None, error
-    quiz = generate_quiz_batch(normalize_jenjang(jenjang), mapel, stage, selected_submateri)
+    quiz = generate_omi_quiz_batch(normalize_jenjang(jenjang), mapel, stage, selected_submateri)
     if not quiz or len(quiz) != QUESTION_COUNT:
         return None, "⚠️ Paket soal belum berhasil dibuat. Silakan coba lagi."
     sess = create_session(
@@ -66,7 +66,7 @@ def hint_for(session_id: str, q_index: int, attempt: str) -> str:
         return "⚠️ Nomor soal tidak valid."
     question = quiz[q_index].get("question", "")
     try:
-        text = "".join(get_ai_hint_stream(question, attempt, sess.get("mapel", "OMI")))
+        text = "".join(get_omi_hint_stream(question, attempt, sess.get("mapel", "OMI")))
         return text or "RoboMANTAP belum mendapatkan petunjuk. Coba lagi ya."
     except Exception as exc:
         return f"⚠️ Maaf, RoboMANTAP sedang sibuk sebentar. Coba lagi ya. ({exc})"
@@ -83,7 +83,13 @@ def solution_for(session_id: str, q_index: int) -> str:
         return "⚠️ Nomor soal tidak valid."
     item = quiz[q_index]
     try:
-        text = "".join(get_ai_solution_stream(item.get("question", ""), item.get("correct_answer", ""), sess.get("mapel", "OMI")))
+        text = "".join(get_omi_solution_stream(item.get("question", ""), item.get("correct_answer", ""), sess.get("mapel", "OMI")))
         return text or "Pembahasan belum tersedia."
     except Exception as exc:
         return f"⚠️ Maaf, pembahasan sedang sibuk sebentar. Coba lagi ya. ({exc})"
+
+
+# Compatibility alias used by the existing OMI tests.
+generate_quiz_batch = generate_omi_quiz_batch
+get_ai_hint_stream = get_omi_hint_stream
+get_ai_solution_stream = get_omi_solution_stream

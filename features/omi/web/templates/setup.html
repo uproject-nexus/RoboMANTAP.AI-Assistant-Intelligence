@@ -9,51 +9,51 @@
       <h1 class="text-xl sm:text-2xl font-black text-white mt-1">{{ mapel }}</h1>
       <p class="text-xs text-slate-400 mt-1">{{ jenjang }} • Latihan 10 soal</p>
     </div>
-    {% if error %}<div class="bg-rose-500/10 border border-rose-500/40 text-rose-400 text-xs p-3 rounded-xl">{{ error }}</div>{% endif %}
-    <form action="/omi/start" method="post" class="space-y-5" hx-boost="true">
-      <input type="hidden" name="jenjang" value="{{ jenjang }}"><input type="hidden" name="mapel" value="{{ mapel }}">
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Nama Lengkap</label>
-        <input type="text" name="nama" required value="{{ nama }}" placeholder="Contoh: Fulanah binti Fulan" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-base text-slate-100 focus:outline-none focus:border-emerald-500">
-      </div>
-      <div class="grid md:grid-cols-2 gap-5">
-        <div class="bg-slate-950 border border-slate-800 rounded-xl p-4">
-          <p class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3">1. Tahap Pembinaan</p>
-          {% for stage in stages %}<label class="flex items-center gap-2 text-xs text-slate-300 py-1.5"><input type="radio" name="stage" value="{{ stage }}" {% if loop.first %}checked{% endif %} class="accent-emerald-500">{{ stage }}</label>{% endfor %}
-        </div>
-        <div class="bg-slate-950 border border-slate-800 rounded-xl p-4">
-          <div class="flex items-center justify-between gap-2 mb-3"><p class="text-xs font-bold text-emerald-400 uppercase tracking-wider">2. Submateri</p><button type="button" onclick="toggleAllSubmateri()" class="text-[10px] text-emerald-400 hover:text-emerald-300">Pilih semua</button></div>
-          <div class="max-h-64 overflow-y-auto pr-1 space-y-1.5">
-          {% for item in submateri %}<label class="flex items-start gap-2 text-[11px] text-slate-300 py-1"><input type="checkbox" name="selected_submateri" value="{{ item }}" class="submateri-check mt-0.5 accent-emerald-500"><span>{{ item }}</span></label>{% endfor %}
-          </div>
-          <p class="text-[10px] text-slate-500 mt-3">Kosongkan untuk cakupan semua submateri terintegrasi.</p>
-        </div>
-      </div>
-      <div class="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 text-xs text-slate-300 space-y-1.5">
-        <p class="font-bold text-emerald-400">📋 Petunjuk CBT RoboMANTAP</p>
-        <p>• Tepat 10 soal pilihan ganda terintegrasi.</p><p>• {{ 'MTs menggunakan A–D.' if 'MTs' in jenjang else 'MA menggunakan A–E.' }}</p><p>• Skoring: benar (+4), salah (-1), kosong (0).</p><p>• Sesi latihan OMI tidak dibatasi timer pada versi ini.</p>
-      </div>
-      <button
-        id="btn-start-omi"
-        type="submit"
-        class="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-[.99] text-slate-950 font-bold text-sm py-3.5 rounded-xl transition shadow-[0_0_20px_rgba(16,185,129,0.35)]"
-      >
-        <span id="btn-start-normal">
-          🚀 MARI MULAI SESI TEST SEKARANG!
-        </span>
-      
-        <span id="btn-start-loading" class="hidden items-center justify-center gap-2">
-          <span class="inline-block w-4 h-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin"></span>
-          <span>SEDANG MENYIAPKAN SOAL...</span>
-        </span>
-      </button>
-      
-      <div id="omi-generation-status" class="text-center text-[10px] text-slate-500">
-        RoboMANTAP akan menyiapkan 10 soal AI. Proses ini dapat memerlukan beberapa detik.
-      </div>
-      
-    </form>
+    {% include "setup_form.html" %}
   </div>
 </div>
 {% endblock %}
-{% block scripts %}<script>function toggleAllSubmateri(){const xs=[...document.querySelectorAll('.submateri-check')];const all=xs.length && xs.every(x=>x.checked);xs.forEach(x=>x.checked=!all);}</script>{% endblock %}
+{% block scripts %}
+<script>
+function toggleAllSubmateri(){
+  const xs=[...document.querySelectorAll('.submateri-check')];
+  const all=xs.length && xs.every(x=>x.checked);
+  xs.forEach(x=>x.checked=!all);
+}
+
+function setOmiStartLoading(form, loading){
+  const button=document.getElementById('omi-start-button');
+  const normal=document.getElementById('omi-start-normal');
+  const indicator=document.getElementById('omi-start-indicator');
+  const status=document.getElementById('omi-start-status');
+  if(!button) return;
+
+  button.disabled=loading;
+  if(normal) normal.classList.toggle('hidden', loading);
+  if(indicator){
+    indicator.classList.toggle('hidden', !loading);
+    indicator.classList.toggle('flex', loading);
+  }
+  if(status){
+    status.textContent=loading
+      ? '🤖 RoboMANTAP sedang membuat 10 soal OMI dengan AI. Mohon tunggu, jangan klik lagi.'
+      : 'RoboMANTAP akan menyiapkan 10 soal AI. Jangan menekan tombol berulang kali.';
+    status.className=loading
+      ? 'text-center text-[10px] text-emerald-400 font-medium animate-pulse'
+      : 'text-center text-[10px] text-slate-500';
+  }
+}
+
+document.body.addEventListener('htmx:beforeRequest', function(evt){
+  if(evt.detail && evt.detail.elt && evt.detail.elt.id==='omi-start-form'){
+    setOmiStartLoading(evt.detail.elt, true);
+  }
+});
+
+document.body.addEventListener('htmx:afterRequest', function(evt){
+  if(evt.detail && evt.detail.elt && evt.detail.elt.id==='omi-start-form' && !evt.detail.successful){
+    setOmiStartLoading(evt.detail.elt, false);
+  }
+});
+</script>
+{% endblock %}
