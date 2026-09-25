@@ -18,7 +18,8 @@ def update_progress_siswa(
     is_custom: bool = False,
     user_answers_dict: dict = None,
     quiz_data_list: list = None,
-    anti_cheat: dict = None
+    anti_cheat: dict = None,
+    session_mode: str | None = None,
 ):
     """
     Menyimpan progress CBT dengan proteksi state final.
@@ -87,6 +88,9 @@ def update_progress_siswa(
 
         if effective_anti_cheat is not None:
             payload["anti_cheat"] = effective_anti_cheat
+
+        if session_mode:
+            payload["session_mode"] = str(session_mode).strip().upper()
 
         detail_json = json.dumps(payload, default=str)
     else:
