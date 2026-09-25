@@ -27,11 +27,52 @@ def test_omi_navigation_and_setup_pages():
     assert response.status_code == 200
     assert "Persiapan CBT OMI" in response.text
     assert "10 soal" in response.text
+    assert 'hx-post="/omi/start"' in response.text
+    assert "SEDANG MEMBUAT 10 SOAL" in response.text
+
+
+def test_omi_start_htmx_returns_hx_redirect(monkeypatch):
+    SESSIONS.clear()
+    monkeypatch.setattr(omi_service, "generate_omi_quiz_batch", lambda *args: _quiz())
+    client = TestClient(app)
+    response = client.post(
+        "/omi/start",
+        data={
+            "nama": "Fulanah Test",
+            "jenjang": "MTs (Sederajat SMP)",
+            "mapel": "Matematika",
+            "stage": "Internal",
+            "selected_submateri": "Bilangan",
+        },
+        headers={"HX-Request": "true"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 204
+    assert response.headers["HX-Redirect"].startswith("/omi/exam/")
+
+
+def test_omi_start_validation_htmx_returns_form_fragment(monkeypatch):
+    client = TestClient(app)
+    response = client.post(
+        "/omi/start",
+        data={
+            "nama": "A",
+            "jenjang": "MTs (Sederajat SMP)",
+            "mapel": "Matematika",
+            "stage": "Internal",
+        },
+        headers={"HX-Request": "true"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 200
+    assert 'id="omi-start-shell"' in response.text
+    assert "Nama Lengkap" in response.text
+    assert "valid" in response.text
 
 
 def test_omi_start_answer_submit_and_result(monkeypatch):
     SESSIONS.clear()
-    monkeypatch.setattr(omi_service, "generate_quiz_batch", lambda *args: _quiz())
+    monkeypatch.setattr(omi_service, "generate_omi_quiz_batch", lambda *args: _quiz())
     client = TestClient(app)
 
     response = client.post(
@@ -70,8 +111,8 @@ def test_omi_start_answer_submit_and_result(monkeypatch):
 
 def test_omi_hint_and_three_strike_anti_cheat(monkeypatch):
     SESSIONS.clear()
-    monkeypatch.setattr(omi_service, "generate_quiz_batch", lambda *args: _quiz())
-    monkeypatch.setattr(omi_service, "get_ai_hint_stream", lambda *args: iter(["Petunjuk OMI"] if args else []))
+    monkeypatch.setattr(omi_service, "generate_omi_quiz_batch", lambda *args: _quiz())
+    monkeypatch.setattr(omi_service, "get_omi_hint_stream", lambda *args: iter(["Petunjuk OMI"] if args else []))
     client = TestClient(app)
 
     response = client.post(
