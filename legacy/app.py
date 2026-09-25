@@ -1632,15 +1632,33 @@ if st.session_state.page == "landing":
         </div>
         """, unsafe_allow_html=True)
         st.markdown(
-            f'<a href="{omi_base_url}/omi/ma" target="_blank" '
-            f'style="text-decoration:none; display:block; color:#020617 !important;">'
-            f'<div style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);'
-            f'color:#020617 !important; padding:12px 18px; border-radius:12px; '
-            f'text-align:center; font-weight:800; font-size:14px; letter-spacing:.2px;">'
-            f'Masuk Modul MA ➔'
-            f'</div></a>',
+            f"""
+            <a href="{omi_base_url}/omi/ma" target="_blank" style="text-decoration: none;">
+                <div style="
+                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                    color: #020617;
+                    padding: 14px 24px;
+                    border-radius: 12px;
+                    text-align: center;
+                    font-weight: 800;
+                    font-size: 15px;
+                    letter-spacing: 0.5px;
+                    transition: all 0.3s ease;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    margin-top: 8px;
+                    margin-bottom: 20px;
+                    cursor: pointer;
+                ">
+                    🏛️ MASUK MODUL MA →
+                </div>
+            </a>
+            """,
             unsafe_allow_html=True,
         )
+
             
     st.write("---")
     st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
