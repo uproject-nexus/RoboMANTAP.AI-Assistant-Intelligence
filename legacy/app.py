@@ -1655,7 +1655,7 @@ if st.session_state.page == "landing":
                 font-size: 15px;
                 letter-spacing: 0.5px;
                 transition: all 0.3s ease;
-                display: flex;
+                
                 align-items: center;
                 justify-content: center;
                 gap: 8px;
@@ -1674,7 +1674,7 @@ if st.session_state.page == "landing":
     st.markdown("#### 👤 Portal SantriMANTAP")
     st.markdown("""
     <div class="guru-card" style="background: linear-gradient(135deg, #172554 0%, #312e81 100%); border-color: #6366f1;">
-        <h2 style="margin:0; font-size: 20px;">🌸 My Learning Intelligence</h2>
+        <h2 style="margin:0; font-size: 20px;">🎓 My Learning Intelligence</h2>
         <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Pahami pola belajar dan tentukan langkah belajar berikutnya</p>
     </div>
     """, unsafe_allow_html=True)
