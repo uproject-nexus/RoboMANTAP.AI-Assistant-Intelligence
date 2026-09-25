@@ -1707,7 +1707,7 @@ if st.session_state.page == "landing":
                 margin-bottom: 20px;
                 cursor: pointer;
             ">
-                🚀 BUKA PORTAL KUIS →
+                🚀 MASUK PORTAL KUIS →
             </div>
         </a>
         """,
@@ -1722,7 +1722,7 @@ if st.session_state.page == "landing":
         <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Pahami pola belajar dan tentukan langkah belajar berikutnya</p>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("Buka Portal Santri ➔", use_container_width=True, type="primary"):
+    if st.button("Masuk Portal Santri ➔", use_container_width=True, type="primary"):
         st.session_state.page = "student_intelligence"
         st.rerun()
 
