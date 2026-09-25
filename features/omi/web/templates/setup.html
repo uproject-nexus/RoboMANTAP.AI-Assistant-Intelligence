@@ -55,46 +55,5 @@
     </form>
   </div>
 </div>
-{% block scripts %}
-<script>
-function toggleAllSubmateri(){
-  const xs = [...document.querySelectorAll('.submateri-check')];
-  const all = xs.length && xs.every(x => x.checked);
-  xs.forEach(x => x.checked = !all);
-}
-
-document.addEventListener("DOMContentLoaded", function () {
-  const form = document.querySelector('form[action="/omi/start"]');
-  const button = document.getElementById("btn-start-omi");
-  const normalText = document.getElementById("btn-start-normal");
-  const loadingText = document.getElementById("btn-start-loading");
-  const statusText = document.getElementById("omi-generation-status");
-
-  if (!form || !button) return;
-
-  form.addEventListener("submit", function () {
-    // Cegah spam klik / submit berulang
-    if (button.dataset.loading === "true") {
-      return;
-    }
-
-    button.dataset.loading = "true";
-    button.disabled = true;
-
-    // Ubah tampilan tombol
-    normalText.classList.add("hidden");
-    loadingText.classList.remove("hidden");
-    loadingText.classList.add("flex");
-
-    // Ubah pesan di bawah tombol
-    statusText.textContent =
-      "🤖 RoboMANTAP sedang membuat 10 soal OMI. Mohon tunggu, jangan menekan tombol lagi.";
-    statusText.className =
-      "text-center text-[10px] text-emerald-400 font-medium animate-pulse";
-
-    // Sedikit redup agar jelas tombol sedang terkunci
-    button.classList.add("opacity-80", "cursor-wait");
-  });
-});
-</script>
 {% endblock %}
+{% block scripts %}<script>function toggleAllSubmateri(){const xs=[...document.querySelectorAll('.submateri-check')];const all=xs.length && xs.every(x=>x.checked);xs.forEach(x=>x.checked=!all);}</script>{% endblock %}
