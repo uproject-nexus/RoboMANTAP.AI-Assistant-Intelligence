@@ -1619,8 +1619,6 @@ if st.session_state.page == "landing":
         """, unsafe_allow_html=True)
         omi_base_url = os.getenv("ROBO_CBT_URL", "https://robomantap-intelligence-cbt.onrender.com").rstrip("/")
         st.markdown(
-
-        st.markdown(
             f"""
             <a href="{omi_base_url}/omi/mts" target="_blank" style="text-decoration: none;">
                 <div style="
@@ -1647,7 +1645,6 @@ if st.session_state.page == "landing":
             """,
             unsafe_allow_html=True,
         )
-
 
     with col2:
         st.markdown("""
