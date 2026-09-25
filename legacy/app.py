@@ -1605,82 +1605,50 @@ def create_5_quiz_packages(master_quiz):
 # ==============================================================================
 if st.session_state.page == "landing":
 
+    # OMI kini memiliki satu pintu masuk dari landing utama.
+    # Pemilihan jenjang MTs/MA dilakukan di landing HTMX /omi agar tidak
+    # menduplikasi dua pilihan jenjang di Streamlit.
+    omi_base_url = os.getenv("ROBO_CBT_URL", "https://robomantap-intelligence-cbt.onrender.com").rstrip("/")
+
     st.markdown("<h3 style='text-align: center; font-size: 25px;'>🏆 BINA PRESTASI OMI 2026</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Portal latihan Olimpiade berbasis CBT — pilih jenjang setelah masuk ke modul OMI</p>", unsafe_allow_html=True)
     st.write("---")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("""
-        <div class="mode-card">
-            <h2>🏫 TINGKAT MTs</h2>
-            <p>Madrasah Tsanawiyah Al-Irsyad Putri</p>
-        </div>
-        """, unsafe_allow_html=True)
-        omi_base_url = os.getenv("ROBO_CBT_URL", "https://robomantap-intelligence-cbt.onrender.com").rstrip("/")
-        st.markdown(
-            f"""
-            <a href="{omi_base_url}/omi/mts" target="_blank" style="text-decoration: none;">
-                <div style="
-                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                    color: #020617;
-                    padding: 12px 18px;
-                    border-radius: 12px;
-                    text-align: center;
-                    font-weight: 800;
-                    font-size: 15px;
-                    letter-spacing: 0.5px;
-                    transition: all 0.3s ease;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 8px;
-                    margin-top: 8px;
-                    margin-bottom: 20px;
-                    cursor: pointer;
-                ">
-                    MASUK MODUL MTs →
-                </div>
-            </a>
-            """,
-            unsafe_allow_html=True,
-        )
+    st.markdown("#### 🏆 Latihan OMI")
+    st.caption("Satu pintu untuk latihan MTs dan MA. Pemilihan jenjang, bidang, dan sesi dilakukan di portal CBT OMI.")
 
-    with col2:
-        st.markdown("""
-        <div class="mode-card">
-            <h2>🏛️ TINGKAT MA</h2>
-            <p>Madrasah Aliyah Al-Irsyad Putri</p>
+    st.markdown(
+        f"""
+        <a href="{omi_base_url}/omi" target="_blank" style="text-decoration:none; display:block;">
+            <div style="
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: #020617;
+                padding: 16px 24px;
+                border-radius: 12px;
+                text-align: center;
+                font-weight: 800;
+                font-size: 15px;
+                letter-spacing: 0.4px;
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                margin-top: 8px;
+                margin-bottom: 8px;
+                cursor: pointer;
+                box-shadow: 0 0 20px rgba(16,185,129,0.20);
+            ">
+                🏆 BUKA LATIHAN OMI →
+            </div>
+        </a>
+        <div style="text-align:center; font-size:10px; opacity:.55; margin-bottom:20px;">
+            MTs &amp; MA • 10 soal per sesi • CBT OMI
         </div>
-        """, unsafe_allow_html=True)
-        st.markdown(
-            f"""
-            <a href="{omi_base_url}/omi/ma" target="_blank" style="text-decoration: none;">
-                <div style="
-                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                    color: #020617;
-                    padding: 12px 28px;
-                    border-radius: 12px;
-                    text-align: center;
-                    font-weight: 800;
-                    font-size: 15px;
-                    letter-spacing: 0.5px;
-                    transition: all 0.3s ease;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 8px;
-                    margin-top: 8px;
-                    margin-bottom: 20px;
-                    cursor: pointer;
-                ">
-                    MASUK MODUL MA →
-                </div>
-            </a>
-            """,
-            unsafe_allow_html=True,
-        )
-            
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.write("---")
     st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
     st.caption("Klik tombol dibawah ini untuk menuju Portal Kuis!")
@@ -1707,7 +1675,7 @@ if st.session_state.page == "landing":
                 margin-bottom: 20px;
                 cursor: pointer;
             ">
-                🚀 MASUK PORTAL KUIS →
+                🚀 BUKA PORTAL KUIS →
             </div>
         </a>
         """,
@@ -1718,11 +1686,11 @@ if st.session_state.page == "landing":
     st.markdown("#### 👤 Portal SantriMANTAP")
     st.markdown("""
     <div class="guru-card" style="background: linear-gradient(135deg, #172554 0%, #312e81 100%); border-color: #6366f1;">
-        <h2 style="margin:0; font-size: 20px;">🎓 My Learning Intelligence</h2>
+        <h2 style="margin:0; font-size: 20px;">🌸 My Learning Intelligence</h2>
         <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Pahami pola belajar dan tentukan langkah belajar berikutnya</p>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("Masuk Portal Santri ➔", use_container_width=True, type="primary"):
+    if st.button("Buka Portal Santri ➔", use_container_width=True, type="primary"):
         st.session_state.page = "student_intelligence"
         st.rerun()
 
@@ -1964,9 +1932,25 @@ elif st.session_state.page == "guru_dashboard":
                 val_aktif = len(df[df['status_real'] == 'BERJALAN'])
                 val_selesai = len(df[df['status_real'] == 'SELESAI'])
                 
-                # Logika Pemisah Pintar: Cek kata '(Custom)' ATAU jumlah kotak soal != 10
+                # Logika pemisah sesi.
+                # OMI HTMX menulis session_mode=OMI ke payload sehingga Live Monitoring
+                # tidak perlu menebak jenis sesi dari nama mapel atau jumlah soal.
                 def check_is_custom(row):
                     mapel_str = str(row['mapel'])
+                    try:
+                        detail = row['detail_jawaban']
+                        if isinstance(detail, str):
+                            detail = json.loads(detail)
+                        if isinstance(detail, dict):
+                            session_mode = str(detail.get("session_mode", "") or "").strip().upper()
+                            if session_mode == "OMI":
+                                return False
+                            if session_mode in {"QUIZ_CUSTOM", "CUSTOM"}:
+                                return True
+                    except Exception:
+                        pass
+
+                    # Compatibility untuk data lama yang belum memiliki session_mode.
                     if "custom" in mapel_str.lower() or "kuis" in mapel_str.lower() or "quiz" in mapel_str.lower():
                         return True
                     try:
