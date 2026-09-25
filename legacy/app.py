@@ -1655,7 +1655,7 @@ if st.session_state.page == "landing":
                 font-size: 15px;
                 letter-spacing: 0.5px;
                 transition: all 0.3s ease;
-                
+                display: flex;
                 align-items: center;
                 justify-content: center;
                 gap: 8px;
