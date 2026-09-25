@@ -1617,10 +1617,12 @@ if st.session_state.page == "landing":
             <p>Madrasah Tsanawiyah Al-Irsyad Putri</p>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("Masuk Modul MTs ➔", key="btn_mts", use_container_width=True, type="primary"):
-            st.session_state.jenjang = "MTs (Sederajat SMP)"
-            st.session_state.page = "select_mapel"
-            st.rerun()
+        omi_base_url = os.getenv("ROBO_CBT_URL", "https://robomantap-intelligence-cbt.onrender.com").rstrip("/")
+        st.markdown(
+            f'<a href="{omi_base_url}/omi/mts" target="_blank" style="text-decoration:none; display:block;">'
+            f'<div style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#020617;padding:12px 18px;border-radius:12px;text-align:center;font-weight:800;font-size:14px;letter-spacing:.2px;">Masuk Modul MTs ➔</div></a>',
+            unsafe_allow_html=True,
+        )
 
     with col2:
         st.markdown("""
@@ -1629,10 +1631,11 @@ if st.session_state.page == "landing":
             <p>Madrasah Aliyah Al-Irsyad Putri</p>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("Masuk Modul MA ➔", key="btn_ma", use_container_width=True, type="primary"):
-            st.session_state.jenjang = "MA (Sederajat SMA)"
-            st.session_state.page = "select_mapel"
-            st.rerun()
+        st.markdown(
+            f'<a href="{omi_base_url}/omi/ma" target="_blank" style="text-decoration:none; display:block;">'
+            f'<div style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#020617;padding:12px 18px;border-radius:12px;text-align:center;font-weight:800;font-size:14px;letter-spacing:.2px;">Masuk Modul MA ➔</div></a>',
+            unsafe_allow_html=True,
+        )
             
     st.write("---")
     st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
