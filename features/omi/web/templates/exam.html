@@ -21,7 +21,7 @@
 <div id="exam-container" class="hidden w-full min-h-screen flex flex-col justify-start">
   <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-40 flex justify-between items-center w-full">
     <div class="flex items-center space-x-2"><span class="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded">OMI</span><div><h1 class="text-xs sm:text-sm font-bold text-white leading-none">RoboMANTAP CBT</h1><p class="text-[10px] text-emerald-400 mt-0.5 truncate max-w-[180px]">{{ sess.mapel }}</p></div></div>
-    <div class="flex items-center space-x-2 sm:space-x-3"><button id="btn-fullscreen-toggle" onclick="toggleFullscreenMode()" class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition"><span id="fs-icon">📺</span> <span id="fs-text">Fullscreen</span></button><div class="bg-slate-950 border border-slate-800 px-3 py-1 rounded-lg text-xs">⏱️ <span class="font-mono text-emerald-400 font-bold">Tanpa batas</span></div></div>
+    <div class="flex items-center space-x-2 sm:space-x-3"><span id="wake-status" class="hidden sm:inline-flex items-center bg-slate-950 border border-slate-800 px-2.5 py-1 rounded-lg text-[10px] text-slate-400">🟢 Layar aktif</span><button id="btn-fullscreen-toggle" onclick="toggleFullscreenMode()" class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition"><span id="fs-icon">📺</span> <span id="fs-text">Fullscreen</span></button><div class="bg-slate-950 border border-slate-800 px-3 py-1 rounded-lg text-xs">⏱️ <span class="font-mono text-emerald-400 font-bold">Tanpa batas</span></div></div>
   </header>
   <div id="cheat-warning-bar" class="hidden bg-amber-500/20 border-b border-amber-500/40 px-4 py-2 text-center text-xs text-amber-300 font-semibold">⚠️ Warning Pelanggaran Pindah Tab: <span id="violation-count-text">0</span> / 3</div>
   <main class="flex-1 max-w-4xl w-full mx-auto p-3 sm:p-5 flex flex-col justify-start">
@@ -37,6 +37,14 @@
 
 <div id="nav-modal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4"><div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl"><div class="flex justify-between items-center mb-4"><h2 class="text-sm font-bold text-white">📑 Navigasi Soal</h2><button onclick="toggleNavModal(false)" class="text-slate-400 hover:text-white">✕</button></div><div id="nav-grid" class="grid grid-cols-5 gap-2"></div></div></div>
 <div id="submit-modal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4"><div class="max-w-sm w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center"><div class="text-3xl mb-3">🏁</div><h2 class="text-lg font-black text-white">Selesaikan Latihan OMI?</h2><p class="text-xs text-slate-400 mt-2">Jawaban yang sudah tersimpan akan dinilai dengan skoring OMI: benar +4, salah -1, kosong 0.</p><div class="flex gap-2 mt-5"><button onclick="toggleSubmitModal(false)" class="flex-1 bg-slate-800 text-slate-300 font-bold text-xs py-3 rounded-xl">Belum</button><form id="form-submit-omi" action="/omi/submit/{{ session_id }}" method="post" class="flex-1"><button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs py-3 rounded-xl">Ya, Selesaikan!</button></form></div></div></div>
+
+<div id="result-processing-overlay" class="hidden fixed inset-0 z-[70] bg-slate-950/95 backdrop-blur-md items-center justify-center p-6">
+  <div class="max-w-sm w-full bg-slate-900 border border-emerald-500/30 rounded-2xl p-7 text-center shadow-[0_0_45px_rgba(16,185,129,0.18)]">
+    <div class="mx-auto mb-4 w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-400 animate-spin"></div>
+    <div class="text-emerald-400 font-black text-sm tracking-wide">🤖 RoboMANTAP sedang memproses hasil</div>
+    <p class="text-slate-400 text-xs leading-relaxed mt-2">Jawaban sedang disimpan dan hasil latihan sedang disiapkan. Mohon tunggu sebentar.</p>
+  </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
@@ -51,36 +59,163 @@ let violationCount=Number(antiCheatInitial?.violation_count||0);
 const maxViolations=Number(antiCheatInitial?.max_violations||3);
 let lastBlurTime=0;
 let wakeLock=null;
+let wakeLockSupported=('wakeLock' in navigator);
+
+function getAnswer(index){return answers[index] ?? answers[String(index)] ?? null;}
+function setWakeStatus(text, tone='ok'){
+  const el=document.getElementById('wake-status');
+  if(!el)return;
+  el.classList.remove('text-emerald-400','text-amber-300','text-slate-400','border-emerald-500/30','border-amber-500/30');
+  if(tone==='ok'){el.classList.add('text-emerald-400','border-emerald-500/30');}
+  else if(tone==='warn'){el.classList.add('text-amber-300','border-amber-500/30');}
+  else el.classList.add('text-slate-400');
+  el.textContent=text;
+}
+
+async function requestWakeLock(){
+  if(!wakeLockSupported){setWakeStatus('⚪ Layar aktif otomatis tidak didukung','muted');return false;}
+  try{
+    if(wakeLock && !wakeLock.released)return true;
+    wakeLock=await navigator.wakeLock.request('screen');
+    setWakeStatus('🟢 Layar aktif','ok');
+    wakeLock.addEventListener('release',()=>{wakeLock=null;if(!isSubmitting)setWakeStatus('🟡 Layar siap diaktifkan kembali','warn');});
+    return true;
+  }catch(e){
+    wakeLock=null;
+    setWakeStatus('🟡 Layar aktif terbatas','warn');
+    return false;
+  }
+}
+
+async function ensureWakeLock(){
+  if(document.visibilityState!=='visible' || isSubmitting)return;
+  if(!wakeLock || wakeLock.released)await requestWakeLock();
+}
 
 function startExamFromLobby(){
   const elem=document.documentElement;
-  try{ if(elem.requestFullscreen) elem.requestFullscreen(); }catch(e){}
+  try{if(elem.requestFullscreen)elem.requestFullscreen().catch(()=>{});}catch(e){}
   document.getElementById('lobby-container').classList.add('hidden');
   document.getElementById('exam-container').classList.remove('hidden');
   history.pushState(null,null,location.href);
   window.addEventListener('popstate',()=>{history.pushState(null,null,location.href);alert('⚠️ Navigasi kembali dimatikan. Selesaikan latihan terlebih dahulu.');});
-  requestWakeLock(); initExamEngine();
+  requestWakeLock();
+  initExamEngine();
 }
-async function requestWakeLock(){try{if('wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen');}catch(e){}}
-function updateFullscreenButtonUI(){const t=document.getElementById('fs-text');const isFS=document.fullscreenElement;if(t)t.textContent=isFS?'Outfullscreen':'Fullscreen';}
-function toggleFullscreenMode(){const e=document.documentElement;if(!document.fullscreenElement){if(e.requestFullscreen)e.requestFullscreen().catch(()=>{});}else{document.exitFullscreen().catch(()=>{});}}
-document.addEventListener('fullscreenchange',updateFullscreenButtonUI);
+
+function updateFullscreenButtonUI(){const t=document.getElementById('fs-text');const isFS=document.fullscreenElement;if(t)t.textContent=isFS?'Keluar Fullscreen':'Fullscreen';}
+function toggleFullscreenMode(){const e=document.documentElement;if(!document.fullscreenElement){if(e.requestFullscreen)e.requestFullscreen().then(ensureWakeLock).catch(()=>{});}else{document.exitFullscreen().catch(()=>{});}}
+document.addEventListener('fullscreenchange',()=>{updateFullscreenButtonUI();ensureWakeLock();});
+
+document.addEventListener('visibilitychange',async()=>{
+  if(isSubmitting)return;
+  if(document.visibilityState==='hidden')handleTabSwitch();
+  else await ensureWakeLock();
+});
+
 function updateCheatWarningBar(){const bar=document.getElementById('cheat-warning-bar');const text=document.getElementById('violation-count-text');if(violationCount>0)bar.classList.remove('hidden');text.textContent=`${Math.min(violationCount,maxViolations)} / ${maxViolations}`;}
 function persistAntiCheat(){const fd=new URLSearchParams();fd.append('violation_count',String(violationCount));fd.append('reason','Pindah tab');fetch(`/omi/api/session/${sessionId}/anti-cheat`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString(),keepalive:true}).catch(()=>{});}
-function handleTabSwitch(){if(isSubmitting)return;const now=Date.now();if(now-lastBlurTime<1500)return;lastBlurTime=now;violationCount=Math.min(violationCount+1,maxViolations);updateCheatWarningBar();persistAntiCheat();if(violationCount>=maxViolations){isSubmitting=true;alert('🚨 DETEKSI KECURANGAN!\n\nAnda meninggalkan tab latihan 3 kali. Sesi otomatis dihentikan.');document.getElementById('form-submit-omi').submit();}else{alert(`⚠️ PERINGATAN KECURANGAN (${violationCount}/${maxViolations})!\n\nDilarang meninggalkan tab latihan.`);}}
-document.addEventListener('visibilitychange',async()=>{if(isSubmitting)return;if(document.visibilityState==='hidden')handleTabSwitch();else if(document.visibilityState==='visible'&&wakeLock===null)await requestWakeLock();});
-setInterval(()=>{if(isSubmitting||document.visibilityState!=='visible')return;fetch(`/omi/api/session/${sessionId}/heartbeat`,{method:'POST',keepalive:true}).catch(()=>{});},15000);
-function renderQuestion(index){currentIndex=index;const item=quizData[index];document.getElementById('label-no-soal').textContent=`Soal No. ${index+1} dari ${quizData.length}`;document.getElementById('question-text').innerHTML=item.question;const box=document.getElementById('options-container');box.innerHTML='';item.options.forEach((opt,optIdx)=>{const selected=String(answers[index])===String(opt);const btn=document.createElement('button');btn.type='button';btn.className=`option-card w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm transition flex items-start space-x-3 ${selected?'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-medium shadow-[0_0_10px_rgba(16,185,129,0.15)]':'bg-slate-950 border-slate-800 text-slate-300'}`;btn.innerHTML=`<span class="w-6 h-6 rounded-full border border-slate-700 flex-shrink-0 flex items-center justify-center text-[11px] font-bold mt-0.5 ${selected?'border-emerald-500 bg-emerald-500 text-slate-950':''}">${opt.charAt(0)}</span><span class="leading-relaxed">${opt}</span>`;btn.onclick=()=>selectAnswer(index,opt,optIdx);box.appendChild(btn);});updateNav();document.getElementById('hint-curr-idx').value=index;document.getElementById('hint-attempt-input').value='';document.getElementById('hint-result').innerHTML='';setTimeout(()=>triggerKaTeX(document.getElementById('question-box')),20);}
-function selectAnswer(index,opt,optIdx){answers[index]=opt;renderQuestion(index);const fd=new URLSearchParams();fd.append('q_index',String(index));fd.append('answer',opt);fetch(`/omi/api/session/${sessionId}/answer`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString(),keepalive:true}).catch(()=>{});}
-function updateNav(){const prev=document.getElementById('btn-prev'),next=document.getElementById('btn-next-submit');prev.disabled=currentIndex===0;if(currentIndex===quizData.length-1){next.textContent='🚀 Selesai Latihan';next.className='flex-1 sm:flex-none bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(244,63,94,0.4)]';}else{next.textContent='Next →';next.className='flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)]';}document.getElementById('progress-text').textContent=`${currentIndex+1} / ${quizData.length}`;document.getElementById('progress-bar').style.width=`${((currentIndex+1)/quizData.length)*100}%`;updateRaguButtonUI();}
+function handleTabSwitch(){if(isSubmitting)return;const now=Date.now();if(now-lastBlurTime<1500)return;lastBlurTime=now;violationCount=Math.min(violationCount+1,maxViolations);updateCheatWarningBar();persistAntiCheat();if(violationCount>=maxViolations){isSubmitting=true;alert('🚨 DETEKSI KECURANGAN!\n\nAnda meninggalkan tab latihan 3 kali. Sesi otomatis dihentikan.');const form=document.getElementById('form-submit-omi');if(form)form.submit();}else{alert(`⚠️ PERINGATAN KECURANGAN (${violationCount}/${maxViolations})!\n\nDilarang meninggalkan tab latihan.`);}}
+
+setInterval(()=>{if(isSubmitting||document.visibilityState!=='visible')return;fetch(`/omi/api/session/${sessionId}/heartbeat`,{method:'POST',keepalive:true}).catch(()=>{});ensureWakeLock();},15000);
+
+function renderMathSafely(container){
+  if(!container)return;
+  container.style.visibility='hidden';
+  const reveal=()=>{
+    requestAnimationFrame(()=>{container.style.visibility='visible';});
+  };
+  try{
+    if(window.renderMathInElement){
+      renderMathInElement(container,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});
+    }
+  }catch(e){}
+  setTimeout(reveal,25);
+}
+
+function optionClasses(btn,selected){
+  btn.className=`option-card w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm transition flex items-start space-x-3 ${selected?'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-medium shadow-[0_0_10px_rgba(16,185,129,0.15)]':'bg-slate-950 border-slate-800 text-slate-300'}`;
+  const dot=btn.querySelector('.option-dot');
+  if(dot)dot.className=`option-dot w-6 h-6 rounded-full border border-slate-700 flex-shrink-0 flex items-center justify-center text-[11px] font-bold mt-0.5 ${selected?'border-emerald-500 bg-emerald-500 text-slate-950':''}`;
+}
+
+function updateOptionSelection(index){
+  const selected=getAnswer(index);
+  document.querySelectorAll('#options-container .option-card').forEach(btn=>{
+    const optIndex=Number(btn.dataset.optionIndex);
+    optionClasses(btn,String(selected)===String(quizData[index].options[optIndex]));
+  });
+}
+
+function renderOptions(index){
+  const item=quizData[index];
+  const box=document.getElementById('options-container');
+  box.innerHTML='';
+  item.options.forEach((opt,optIdx)=>{
+    const selected=String(getAnswer(index))===String(opt);
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.dataset.optionIndex=String(optIdx);
+    btn.innerHTML=`<span class="option-dot w-6 h-6 rounded-full border border-slate-700 flex-shrink-0 flex items-center justify-center text-[11px] font-bold mt-0.5 ${selected?'border-emerald-500 bg-emerald-500 text-slate-950':''}">${opt.charAt(0)}</span><span class="leading-relaxed">${opt}</span>`;
+    optionClasses(btn,selected);
+    btn.onclick=()=>selectAnswer(index,opt,optIdx);
+    box.appendChild(btn);
+  });
+}
+
+function renderQuestion(index){
+  currentIndex=index;
+  const item=quizData[index];
+  const questionBox=document.getElementById('question-box');
+  questionBox.style.visibility='hidden';
+  document.getElementById('label-no-soal').textContent=`Soal No. ${index+1} dari ${quizData.length}`;
+  document.getElementById('question-text').innerHTML=item.question;
+  renderOptions(index);
+  updateNav();
+  document.getElementById('hint-curr-idx').value=index;
+  document.getElementById('hint-attempt-input').value='';
+  document.getElementById('hint-result').innerHTML='';
+  renderMathSafely(questionBox);
+}
+
+function selectAnswer(index,opt,optIdx){
+  if(isSubmitting)return;
+  answers[index]=opt;
+  updateOptionSelection(index);
+  updateNav();
+  renderGrid();
+  const fd=new URLSearchParams();
+  fd.append('q_index',String(index));
+  fd.append('answer',opt);
+  fetch(`/omi/api/session/${sessionId}/answer`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString(),keepalive:true}).catch(()=>{});
+}
+
+function updateNav(){
+  const prev=document.getElementById('btn-prev'),next=document.getElementById('btn-next-submit');
+  prev.disabled=currentIndex===0;
+  if(currentIndex===quizData.length-1){next.textContent='🚀 Selesai Latihan';next.className='flex-1 sm:flex-none bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(244,63,94,0.4)]';}
+  else{next.textContent='Next →';next.className='flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)]';}
+  document.getElementById('progress-text').textContent=`${currentIndex+1} / ${quizData.length}`;
+  document.getElementById('progress-bar').style.width=`${((currentIndex+1)/quizData.length)*100}%`;
+  updateRaguButtonUI();
+}
 function prevQuestion(){if(currentIndex>0)renderQuestion(currentIndex-1);}
 function handleNextOrSubmit(){if(currentIndex<quizData.length-1)renderQuestion(currentIndex+1);else toggleSubmitModal(true);}
-function toggleRagu(){raguState[currentIndex]=!raguState[currentIndex];updateRaguButtonUI();}
+function toggleRagu(){raguState[currentIndex]=!raguState[currentIndex];updateRaguButtonUI();renderGrid();}
 function updateRaguButtonUI(){const b=document.getElementById('btn-ragu');b.className=raguState[currentIndex]?'flex-1 sm:flex-none bg-amber-500 text-slate-950 border border-amber-400 font-bold text-[10px] py-2.5 px-2 rounded-xl transition text-center shadow-[0_0_12px_rgba(245,158,11,0.4)]':'flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold py-2.5 px-2 rounded-xl transition text-center';}
-function renderGrid(){const grid=document.getElementById('nav-grid');grid.innerHTML='';quizData.forEach((_,idx)=>{const b=document.createElement('button');const answered=answers[idx]!==undefined&&answers[idx]!==null;const ragu=raguState[idx]===true;let c='bg-slate-950 border-slate-800 text-slate-400';if(ragu)c='bg-amber-500/20 border-amber-500/60 text-amber-300 font-bold';else if(answered)c='bg-emerald-500/20 border-emerald-500/60 text-emerald-300 font-bold';b.className=`h-10 text-xs rounded-xl border transition ${c} ${idx===currentIndex?'ring-2 ring-emerald-400 border-emerald-400':''}`;b.textContent=idx+1;b.onclick=()=>{renderQuestion(idx);toggleNavModal(false);};grid.appendChild(b);});}
+function renderGrid(){const grid=document.getElementById('nav-grid');grid.innerHTML='';quizData.forEach((_,idx)=>{const b=document.createElement('button');const answered=getAnswer(idx)!==undefined&&getAnswer(idx)!==null;const ragu=raguState[idx]===true;let c='bg-slate-950 border-slate-800 text-slate-400';if(ragu)c='bg-amber-500/20 border-amber-500/60 text-amber-300 font-bold';else if(answered)c='bg-emerald-500/20 border-emerald-500/60 text-emerald-300 font-bold';b.className=`h-10 text-xs rounded-xl border transition ${c} ${idx===currentIndex?'ring-2 ring-emerald-400 border-emerald-400':''}`;b.textContent=idx+1;b.onclick=()=>{renderQuestion(idx);toggleNavModal(false);};grid.appendChild(b);});}
 function toggleNavModal(show){const m=document.getElementById('nav-modal');if(show){renderGrid();m.classList.remove('hidden');}else m.classList.add('hidden');}
 function toggleSubmitModal(show){const m=document.getElementById('submit-modal');if(show)m.classList.remove('hidden');else m.classList.add('hidden');}
-function initExamEngine(){renderQuestion(0);updateCheatWarningBar();updateFullscreenButtonUI();}
+function showResultProcessing(event){
+  if(isSubmitting)return;
+  isSubmitting=true;
+  const btn=document.getElementById('btn-confirm-submit');
+  if(btn){btn.disabled=true;btn.textContent='Memproses...';btn.classList.add('opacity-70','cursor-wait');}
+  toggleSubmitModal(false);
+  const overlay=document.getElementById('result-processing-overlay');
+  if(overlay){overlay.classList.remove('hidden');overlay.classList.add('flex');}
+}
+function initExamEngine(){renderQuestion(0);updateCheatWarningBar();updateFullscreenButtonUI();ensureWakeLock();}
 window.addEventListener('beforeunload',e=>{if(!isSubmitting){e.preventDefault();e.returnValue='';}});
 </script>
 {% endblock %}

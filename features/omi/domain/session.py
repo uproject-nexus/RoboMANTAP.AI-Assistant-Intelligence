@@ -50,6 +50,7 @@ def _persist(sess: dict, status: str = "BERJALAN") -> None:
             user_answers_dict=dict(sess.get("answers", {})),
             quiz_data_list=list(sess.get("quiz", [])),
             anti_cheat=dict(sess.get("anti_cheat", {})),
+            session_mode="OMI",
         )
     except Exception as exc:
         print(f"[OMI DB WARN] {exc}")
@@ -109,6 +110,7 @@ def _load_from_db(session_id: str) -> dict | None:
             "quiz": quiz, "answers": {int(k) if str(k).isdigit() else k: v for k, v in answers.items()},
             "current_index": max(0, int(row[4] or 1) - 1), "start_time": start_time or _now(),
             "finished": str(row[6] or "").upper() == "SELESAI", "anti_cheat": anti,
+            "session_mode": str(raw.get("session_mode", "OMI") or "OMI").upper(),
         }
         # Older payloads may not contain OMI metadata. It is safe to use defaults.
         SESSIONS[session_id] = sess
