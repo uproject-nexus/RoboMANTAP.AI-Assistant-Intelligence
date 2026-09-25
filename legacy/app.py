@@ -1632,8 +1632,13 @@ if st.session_state.page == "landing":
         </div>
         """, unsafe_allow_html=True)
         st.markdown(
-            f'<a href="{omi_base_url}/omi/ma" target="_blank" style="text-decoration:none; display:block;">'
-            f'<div style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);padding:12px 18px;border-radius:12px;text-align:center;font-weight:800;font-size:14px;letter-spacing:.2px;">Masuk Modul MA ➔</div></a>',
+            f'<a href="{omi_base_url}/omi/ma" target="_blank" '
+            f'style="text-decoration:none; display:block; color:#020617 !important;">'
+            f'<div style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);'
+            f'color:#020617 !important; padding:12px 18px; border-radius:12px; '
+            f'text-align:center; font-weight:800; font-size:14px; letter-spacing:.2px;">'
+            f'Masuk Modul MA ➔'
+            f'</div></a>',
             unsafe_allow_html=True,
         )
             
