@@ -136,3 +136,45 @@ def test_omi_hint_and_three_strike_anti_cheat(monkeypatch):
     result = client.get(f"/omi/result/{session_id}")
     assert result.status_code == 200
     assert "CBT OMI" in result.text
+
+
+def test_omi_runtime_hardening_features_present():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    exam = (root / "features/omi/web/templates/exam.html").read_text(encoding="utf-8")
+    result = (root / "features/omi/web/templates/result.html").read_text(encoding="utf-8")
+    application = (root / "api/application.py").read_text(encoding="utf-8")
+    monitoring = (root / "legacy/app.py").read_text(encoding="utf-8")
+    assert "requestWakeLock" in exam
+    assert "wakeLock.request('screen')" in exam
+    assert "showResultProcessing" in exam
+    assert "result-processing-overlay" in exam
+    assert "session_mode" in monitoring
+    assert "omi_router" in application
+    # Answer clicks must update the selected option without rebuilding the whole question.
+    select_block = exam.split("function selectAnswer", 1)[1].split("function updateNav", 1)[0]
+    assert "renderQuestion(index)" not in select_block
+    assert "updateOptionSelection(index)" in select_block
+    assert "SEDANG MEMPROSES" not in result  # submit spinner belongs to the exam submit boundary
+
+
+def test_omi_persistence_marks_session_for_live_monitoring(monkeypatch):
+    from features.omi.domain import session as omi_session
+    captured = {}
+
+    def fake_persist(**kwargs):
+        captured.update(kwargs)
+        return True
+
+    monkeypatch.setattr(omi_session, "update_progress_siswa", fake_persist)
+    omi_session.SESSIONS.clear()
+    sess = omi_session.create_session(
+        nama="Santri Live",
+        jenjang="MTs (Sederajat SMP)",
+        mapel="Matematika",
+        stage="Internal",
+        selected_submateri=["Bilangan"],
+        quiz=_quiz(),
+    )
+    assert sess["session_id"] in omi_session.SESSIONS
+    assert captured["session_mode"] == "OMI"
