@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Bina Prestasi OMI 2026 - RoboMANTAP{% endblock %}
+{% block body %}
+<div class="min-h-screen flex items-center justify-center p-4">
+  <div class="max-w-lg w-full bg-slate-900 border border-emerald-500/30 rounded-2xl p-6 sm:p-8 shadow-[0_0_40px_rgba(16,185,129,0.15)] space-y-6">
+    <div class="text-center">
+      <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold text-[10px] px-3 py-1 rounded-full uppercase tracking-widest">Bina Prestasi OMI 2026</span>
+      <h1 class="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">RoboMANTAP CBT OMI</h1>
+      <p class="text-xs text-slate-400 mt-1">Latihan CBT Olimpiade untuk MTs & MA Al Irsyad Putri</p>
+    </div>
+    {% if error %}<div class="bg-rose-500/10 border border-rose-500/40 text-rose-400 text-xs p-3 rounded-xl text-center">{{ error }}</div>{% endif %}
+    <div class="grid sm:grid-cols-2 gap-4">
+      <a href="/omi/mts" class="block bg-slate-950 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-5 transition shadow-xl">
+        <div class="text-2xl mb-2">🏫</div><h2 class="font-black text-white">TINGKAT MTs</h2><p class="text-xs text-slate-400 mt-1">Sederajat SMP • 4 pilihan jawaban</p>
+      </a>
+      <a href="/omi/ma" class="block bg-slate-950 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-5 transition shadow-xl">
+        <div class="text-2xl mb-2">🏛️</div><h2 class="font-black text-white">TINGKAT MA</h2><p class="text-xs text-slate-400 mt-1">Sederajat SMA • 5 pilihan jawaban</p>
+      </a>
+    </div>
+    <div class="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 text-xs text-slate-300 leading-relaxed">
+      <p class="font-bold text-emerald-400 mb-1">RoboMANTAP OMI</p>
+      <p>10 soal pilihan ganda terintegrasi per sesi. Skoring latihan: benar <b>+4</b>, salah <b>-1</b>, kosong <b>0</b>.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

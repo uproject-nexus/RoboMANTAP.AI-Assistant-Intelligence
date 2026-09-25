@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+    <title>{% block title %}OMI CBT - RoboMANTAP{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <style>
+        * { -webkit-user-select:none !important; -moz-user-select:none !important; -ms-user-select:none !important; user-select:none !important; -webkit-touch-callout:none !important; }
+        input, textarea, select { user-select:text !important; -webkit-user-select:text !important; }
+        .katex, .katex-html { text-align:left !important; text-justify:none !important; white-space:nowrap !important; display:inline-block !important; }
+        .katex-display { text-align:center !important; display:block !important; white-space:normal !important; }
+        .htmx-indicator { display:none; }
+        .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { display:flex !important; }
+        #question-box { min-height:260px; }
+        .option-card { transition: all .15s ease; }
+        .option-card:hover { transform: translateY(-1px); }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased">
+{% block body %}{% endblock %}
+<script>
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('copy', e => e.preventDefault());
+    document.addEventListener('cut', e => e.preventDefault());
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && ['c','v','a','u','s','p'].includes(e.key.toLowerCase())) e.preventDefault();
+        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['i','j','c'].includes(e.key.toLowerCase()))) e.preventDefault();
+    });
+    function triggerKaTeX(target) {
+        const container = target || document.body;
+        if (window.renderMathInElement && container) {
+            renderMathInElement(container, {
+                delimiters: [
+                    {left:'$$', right:'$$', display:true},
+                    {left:'$', right:'$', display:false}
+                ],
+                throwOnError:false
+            });
+        }
+    }
+    document.body.addEventListener('htmx:afterSettle', function(evt) { triggerKaTeX(evt.detail.target); });
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
