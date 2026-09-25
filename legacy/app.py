@@ -1619,10 +1619,35 @@ if st.session_state.page == "landing":
         """, unsafe_allow_html=True)
         omi_base_url = os.getenv("ROBO_CBT_URL", "https://robomantap-intelligence-cbt.onrender.com").rstrip("/")
         st.markdown(
-            f'<a href="{omi_base_url}/omi/mts" target="_blank" style="text-decoration:none; display:block;">'
-            f'<div style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#020617;padding:12px 18px;border-radius:12px;text-align:center;font-weight:800;font-size:14px;letter-spacing: 0.5px;">Masuk Modul MTs ➔</div></a>',
+
+        st.markdown(
+            f"""
+            <a href="{omi_base_url}/omi/mts" target="_blank" style="text-decoration: none;">
+                <div style="
+                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                    color: #020617;
+                    padding: 12px 18px;
+                    border-radius: 12px;
+                    text-align: center;
+                    font-weight: 800;
+                    font-size: 15px;
+                    letter-spacing: 0.5px;
+                    transition: all 0.3s ease;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    margin-top: 8px;
+                    margin-bottom: 20px;
+                    cursor: pointer;
+                ">
+                    MASUK MODUL MTs →
+                </div>
+            </a>
+            """,
             unsafe_allow_html=True,
         )
+
 
     with col2:
         st.markdown("""
