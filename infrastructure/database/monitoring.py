@@ -19,7 +19,7 @@ def update_progress_siswa(
     user_answers_dict: dict = None,
     quiz_data_list: list = None,
     anti_cheat: dict = None,
-    session_mode: str | None = None,
+    session_type: str | None = None
 ):
     """
     Menyimpan progress CBT dengan proteksi state final.
@@ -77,6 +77,17 @@ def update_progress_siswa(
 
     effective_anti_cheat = anti_cheat if isinstance(anti_cheat, dict) else existing_anti_cheat
 
+    # Keep an explicit source marker inside the existing JSONB payload.
+    # This requires no schema migration and lets the teacher Live Monitoring
+    # distinguish OMI from other CBT flows without guessing from mapel names.
+    existing_session_type = None
+    try:
+        if isinstance(raw_existing, dict):
+            existing_session_type = raw_existing.get("session_type")
+    except Exception:
+        existing_session_type = None
+    effective_session_type = session_type or existing_session_type
+
     # Payload JSONB.
     # Tanpa metadata tambahan, format list lama tetap dipertahankan untuk kompatibilitas.
     if user_answers_dict is not None or quiz_data_list is not None or effective_anti_cheat is not None:
@@ -88,9 +99,8 @@ def update_progress_siswa(
 
         if effective_anti_cheat is not None:
             payload["anti_cheat"] = effective_anti_cheat
-
-        if session_mode:
-            payload["session_mode"] = str(session_mode).strip().upper()
+        if effective_session_type:
+            payload["session_type"] = str(effective_session_type)
 
         detail_json = json.dumps(payload, default=str)
     else:
