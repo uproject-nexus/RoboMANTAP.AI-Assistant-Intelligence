@@ -28,14 +28,31 @@
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
       <div class="mb-4"><h2 class="text-sm font-black text-white">📖 Pembahasan Rinci</h2><p class="text-[10px] text-slate-500 mt-1">Klik pembahasan pada setiap soal untuk meminta RoboMANTAP menjelaskan langkah penyelesaiannya.</p></div>
       <div class="space-y-3">
-      {% for q in quiz %}
+      {% for q in display_quiz %}
+        {% set raw_q = quiz[loop.index0] %}
         {% set u = answers.get(loop.index0) %}
-        {% set correct = u == q.correct_answer %}
+        {% set correct = u == raw_q.correct_answer %}
         <article class="bg-slate-950 border border-slate-800 rounded-xl p-4">
-          <div class="flex items-center justify-between gap-2 mb-3"><span class="text-[10px] font-bold uppercase tracking-wider {% if not u %}text-amber-400{% elif correct %}text-emerald-400{% else %}text-rose-400{% endif %}">Soal {{ loop.index }} • {% if not u %}KOSONG{% elif correct %}BENAR{% else %}SALAH{% endif %}</span><span class="text-[10px] text-slate-500">Jawaban: {{ u or 'Tidak dijawab' }}</span></div>
-          <div class="text-sm text-slate-200 leading-relaxed overflow-x-auto">{{ q.question|safe }}</div>
-          <div class="mt-3 grid sm:grid-cols-2 gap-2">{% for opt in q.options %}<div class="text-xs p-2.5 rounded-lg border {% if opt == q.correct_answer %}bg-emerald-500/10 border-emerald-500/30 text-emerald-300{% elif opt == u %}bg-rose-500/10 border-rose-500/30 text-rose-300{% else %}bg-slate-900 border-slate-800 text-slate-400{% endif %}">{{ opt|safe }}</div>{% endfor %}</div>
-          <div class="mt-3 flex items-center gap-2"><span class="text-[10px] text-slate-500">Kunci: <b class="text-emerald-400">{{ q.correct_answer }}</b></span><button hx-post="/omi/api/session/{{ session_id }}/solution/{{ loop.index0 }}" hx-target="#solution-{{ loop.index0 }}" hx-swap="innerHTML" hx-indicator="#solution-loading-{{ loop.index0 }}" class="ml-auto bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 text-[10px] font-bold px-3 py-2 rounded-lg"><span class="solution-normal">Tampilkan Pembahasan</span><span id="solution-loading-{{ loop.index0 }}" class="htmx-indicator">⏳ RoboMANTAP sedang menjelaskan...</span></button></div>
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <span class="text-[10px] font-bold uppercase tracking-wider {% if not u %}text-amber-400{% elif correct %}text-emerald-400{% else %}text-rose-400{% endif %}">Soal {{ loop.index }} • {% if not u %}KOSONG{% elif correct %}BENAR{% else %}SALAH{% endif %}</span>
+            <span class="text-[10px] text-slate-500">Jawaban: {% if u %}{{ display_answers.get(loop.index0, 'Tidak dijawab')|safe }}{% else %}Tidak dijawab{% endif %}</span>
+          </div>
+
+          <div class="text-sm text-slate-200 leading-relaxed overflow-x-auto omi-result-math">{{ q.display_question|safe }}</div>
+
+          <div class="mt-3 grid sm:grid-cols-2 gap-2">
+            {% for opt in q.display_options %}
+              <div class="text-xs p-2.5 rounded-lg border {% if loop.index0 < raw_q.options|length and raw_q.options[loop.index0] == raw_q.correct_answer %}bg-emerald-500/10 border-emerald-500/30 text-emerald-300{% elif loop.index0 < raw_q.options|length and raw_q.options[loop.index0] == u %}bg-rose-500/10 border-rose-500/30 text-rose-300{% else %}bg-slate-900 border-slate-800 text-slate-400{% endif %} omi-result-math">{{ opt|safe }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="mt-3 flex items-center gap-2">
+            <span class="text-[10px] text-slate-500">Kunci: <b class="text-emerald-400 omi-result-math">{{ q.display_correct_answer|safe }}</b></span>
+            <button hx-post="/omi/api/session/{{ session_id }}/solution/{{ loop.index0 }}" hx-target="#solution-{{ loop.index0 }}" hx-swap="innerHTML" hx-indicator="#solution-loading-{{ loop.index0 }}" class="ml-auto bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 text-[10px] font-bold px-3 py-2 rounded-lg">
+              <span class="solution-normal">Tampilkan Pembahasan</span>
+              <span id="solution-loading-{{ loop.index0 }}" class="htmx-indicator">⏳ RoboMANTAP sedang menjelaskan...</span>
+            </button>
+          </div>
           <div id="solution-{{ loop.index0 }}"></div>
         </article>
       {% endfor %}
@@ -43,4 +60,16 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  triggerKaTeX(document.getElementById('question-box') || document.body);
+  document.querySelectorAll('.omi-result-math').forEach(function(el){ triggerKaTeX(el); });
+});
+document.body.addEventListener('htmx:afterSettle', function(evt){
+  if(evt.detail && evt.detail.target){ triggerKaTeX(evt.detail.target); }
+});
+</script>
 {% endblock %}

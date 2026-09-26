@@ -38,23 +38,30 @@ def _detail(quiz: list[dict], answers: dict) -> list[bool | None]:
     return out
 
 
-def _persist(sess: dict, status: str = "BERJALAN") -> bool:
-    """Mirror the current OMI state to the shared monitoring table."""
+def _persist(sess: dict, status: str = "BERJALAN", include_payload: bool = True) -> bool:
+    """Mirror OMI state to the shared monitoring table.
+
+    ``include_payload=False`` is used for the very first write so the
+    monitoring row exists immediately, even before the larger quiz payload is
+    serialized. Subsequent writes include the full question/answer payload.
+    """
     try:
-        return bool(update_progress_siswa(
-            session_id=sess["session_id"],
-            nama=sess["nama"],
-            jenjang=normalize_jenjang(sess["jenjang"]),
-            mapel=sess["mapel"],
-            soal_sekarang=int(sess.get("current_index", 0)) + 1,
-            detail_jawaban=_detail(sess["quiz"], sess.get("answers", {})),
-            status=status,
-            is_custom=False,
-            user_answers_dict=dict(sess.get("answers", {})),
-            quiz_data_list=list(sess.get("quiz", [])),
-            anti_cheat=dict(sess.get("anti_cheat", {})),
-            session_type=SESSION_TYPE,
-        ))
+        kwargs = {
+            "session_id": sess["session_id"],
+            "nama": sess["nama"],
+            "jenjang": normalize_jenjang(sess["jenjang"]),
+            "mapel": sess["mapel"],
+            "soal_sekarang": int(sess.get("current_index", 0)) + 1,
+            "detail_jawaban": _detail(sess["quiz"], sess.get("answers", {})),
+            "status": status,
+            "is_custom": False,
+            "anti_cheat": dict(sess.get("anti_cheat", {})),
+            "session_type": SESSION_TYPE,
+        }
+        if include_payload:
+            kwargs["user_answers_dict"] = dict(sess.get("answers", {}))
+            kwargs["quiz_data_list"] = list(sess.get("quiz", []))
+        return bool(update_progress_siswa(**kwargs))
     except Exception as exc:
         print(f"[OMI DB WARN] {exc}")
         return False
@@ -78,7 +85,13 @@ def create_session(*, nama: str, jenjang: str, mapel: str, stage: str, selected_
         "anti_cheat": {"detected": False, "reason": "", "violation_count": 0, "max_violations": MAX_ANTI_CHEAT},
     }
     SESSIONS[session_id] = sess
-    _persist(sess, "BERJALAN")
+
+    # 1) Buat row monitoring secepat mungkin dengan payload ringan.
+    # 2) Lanjutkan dengan payload lengkap agar review/result tetap punya data.
+    created = _persist(sess, "BERJALAN", include_payload=False)
+    if not created:
+        print("[OMI DB WARN] Initial monitoring row gagal dibuat.")
+    _persist(sess, "BERJALAN", include_payload=True)
     return sess
 
 

@@ -5,6 +5,7 @@ from infrastructure.ai.omi import generate_omi_quiz_batch, get_omi_hint_stream, 
 from .config import QUESTION_COUNT, STAGES, normalize_jenjang, validate_subject
 from .scoring import score_answers
 from .session import create_session, get_session, mark_finished, public_quiz
+from .math import display_math_html
 
 
 def validate_start(nama: str, jenjang: str, mapel: str, stage: str, selected_submateri: list[str]) -> tuple[bool, str]:
@@ -41,8 +42,29 @@ def result_for(session_id: str) -> dict | None:
     sess = get_session(session_id)
     if not sess:
         return None
-    score = score_answers(sess.get("quiz", []), sess.get("answers", {}))
-    return {"sess": sess, **score, "nama": sess.get("nama", "Santri MANTAP").split()[0]}
+    raw_quiz = sess.get("quiz", [])
+    raw_answers = sess.get("answers", {})
+    score = score_answers(raw_quiz, raw_answers)
+
+    # Display-only copy. Scoring always continues to use raw_quiz/raw_answers.
+    display_quiz = []
+    display_answers = {}
+    for idx, item in enumerate(raw_quiz):
+        copied = dict(item)
+        copied["display_question"] = display_math_html(item.get("question", ""))
+        copied["display_options"] = [display_math_html(x) for x in (item.get("options", []) or [])]
+        copied["display_correct_answer"] = display_math_html(item.get("correct_answer", ""))
+        display_quiz.append(copied)
+        ans = raw_answers.get(idx, raw_answers.get(str(idx)))
+        if ans is not None:
+            display_answers[idx] = display_math_html(ans)
+
+    return {
+        "sess": sess, **score,
+        "nama": sess.get("nama", "Santri MANTAP").split()[0],
+        "display_quiz": display_quiz,
+        "display_answers": display_answers,
+    }
 
 
 def submit(session_id: str) -> dict | None:

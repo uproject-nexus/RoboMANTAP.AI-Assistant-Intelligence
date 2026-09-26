@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from features.omi.domain.config import KISI_KISI_OMI, STAGES, normalize_jenjang, subjects_for_jenjang, validate_subject
 from features.omi.domain.service import result_for, solution_for, start_omi, hint_for
 from features.omi.domain.session import anti_cheat, get_session, heartbeat, save_answer, public_quiz
+from features.omi.domain.math import display_math_html
 
 router = APIRouter(prefix="/omi", tags=["OMI CBT"])
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "web" / "templates"
@@ -174,6 +175,8 @@ def omi_result(request: Request, session_id: str):
             "session_id": session_id,
             "quiz": sess.get("quiz", []),
             "answers": sess.get("answers", {}),
+            "display_quiz": result.get("display_quiz", []),
+            "display_answers": result.get("display_answers", {}),
             "jenjang": sess.get("jenjang"),
             "mapel": sess.get("mapel"),
             "stage": sess.get("stage", "Internal"),
@@ -185,8 +188,8 @@ def omi_result(request: Request, session_id: str):
 @router.post("/api/session/{session_id}/solution/{q_index}", response_class=HTMLResponse)
 def omi_solution(session_id: str, q_index: int):
     text = solution_for(session_id, q_index)
-    safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    return HTMLResponse(content=f'<div class="mt-3 bg-slate-950 border border-emerald-500/20 rounded-xl p-4 text-xs text-slate-300 leading-relaxed"><div class="font-bold text-emerald-400 mb-2">🧕🏼 Pembahasan dari RoboMANTAP:</div><div>{safe}</div></div>')
+    safe = display_math_html(text)
+    return HTMLResponse(content=f'<div class="mt-3 bg-slate-950 border border-emerald-500/20 rounded-xl p-4 text-xs text-slate-300 leading-relaxed"><div class="font-bold text-emerald-400 mb-2">🧕🏼 Pembahasan dari RoboMANTAP:</div><div class="omi-result-math">{safe}</div></div>')
 
 
 @router.get("/{jenjang}", response_class=HTMLResponse)
