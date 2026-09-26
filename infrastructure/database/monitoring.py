@@ -50,6 +50,7 @@ def update_progress_siswa(
 
     # Ambil metadata anti-cheat sebelumnya agar tidak hilang karena save-answer biasa.
     existing_anti_cheat = None
+    raw_existing = None
     try:
         with conn.session as s:
             existing = s.execute(
@@ -90,7 +91,7 @@ def update_progress_siswa(
 
     # Payload JSONB.
     # Tanpa metadata tambahan, format list lama tetap dipertahankan untuk kompatibilitas.
-    if user_answers_dict is not None or quiz_data_list is not None or effective_anti_cheat is not None:
+    if user_answers_dict is not None or quiz_data_list is not None or effective_anti_cheat is not None or effective_session_type is not None:
         payload = {
             "detail_boolean": detail_jawaban,
             "user_answers": user_answers_dict or {},
