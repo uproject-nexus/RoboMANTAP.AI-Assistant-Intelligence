@@ -125,8 +125,9 @@ def omi_answer(session_id: str, q_index: int = Form(...), answer: str = Form(...
 
 
 @router.post("/api/session/{session_id}/heartbeat")
-def omi_heartbeat(session_id: str):
-    return HTMLResponse(content="", status_code=heartbeat(session_id))
+def omi_heartbeat(session_id: str, q_index: int = Form(-1)):
+    current_index = None if q_index < 0 else q_index
+    return HTMLResponse(content="", status_code=heartbeat(session_id, current_index))
 
 
 @router.post("/api/session/{session_id}/anti-cheat")

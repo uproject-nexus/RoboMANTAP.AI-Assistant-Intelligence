@@ -9,7 +9,10 @@
       <h1 class="text-xl sm:text-2xl font-black text-white mt-1">{{ mapel }}</h1>
       <p class="text-xs text-slate-400 mt-1">{{ jenjang }} • Latihan 10 soal</p>
     </div>
-    {% include "setup_form.html" %}
+
+    <div id="omi-start-shell">
+      {% include "setup_form.html" %}
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -21,38 +24,32 @@ function toggleAllSubmateri(){
   xs.forEach(x=>x.checked=!all);
 }
 
-function setOmiStartLoading(form, loading){
-  const button=document.getElementById('omi-start-button');
-  const normal=document.getElementById('omi-start-normal');
-  const indicator=document.getElementById('omi-start-indicator');
-  const status=document.getElementById('omi-start-status');
-  if(!button) return;
-
-  button.disabled=loading;
-  if(normal) normal.classList.toggle('hidden', loading);
-  if(indicator){
-    indicator.classList.toggle('hidden', !loading);
-    indicator.classList.toggle('flex', loading);
+// Prevent accidental double-submit even if the browser is slow to paint.
+document.addEventListener('htmx:beforeRequest', function(evt){
+  const form = evt.detail.elt;
+  if (!form || form.id !== 'omi-start-form') return;
+  const button = document.getElementById('omi-start-button');
+  if (button) {
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
   }
-  if(status){
-    status.textContent=loading
-      ? '🤖 RoboMANTAP sedang membuat 10 soal OMI dengan AI. Mohon tunggu, jangan klik lagi.'
-      : 'RoboMANTAP akan menyiapkan 10 soal AI. Jangan menekan tombol berulang kali.';
-    status.className=loading
-      ? 'text-center text-[10px] text-emerald-400 font-medium animate-pulse'
-      : 'text-center text-[10px] text-slate-500';
-  }
-}
-
-document.body.addEventListener('htmx:beforeRequest', function(evt){
-  if(evt.detail && evt.detail.elt && evt.detail.elt.id==='omi-start-form'){
-    setOmiStartLoading(evt.detail.elt, true);
+  const status = document.getElementById('omi-start-status');
+  if (status) {
+    status.textContent = '🤖 RoboMANTAP sedang membuat 10 soal OMI dengan AI. Mohon tunggu, jangan klik lagi.';
+    status.className = 'text-center text-[10px] text-emerald-400 font-medium animate-pulse';
   }
 });
 
-document.body.addEventListener('htmx:afterRequest', function(evt){
-  if(evt.detail && evt.detail.elt && evt.detail.elt.id==='omi-start-form' && !evt.detail.successful){
-    setOmiStartLoading(evt.detail.elt, false);
+document.addEventListener('htmx:afterRequest', function(evt){
+  const form = evt.detail.elt;
+  if (!form || form.id !== 'omi-start-form') return;
+  // On success HX-Redirect takes over. Re-enable only on an actual failure.
+  if (!evt.detail.successful) {
+    const button = document.getElementById('omi-start-button');
+    if (button) {
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+    }
   }
 });
 </script>

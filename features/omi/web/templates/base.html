@@ -19,6 +19,9 @@
         #question-box { min-height:260px; }
         .option-card { transition: all .15s ease; }
         .option-card:hover { transform: translateY(-1px); }
+        #omi-start-form.htmx-request #omi-start-normal { display:none !important; }
+        #omi-start-form.htmx-request #omi-start-indicator { display:inline-flex !important; }
+        .htmx-request .solution-normal { display:none !important; }
     </style>
     {% block head %}{% endblock %}
 </head>

@@ -1,8 +1,9 @@
 """OMI session state and persistence boundary.
 
 Active sessions are kept in memory for fast interaction and mirrored to the
-existing ``sesi_ujian`` table. The existing table/schema is intentionally
-reused; no database migration is required for this OMI move.
+existing ``sesi_ujian`` table. The OMI session also carries an explicit
+``session_type=OMI`` marker so the existing teacher Live Monitoring can
+recognise the session without guessing from the subject name.
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from .config import normalize_jenjang
 
 SESSIONS: dict[str, dict[str, Any]] = {}
 MAX_ANTI_CHEAT = 3
+SESSION_TYPE = "OMI"
 
 
 def _now() -> datetime:
@@ -36,9 +38,10 @@ def _detail(quiz: list[dict], answers: dict) -> list[bool | None]:
     return out
 
 
-def _persist(sess: dict, status: str = "BERJALAN") -> None:
+def _persist(sess: dict, status: str = "BERJALAN") -> bool:
+    """Mirror the current OMI state to the shared monitoring table."""
     try:
-        update_progress_siswa(
+        return bool(update_progress_siswa(
             session_id=sess["session_id"],
             nama=sess["nama"],
             jenjang=normalize_jenjang(sess["jenjang"]),
@@ -50,16 +53,18 @@ def _persist(sess: dict, status: str = "BERJALAN") -> None:
             user_answers_dict=dict(sess.get("answers", {})),
             quiz_data_list=list(sess.get("quiz", [])),
             anti_cheat=dict(sess.get("anti_cheat", {})),
-            session_mode="OMI",
-        )
+            session_type=SESSION_TYPE,
+        ))
     except Exception as exc:
         print(f"[OMI DB WARN] {exc}")
+        return False
 
 
 def create_session(*, nama: str, jenjang: str, mapel: str, stage: str, selected_submateri: list[str], quiz: list[dict]) -> dict:
     session_id = str(uuid.uuid4())
     sess = {
         "session_id": session_id,
+        "session_type": SESSION_TYPE,
         "nama": nama.strip(),
         "jenjang": normalize_jenjang(jenjang),
         "mapel": mapel,
@@ -104,15 +109,20 @@ def _load_from_db(session_id: str) -> dict | None:
         except Exception:
             start_time = _now()
         sess = {
-            "session_id": row[0], "nama": row[1] or "Siswa", "jenjang": row[2] or "MA",
-            "mapel": row[3] or "OMI", "stage": raw.get("stage", "Internal"),
+            "session_id": row[0],
+            "session_type": raw.get("session_type", SESSION_TYPE),
+            "nama": row[1] or "Siswa",
+            "jenjang": row[2] or "MA",
+            "mapel": row[3] or "OMI",
+            "stage": raw.get("stage", "Internal"),
             "selected_submateri": raw.get("selected_submateri", []) if isinstance(raw.get("selected_submateri", []), list) else [],
-            "quiz": quiz, "answers": {int(k) if str(k).isdigit() else k: v for k, v in answers.items()},
-            "current_index": max(0, int(row[4] or 1) - 1), "start_time": start_time or _now(),
-            "finished": str(row[6] or "").upper() == "SELESAI", "anti_cheat": anti,
-            "session_mode": str(raw.get("session_mode", "OMI") or "OMI").upper(),
+            "quiz": quiz,
+            "answers": {int(k) if str(k).isdigit() else k: v for k, v in answers.items()},
+            "current_index": max(0, int(row[4] or 1) - 1),
+            "start_time": start_time or _now(),
+            "finished": str(row[6] or "").upper() == "SELESAI",
+            "anti_cheat": anti,
         }
-        # Older payloads may not contain OMI metadata. It is safe to use defaults.
         SESSIONS[session_id] = sess
         return sess
     except Exception as exc:
@@ -142,12 +152,26 @@ def save_answer(session_id: str, q_index: int, answer: str) -> dict:
     return {"ok": True, "status": 200, "message": "Jawaban tersimpan."}
 
 
-def heartbeat(session_id: str) -> int:
+def heartbeat(session_id: str, current_index: int | None = None) -> int:
+    """Keep monitoring fresh and persist the current question position.
+
+    Persisting the position here matters for OMI because a student can move to
+    another question without selecting an answer. The teacher dashboard should
+    still see that movement in real time.
+    """
     sess = get_session(session_id)
     if not sess:
         return 404
     if sess.get("finished"):
         return 204
+    if current_index is not None:
+        try:
+            idx = max(0, min(int(current_index), max(0, len(sess.get("quiz", [])) - 1)))
+            sess["current_index"] = idx
+            _persist(sess, "BERJALAN")
+            return 204
+        except Exception as exc:
+            print(f"[OMI HEARTBEAT PERSIST WARN] {exc}")
     try:
         touch_session_heartbeat(session_id)
     except Exception as exc:
