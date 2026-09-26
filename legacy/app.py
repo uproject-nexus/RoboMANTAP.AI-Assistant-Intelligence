@@ -1823,12 +1823,14 @@ elif st.session_state.page == "guru_dashboard":
             anti_cheat = {}
             user_answers = {}
             quiz_data = []
+            session_type = ""
 
             if isinstance(raw_detail, dict):
                 detail_boolean = raw_detail.get("detail_boolean", [])
                 user_answers = raw_detail.get("user_answers", {}) or {}
                 quiz_data = raw_detail.get("quiz_data", []) or []
                 anti_cheat = raw_detail.get("anti_cheat", {}) or {}
+                session_type = str(raw_detail.get("session_type", "") or "").upper()
             elif isinstance(raw_detail, list):
                 detail_boolean = raw_detail
             else:
@@ -1840,7 +1842,7 @@ elif st.session_state.page == "guru_dashboard":
             if not isinstance(anti_cheat, dict):
                 anti_cheat = {}
 
-            return detail_boolean, user_answers, quiz_data, anti_cheat
+            return detail_boolean, user_answers, quiz_data, anti_cheat, session_type
 
         def render_progress_bar_html(detail_list, current_index=None):
             if not isinstance(detail_list, list) or len(detail_list) == 0:
@@ -2143,7 +2145,7 @@ elif st.session_state.page == "guru_dashboard":
 
                 tracking_rows = []
                 for _, row in df.iterrows():
-                    _, _, _, anti_meta = parse_tracking_payload(row["detail_jawaban"])
+                    _, _, _, anti_meta, _session_type = parse_tracking_payload(row["detail_jawaban"])
                     count = max(0, int(anti_meta.get("violation_count", 0) or 0))
                     detected = bool(anti_meta.get("detected", False))
 
@@ -2219,7 +2221,7 @@ elif st.session_state.page == "guru_dashboard":
                     mapel_label = html.escape(str(row["mapel"]))
                     jenjang_label = html.escape(str(row["jenjang"] or "")[:10])
 
-                    detail_boolean, user_answers, quiz_data, anti_meta = parse_tracking_payload(
+                    detail_boolean, user_answers, quiz_data, anti_meta, session_type = parse_tracking_payload(
                         row["detail_jawaban"]
                     )
                     session_source = ""
