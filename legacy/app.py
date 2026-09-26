@@ -1932,31 +1932,24 @@ elif st.session_state.page == "guru_dashboard":
                 val_aktif = len(df[df['status_real'] == 'BERJALAN'])
                 val_selesai = len(df[df['status_real'] == 'SELESAI'])
                 
-                # Logika pemisah sesi.
-                # OMI HTMX menulis session_mode=OMI ke payload sehingga Live Monitoring
-                # tidak perlu menebak jenis sesi dari nama mapel atau jumlah soal.
+                # Logika Pemisah Pintar: Cek kata '(Custom)' ATAU jumlah kotak soal != 10
                 def check_is_custom(row):
-                    mapel_str = str(row['mapel'])
+                    # OMI now writes an explicit session_type marker. Respect it
+                    # before the historical heuristic so OMI is never treated as
+                    # a custom quiz merely because its payload evolves later.
                     try:
                         detail = row['detail_jawaban']
                         if isinstance(detail, str):
                             detail = json.loads(detail)
-                        if isinstance(detail, dict):
-                            session_mode = str(detail.get("session_mode", "") or "").strip().upper()
-                            if session_mode == "OMI":
-                                return False
-                            if session_mode in {"QUIZ_CUSTOM", "CUSTOM"}:
-                                return True
+                        if isinstance(detail, dict) and str(detail.get('session_type', '')).upper() == 'OMI':
+                            return False
                     except Exception:
                         pass
 
-                    # Compatibility untuk data lama yang belum memiliki session_mode.
+                    mapel_str = str(row['mapel'])
                     if "custom" in mapel_str.lower() or "kuis" in mapel_str.lower() or "quiz" in mapel_str.lower():
                         return True
                     try:
-                        detail = row['detail_jawaban']
-                        if isinstance(detail, str):
-                            detail = json.loads(detail)
                         if isinstance(detail, list) and len(detail) > 0 and len(detail) != 10:
                             return True
                     except Exception:
@@ -2229,6 +2222,15 @@ elif st.session_state.page == "guru_dashboard":
                     detail_boolean, user_answers, quiz_data, anti_meta = parse_tracking_payload(
                         row["detail_jawaban"]
                     )
+                    session_source = ""
+                    try:
+                        raw_tracking = row["detail_jawaban"]
+                        if isinstance(raw_tracking, str):
+                            raw_tracking = json.loads(raw_tracking)
+                        if isinstance(raw_tracking, dict) and str(raw_tracking.get("session_type", "")).upper() == "OMI":
+                            session_source = "🏆 OMI · "
+                    except Exception:
+                        session_source = ""
 
                     total_soal = len(detail_boolean)
                     if not total_soal:
@@ -2333,7 +2335,7 @@ elif st.session_state.page == "guru_dashboard":
                                         <span class="upn-live-tag {status_class}">{status_badge}</span>
                                     </div>
                                     <div class="upn-live-sub">
-                                        {mapel_label} · {jenjang_label} · {html.escape(percobaan_text)}
+                                        {html.escape(session_source)}{mapel_label} · {jenjang_label} · {html.escape(percobaan_text)}
                                     </div>
                                 </div>
                                 <div class="upn-live-score">
