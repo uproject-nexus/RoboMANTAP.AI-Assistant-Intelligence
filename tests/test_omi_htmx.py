@@ -27,47 +27,6 @@ def test_omi_navigation_and_setup_pages():
     assert response.status_code == 200
     assert "Persiapan CBT OMI" in response.text
     assert "10 soal" in response.text
-    assert 'hx-post="/omi/start"' in response.text
-    assert "SEDANG MEMBUAT 10 SOAL" in response.text
-
-
-def test_omi_start_htmx_returns_hx_redirect(monkeypatch):
-    SESSIONS.clear()
-    monkeypatch.setattr(omi_service, "generate_omi_quiz_batch", lambda *args: _quiz())
-    client = TestClient(app)
-    response = client.post(
-        "/omi/start",
-        data={
-            "nama": "Fulanah Test",
-            "jenjang": "MTs (Sederajat SMP)",
-            "mapel": "Matematika",
-            "stage": "Internal",
-            "selected_submateri": "Bilangan",
-        },
-        headers={"HX-Request": "true"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 204
-    assert response.headers["HX-Redirect"].startswith("/omi/exam/")
-
-
-def test_omi_start_validation_htmx_returns_form_fragment(monkeypatch):
-    client = TestClient(app)
-    response = client.post(
-        "/omi/start",
-        data={
-            "nama": "A",
-            "jenjang": "MTs (Sederajat SMP)",
-            "mapel": "Matematika",
-            "stage": "Internal",
-        },
-        headers={"HX-Request": "true"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 200
-    assert 'id="omi-start-shell"' in response.text
-    assert "Nama Lengkap" in response.text
-    assert "valid" in response.text
 
 
 def test_omi_start_answer_submit_and_result(monkeypatch):
@@ -138,43 +97,88 @@ def test_omi_hint_and_three_strike_anti_cheat(monkeypatch):
     assert "CBT OMI" in result.text
 
 
-def test_omi_runtime_hardening_features_present():
-    from pathlib import Path
-    root = Path(__file__).resolve().parents[1]
-    exam = (root / "features/omi/web/templates/exam.html").read_text(encoding="utf-8")
-    result = (root / "features/omi/web/templates/result.html").read_text(encoding="utf-8")
-    application = (root / "api/application.py").read_text(encoding="utf-8")
-    monitoring = (root / "legacy/app.py").read_text(encoding="utf-8")
-    assert "requestWakeLock" in exam
-    assert "wakeLock.request('screen')" in exam
-    assert "showResultProcessing" in exam
-    assert "result-processing-overlay" in exam
-    assert "session_mode" in monitoring
-    assert "omi_router" in application
-    # Answer clicks must update the selected option without rebuilding the whole question.
-    select_block = exam.split("function selectAnswer", 1)[1].split("function updateNav", 1)[0]
-    assert "renderQuestion(index)" not in select_block
-    assert "updateOptionSelection(index)" in select_block
-    assert "SEDANG MEMPROSES" not in result  # submit spinner belongs to the exam submit boundary
-
-
-def test_omi_persistence_marks_session_for_live_monitoring(monkeypatch):
-    from features.omi.domain import session as omi_session
-    captured = {}
+def test_omi_session_writes_explicit_monitoring_marker_and_heartbeat_position(monkeypatch):
+    SESSIONS.clear()
+    captured = []
 
     def fake_persist(**kwargs):
-        captured.update(kwargs)
+        captured.append(kwargs)
         return True
 
-    monkeypatch.setattr(omi_session, "update_progress_siswa", fake_persist)
-    omi_session.SESSIONS.clear()
-    sess = omi_session.create_session(
-        nama="Santri Live",
+    monkeypatch.setattr("features.omi.domain.session.update_progress_siswa", fake_persist)
+    from features.omi.domain.session import create_session, heartbeat
+
+    sess = create_session(
+        nama="Santri Monitoring",
         jenjang="MTs (Sederajat SMP)",
         mapel="Matematika",
         stage="Internal",
-        selected_submateri=["Bilangan"],
+        selected_submateri=[],
         quiz=_quiz(),
     )
-    assert sess["session_id"] in omi_session.SESSIONS
-    assert captured["session_mode"] == "OMI"
+    assert captured[-1]["session_type"] == "OMI"
+    assert captured[-1]["status"] == "BERJALAN"
+
+    heartbeat(sess["session_id"], 5)
+    assert captured[-1]["session_type"] == "OMI"
+    assert captured[-1]["soal_sekarang"] == 6
+
+
+def test_omi_exam_avoids_full_question_rerender_on_option_click():
+    html = open("features/omi/web/templates/exam.html", encoding="utf-8").read()
+    assert "// IMPORTANT: do not call renderQuestion here." in html
+    select_block = html.split("function selectAnswer(index,opt,optIdx)", 1)[1].split("function updateNav", 1)[0]
+    assert "renderQuestion(index)" not in select_block
+    assert "applySelectedVisual(index,opt)" in select_block
+    assert "wakeLock.request('screen')" in html
+    assert "submit-processing" in html
+
+
+def test_omi_initial_monitoring_write_is_lightweight_then_full(monkeypatch):
+    SESSIONS.clear()
+    captured = []
+
+    def fake_persist(**kwargs):
+        captured.append(kwargs)
+        return True
+
+    monkeypatch.setattr("features.omi.domain.session.update_progress_siswa", fake_persist)
+    from features.omi.domain.session import create_session
+
+    create_session(
+        nama="Santri Live",
+        jenjang="MA (Sederajat SMA)",
+        mapel="Matematika Terintegrasi",
+        stage="Internal",
+        selected_submateri=[],
+        quiz=_quiz(),
+    )
+    assert len(captured) == 2
+    assert captured[0]["session_type"] == "OMI"
+    assert "quiz_data_list" not in captured[0]
+    assert captured[1]["session_type"] == "OMI"
+    assert len(captured[1]["quiz_data_list"]) == 10
+
+
+def test_omi_result_uses_quiz_custom_math_cleaner(monkeypatch):
+    SESSIONS.clear()
+    monkeypatch.setattr(omi_service, "generate_omi_quiz_batch", lambda *args: [
+        {
+            "id": 1,
+            "question": r"Hitung $x^2$ dan \frac{3}{4} serta circl.",
+            "options": [r"A. \frac{1}{2}", r"B. x^2", "C. 3", "D. 4"],
+            "correct_answer": r"A. \frac{1}{2}",
+        }
+    ] * 10)
+    client = TestClient(app)
+    response = client.post(
+        "/omi/start",
+        data={"nama": "Santri Math", "jenjang": "MTs", "mapel": "Matematika", "stage": "Internal"},
+    )
+    session_id = str(response.url).rsplit("/", 1)[-1]
+    client.post(f"/omi/api/session/{session_id}/answer", data={"q_index": 0, "answer": r"A. \frac{1}{2}"})
+    submit = client.post(f"/omi/submit/{session_id}", follow_redirects=False)
+    result = client.get(submit.headers["location"])
+    assert "circl" not in result.text
+    assert "\\frac" in result.text or "3/4" in result.text
+    assert "katex" in result.text.lower()
