@@ -2685,10 +2685,12 @@ elif st.session_state.page == "guru_dashboard":
 
             st.markdown("##### 📅 Masa Aktif Kuis")
             st.caption("Atur jam buka dan jam tutup kuis dalam WIB.")
-            now_wib_time = (datetime.utcnow() + timedelta(hours=7)).time()
-            default_end_time = (datetime.utcnow() + timedelta(hours=9)).time()
+            
+            # Penggunaan datetime modern (mencegah DeprecationWarning)
+            now_wib_dt = datetime.now(timezone.utc) + timedelta(hours=7)
+            now_wib_time = now_wib_dt.time()
+            default_end_time = (now_wib_dt + timedelta(hours=2)).time()
 
-            # Menggunakan helper parse_time_val agar tidak crash saat membaca ulang config
             val_start = parse_time_val(custom_cfg.get("time_start_val"), now_wib_time)
             val_end = parse_time_val(custom_cfg.get("time_end_val"), default_end_time)
 
@@ -2706,7 +2708,7 @@ elif st.session_state.page == "guru_dashboard":
             )
 
         if submitted:
-            now_wib = datetime.utcnow() + timedelta(hours=7)
+            now_wib = datetime.now(timezone.utc) + timedelta(hours=7)
             dt_start = datetime.combine(now_wib.date(), time_start)
             dt_end = datetime.combine(now_wib.date(), time_end)
             if dt_end <= dt_start:
@@ -2752,7 +2754,6 @@ elif st.session_state.page == "guru_dashboard":
 
                 if generated:
                     st.session_state.custom_quiz_draft = generated
-                    # FIX: Simpan objek waktu dalam bentuk STRING (%H:%M:%S) agar aman di-serialize ke JSON
                     st.session_state.custom_quiz_config = {
                         "mapel": custom_mapel.strip(),
                         "jenjang": custom_jenjang,
@@ -2784,48 +2785,7 @@ elif st.session_state.page == "guru_dashboard":
                     st.success(f"✅ {len(generated)} soal siap. Draft sudah melewati lapisan validasi AI.")
                 else:
                     st.error("❌ RoboMANTAP belum berhasil menghasilkan paket soal valid. Coba ulangi atau perjelas materi.")
-
-        # --- REVISI BLOK TERBITKAN KUIS SEBAGAI SINKRONISASI AMAN ---
-        if custom_quiz:
-            st.markdown("---")
-            # ... (bagian preview soal) ...
-
-            st.markdown("#### 🚀 Terbitkan Kuis ke Siswa")
-            if "default_quiz_code" not in st.session_state:
-                st.session_state.default_quiz_code = f"MNT-{uuid.uuid4().hex[:4].upper()}"
-            col_pub1, col_pub2 = st.columns([2, 1])
-            with col_pub1:
-                st.text_input(
-                    "🔑 Buat Kode Kuis Unik (opsional)",
-                    value=st.session_state.default_quiz_code,
-                    max_chars=15,
-                    key="user_quiz_code",
-                    help="Contoh: MTK-KLS10",
-                )
-            with col_pub2:
-                st.write("")
-                if st.button("🚀 TERBITKAN KUIS", type="primary", use_container_width=True):
-                    clean_code = st.session_state.user_quiz_code.strip().upper()
-                    if not clean_code:
-                        st.warning("⚠️ Kode kuis tidak boleh kosong.")
-                    else:
-                        try:
-                            packages_5 = create_5_quiz_packages(custom_quiz)
-                            custom_cfg["packages"] = packages_5
-
-                            # SANITASI AMAN: Paksa konversi semua tipe data ke format string/JSON murni
-                            clean_cfg = json.loads(json.dumps(custom_cfg, default=str))
-                            clean_quiz = json.loads(json.dumps(custom_quiz, default=str))
-
-                            if publish_custom_quiz_to_db(clean_code, clean_cfg, clean_quiz):
-                                st.session_state.last_published_code = clean_code
-                                st.session_state.default_quiz_code = f"MNT-{uuid.uuid4().hex[:4].upper()}"
-                                st.success(f"🎉 Kuis diterbitkan. 5 Paket Soal Acak siap digunakan. Kode: **{clean_code}**")
-                            else:
-                                st.error("❌ Gagal menerbitkan kuis. Pastikan koneksi database aktif dan tabel kuis sudah tersedia.")
-                        except Exception as err:
-                            st.error(f"❌ Error Detail: {err}")
-
+                    
         st.markdown("""
         <div class="premium-footer-card">
             <div class="footer-kicker">ROBO MANTAP • U.PROJECT NEXUS</div>
