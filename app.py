@@ -21,7 +21,7 @@ from docx.oxml.ns import nsdecls
 from reportlab.lib import colors
 from reportlab.lib.units import cm
 from reportlab.lib.pagesizes import A4
-from datetime import datetime, timedelta, time zone
+from datetime import datetime, timedelta, timezone
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.enum.text import WD_ALIGN_PARAGRAPH
