@@ -1659,7 +1659,7 @@ if st.session_state.page == "landing":
                 margin-bottom: 20px;
                 cursor: pointer;
             ">
-                🚀 BUKA PORTAL KUIS →
+                🚀 MASUK PORTAL KUIS →
             </div>
         </a>
         """,
@@ -1667,14 +1667,14 @@ if st.session_state.page == "landing":
     )
 
     st.write("---")
-    st.markdown("#### 🧠 Student Intelligence")
+    st.markdown("#### 👥 Portal SantriMANTAP")
     st.markdown("""
     <div class="guru-card" style="background: linear-gradient(135deg, #172554 0%, #312e81 100%); border-color: #6366f1;">
-        <h2 style="margin:0; font-size: 20px;">🧠 My Learning Intelligence</h2>
-        <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Pahami pola belajar, temukan area yang perlu diperkuat, dan tentukan langkah belajar berikutnya.</p>
+        <h2 style="margin:0; font-size: 20px;">🎓 My Learning Intelligence</h2>
+        <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Evaluasi secara mendalam pola belajarmu selama ini, identifikasi secara spesifik materi yang masih lemah dan butuh perbaikan, lalu susun rencana strategis untuk langkah pembelajaran berikutnya</p>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("🧠 Buka Student Intelligence ➔", use_container_width=True, type="primary"):
+    if st.button("Masuk Portal Siswa ➔", use_container_width=True, type="primary"):
         st.session_state.page = "student_intelligence"
         st.rerun()
 
@@ -1695,7 +1695,7 @@ if st.session_state.page == "landing":
 # ==============================================================================
 #=========================================================================================================
 elif st.session_state.page == "student_intelligence":
-    st.markdown("### 🧠 Student Intelligence")
+    st.markdown("### 🎓 Student Intelligence")
     if st.button("⬅️ Kembali ke Beranda", use_container_width=True):
         st.session_state.page = "landing"
         st.rerun()
@@ -2502,7 +2502,7 @@ elif st.session_state.page == "guru_dashboard":
 
         st.markdown("""
         <div class="premium-hero">
-            <div class="premium-kicker">UPN • QUIZ-Intelligence</div>
+            <div class="premium-kicker">UPN • QUIZ-INTELLIGENCE</div>
             <div class="premium-title">🧩 RoboMANTAP <span>Quiz Custom</span></div>
             <div class="premium-subtitle">Susun soal presisi dari topik manual atau langsung dari materi GuruMANTAP yang dilampirkan.</div>
             <div class="premium-pills">
@@ -2686,7 +2686,7 @@ elif st.session_state.page == "guru_dashboard":
             )
 
         if submitted:
-            now_wib = datetime.utcnow() + timedelta(hours=7)
+            now_wib = datetime.now(timezone.utc) + timedelta(hours=7)
             dt_start = datetime.combine(now_wib.date(), time_start)
             dt_end = datetime.combine(now_wib.date(), time_end)
             if dt_end <= dt_start:
@@ -2768,7 +2768,7 @@ elif st.session_state.page == "guru_dashboard":
             source_chip = (
                 f"<span class='chip chip-green'>📚 Source Grounding • {html.escape(custom_cfg.get('material_bundle_code','-'))}</span>"
                 if source_mode == "teacher_material" else
-                "<span class='chip chip-blue'>🧠 Topic Architect • manual</span>"
+                "<span class='chip chip-blue'>🎯 Topic Architect • manual</span>"
             )
             st.markdown(f"""
             <div class="preview-hero">
