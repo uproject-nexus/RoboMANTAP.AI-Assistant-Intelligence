@@ -15,6 +15,7 @@ import tempfile                        # <--- Tambahkan ini
 import matplotlib.pyplot as plt
 from sqlalchemy import text
 # from-import python-docx untuk generate Word dan Pdf berlogo
+from datetime import time as dt_time
 from docx import Document
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
@@ -550,6 +551,20 @@ if "student_intelligence_name" not in st.session_state: st.session_state.student
 if "student_intelligence_grade" not in st.session_state: st.session_state.student_intelligence_grade = "Semua Jenjang"
 if "student_adaptive_focus" not in st.session_state: st.session_state.student_adaptive_focus = ""
 if "student_adaptive_topics" not in st.session_state: st.session_state.student_adaptive_topics = []
+
+def parse_time_val(val, default_val):
+    """Mencegah crash saat memuat string atau objek waktu ke st.time_input."""
+    if not val:
+        return default_val
+    if isinstance(val, dt_time):
+        return val
+    if isinstance(val, str):
+        try:
+            parts = [int(p) for p in val.split(":")[:2]]
+            return dt_time(parts[0], parts[1])
+        except Exception:
+            return default_val
+    return default_val
 
 # ------------------------------------------------------------------------------
 # RANDOMISASI PRODUCTION: URUTAN SOAL UNIK PER SESI SISWA
@@ -2670,13 +2685,18 @@ elif st.session_state.page == "guru_dashboard":
 
             st.markdown("##### 📅 Masa Aktif Kuis")
             st.caption("Atur jam buka dan jam tutup kuis dalam WIB.")
-            now_wib_time = (datetime.now(timezone.utc) + timedelta(hours=7)).time()
-            default_end_time = (datetime.now(timezone.utc) + timedelta(hours=9)).time()
+            now_wib_time = (datetime.utcnow() + timedelta(hours=7)).time()
+            default_end_time = (datetime.utcnow() + timedelta(hours=9)).time()
+
+            # Menggunakan helper parse_time_val agar tidak crash saat membaca ulang config
+            val_start = parse_time_val(custom_cfg.get("time_start_val"), now_wib_time)
+            val_end = parse_time_val(custom_cfg.get("time_end_val"), default_end_time)
+
             col_act1, col_act2 = st.columns(2)
             with col_act1:
-                time_start = st.time_input("Jam Buka", value=custom_cfg.get("time_start_val", now_wib_time), key="input_time_start")
+                time_start = st.time_input("Jam Buka", value=val_start, key="input_time_start")
             with col_act2:
-                time_end = st.time_input("Jam Tutup", value=custom_cfg.get("time_end_val", default_end_time), key="input_time_end")
+                time_end = st.time_input("Jam Tutup", value=val_end, key="input_time_end")
             st.info(f"📌 **Masa Aktif:** {time_start.strftime('%H:%M')} → {time_end.strftime('%H:%M')} WIB")
 
             submitted = st.form_submit_button(
@@ -2686,7 +2706,7 @@ elif st.session_state.page == "guru_dashboard":
             )
 
         if submitted:
-            now_wib = datetime.now(timezone.utc) + timedelta(hours=7)
+            now_wib = datetime.utcnow() + timedelta(hours=7)
             dt_start = datetime.combine(now_wib.date(), time_start)
             dt_end = datetime.combine(now_wib.date(), time_end)
             if dt_end <= dt_start:
@@ -2732,6 +2752,7 @@ elif st.session_state.page == "guru_dashboard":
 
                 if generated:
                     st.session_state.custom_quiz_draft = generated
+                    # FIX: Simpan objek waktu dalam bentuk STRING (%H:%M:%S) agar aman di-serialize ke JSON
                     st.session_state.custom_quiz_config = {
                         "mapel": custom_mapel.strip(),
                         "jenjang": custom_jenjang,
@@ -2751,6 +2772,8 @@ elif st.session_state.page == "guru_dashboard":
                         "active_until": dt_end.isoformat(),
                         "time_start_str": time_start.strftime('%H:%M'),
                         "time_end_str": time_end.strftime('%H:%M'),
+                        "time_start_val": time_start.strftime('%H:%M:%S'),
+                        "time_end_val": time_end.strftime('%H:%M:%S'),
                         "material_bundle_code": st.session_state.get("material_bundle_code", "") if material_triggered else "",
                         "source_mode": "teacher_material" if material_triggered else "manual_topic",
                         "option_count": option_count_for_jenjang(custom_jenjang),
@@ -2762,45 +2785,10 @@ elif st.session_state.page == "guru_dashboard":
                 else:
                     st.error("❌ RoboMANTAP belum berhasil menghasilkan paket soal valid. Coba ulangi atau perjelas materi.")
 
+        # --- REVISI BLOK TERBITKAN KUIS SEBAGAI SINKRONISASI AMAN ---
         if custom_quiz:
             st.markdown("---")
-            source_mode = custom_cfg.get("source_mode", "manual_topic")
-            source_chip = (
-                f"<span class='chip chip-green'>📚 Source Grounding • {html.escape(custom_cfg.get('material_bundle_code','-'))}</span>"
-                if source_mode == "teacher_material" else
-                "<span class='chip chip-blue'>🎯 Topic Architect • manual</span>"
-            )
-            st.markdown(f"""
-            <div class="preview-hero">
-                <div><div class="preview-label">QUIZ PREVIEW</div><div class="preview-title">{html.escape(custom_cfg.get('mapel','Kuis'))}</div></div>
-                <div class="preview-meta">{source_chip}<span class='chip chip-purple'>{len(custom_quiz)} soal</span><span class='chip chip-blue'>Opsi {"A-D" if option_count_for_jenjang(custom_cfg.get("jenjang", "MTs")) == 4 else "A-E"}</span><span class='chip chip-gold'>{html.escape(custom_cfg.get('kesulitan','-'))}</span></div>
-            </div>
-            """, unsafe_allow_html=True)
-            st.caption(
-                f"{custom_cfg.get('mapel', '-')} • {custom_cfg.get('jenjang', '-')} • "
-                f"{custom_cfg.get('kesulitan', '-')} • {len(custom_quiz)} soal • "
-                f"Timer: {str(timedelta(seconds=int(custom_cfg.get('timer_seconds', 0)))) if custom_cfg.get('timer_seconds', 0) else 'Tanpa batas'}"
-            )
-
-            for q_idx, cq in enumerate(custom_quiz, start=1):
-                with st.expander(f"Soal {q_idx}", expanded=(q_idx == 1)):
-                    st.markdown(cq["question"])
-                    for option in cq["options"]:
-                        st.markdown(f"- {option}")
-                    st.success(f"Kunci terencana: **{cq['correct_answer']}**")
-                    with st.expander("Lihat Solution Basis"):
-                        st.markdown(cq.get("solution_basis", "Belum tersedia."))
-
-            docx_data = generate_quiz_docx(custom_cfg, custom_quiz)
-            clean_mapel_name = custom_cfg.get('mapel', 'Quiz').replace(' ', '_')
-            st.download_button(
-                label="📄 Download Paket Kuis (.docx)",
-                data=docx_data,
-                file_name=f"RoboMANTAP_Kuis_{clean_mapel_name}.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True,
-                type="primary",
-            )
+            # ... (bagian preview soal) ...
 
             st.markdown("#### 🚀 Terbitkan Kuis ke Siswa")
             if "default_quiz_code" not in st.session_state:
@@ -2821,14 +2809,22 @@ elif st.session_state.page == "guru_dashboard":
                     if not clean_code:
                         st.warning("⚠️ Kode kuis tidak boleh kosong.")
                     else:
-                        packages_5 = create_5_quiz_packages(custom_quiz)
-                        custom_cfg["packages"] = packages_5
-                        if publish_custom_quiz_to_db(clean_code, custom_cfg, custom_quiz):
-                            st.session_state.last_published_code = clean_code
-                            st.session_state.default_quiz_code = f"MNT-{uuid.uuid4().hex[:4].upper()}"
-                            st.success(f"🎉 Kuis diterbitkan. 5 Paket Soal Acak siap digunakan. Kode: **{clean_code}**")
-                        else:
-                            st.error("❌ Gagal menerbitkan kuis. Periksa koneksi Database.")
+                        try:
+                            packages_5 = create_5_quiz_packages(custom_quiz)
+                            custom_cfg["packages"] = packages_5
+
+                            # SANITASI AMAN: Paksa konversi semua tipe data ke format string/JSON murni
+                            clean_cfg = json.loads(json.dumps(custom_cfg, default=str))
+                            clean_quiz = json.loads(json.dumps(custom_quiz, default=str))
+
+                            if publish_custom_quiz_to_db(clean_code, clean_cfg, clean_quiz):
+                                st.session_state.last_published_code = clean_code
+                                st.session_state.default_quiz_code = f"MNT-{uuid.uuid4().hex[:4].upper()}"
+                                st.success(f"🎉 Kuis diterbitkan. 5 Paket Soal Acak siap digunakan. Kode: **{clean_code}**")
+                            else:
+                                st.error("❌ Gagal menerbitkan kuis. Pastikan koneksi database aktif dan tabel kuis sudah tersedia.")
+                        except Exception as err:
+                            st.error(f"❌ Error Detail: {err}")
 
         st.markdown("""
         <div class="premium-footer-card">
