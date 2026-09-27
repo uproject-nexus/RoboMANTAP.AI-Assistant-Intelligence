@@ -21,7 +21,7 @@ from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
-from docx.oxml import OxmlElement, parse_xml, nsdecls
+
 from docx.oxml.ns import qn
 from xml.sax.saxutils import escape
 
