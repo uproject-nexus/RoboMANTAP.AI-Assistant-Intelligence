@@ -21,7 +21,7 @@ from docx.oxml.ns import nsdecls
 from reportlab.lib import colors
 from reportlab.lib.units import cm
 from reportlab.lib.pagesizes import A4
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time zone
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -115,7 +115,7 @@ st.markdown("""
     </script>
 """, unsafe_allow_html=True)
 
-components.html(
+st.html(
     """
     <script>
     if ('wakeLock' in navigator) {
@@ -135,8 +135,7 @@ components.html(
         });
     }
     </script>
-    """,
-    height=0,
+    """
 )
 
 # Custom Styling 
@@ -1151,7 +1150,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     r2.font.size = Pt(10.5)
     
     # Ambil tanggal WIB presisi saat dokumen dibuat
-    now_wib = datetime.utcnow() + timedelta(hours=7)
+    now_wib = datetime.now(timezone.utc) + timedelta(hours=7)
     nama_bulan = [
         "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
         "Juli", "Agustus", "September", "Oktober", "November", "Desember"
@@ -2671,8 +2670,8 @@ elif st.session_state.page == "guru_dashboard":
 
             st.markdown("##### 📅 Masa Aktif Kuis")
             st.caption("Atur jam buka dan jam tutup kuis dalam WIB.")
-            now_wib_time = (datetime.utcnow() + timedelta(hours=7)).time()
-            default_end_time = (datetime.utcnow() + timedelta(hours=9)).time()
+            now_wib_time = (datetime.now(timezone.utc) + timedelta(hours=7)).time()
+            default_end_time = (datetime.now(timezone.utc) + timedelta(hours=9)).time()
             col_act1, col_act2 = st.columns(2)
             with col_act1:
                 time_start = st.time_input("Jam Buka", value=custom_cfg.get("time_start_val", now_wib_time), key="input_time_start")
