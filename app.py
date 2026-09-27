@@ -63,7 +63,7 @@ if "review_session" in st.query_params:
 
 st.set_page_config(
     page_title="RoboMANTAP-Intelligence",
-    page_icon="logo.png",
+    page_icon="LOGO/dark_new no bg_favicon_nexus.png",
     layout="wide",
     initial_sidebar_state="auto"
 )
@@ -503,8 +503,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+UPN_PRIMARY_LOGO = "LOGO/dark_secound_primary_nexus.png"
+UPN_MARK_LOGO = "LOGO/dark_new no bg_favicon_nexus.png"
 logo_mantap_b64 = get_image_base64("logo.png")
-logo_nexus_b64 = get_image_base64("nexus_logo.png")
+logo_nexus_b64 = get_image_base64(UPN_PRIMARY_LOGO) or get_image_base64("nexus_logo.png")
 
 img_mantap_html = f'<img src="data:image/png;base64,{logo_mantap_b64}" style="height: 70px; margin-bottom: 8px;">' if logo_mantap_b64 else '<div style="font-size: 32px;">🎓</div>'
 
@@ -778,7 +780,7 @@ with st.sidebar:
 
         st.markdown("""
         <div style="background: var(--secondary-background-color); border: 1px solid rgba(128,128,128,0.2); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
-            <div style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 8px;">📋 ATURAN SKORING CBT OMI</div>
+            <div style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 8px;">📋 ATURAN SKORING CBT</div>
             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
                 <span>✅ Jawaban Benar</span>
                 <b style="color: #059669;">+4 Poin</b>
@@ -833,30 +835,6 @@ def clean_math_string(text: str) -> str:
         r"\alpha": "α", r"\beta": "β", r"\theta": "θ", r"\lambda": "λ",
         r"\in": "∈", r"\notin": "∉", r"\forall": "∀", r"\exists": "∃",
         r"\emptyset": "∅", r"\angle": "∠", r"\perp": "⊥", r"\parallel": "∥",
-        r"\implies": "⇒",
-        r"\impliedby": "⇐",
-        r"\iff": "⇔",
-        r"\Longleftrightarrow": "⇔",
-        r"\longleftrightarrow": "↔",
-        r"\Longleftarrow": "⇐",
-        r"\Longrightarrow": "⇒",
-        
-        r"\approx": "≈",
-        r"\equiv": "≡",
-        r"\propto": "∝",
-        
-        r"\sum": "Σ",
-        r"\prod": "Π",
-        r"\int": "∫",
-        r"\partial": "∂",
-        r"\nabla": "∇",
-        
-        r"\Delta": "Δ",
-        r"\Omega": "Ω",
-        r"\Gamma": "Γ",
-        r"\Lambda": "Λ",
-        r"\Sigma": "Σ",
-        r"\Phi": "Φ",
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
@@ -1086,6 +1064,7 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
             if color_rgb:
                 run.font.color.rgb = color_rgb
 
+
 # GENERATOR KUIS
 def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     """Membuat file Word (.docx) berformat LKPD resmi lengkap dengan logo, kop instansi, dan layout rapi."""
@@ -1105,7 +1084,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     # Kolom Kiri: Logo Instansi
     p_logo = cells[0].paragraphs[0]
     p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    logo_path = "logo.png"  # File logo.png di root directory
+    logo_path = UPN_PRIMARY_LOGO
     if os.path.exists(logo_path):
         p_logo.add_run().add_picture(logo_path, width=Inches(1.5))
     else:
@@ -1578,7 +1557,7 @@ def create_5_quiz_packages(master_quiz):
         packages.append(shuffled_list)
         
     return packages
-
+    
 # ==============================================================================
 # 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
 # ==============================================================================
@@ -1651,7 +1630,7 @@ if st.session_state.page == "landing":
     st.markdown("""
     <div class="guru-card">
         <h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
-        <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal dan fitur automation</p>
+        <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp</p>
     </div>
     """, unsafe_allow_html=True)
     if st.button("🔒 Masuk Portal Guru ➔", use_container_width=True):
@@ -1661,7 +1640,6 @@ if st.session_state.page == "landing":
 # ==============================================================================
 # 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
 # ==============================================================================
-#=========================================================================================================
 elif st.session_state.page == "guru_login":
     st.subheader("🔒 Akses Portal GuruMANTAP")
 
@@ -1678,7 +1656,7 @@ elif st.session_state.page == "guru_login":
             st.session_state.page = "guru_dashboard"
             st.rerun()
         else:
-            st.error("PIN Salah. Silakhan coba lagi!")
+            st.error("PIN Salah. Silakan coba lagi.")
 
 elif st.session_state.page == "guru_dashboard":
     if not st.session_state.guru_auth:
@@ -1706,13 +1684,13 @@ elif st.session_state.page == "guru_dashboard":
             st.markdown(
                 '<p style="font-size: 12px; opacity: 0.82;">'
                 '<span class="blinking-dot-green">🟢</span> '
-                '<b>LIVE AKTIF!</b> · memperbarui data secara real time, matikan Live bila Hp/Perangkat terasa Lemot.'
+                '<b>Live aktif!</b> · memperbarui data secara real time, matikan Live bila Hp/Perangkat terasa Lemot'
                 '</p>',
                 unsafe_allow_html=True
             )
         else:
             st.caption(
-                "⏸️ **Live Dimatikan** · tampilan stabil dan nyaman untuk membaca laporan RoboMANTAP."
+                "⏸️ **Live dimatikan** · tampilan stabil dan nyaman untuk membaca laporan RoboMANTAP."
             )
         
         # Kondisi Dasar: Abaikan status uji coba internal jika ada
@@ -2321,23 +2299,10 @@ elif st.session_state.page == "guru_dashboard":
                                     skor_omi = (b_cnt * 4) - (s_cnt * 1)
                                     pct = max(0, (skor_omi / 40) * 100)
 
-                                # Display Kartu Ringkas
-                                st.markdown(f"""
-                                <div style="display: flex; gap: 6px; margin: 10px 0;">
-                                    <div style="flex: 1; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
-                                        <div style="font-size: 10px; color: #34d399; font-weight: 600;">Benar</div>
-                                        <div style="font-size: 16px; font-weight: 800;">{b_cnt}</div>
-                                    </div>
-                                    <div style="flex: 1; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
-                                        <div style="font-size: 10px; color: #f87171; font-weight: 600;">Salah</div>
-                                        <div style="font-size: 16px; font-weight: 800;">{s_cnt}</div>
-                                    </div>
-                                    <div style="flex: 1; background: rgba(156, 163, 175, 0.12); border: 1px solid rgba(156, 163, 175, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
-                                        <div style="font-size: 10px; color: #9ca3af; font-weight: 600;">Kosong</div>
-                                        <div style="font-size: 16px; font-weight: 800;">{k_cnt}</div>
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
+                                mini_cols = st.columns(3)
+                                mini_cols[0].metric("Benar", b_cnt)
+                                mini_cols[1].metric("Salah", s_cnt)
+                                mini_cols[2].metric("Kosong", k_cnt)
 
                                 if anti_detected:
                                     st.error(
@@ -2457,9 +2422,9 @@ elif st.session_state.page == "guru_dashboard":
 
         st.markdown("""
         <div class="premium-hero">
-            <div class="premium-kicker">UPN • QUIZ-Intelligence</div>
+            <div class="premium-kicker">UPN • QUIZ ENGINE</div>
             <div class="premium-title">🧩 RoboMANTAP <span>Quiz Custom</span></div>
-            <div class="premium-subtitle">Susun soal presisi dari topik manual atau langsung dari materi GuruMANTAP yang dilampirkan.</div>
+            <div class="premium-subtitle">Susun soal presisi dari topik manual atau langsung dari materi guru yang dilampirkan.</div>
             <div class="premium-pills">
                 <span>AI Grounded</span><span>QA Validator</span><span>Mobile Ready</span><span>Teacher First</span>
             </div>
@@ -2468,7 +2433,7 @@ elif st.session_state.page == "guru_dashboard":
 
         st.markdown("""
         <div class="source-warning">
-            <div class="source-warning-title">📌 PENTING!</div>
+            <div class="source-warning-title">📌 PENTING UNTUK GURU</div>
             Mohon Ustadzah untuk ketik di kolom <b>Materi Utama</b> dengan teks <code>materi dilampirkan</code>
             agar RoboMANTAP menggunakan file yang sudah di-drop sebagai sumber utama pembuatan soal dengan lebih akurat dan presisi.
         </div>
@@ -2731,20 +2696,21 @@ elif st.session_state.page == "guru_dashboard":
                 <div class="preview-meta">{source_chip}<span class='chip chip-purple'>{len(custom_quiz)} soal</span><span class='chip chip-blue'>Opsi {"A-D" if option_count_for_jenjang(custom_cfg.get("jenjang", "MTs")) == 4 else "A-E"}</span><span class='chip chip-gold'>{html.escape(custom_cfg.get('kesulitan','-'))}</span></div>
             </div>
             """, unsafe_allow_html=True)
-            st.caption(
-                f"{custom_cfg.get('mapel', '-')} • {custom_cfg.get('jenjang', '-')} • "
-                f"{custom_cfg.get('kesulitan', '-')} • {len(custom_quiz)} soal • "
-                f"Timer: {str(timedelta(seconds=int(custom_cfg.get('timer_seconds', 0)))) if custom_cfg.get('timer_seconds', 0) else 'Tanpa batas'}"
-            )
 
+            total_q = len(custom_quiz)
             for q_idx, cq in enumerate(custom_quiz, start=1):
-                with st.expander(f"Soal {q_idx}", expanded=(q_idx == 1)):
-                    st.markdown(cq["question"])
-                    for option in cq["options"]:
-                        st.markdown(f"- {option}")
-                    st.success(f"Kunci terencana: **{cq['correct_answer']}**")
+                with st.expander(f"{q_idx:02d} • {cq.get('question','Soal')[:88]}", expanded=(q_idx == 1)):
+                    st.markdown(f"**Soal {q_idx}**")
+                    st.markdown(cq.get("question", ""))
+                    opt_cols = st.columns(2)
+                    for opt_idx, option in enumerate(cq.get("options", [])):
+                        with opt_cols[opt_idx % 2]:
+                            st.markdown(f"<div class='answer-card'><b>{html.escape(str(option).split('.',1)[0] if '.' in str(option) else chr(65+opt_idx))}</b> {html.escape(str(option).split('.',1)[1].strip() if '.' in str(option) else str(option))}</div>", unsafe_allow_html=True)
+                    st.success(f"Kunci terencana: **{cq.get('correct_answer','-')}**")
+                    if cq.get("source_locator"):
+                        st.caption(f"🔎 Grounded source: {cq.get('source_locator')}")
                     with st.expander("Lihat Solution Basis"):
-                        st.markdown(cq.get("solution_basis", "Belum tersedia."))
+                        st.markdown(clean_solution_preview(cq.get("solution_basis", "Belum tersedia.")))
 
             docx_data = generate_quiz_docx(custom_cfg, custom_quiz)
             clean_mapel_name = custom_cfg.get('mapel', 'Quiz').replace(' ', '_')
