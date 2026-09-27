@@ -1605,50 +1605,35 @@ def create_5_quiz_packages(master_quiz):
 # ==============================================================================
 if st.session_state.page == "landing":
 
-    # OMI kini memiliki satu pintu masuk dari landing utama.
-    # Pemilihan jenjang MTs/MA dilakukan di landing HTMX /omi agar tidak
-    # menduplikasi dua pilihan jenjang di Streamlit.
-    omi_base_url = os.getenv("ROBO_CBT_URL", "https://robomantap-intelligence-cbt.onrender.com").rstrip("/")
-
     st.markdown("<h3 style='text-align: center; font-size: 25px;'>🏆 BINA PRESTASI OMI 2026</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Portal latihan Olimpiade berbasis CBT — pilih jenjang setelah masuk ke modul OMI</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
     st.write("---")
 
-    st.markdown("#### 🏆 Latihan OMI")
-    st.caption("Satu pintu untuk latihan MTs dan MA. Pemilihan jenjang, bidang, dan sesi dilakukan di portal CBT OMI.")
-
-    st.markdown(
-        f"""
-        <a href="{omi_base_url}/omi" target="_blank" style="text-decoration:none; display:block;">
-            <div style="
-                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                color: #020617;
-                padding: 16px 24px;
-                border-radius: 12px;
-                text-align: center;
-                font-weight: 800;
-                font-size: 15px;
-                letter-spacing: 0.4px;
-                transition: all 0.3s ease;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 8px;
-                margin-top: 8px;
-                margin-bottom: 8px;
-                cursor: pointer;
-                box-shadow: 0 0 20px rgba(16,185,129,0.20);
-            ">
-                🏆 BUKA LATIHAN OMI →
-            </div>
-        </a>
-        <div style="text-align:center; font-size:10px; opacity:.55; margin-bottom:20px;">
-            MTs &amp; MA • 10 soal per sesi • CBT OMI
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("""
+        <div class="mode-card">
+            <h2>🏫 TINGKAT MTs</h2>
+            <p>Madrasah Tsanawiyah Al-Irsyad Putri</p>
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
+        """, unsafe_allow_html=True)
+        if st.button("Masuk Modul MTs ➔", key="btn_mts", use_container_width=True, type="primary"):
+            st.session_state.jenjang = "MTs (Sederajat SMP)"
+            st.session_state.page = "select_mapel"
+            st.rerun()
 
+    with col2:
+        st.markdown("""
+        <div class="mode-card">
+            <h2>🏛️ TINGKAT MA</h2>
+            <p>Madrasah Aliyah Al-Irsyad Putri</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Masuk Modul MA ➔", key="btn_ma", use_container_width=True, type="primary"):
+            st.session_state.jenjang = "MA (Sederajat SMA)"
+            st.session_state.page = "select_mapel"
+            st.rerun()
+            
     st.write("---")
     st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
     st.caption("Klik tombol dibawah ini untuk menuju Portal Kuis!")
@@ -1823,14 +1808,12 @@ elif st.session_state.page == "guru_dashboard":
             anti_cheat = {}
             user_answers = {}
             quiz_data = []
-            session_type = ""
 
             if isinstance(raw_detail, dict):
                 detail_boolean = raw_detail.get("detail_boolean", [])
                 user_answers = raw_detail.get("user_answers", {}) or {}
                 quiz_data = raw_detail.get("quiz_data", []) or []
                 anti_cheat = raw_detail.get("anti_cheat", {}) or {}
-                session_type = str(raw_detail.get("session_type", "") or "").upper()
             elif isinstance(raw_detail, list):
                 detail_boolean = raw_detail
             else:
@@ -1842,7 +1825,7 @@ elif st.session_state.page == "guru_dashboard":
             if not isinstance(anti_cheat, dict):
                 anti_cheat = {}
 
-            return detail_boolean, user_answers, quiz_data, anti_cheat, session_type
+            return detail_boolean, user_answers, quiz_data, anti_cheat
 
         def render_progress_bar_html(detail_list, current_index=None):
             if not isinstance(detail_list, list) or len(detail_list) == 0:
@@ -1936,22 +1919,13 @@ elif st.session_state.page == "guru_dashboard":
                 
                 # Logika Pemisah Pintar: Cek kata '(Custom)' ATAU jumlah kotak soal != 10
                 def check_is_custom(row):
-                    # OMI now writes an explicit session_type marker. Respect it
-                    # before the historical heuristic so OMI is never treated as
-                    # a custom quiz merely because its payload evolves later.
-                    try:
-                        detail = row['detail_jawaban']
-                        if isinstance(detail, str):
-                            detail = json.loads(detail)
-                        if isinstance(detail, dict) and str(detail.get('session_type', '')).upper() == 'OMI':
-                            return False
-                    except Exception:
-                        pass
-
                     mapel_str = str(row['mapel'])
                     if "custom" in mapel_str.lower() or "kuis" in mapel_str.lower() or "quiz" in mapel_str.lower():
                         return True
                     try:
+                        detail = row['detail_jawaban']
+                        if isinstance(detail, str):
+                            detail = json.loads(detail)
                         if isinstance(detail, list) and len(detail) > 0 and len(detail) != 10:
                             return True
                     except Exception:
@@ -2145,7 +2119,7 @@ elif st.session_state.page == "guru_dashboard":
 
                 tracking_rows = []
                 for _, row in df.iterrows():
-                    _, _, _, anti_meta, _session_type = parse_tracking_payload(row["detail_jawaban"])
+                    _, _, _, anti_meta = parse_tracking_payload(row["detail_jawaban"])
                     count = max(0, int(anti_meta.get("violation_count", 0) or 0))
                     detected = bool(anti_meta.get("detected", False))
 
@@ -2221,18 +2195,9 @@ elif st.session_state.page == "guru_dashboard":
                     mapel_label = html.escape(str(row["mapel"]))
                     jenjang_label = html.escape(str(row["jenjang"] or "")[:10])
 
-                    detail_boolean, user_answers, quiz_data, anti_meta, session_type = parse_tracking_payload(
+                    detail_boolean, user_answers, quiz_data, anti_meta = parse_tracking_payload(
                         row["detail_jawaban"]
                     )
-                    session_source = ""
-                    try:
-                        raw_tracking = row["detail_jawaban"]
-                        if isinstance(raw_tracking, str):
-                            raw_tracking = json.loads(raw_tracking)
-                        if isinstance(raw_tracking, dict) and str(raw_tracking.get("session_type", "")).upper() == "OMI":
-                            session_source = "🏆 OMI · "
-                    except Exception:
-                        session_source = ""
 
                     total_soal = len(detail_boolean)
                     if not total_soal:
@@ -2337,7 +2302,7 @@ elif st.session_state.page == "guru_dashboard":
                                         <span class="upn-live-tag {status_class}">{status_badge}</span>
                                     </div>
                                     <div class="upn-live-sub">
-                                        {html.escape(session_source)}{mapel_label} · {jenjang_label} · {html.escape(percobaan_text)}
+                                        {mapel_label} · {jenjang_label} · {html.escape(percobaan_text)}
                                     </div>
                                 </div>
                                 <div class="upn-live-score">
