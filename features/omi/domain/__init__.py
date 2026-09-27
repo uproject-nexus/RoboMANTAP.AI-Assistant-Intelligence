@@ -1,1 +1,0 @@
-"""OMI domain services."""
