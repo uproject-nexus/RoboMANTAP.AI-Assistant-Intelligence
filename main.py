@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from ai_engine import (
     create_table_if_not_exists,
     get_custom_quiz_from_db,
+    normalize_custom_timer_config,
     update_progress_siswa,
     touch_session_heartbeat,
     get_ai_hint_stream
@@ -122,7 +123,7 @@ async def verify_token(
             context={"error": "❌ Kode Kuis tidak ditemukan atau belum diterbitkan!"}
         )
 
-    config = quiz_package.get("config", {}) or {}
+    config = normalize_custom_timer_config(quiz_package.get("config", {}) or {})
 
     # 2. Waktu saat ini dalam WIB
     now_wib = datetime.now(timezone.utc).astimezone(
@@ -231,15 +232,18 @@ async def render_exam_workspace(request: Request, session_id: str):
     if "start_time" not in sess:
         sess["start_time"] = datetime.now(timezone.utc)
 
-    # 2. Hitung Sisa Waktu Ujian Real-Time dari Server
-    duration_m = sess.get("config", {}).get("timer_m", 30)
+    # 2. Hitung Sisa Waktu Ujian REAL-TIME dari satu sumber kebenaran.
+    # Jangan membaca timer_m saja: itu akan memotong kuis 2j/3j menjadi 30 menit.
+    config = normalize_custom_timer_config(sess.get("config", {}) or {})
+    sess["config"] = config
+    duration_seconds = int(config.get("timer_seconds", 0) or 0)
     now_utc = datetime.now(timezone.utc)
     start_time = sess["start_time"]
     if start_time.tzinfo is None:
         start_time = start_time.replace(tzinfo=timezone.utc)
-        
-    elapsed_s = (now_utc - start_time).total_seconds()
-    remaining_s = max(0, int((duration_m * 60) - elapsed_s))
+
+    elapsed_s = max(0.0, (now_utc - start_time).total_seconds())
+    remaining_s = max(0, int(duration_seconds - elapsed_s)) if duration_seconds > 0 else 0
 
     # 3. Render Single-File student_exam.html
     return templates.TemplateResponse(
@@ -254,7 +258,17 @@ async def render_exam_workspace(request: Request, session_id: str):
             "kelas": sess.get("kelas", "-"),
             "absen": sess.get("absen", "-"),
             "jumlah_soal": len(sess.get("quiz", [])),
-            "durasi_menit": sess.get("config", {}).get("timer_m", 30),
+            "durasi_menit": (duration_seconds + 59) // 60 if duration_seconds > 0 else 0,
+            "duration_seconds": duration_seconds,
+            "durasi_label": (
+                f"{duration_seconds // 3600} jam {(duration_seconds % 3600) // 60} menit"
+                if duration_seconds >= 3600 and duration_seconds % 60 == 0
+                else f"{duration_seconds // 3600} jam {(duration_seconds % 3600) // 60} menit {duration_seconds % 60} detik"
+                if duration_seconds >= 3600
+                else f"{duration_seconds // 60} menit {duration_seconds % 60} detik"
+                if duration_seconds > 0
+                else "Tanpa batas waktu"
+            ),
             "quiz_json": json.dumps(sess.get("quiz", [])),
             "answers_json": json.dumps(sess.get("answers", {})),
             "remaining_seconds": remaining_s,
@@ -288,6 +302,19 @@ async def save_answer(
 
     if sess.get("finished"):
         return HTMLResponse(content="", status_code=409)
+
+    # Sumber kebenaran durasi tetap di server. Jawaban baru ditolak setelah
+    # batas waktu tercapai, sehingga timer tidak hanya bergantung pada browser.
+    config = normalize_custom_timer_config(sess.get("config", {}) or {})
+    sess["config"] = config
+    duration_seconds = int(config.get("timer_seconds", 0) or 0)
+    if duration_seconds > 0:
+        start_time = sess.get("start_time")
+        if start_time:
+            if start_time.tzinfo is None:
+                start_time = start_time.replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - start_time).total_seconds() >= duration_seconds:
+                return HTMLResponse(content="TIMEOUT", status_code=409)
 
     quiz = sess.get("quiz", []) or []
     if q_index < 0 or q_index >= len(quiz):

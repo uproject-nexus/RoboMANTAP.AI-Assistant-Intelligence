@@ -31,14 +31,28 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 )
 
+from bank_soal_engine import (
+    extract_blueprint_from_docx,
+    blueprint_summary,
+    generate_bank_soal,
+    build_bank_soal_docx,
+    extract_blueprint_preview_rows,
+)
+
 from ai_engine import (
     generate_quiz_batch, get_ai_hint_stream, get_ai_solution_stream,
     create_table_if_not_exists, update_progress_siswa, init_db_connection,
     generate_lkpd_content, stream_ai_text, generate_custom_quiz_ai,
     publish_custom_quiz_to_db, get_custom_quiz_from_db, check_active_session_from_db,
     call_gemini_with_rotation, generate_corporate_executive_docx_report,
-    generate_individual_analysis_ai, load_session_review_from_db
+    generate_individual_analysis_ai, load_session_review_from_db,
+    build_material_knowledge_pack, save_material_bundle_to_db, get_material_bundle_from_db,
+    normalize_material_trigger, generate_media_ajar_ai, build_media_ajar_pptx,
+    option_labels_for_jenjang, option_count_for_jenjang, normalize_quiz_options,
+    normalize_custom_timer_config, build_language_guidance
 )
+
+from student_intelligence import ensure_student_intelligence_tables, render_student_intelligence_dashboard
 
 # Interseptor Deep Link dari CBT Engine Render
 if "review_session" in st.query_params:
@@ -66,6 +80,8 @@ st.set_page_config(
 
 # Inisialisasi Tabel Database saat aplikasi pertama kali dimuat
 create_table_if_not_exists()
+# Student Intelligence uses additive tables only; existing CBT tables remain unchanged.
+ensure_student_intelligence_tables()
 # ==============================================================================
 # ANTI-COPAS & DISABLE KLIK KANAN (PERLINDUNGAN HALAMAN KUIS)
 # ==============================================================================
@@ -485,6 +501,20 @@ def get_image_base64(path):
             return base64.b64encode(img_file.read()).decode()
     return None
 
+
+# Premium responsive UPN UI layer
+st.markdown("""
+<style>
+.premium-hero{padding:22px 24px;border-radius:24px;margin:8px 0 18px;background:radial-gradient(circle at 84% 10%,rgba(16,185,129,.25),transparent 32%),linear-gradient(135deg,#081225 0%,#111827 56%,#0a3a2d 100%);border:1px solid rgba(110,231,183,.22);box-shadow:0 18px 50px rgba(0,0,0,.22);overflow:hidden}
+.premium-kicker{font-size:10px;letter-spacing:.18em;font-weight:800;color:#a7f3d0;margin-bottom:5px}
+.premium-title{font-size:30px;font-weight:900;line-height:1.05;color:#f8fafc}.premium-title span{background:linear-gradient(90deg,#6ee7b7,#c4b5fd);-webkit-background-clip:text;color:transparent}
+.premium-subtitle{margin-top:8px;color:#cbd5e1;font-size:13px;max-width:840px}.premium-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}.premium-pills span,.chip{display:inline-flex;align-items:center;border:1px solid rgba(148,163,184,.18);background:rgba(15,23,42,.55);border-radius:999px;padding:5px 9px;font-size:10px;color:#e2e8f0}.chip-green{border-color:rgba(16,185,129,.35);color:#a7f3d0}.chip-blue{border-color:rgba(59,130,246,.35);color:#bfdbfe}.chip-purple{border-color:rgba(168,85,247,.35);color:#ddd6fe}.chip-gold{border-color:rgba(245,158,11,.35);color:#fde68a}
+.source-warning{padding:14px 16px;border:1px solid rgba(245,158,11,.24);background:linear-gradient(135deg,rgba(120,53,15,.18),rgba(15,23,42,.65));border-radius:16px;margin-bottom:15px}.source-warning-title{font-size:12px;font-weight:900;color:#fcd34d;margin-bottom:4px}.source-warning code{color:#a7f3d0;background:rgba(16,185,129,.11);padding:2px 6px;border-radius:6px}
+.file-list,.hub-code,.hub-empty,.result-card,.story-card,.premium-footer-card,.answer-card{border:1px solid rgba(148,163,184,.12);background:rgba(15,23,42,.52);border-radius:16px}.file-list{padding:7px;margin-top:8px}.file-row{display:flex;justify-content:space-between;gap:12px;padding:8px 10px;border-bottom:1px solid rgba(148,163,184,.08);font-size:11px;color:#dbeafe}.file-row:last-child{border-bottom:none}.hub-code,.hub-empty{padding:16px;min-height:126px}.hub-code-label,.preview-label,.footer-kicker{font-size:9px;letter-spacing:.15em;font-weight:900;color:#94a3b8}.hub-code-value{font-size:24px;font-weight:900;color:#6ee7b7;letter-spacing:.08em;margin:6px 0}.hub-empty-title{font-size:17px;font-weight:800;color:#f8fafc;margin-top:8px}.hub-code-note,.footer-copy,.result-card-copy,.story-meta{font-size:10px;color:#94a3b8;line-height:1.5}.preview-hero{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:16px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(59,130,246,.08),rgba(168,85,247,.08));border:1px solid rgba(110,231,183,.16);margin-bottom:12px}.preview-title{font-size:21px;font-weight:900;color:#f8fafc}.preview-meta{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}.answer-card{padding:10px 12px;margin:5px 0;color:#e5e7eb;font-size:12px;min-height:42px}.answer-card b{color:#6ee7b7;margin-right:5px}.result-card{padding:15px 16px;margin:10px 0}.result-card-title{font-size:16px;font-weight:900;color:#f8fafc}.story-card{display:flex;gap:12px;align-items:center;padding:10px 12px;margin:6px 0}.story-number{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,#059669,#2563eb);font-size:11px;font-weight:900;color:white}.premium-footer-card{padding:16px 18px;margin-top:18px;background:linear-gradient(135deg,rgba(15,23,42,.78),rgba(6,78,59,.12))}.footer-title{font-weight:900;font-size:15px;color:#f8fafc;margin:4px 0 3px}.automation-hero{background:radial-gradient(circle at 82% 10%,rgba(168,85,247,.18),transparent 30%),linear-gradient(135deg,#081225 0%,#121225 55%,#0a3a2d 100%)}
+@media(max-width:760px){.premium-hero{padding:18px 16px;border-radius:20px}.premium-title{font-size:24px}.premium-subtitle{font-size:12px}.premium-pills{gap:5px}.premium-pills span{font-size:9px;padding:4px 7px}.preview-hero{display:block}.preview-meta{justify-content:flex-start;margin-top:9px}.hub-code,.hub-empty{min-height:auto}.answer-card{font-size:11px}.story-card{align-items:flex-start}}
+</style>
+""", unsafe_allow_html=True)
+
 logo_mantap_b64 = get_image_base64("logo.png")
 logo_nexus_b64 = get_image_base64("nexus_logo.png")
 
@@ -506,6 +536,21 @@ if "session_id" not in st.session_state: st.session_state.session_id = str(uuid.
 if "guru_auth" not in st.session_state: st.session_state.guru_auth = False
 if "ai_hint_cache" not in st.session_state: st.session_state.ai_hint_cache = {}
 if "ai_solution_cache" not in st.session_state: st.session_state.ai_solution_cache = {}
+if "material_bundle_code" not in st.session_state: st.session_state.material_bundle_code = ""
+if "material_bundle" not in st.session_state: st.session_state.material_bundle = None
+if "media_storyboard" not in st.session_state: st.session_state.media_storyboard = None
+if "media_ppt_bytes" not in st.session_state: st.session_state.media_ppt_bytes = None
+if "package_lkpd_bytes" not in st.session_state: st.session_state.package_lkpd_bytes = None
+if "package_ppt_bytes" not in st.session_state: st.session_state.package_ppt_bytes = None
+if "bank_blueprint" not in st.session_state: st.session_state.bank_blueprint = None
+if "bank_questions" not in st.session_state: st.session_state.bank_questions = []
+if "bank_report" not in st.session_state: st.session_state.bank_report = None
+if "bank_docx_bytes" not in st.session_state: st.session_state.bank_docx_bytes = None
+if "bank_docx_config_signature" not in st.session_state: st.session_state.bank_docx_config_signature = None
+if "student_intelligence_name" not in st.session_state: st.session_state.student_intelligence_name = ""
+if "student_intelligence_grade" not in st.session_state: st.session_state.student_intelligence_grade = "Semua Jenjang"
+if "student_adaptive_focus" not in st.session_state: st.session_state.student_adaptive_focus = ""
+if "student_adaptive_topics" not in st.session_state: st.session_state.student_adaptive_topics = []
 
 # ------------------------------------------------------------------------------
 # RANDOMISASI PRODUCTION: URUTAN SOAL UNIK PER SESI SISWA
@@ -754,7 +799,7 @@ with st.sidebar:
 
         st.markdown("""
         <div style="background: var(--secondary-background-color); border: 1px solid rgba(128,128,128,0.2); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
-            <div style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 8px;">📋 ATURAN SKORING CBT</div>
+            <div style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 8px;">📋 ATURAN SKORING CBT OMI</div>
             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
                 <span>✅ Jawaban Benar</span>
                 <b style="color: #059669;">+4 Poin</b>
@@ -795,48 +840,163 @@ with st.sidebar:
 #===========================================================
 # PEMBERSIH
 def clean_math_string(text: str) -> str:
-    """Pembersih simbol & notasi matematika dasar untuk teks biasa."""
+    r"""Pembersih notasi matematika untuk Word; khususnya mencegah \circ -> circ/circl mentah."""
     if not text:
         return ""
-    
-    # 1. Konversi Panah LaTeX SEBELUM memproses \left / \right
-    text = re.sub(r'\\(?:rightarrow|to)\b', '→', text)
-    text = re.sub(r'\\Rightarrow\b', '⇒', text)
-    text = re.sub(r'\\leftarrow\b', '←', text)
-    text = re.sub(r'\\leftrightarrow\b', '↔', text)
-
-    # 2. Bersihkan \left dan \right (Gunakan \b agar \rightarrow tidak terpotong)
-    text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
-    text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
-    text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
-
-    # 3. Konversi Akar \sqrt{x}
-    text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
-    text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
-
-    # 4. Pangkat & Subscript Unicode
-    sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
-    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄⁵₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
-
-    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sup_map), text)
-    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sub_map), text)
-
-    # 5. Simbol Matematika
+    text = str(text)
     replacements = {
+        r"\rightarrow": "→", r"\to": "→", r"\Rightarrow": "⇒",
+        r"\leftarrow": "←", r"\leftrightarrow": "↔",
+        r"\circ": "∘", r"\circl": "∘",
         r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
-        r"\leq": "≤", r"\geq": "≥", r"\pm": "±", r"\infty": "∞",
-        r"\pi": "π", r"\alpha": "α", r"\beta": "β", r"\theta": "θ", "$": ""
+        r"\leq": "≤", r"\geq": "≥", r"\le": "≤", r"\ge": "≥",
+        r"\pm": "±", r"\mp": "∓", r"\infty": "∞", r"\pi": "π",
+        r"\alpha": "α", r"\beta": "β", r"\theta": "θ", r"\lambda": "λ",
+        r"\in": "∈", r"\notin": "∉", r"\forall": "∀", r"\exists": "∃",
+        r"\emptyset": "∅", r"\angle": "∠", r"\perp": "⊥", r"\parallel": "∥",
+        r"\implies": "⇒",
+        r"\impliedby": "⇐",
+        r"\iff": "⇔",
+        r"\Longleftrightarrow": "⇔",
+        r"\longleftrightarrow": "↔",
+        r"\Longleftarrow": "⇐",
+        r"\Longrightarrow": "⇒",
+        
+        r"\approx": "≈",
+        r"\equiv": "≡",
+        r"\propto": "∝",
+        
+        r"\sum": "Σ",
+        r"\prod": "Π",
+        r"\int": "∫",
+        r"\partial": "∂",
+        r"\nabla": "∇",
+        
+        r"\Delta": "Δ",
+        r"\Omega": "Ω",
+        r"\Gamma": "Γ",
+        r"\Lambda": "Λ",
+        r"\Sigma": "Σ",
+        r"\Phi": "Φ",
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
-
-    # 6. Sapu bersih ampas backslash
+    text = re.sub(r"(?<![A-Za-z])circl(?![A-Za-z])", "∘", text)
+    text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
+    text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
+    text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
+    text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
+    text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
+    sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
+    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄⁵₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
+    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sup_map), text)
+    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sub_map), text)
+    text = text.replace("$", "")
     text = text.replace("left(", "(").replace("right)", ")").replace("dots", "…")
     text = text.replace("{", "").replace("}", "")
     text = re.sub(r'\\([a-zA-Z]+)', r'\1', text).replace("\\", "")
     return re.sub(r'\s+', ' ', text).strip()
 
 clean_math_text = clean_math_string
+
+def clean_solution_preview(text: str) -> str:
+    """Pembersih KHUSUS Solution Basis pada preview Quiz Custom.
+
+    Tujuannya bukan mengubah isi pembahasan, tetapi membuat notasi matematika/
+    ilmiah yang dikirim AI tetap terbaca di Streamlit: arrow, relasi, komposisi,
+    pecahan, akar, pangkat, indeks, dan token rusak seperti ``circl``.
+    """
+    if not text:
+        return ""
+
+    value = str(text).strip()
+
+    # Token rusak yang sering muncul ketika LaTeX dipotong oleh model.
+    value = re.sub(r"(?<![A-Za-z])circl(?![A-Za-z])", lambda _: r"\circ", value)
+
+    # Perintah sederhana lebih aman ditampilkan sebagai Unicode pada preview,
+    # sehingga tidak pernah terlihat sebagai backslash mentah.
+    simple_math = {
+        r"\longrightarrow": "→", r"\rightarrow": "→", r"\to": "→",
+        r"\Longrightarrow": "⇒", r"\Rightarrow": "⇒",
+        r"\leftarrow": "←", r"\leftrightarrow": "↔",
+        r"\times": "×", r"\cdot": "·", r"\div": "÷",
+        r"\neq": "≠", r"\leq": "≤", r"\le": "≤",
+        r"\geq": "≥", r"\ge": "≥", r"\pm": "±",
+        r"\infty": "∞", r"\circ": "∘", r"\perp": "⊥",
+        r"\parallel": "∥", r"\angle": "∠", r"\in": "∈",
+        r"\notin": "∉", r"\forall": "∀", r"\exists": "∃",
+        r"\emptyset": "∅", r"\pi": "π", r"\alpha": "α",
+        r"\beta": "β", r"\gamma": "γ", r"\delta": "δ",
+        r"\theta": "θ", r"\lambda": "λ", r"\mu": "μ",
+        r"\approx": "≈", r"\equiv": "≡", r"\propto": "∝",
+        r"\sum": "Σ", r"\int": "∫", r"\partial": "∂",
+        r"\Delta": "Δ", r"\Omega": "Ω", r"\degree": "°",
+    }
+    for old, new in simple_math.items():
+        value = value.replace(old, new)
+
+    value = value.replace(" -> ", " → ").replace(" => ", " ⇒ ")
+    value = value.replace("->", "→").replace("=>", "⇒")
+    value = re.sub(r"\\left\s*([\(\[\{])", r"\1", value)
+    value = re.sub(r"\\right\s*([\)\]\}])", r"\1", value)
+    value = re.sub(r"\\(?:mathrm|text|mathbf|operatorname)\{([^{}]+)\}", r"\1", value)
+    value = re.sub(r"\\ce\{([^{}]+)\}", r"\1", value)
+
+    # Pecahan/akar tetap memakai KaTeX agar tampil sebagai notasi matematika,
+    # tetapi hanya bagian rumusnya yang dibungkus, bukan seluruh paragraf.
+    def wrap_formula(match):
+        expr = match.group(0)
+        return f"${expr}$"
+
+    value = re.sub(r"\\frac\{[^{}]+\}\{[^{}]+\}", wrap_formula, value)
+    value = re.sub(r"\\sqrt(?:\{[^{}]+\}|[A-Za-z0-9]+)", wrap_formula, value)
+
+    # Pangkat/indeks sederhana tanpa delimiter: ubah ke Unicode agar tidak mentah.
+    sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
+    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
+    value = re.sub(r"\^\{([^}]+)\}|\^([A-Za-z0-9])", lambda m: (m.group(1) or m.group(2)).translate(sup_map), value)
+    value = re.sub(r"_\{([^}]+)\}|_([A-Za-z0-9])", lambda m: (m.group(1) or m.group(2)).translate(sub_map), value)
+
+    # Hapus delimiter math kosong yang kadang ditinggalkan generator.
+    value = value.replace("$$$$", "")
+    value = re.sub(r"\$\s*\$", "", value)
+    return value.strip()
+
+
+def contains_arabic(text: str) -> bool:
+    return bool(re.search(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]", str(text or "")))
+
+
+def apply_arabic_paragraph_style(paragraph):
+    """Aktifkan RTL untuk paragraf Word yang mengandung aksara Arab."""
+    if not paragraph:
+        return
+    try:
+        ppr = paragraph._p.get_or_add_pPr()
+        bidi = parse_xml(r'<w:bidi xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="1"/>')
+        ppr.append(bidi)
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    except Exception:
+        pass
+
+
+def apply_arabic_run_style(run):
+    """Gunakan font complex-script yang aman untuk aksara Arab di Word."""
+    if not run:
+        return
+    try:
+        run.font.name = "Traditional Arabic"
+        rpr = run._r.get_or_add_rPr()
+        rfonts = rpr.rFonts
+        if rfonts is None:
+            rfonts = parse_xml(r'<w:rFonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+            rpr.append(rfonts)
+        rfonts.set('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}cs', 'Traditional Arabic')
+        rfonts.set('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}ascii', 'Aptos')
+    except Exception:
+        pass
+
 
 def add_omml_fraction(paragraph, num_text: str, den_text: str):
     """Menyisipkan struktur Pecahan Tegak Resmi Microsoft Word (Equation)."""
@@ -916,6 +1076,9 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
             if plain_part:
                 run = paragraph.add_run(plain_part + " ")
                 run.bold = is_bold
+                if contains_arabic(plain_part):
+                    apply_arabic_paragraph_style(paragraph)
+                    apply_arabic_run_style(run)
                 if color_rgb:
                     run.font.color.rgb = color_rgb
 
@@ -938,9 +1101,11 @@ def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, colo
         if plain_part:
             run = paragraph.add_run(plain_part)
             run.bold = is_bold
+            if contains_arabic(plain_part):
+                apply_arabic_paragraph_style(paragraph)
+                apply_arabic_run_style(run)
             if color_rgb:
                 run.font.color.rgb = color_rgb
-
 
 # GENERATOR KUIS
 def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
@@ -1022,7 +1187,7 @@ def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
     meta_items = [
         ("Jenjang / Kelas", f"{config.get('jenjang', '-')} ({config.get('kelas', '-')})"),
         ("Materi Utama", f"{clean_math_string(config.get('materi', '-'))}"),
-        ("Jumlah Soal", f"{len(quiz_list)} Soal | Durasi: {config.get('timer_h', 0)}j {config.get('timer_m', 0)}m"),
+        ("Jumlah Soal", f"{len(quiz_list)} Soal | Opsi: {'A-D' if option_count_for_jenjang(config.get('jenjang', 'MTs')) == 4 else 'A-E'} | Durasi: {timedelta(seconds=int(normalize_custom_timer_config(config).get('timer_seconds', 0)))}"),
         ("Masa Aktif Kuis", f"{config.get('time_start_str', '--:--')} hingga {config.get('time_end_str', '--:--')} WIB")
     ]
 
@@ -1434,7 +1599,7 @@ def create_5_quiz_packages(master_quiz):
         packages.append(shuffled_list)
         
     return packages
-    
+
 # ==============================================================================
 # 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
 # ==============================================================================
@@ -1503,16 +1668,42 @@ if st.session_state.page == "landing":
     )
 
     st.write("---")
+    st.markdown("#### 👤 Portal SantriMANTAP")
+    st.markdown("""
+    <div class="guru-card" style="background: linear-gradient(135deg, #172554 0%, #312e81 100%); border-color: #6366f1;">
+        <h2 style="margin:0; font-size: 20px;">🌸 My Learning Intelligence</h2>
+        <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Pahami pola belajar dan tentukan langkah belajar berikutnya</p>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.button("Buka Portal Santri ➔", use_container_width=True, type="primary"):
+        st.session_state.page = "student_intelligence"
+        st.rerun()
+
+    st.write("---")
     st.markdown("#### 🧕🏼 Portal GuruMANTAP")
     st.markdown("""
     <div class="guru-card">
         <h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
-        <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal, dan integrasi WhatsApp</p>
+        <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal dan fitur automation</p>
     </div>
     """, unsafe_allow_html=True)
     if st.button("🔒 Masuk Portal Guru ➔", use_container_width=True):
         st.session_state.page = "guru_login"
         st.rerun()
+
+# ==============================================================================
+# 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
+# ==============================================================================
+#=========================================================================================================
+elif st.session_state.page == "student_intelligence":
+    st.markdown("### Student Intelligence")
+    if st.button("⬅️ Kembali ke Beranda", use_container_width=True):
+        st.session_state.page = "landing"
+        st.rerun()
+    render_student_intelligence_dashboard(
+        st.session_state.get("student_intelligence_name", ""),
+        st.session_state.get("student_intelligence_grade", "Semua Jenjang"),
+    )
 
 # ==============================================================================
 # 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
@@ -1533,7 +1724,7 @@ elif st.session_state.page == "guru_login":
             st.session_state.page = "guru_dashboard"
             st.rerun()
         else:
-            st.error("PIN Salah. Silakan coba lagi.")
+            st.error("PIN Salah. Silakhan coba lagi!")
 
 elif st.session_state.page == "guru_dashboard":
     if not st.session_state.guru_auth:
@@ -1541,7 +1732,7 @@ elif st.session_state.page == "guru_dashboard":
         st.stop()
 
     st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
-    tab1, tab2, tab3 = st.tabs(["🔴 Live Monitoring", "✨ Quiz Custom", "⚡ Automation"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🔴 Live Monitoring", "✨ Quiz Custom", "⚡ Automation", "📚 Bank Soal"])
     with tab1:
         st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Evaluasi Siswa</p>", unsafe_allow_html=True)
 
@@ -1561,13 +1752,13 @@ elif st.session_state.page == "guru_dashboard":
             st.markdown(
                 '<p style="font-size: 12px; opacity: 0.82;">'
                 '<span class="blinking-dot-green">🟢</span> '
-                '<b>Live aktif!</b> · memperbarui data secara real time, matikan Live bila Hp/Perangkat terasa Lemot'
+                '<b>LIVE AKTIF!</b> · memperbarui data secara real time, matikan Live bila Hp/Perangkat terasa Lemot.'
                 '</p>',
                 unsafe_allow_html=True
             )
         else:
             st.caption(
-                "⏸️ **Live dimatikan** · tampilan stabil dan nyaman untuk membaca laporan RoboMANTAP."
+                "⏸️ **Live Dimatikan** · tampilan stabil dan nyaman untuk membaca laporan RoboMANTAP."
             )
         
         # Kondisi Dasar: Abaikan status uji coba internal jika ada
@@ -2176,10 +2367,23 @@ elif st.session_state.page == "guru_dashboard":
                                     skor_omi = (b_cnt * 4) - (s_cnt * 1)
                                     pct = max(0, (skor_omi / 40) * 100)
 
-                                mini_cols = st.columns(3)
-                                mini_cols[0].metric("Benar", b_cnt)
-                                mini_cols[1].metric("Salah", s_cnt)
-                                mini_cols[2].metric("Kosong", k_cnt)
+                                # Display Kartu Ringkas
+                                st.markdown(f"""
+                                <div style="display: flex; gap: 6px; margin: 10px 0;">
+                                    <div style="flex: 1; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
+                                        <div style="font-size: 10px; color: #34d399; font-weight: 600;">Benar</div>
+                                        <div style="font-size: 16px; font-weight: 800;">{b_cnt}</div>
+                                    </div>
+                                    <div style="flex: 1; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
+                                        <div style="font-size: 10px; color: #f87171; font-weight: 600;">Salah</div>
+                                        <div style="font-size: 16px; font-weight: 800;">{s_cnt}</div>
+                                    </div>
+                                    <div style="flex: 1; background: rgba(156, 163, 175, 0.12); border: 1px solid rgba(156, 163, 175, 0.3); border-radius: 8px; padding: 6px; text-align: center;">
+                                        <div style="font-size: 10px; color: #9ca3af; font-weight: 600;">Kosong</div>
+                                        <div style="font-size: 16px; font-weight: 800;">{k_cnt}</div>
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
 
                                 if anti_detected:
                                     st.error(
@@ -2294,11 +2498,98 @@ elif st.session_state.page == "guru_dashboard":
     with tab2:
         custom_cfg = st.session_state.get("custom_quiz_config", {})
         custom_quiz = st.session_state.get("custom_quiz_draft", [])
+        material_code = st.session_state.get("material_bundle_code", "")
+        material_pack = st.session_state.get("material_bundle", None)
+
+        st.markdown("""
+        <div class="premium-hero">
+            <div class="premium-kicker">UPN • QUIZ-Intelligence</div>
+            <div class="premium-title">🧩 RoboMANTAP <span>Quiz Custom</span></div>
+            <div class="premium-subtitle">Susun soal presisi dari topik manual atau langsung dari materi GuruMANTAP yang dilampirkan.</div>
+            <div class="premium-pills">
+                <span>AI Grounded</span><span>QA Validator</span><span>Mobile Ready</span><span>Teacher First</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="source-warning">
+            <div class="source-warning-title">📌 PENTING!</div>
+            Mohon Ustadzah untuk ketik di kolom <b>Materi Utama</b> dengan teks <code>materi dilampirkan</code>
+            agar RoboMANTAP menggunakan file yang sudah di-drop sebagai sumber utama pembuatan soal dengan lebih akurat dan presisi.
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("#### 📚 Material Hub • File Drop Guru")
+        st.caption("Satu paket materi dapat berisi PDF, PPTX, DOCX, PNG, JPG, atau WEBP. Materi yang sama dapat dipakai kembali untuk Quiz, LKPD, dan Media Ajar.")
+
+        upload_col, status_col = st.columns([1.7, 1], gap="large")
+        with upload_col:
+            material_files = st.file_uploader(
+                "Drag & drop materi guru di sini",
+                type=["pdf", "pptx", "ppt", "docx", "png", "jpg", "jpeg", "webp"],
+                accept_multiple_files=True,
+                key="guru_material_drop",
+                help="Dapat menambahkan beberapa file sekaligus menjadi satu File Drop.",
+            )
+            if material_files:
+                file_rows = "".join(
+                    f"<div class='file-row'><span>📄 {html.escape(f.name)}</span><span>{len(f.getvalue())/1024:.0f} KB</span></div>"
+                    for f in material_files
+                )
+                st.markdown(f"<div class='file-list'>{file_rows}</div>", unsafe_allow_html=True)
+
+        with status_col:
+            current_code_html = (
+                f"<div class='hub-code'><div class='hub-code-label'>FILE DROP AKTIF</div><div class='hub-code-value'>{html.escape(material_code)}</div><div class='hub-code-note'>{material_pack.get('file_count',0) if isinstance(material_pack, dict) else 0} file tersimpan untuk sesi ini.</div></div>"
+                if material_code else
+                "<div class='hub-empty'><div class='hub-code-label'>MATERIAL HUB</div><div class='hub-empty-title'>Belum ada materi aktif</div><div class='hub-code-note'>Drop file → simpan → gunakan kode yang sama di Quiz / LKPD / PPT.</div></div>"
+            )
+            st.markdown(current_code_html, unsafe_allow_html=True)
+
+        save_material_col, recall_col = st.columns(2)
+        with save_material_col:
+            if st.button("💾 SIMPAN FILE DROP", type="primary", use_container_width=True, key="btn_save_material_hub"):
+                if not material_files:
+                    st.warning("Tambahkan minimal satu file terlebih dahulu.")
+                else:
+                    with st.spinner("RoboMANTAP membaca file, tabel, slide, gambar, dan membangun Source Knowledge Pack..."):
+                        built_pack = build_material_knowledge_pack(material_files)
+                    if not built_pack or not built_pack.get("files"):
+                        st.error("File belum berhasil dibaca. Cek format atau coba upload ulang.")
+                    else:
+                        new_code = f"MD-{uuid.uuid4().hex[:6].upper()}"
+                        meta_cfg = {
+                            "source": "teacher_file_drop",
+                            "file_count": built_pack.get("file_count", 0),
+                            "created_by": "RoboMANTAP Streamlit",
+                        }
+                        db_ok = save_material_bundle_to_db(new_code, built_pack, meta_cfg)
+                        st.session_state.material_bundle_code = new_code
+                        st.session_state.material_bundle = built_pack | {"bundle_code": new_code, "config": meta_cfg}
+                        if db_ok:
+                            st.success(f"✅ Materi berhasil disimpan. File Drop: **{new_code}**")
+                        else:
+                            st.warning(f"✅ Materi berhasil dibaca untuk sesi ini. Kode aktif: **{new_code}** (penyimpanan database belum terhubung).")
+                        st.rerun()
+        with recall_col:
+            recall_input = st.text_input("🔑 Ambil File Drop", value=material_code, placeholder="Contoh: MD-7K29FA", key="material_recall_code")
+            if st.button("↻ MUAT FILE DROP", use_container_width=True, key="btn_recall_material_hub"):
+                code = recall_input.strip().upper()
+                recalled = get_material_bundle_from_db(code) if code else None
+                if recalled:
+                    st.session_state.material_bundle_code = code
+                    st.session_state.material_bundle = recalled
+                    st.success(f"✅ File Drop **{code}** aktif kembali.")
+                    st.rerun()
+                else:
+                    st.error("Kode File Drop tidak ditemukan di Material Hub.")
+
+        st.markdown("---")
+        st.markdown("#### ⚙️ Konfigurasi Quiz Custom")
 
         with st.form("robomantap_quiz_custom_form", clear_on_submit=False):
-            st.markdown("#### 🧩 Konfigurasi Quiz Custom")
-
-            cqa, cqb = st.columns(2)
+            cqa, cqb = st.columns(2, gap="large")
             with cqa:
                 custom_mapel = st.text_input(
                     "📚 Mata Pelajaran",
@@ -2307,13 +2598,8 @@ elif st.session_state.page == "guru_dashboard":
                 )
                 custom_jenjang = st.selectbox(
                     "🏫 Jenjang",
-                    [                
-                        "MTs",                      
-                        "MA",            
-                    ],
-                    index=[
-                        "MTs", "MA"
-                    ].index(custom_cfg.get("jenjang", "MA")),
+                    ["MTs", "MA"],
+                    index=["MTs", "MA"].index(custom_cfg.get("jenjang", "MA")),
                 )
                 custom_kelas = st.text_input(
                     "🎓 Kelas / Tingkat",
@@ -2323,7 +2609,8 @@ elif st.session_state.page == "guru_dashboard":
                 custom_materi = st.text_input(
                     "📖 Materi Utama",
                     value=custom_cfg.get("materi", ""),
-                    placeholder="Contoh: Logaritma",
+                    placeholder="Ketik materi topik, atau tepat: materi dilampirkan",
+                    help="Gunakan 'materi dilampirkan' untuk menjadikan File Drop sebagai sumber utama.",
                 )
                 custom_submateri = st.text_input(
                     "🧠 Submateri (opsional)",
@@ -2358,19 +2645,16 @@ elif st.session_state.page == "guru_dashboard":
                     index=lang_options.index(custom_cfg.get("bahasa", "Bahasa Indonesia")),
                 )
                 context_options = [
-                    "Standar Sekolah",
-                    "Kehidupan Sehari-hari",
-                    "Keislaman",
-                    "Lingkungan",
-                    "Teknologi",
-                    "OMI / Olimpiade",
-                    "Campuran",
+                    "Standar Sekolah", "Kehidupan Sehari-hari", "Keislaman", "Lingkungan", "Teknologi", "OMI / Olimpiade", "Campuran",
                 ]
                 custom_konteks = st.selectbox(
                     "🌍 Konteks",
                     context_options,
                     index=context_options.index(custom_cfg.get("konteks", "Standar Sekolah")),
                 )
+
+            option_rule = "A–D • 4 pilihan" if option_count_for_jenjang(custom_jenjang) == 4 else "A–E • 5 pilihan"
+            st.info(f"🎯 **Aturan opsi {custom_jenjang}: {option_rule}.** RoboMANTAP akan memvalidasi jumlah opsi kembali sebelum kuis diterbitkan.")
 
             st.markdown("##### ⏱️ Durasi Pengerjaan Kuis")
             t1, t2, t3 = st.columns(3)
@@ -2384,31 +2668,20 @@ elif st.session_state.page == "guru_dashboard":
             timer_total = int(timer_h) * 3600 + int(timer_m) * 60 + int(timer_s)
             timer_label = "Tanpa batas waktu" if timer_total <= 0 else str(timedelta(seconds=timer_total))
             st.caption(f"⏳ Durasi sesi: **{timer_label}**")
-            
-            st.markdown("##### 📅 Masa Aktif Kuis (Rentang Waktu 1x24 Jam)")
-            st.caption("Set jam kuis mulai dibuka hingga otomatis ditutup:")
-            
-            now_wib_time = (datetime.utcnow() + timedelta(hours=7)).time()
-            default_end_time = (datetime.utcnow() + timedelta(hours=9)).time() # Default aktif 2 jam
 
+            st.markdown("##### 📅 Masa Aktif Kuis")
+            st.caption("Atur jam buka dan jam tutup kuis dalam WIB.")
+            now_wib_time = (datetime.utcnow() + timedelta(hours=7)).time()
+            default_end_time = (datetime.utcnow() + timedelta(hours=9)).time()
             col_act1, col_act2 = st.columns(2)
             with col_act1:
-                time_start = st.time_input(
-                    "Jam Buka:", 
-                    value=custom_cfg.get("time_start_val", now_wib_time),
-                    key="input_time_start"
-                )
+                time_start = st.time_input("Jam Buka", value=custom_cfg.get("time_start_val", now_wib_time), key="input_time_start")
             with col_act2:
-                time_end = st.time_input(
-                    "Jam Tutup:", 
-                    value=custom_cfg.get("time_end_val", default_end_time),
-                    key="input_time_end"
-                )
+                time_end = st.time_input("Jam Tutup", value=custom_cfg.get("time_end_val", default_end_time), key="input_time_end")
+            st.info(f"📌 **Masa Aktif:** {time_start.strftime('%H:%M')} → {time_end.strftime('%H:%M')} WIB")
 
-            st.info(f"📌 **Masa Aktif Kuis:** ( {time_start.strftime('%H:%M')} hingga {time_end.strftime('%H:%M')} WIB )")
-            
             submitted = st.form_submit_button(
-                "🧕🏼 GENERATE RoboMANTAP QUIZ CUSTOM",
+                "✨ GENERATE QUIZ CUSTOM • AI + SOURCE QA",
                 type="primary",
                 use_container_width=True,
             )
@@ -2417,22 +2690,32 @@ elif st.session_state.page == "guru_dashboard":
             now_wib = datetime.utcnow() + timedelta(hours=7)
             dt_start = datetime.combine(now_wib.date(), time_start)
             dt_end = datetime.combine(now_wib.date(), time_end)
-            # Jika jam tutup lebih kecil dari jam buka, anggap kuis selesai di hari berikutnya
             if dt_end <= dt_start:
                 dt_end += timedelta(days=1)
+
+            material_triggered = normalize_material_trigger(custom_materi)
+            source_pack_for_quiz = None
+            if material_triggered:
+                source_pack_for_quiz = st.session_state.get("material_bundle")
+                source_code = st.session_state.get("material_bundle_code", "")
+                if not source_pack_for_quiz and source_code:
+                    source_pack_for_quiz = get_material_bundle_from_db(source_code)
+                    if source_pack_for_quiz:
+                        st.session_state.material_bundle = source_pack_for_quiz
+                if not source_pack_for_quiz:
+                    st.error("⚠️ Materi ditandai 'materi dilampirkan', tetapi belum ada File Drop aktif. Upload + Simpan materi terlebih dahulu.")
 
             if not custom_mapel.strip():
                 st.error("⚠️ Mata pelajaran wajib diisi")
             elif not custom_materi.strip():
-                st.error("⚠️ Materi utama wajib diisi agar RoboMANTAP dapat merancang soal secara spesifik")
+                st.error("⚠️ Materi utama wajib diisi")
+            elif material_triggered and not source_pack_for_quiz:
+                pass
             else:
-                # Tampilkan info jika tanpa batas waktu (timer 0), tapi proses pembuatan soal tetap berjalan
                 if timer_total == 0:
                     st.info("⏱️ Kuis dibuat tanpa batas waktu pengerjaan.")
-
-                with st.spinner(
-                    f"RoboMANTAP sedang merancang {custom_jumlah} soal {custom_mapel} dengan tingkat {custom_kesulitan}..."
-                ):
+                source_label = "File Drop aktif" if material_triggered else "Topik manual"
+                with st.spinner(f"RoboMANTAP sedang merancang {custom_jumlah} soal • {source_label} • AI Validator aktif..."):
                     generated = generate_custom_quiz_ai(
                         mapel=custom_mapel.strip(),
                         jenjang=custom_jenjang,
@@ -2445,6 +2728,7 @@ elif st.session_state.page == "guru_dashboard":
                         bahasa=custom_bahasa,
                         konteks=custom_konteks,
                         timer_seconds=timer_total,
+                        source_pack=source_pack_for_quiz,
                     )
 
                 if generated:
@@ -2464,24 +2748,35 @@ elif st.session_state.page == "guru_dashboard":
                         "timer_m": int(timer_m),
                         "timer_s": int(timer_s),
                         "timer_seconds": timer_total,
-                        # --- PENAMBAHAN MASA AKTIF KUIS (WAJIB ADA) ---
                         "active_from": dt_start.isoformat(),
                         "active_until": dt_end.isoformat(),
                         "time_start_str": time_start.strftime('%H:%M'),
                         "time_end_str": time_end.strftime('%H:%M'),
+                        "material_bundle_code": st.session_state.get("material_bundle_code", "") if material_triggered else "",
+                        "source_mode": "teacher_material" if material_triggered else "manual_topic",
+                        "option_count": option_count_for_jenjang(custom_jenjang),
+                        "option_labels": list(option_labels_for_jenjang(custom_jenjang)),
                     }
                     custom_quiz = generated
                     custom_cfg = st.session_state.custom_quiz_config
-                    st.success(f"✅ {len(generated)} soal berhasil dibuat dan disimpan sebagai draft.")
+                    st.success(f"✅ {len(generated)} soal siap. Draft sudah melewati lapisan validasi AI.")
                 else:
-                    st.error(
-                        "❌ RoboMANTAP belum berhasil menghasilkan paket yang valid. "
-                        "Coba ulangi atau sederhanakan materi/konteks."
-                    )
+                    st.error("❌ RoboMANTAP belum berhasil menghasilkan paket soal valid. Coba ulangi atau perjelas materi.")
 
         if custom_quiz:
-            st.write("---")
-            st.markdown("#### 🔎 Preview Quiz Custom")
+            st.markdown("---")
+            source_mode = custom_cfg.get("source_mode", "manual_topic")
+            source_chip = (
+                f"<span class='chip chip-green'>📚 Source Grounding • {html.escape(custom_cfg.get('material_bundle_code','-'))}</span>"
+                if source_mode == "teacher_material" else
+                "<span class='chip chip-blue'>🧠 Topic Architect • manual</span>"
+            )
+            st.markdown(f"""
+            <div class="preview-hero">
+                <div><div class="preview-label">QUIZ PREVIEW</div><div class="preview-title">{html.escape(custom_cfg.get('mapel','Kuis'))}</div></div>
+                <div class="preview-meta">{source_chip}<span class='chip chip-purple'>{len(custom_quiz)} soal</span><span class='chip chip-blue'>Opsi {"A-D" if option_count_for_jenjang(custom_cfg.get("jenjang", "MTs")) == 4 else "A-E"}</span><span class='chip chip-gold'>{html.escape(custom_cfg.get('kesulitan','-'))}</span></div>
+            </div>
+            """, unsafe_allow_html=True)
             st.caption(
                 f"{custom_cfg.get('mapel', '-')} • {custom_cfg.get('jenjang', '-')} • "
                 f"{custom_cfg.get('kesulitan', '-')} • {len(custom_quiz)} soal • "
@@ -2497,131 +2792,464 @@ elif st.session_state.page == "guru_dashboard":
                     with st.expander("Lihat Solution Basis"):
                         st.markdown(cq.get("solution_basis", "Belum tersedia."))
 
-            # Generate dokumen Word (.docx) berformat rapi
             docx_data = generate_quiz_docx(custom_cfg, custom_quiz)
             clean_mapel_name = custom_cfg.get('mapel', 'Quiz').replace(' ', '_')
-
             st.download_button(
                 label="📄 Download Paket Kuis (.docx)",
                 data=docx_data,
                 file_name=f"RoboMANTAP_Kuis_{clean_mapel_name}.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True,
-                type="primary"
+                type="primary",
             )
 
             st.markdown("#### 🚀 Terbitkan Kuis ke Siswa")
-
-            # 1. Inisialisasi kode default sekali saja agar tidak berubah saat rerun
             if "default_quiz_code" not in st.session_state:
                 st.session_state.default_quiz_code = f"MNT-{uuid.uuid4().hex[:4].upper()}"
-
             col_pub1, col_pub2 = st.columns([2, 1])
             with col_pub1:
-                # 2. Gunakan key="user_quiz_code" agar Streamlit mengunci input dari guru
                 st.text_input(
-                    "🔑 Buat Kode Kuis Unik (opsional):", 
-                    value=st.session_state.default_quiz_code, 
+                    "🔑 Buat Kode Kuis Unik (opsional)",
+                    value=st.session_state.default_quiz_code,
                     max_chars=15,
                     key="user_quiz_code",
-                    help="Ubah teks ini jika ingin membuat kode khusus (misal: MTK-KLS10)"
+                    help="Contoh: MTK-KLS10",
                 )
             with col_pub2:
                 st.write("")
-                if st.button("🚀 TERBITKAN KUIS CUSTOM", type="primary", use_container_width=True):
+                if st.button("🚀 TERBITKAN KUIS", type="primary", use_container_width=True):
                     clean_code = st.session_state.user_quiz_code.strip().upper()
-                    
                     if not clean_code:
-                        st.warning("⚠️ Kode kuis tidak boleh kosong!")
+                        st.warning("⚠️ Kode kuis tidak boleh kosong.")
                     else:
-                        # Pre-generate 5 Paket Soal Acak sebelum masuk Database
                         packages_5 = create_5_quiz_packages(custom_quiz)
                         custom_cfg["packages"] = packages_5
-                        
                         if publish_custom_quiz_to_db(clean_code, custom_cfg, custom_quiz):
                             st.session_state.last_published_code = clean_code
                             st.session_state.default_quiz_code = f"MNT-{uuid.uuid4().hex[:4].upper()}"
-                            st.success(f"🎉 Kuis Berhasil Diterbitkan! 5 Paket Soal Acak Siap Digunakan. Bagikan Kode: **{clean_code}**")
+                            st.success(f"🎉 Kuis diterbitkan. 5 Paket Soal Acak siap digunakan. Kode: **{clean_code}**")
                         else:
                             st.error("❌ Gagal menerbitkan kuis. Periksa koneksi Database.")
-                        
-        st.write("---")
+
         st.markdown("""
-        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; margin-bottom: 15px;">
-            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
-                🧕 RoboMANTAP QUIZ CUSTOM 
-            </div>
-            <ul style="margin: 6px 0 0 0; padding-left: 18px;">
-                <li><b>✨ Buat kuis sesuai kebutuhan Anda!</b></li>
-                <li><b>⚡ Atur → Klik → Siap Digunakan!</b></li>
-            </ul>
-            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
-                Ingin sistem seperti ini diterapkan secara resmi di sekolah Anda? U.Project Nexus menyediakan implementasi dan kustomisasi sistem sesuai kebutuhan institusi.
-            </div>
+        <div class="premium-footer-card">
+            <div class="footer-kicker">ROBO MANTAP • U.PROJECT NEXUS</div>
+            <div class="footer-title">Satu sumber materi, banyak output pembelajaran.</div>
+            <div class="footer-copy">Material Hub dapat dipakai kembali untuk Quiz Custom, LKPD, dan Media Ajar PPT tanpa upload ulang.</div>
         </div>
         """, unsafe_allow_html=True)
 
     with tab3:
-        # GENERATOR LKPD EKSKLUSIF BERLOGO
         st.markdown("""
-        <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 12px; border-radius: 10px; border: 1px solid #059669; color: white; margin-bottom: 12px;">
-            <div style="font-size: 14px; font-weight: 700;">📄 Generator LKPD</div>
-            <div style="font-size: 11px; opacity: 0.85; margin-top: 2px;">Terintegrasi AI By U.Project Nexus dengan format menyesuaikan sekolah</div>
+        <div class="premium-hero automation-hero">
+            <div class="premium-kicker">UPN • AUTOMATION STUDIO</div>
+            <div class="premium-title">⚡ RoboMANTAP <span>Automation</span></div>
+            <div class="premium-subtitle">Bangun LKPD dan media presentasi dari topik manual atau File Drop yang sama.</div>
+            <div class="premium-pills"><span>LKPD PDF</span><span>Media PPTX</span><span>Speaker Notes</span><span>Material Reuse</span></div>
         </div>
         """, unsafe_allow_html=True)
 
-        topic_lkpd = st.text_input("Topik / Materi Pembelajaran:", placeholder="Contoh: Persamaan Kuadrat / Tajwid Hukum Nun Mati", key="lkpd_topic")
-        
-        col_lkpd1, col_lkpd2 = st.columns(2)
-        with col_lkpd1:
-            kelas_lkpd = st.selectbox("Kelas / Jenjang:", ["VII MTs", "VIII MTs", "IX MTs", "X MA", "XI MA", "XII MA"], key="lkpd_kelas")
-        with col_lkpd2:
-            mapel_lkpd = st.selectbox("Mata Pelajaran:", ["Matematika", "IPA", "IPS", "PAI & Bahasa Arab", "Fisika", "Biologi", "Kimia"], key="lkpd_mapel")
+        shared_code = st.session_state.get("material_bundle_code", "")
+        shared_pack = st.session_state.get("material_bundle", None)
+        auto1, auto2, auto3 = st.tabs(["📄 LKPD Studio", "📊 Media Ajar PPT", "📦 Paket Pembelajaran"])
 
-        st.caption("💡*Modul cetak PDF ini adalah versi demo. Tampilan cover, logo, dan struktur LKPD dapat ditingkatkan atau disesuaikan penuh berdasarkan permintaan pihak sekolah*")
-        if st.button("📄 Generate LKPD (.pdf)", type="primary", use_container_width=True):
-            if not topic_lkpd.strip():
-                st.warning("⚠️ Ketik topik/materi pembelajarannya dulu ya!")
-            else:
-                with st.spinner("RoboMANTAP sedang merancang LKPD Anda..."):
-                    ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, topic_lkpd)
+        with auto1:
+            st.markdown("#### 📄 LKPD Studio")
+            st.caption("LKPD generatif dengan layout premium, logo UPN, dan grounding materi yang sama dengan Quiz Custom.")
+            lk_source_col, lk_code_col = st.columns([1.4, 1])
+            with lk_source_col:
+                topic_lkpd = st.text_input("Topik / Materi Pembelajaran", value="", placeholder="Contoh: Persamaan Kuadrat", key="lkpd_topic")
+            with lk_code_col:
+                lk_material_code = st.text_input("File Drop (opsional)", value=shared_code, placeholder="MD-XXXXXX", key="lkpd_material_code")
+            col_lkpd1, col_lkpd2 = st.columns(2)
+            with col_lkpd1:
+                kelas_lkpd = st.selectbox("Kelas / Jenjang", ["VII MTs", "VIII MTs", "IX MTs", "X MA", "XI MA", "XII MA"], key="lkpd_kelas")
+            with col_lkpd2:
+                mapel_lkpd = st.selectbox("Mata Pelajaran", ["Matematika", "IPA", "IPS", "PAI & Bahasa Arab", "Fisika", "Biologi", "Kimia", "Bahasa Indonesia", "Bahasa Inggris"], key="lkpd_mapel")
+
+            if st.button("✨ GENERATE LKPD PREMIUM", type="primary", use_container_width=True, key="generate_lkpd_premium"):
+                source_for_lkpd = shared_pack if lk_material_code.strip().upper() == shared_code and shared_pack else None
+                if lk_material_code.strip():
+                    source_for_lkpd = get_material_bundle_from_db(lk_material_code.strip().upper()) or source_for_lkpd
+                if not topic_lkpd.strip() and not source_for_lkpd:
+                    st.warning("Isi topik atau masukkan File Drop yang sudah disimpan.")
+                else:
+                    effective_topic = topic_lkpd.strip() or "Materi terlampir"
+                    with st.spinner("RoboMANTAP sedang menyusun LKPD • mengikat sumber • menata layout..."):
+                        ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, effective_topic, source_pack=source_for_lkpd)
                     if not ai_content:
-                        st.error("Gagal menyusun LKPD. Silakan coba klik tombol sekali lagi.")
+                        st.error("LKPD belum berhasil dibuat. Silakan coba ulangi.")
                     else:
-                        pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, topic_lkpd, ai_content)
-                        # Simpan hasil PDF & nama file ke session_state agar permanen
+                        pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, effective_topic, ai_content, logo_path=UPN_PRIMARY_LOGO)
                         st.session_state.lkpd_pdf_bytes = pdf_buffer.getvalue()
-                        st.session_state.lkpd_filename = f"LKPD_{mapel_lkpd}_{topic_lkpd.replace(' ', '_')}_GuruMANTAP.pdf"
-        # TAMPILKAN TOMBOL DOWNLOAD PERMANEN
-        if st.session_state.get("lkpd_pdf_bytes"):
-            st.success("✅ Dokumen LKPD Berhasil Dibuat!")
-            st.download_button(
-                label="📥 Download LKPD",
-                type="primary",
-                data=st.session_state.lkpd_pdf_bytes,
-                file_name=st.session_state.get("lkpd_filename", "LKPD_RoboMANTAP.pdf"),
-                mime="application/pdf",
-                use_container_width=True
-            )
-                        
-        st.write("---")
+                        st.session_state.lkpd_filename = f"RoboMANTAP_LKPD_{mapel_lkpd}_{effective_topic.replace(' ', '_')}.pdf"
+                        st.session_state.lkpd_source_code = lk_material_code.strip().upper()
+                        st.success("✅ LKPD premium berhasil dibuat.")
+
+            if st.session_state.get("lkpd_pdf_bytes"):
+                st.markdown("<div class='result-card'><div class='result-card-title'>✅ LKPD READY</div><div class='result-card-copy'>Dokumen siap dicetak atau dibagikan ke guru/siswa.</div></div>", unsafe_allow_html=True)
+                st.download_button(
+                    label="📥 DOWNLOAD LKPD PDF",
+                    type="primary",
+                    data=st.session_state.lkpd_pdf_bytes,
+                    file_name=st.session_state.get("lkpd_filename", "RoboMANTAP_LKPD.pdf"),
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key="download_lkpd_premium",
+                )
+
+        with auto2:
+            st.markdown("#### 📊 Media Ajar Studio")
+            st.caption("Storyboard → visual shape → speaker notes → PPTX 16:9 siap presentasi.")
+            media_source_col, media_info_col = st.columns([1.5, 1])
+            with media_source_col:
+                media_topic = st.text_input("Topik Presentasi", value="", placeholder="Contoh: Sistem Persamaan Linear", key="media_topic")
+                media_material_code = st.text_input("File Drop (opsional)", value=shared_code, placeholder="MD-XXXXXX", key="media_material_code")
+            with media_info_col:
+                media_slide_count = st.number_input("Jumlah Slide", min_value=6, max_value=30, value=12, step=1, key="media_slide_count")
+                media_duration = st.number_input("Durasi Kelas (menit)", min_value=15, max_value=180, value=60, step=5, key="media_duration")
+            m1, m2, m3 = st.columns(3)
+            with m1:
+                media_lang = st.selectbox("Bahasa", ["Bahasa Indonesia", "Indonesia + Arab", "English"], key="media_lang")
+            with m2:
+                media_style = st.selectbox("Gaya Visual", ["Premium UPN", "Academic Clean", "Modern Madrasah", "Minimal Executive"], key="media_style")
+            with m3:
+                media_mode = st.selectbox("Mode Presenter", ["Interactive", "Expository", "HOTS / Discussion"], key="media_mode")
+
+            if st.button("🚀 BUILD MEDIA AJAR • PPTX", type="primary", use_container_width=True, key="generate_media_ppt"):
+                source_for_media = shared_pack if media_material_code.strip().upper() == shared_code and shared_pack else None
+                if media_material_code.strip():
+                    source_for_media = get_material_bundle_from_db(media_material_code.strip().upper()) or source_for_media
+                if not media_topic.strip() and not source_for_media:
+                    st.warning("Isi topik presentasi atau masukkan File Drop.")
+                else:
+                    effective_media_topic = media_topic.strip() or "Materi terlampir"
+                    with st.spinner(f"RoboMANTAP sedang membangun storyboard {media_slide_count} slide + speaker notes..."):
+                        storyboard = generate_media_ajar_ai(
+                            mapel=mapel_lkpd if 'mapel_lkpd' in locals() else "Umum",
+                            jenjang=st.session_state.get("jenjang") or "MA",
+                            kelas=kelas_lkpd if 'kelas_lkpd' in locals() else "X MA",
+                            topik=effective_media_topic,
+                            jumlah_slide=int(media_slide_count),
+                            durasi_menit=int(media_duration),
+                            bahasa=media_lang,
+                            gaya=media_style,
+                            mode_presentasi=media_mode,
+                            source_pack=source_for_media,
+                        )
+                    if not storyboard:
+                        st.error("Storyboard PPT belum berhasil dibuat. Coba ulangi.")
+                    else:
+                        ppt_bytes = build_media_ajar_pptx(
+                            storyboard,
+                            {
+                                "mapel": mapel_lkpd if 'mapel_lkpd' in locals() else "Umum",
+                                "kelas": kelas_lkpd if 'kelas_lkpd' in locals() else "X MA",
+                            },
+                            logo_path=UPN_MARK_LOGO,
+                        )
+                        st.session_state.media_ppt_bytes = ppt_bytes
+                        st.session_state.media_ppt_filename = f"RoboMANTAP_Media_{re.sub(r'[^A-Za-z0-9_-]+','_',effective_media_topic)}.pptx"
+                        st.session_state.media_storyboard = storyboard
+                        st.success("✅ Media Ajar PPT siap digunakan di kelas.")
+
+            if st.session_state.get("media_storyboard"):
+                story = st.session_state.media_storyboard
+                st.markdown(f"<div class='result-card'><div class='result-card-title'>{html.escape(story.get('deck_title','Media Ajar RoboMANTAP'))}</div><div class='result-card-copy'>{html.escape(story.get('deck_subtitle','PPTX siap presentasi • speaker notes terpasang'))}</div></div>", unsafe_allow_html=True)
+                for slide in story.get("slides", [])[:12]:
+                    st.markdown(f"<div class='story-card'><div class='story-number'>{slide.get('slide',0):02d}</div><div><b>{html.escape(slide.get('title',''))}</b><div class='story-meta'>{html.escape(slide.get('visual_type','concept'))} · {html.escape(slide.get('source_locator','') or 'source internal')}</div></div></div>", unsafe_allow_html=True)
+                st.download_button(
+                    label="📊 DOWNLOAD MEDIA AJAR PPTX",
+                    type="primary",
+                    data=st.session_state.media_ppt_bytes,
+                    file_name=st.session_state.get("media_ppt_filename", "RoboMANTAP_Media_Ajar.pptx"),
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    use_container_width=True,
+                    key="download_media_ppt",
+                )
+
+        with auto3:
+            st.markdown("#### 📦 Paket Pembelajaran Terintegrasi")
+            st.caption("Gunakan satu topik / satu File Drop untuk menghasilkan LKPD PDF dan Media Ajar PPT dalam satu alur kerja.")
+            package_topic = st.text_input("Topik Paket", placeholder="Contoh: Fungsi Kuadrat", key="package_topic")
+            package_code = st.text_input("File Drop Paket (opsional)", value=shared_code, placeholder="MD-XXXXXX", key="package_code")
+            pc1, pc2, pc3 = st.columns(3)
+            with pc1:
+                package_mapel = st.text_input("Mapel", value="Matematika", key="package_mapel")
+            with pc2:
+                package_kelas = st.selectbox("Kelas", ["VII MTs", "VIII MTs", "IX MTs", "X MA", "XI MA", "XII MA"], key="package_kelas")
+            with pc3:
+                package_slides = st.number_input("Slide PPT", min_value=6, max_value=24, value=12, step=1, key="package_slides")
+
+            if st.button("⚡ GENERATE PAKET LKPD + PPT", type="primary", use_container_width=True, key="generate_package"):
+                pack_source = shared_pack if package_code.strip().upper() == shared_code and shared_pack else None
+                if package_code.strip():
+                    pack_source = get_material_bundle_from_db(package_code.strip().upper()) or pack_source
+                if not package_topic.strip() and not pack_source:
+                    st.warning("Isi topik paket atau pilih File Drop yang tersimpan.")
+                else:
+                    effective_package_topic = package_topic.strip() or "Materi terlampir"
+                    with st.spinner("Membangun Paket Pembelajaran: LKPD + Storyboard + PPTX..."):
+                        pack_lkpd = generate_lkpd_content(package_mapel, package_kelas, effective_package_topic, source_pack=pack_source)
+                        pack_story = generate_media_ajar_ai(
+                            mapel=package_mapel,
+                            jenjang=package_kelas.split()[-1] if package_kelas else "MA",
+                            kelas=package_kelas,
+                            topik=effective_package_topic,
+                            jumlah_slide=int(package_slides),
+                            durasi_menit=60,
+                            bahasa="Bahasa Indonesia",
+                            gaya="Premium UPN",
+                            mode_presentasi="Interactive",
+                            source_pack=pack_source,
+                        )
+                    if not pack_lkpd or not pack_story:
+                        st.error("Paket belum lengkap. Silakan ulangi sekali lagi.")
+                    else:
+                        pack_pdf = create_lkpd_pdf_buffer(package_mapel, package_kelas, effective_package_topic, pack_lkpd, logo_path=UPN_PRIMARY_LOGO).getvalue()
+                        pack_ppt = build_media_ajar_pptx(pack_story, {"mapel": package_mapel, "kelas": package_kelas}, logo_path=UPN_MARK_LOGO)
+                        st.session_state.package_lkpd_bytes = pack_pdf
+                        st.session_state.package_ppt_bytes = pack_ppt
+                        st.success("✅ Paket Pembelajaran selesai dibuat dari sumber yang sama.")
+
+            if st.session_state.get("package_lkpd_bytes") and st.session_state.get("package_ppt_bytes"):
+                pdl, pdp = st.columns(2)
+                with pdl:
+                    st.download_button("📄 DOWNLOAD LKPD", data=st.session_state.package_lkpd_bytes, file_name="RoboMANTAP_Paket_LKPD.pdf", mime="application/pdf", use_container_width=True, key="download_package_lkpd")
+                with pdp:
+                    st.download_button("📊 DOWNLOAD PPT", data=st.session_state.package_ppt_bytes, file_name="RoboMANTAP_Paket_Media.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation", use_container_width=True, key="download_package_ppt")
+
         st.markdown("""
-        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; margin-bottom: 15px;">
-            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
-                ⚡ RoboMANTAP AUTOMATION
-            </div>
-            <ul style="margin: 6px 0 0 0; padding-left: 18px;">
-                <li><b>📄 Atur format → klik → LKPD siap!</b></li>
-                <li><b>📲 WhatsApp Automation!</b></li>
-                <li><b>🧕🏼 RoboMANTAP AI Tutor 24/7!</b></li>
-            </ul>
-            <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
-                Ingin sistem seperti ini diterapkan secara resmi di sekolah Anda? U.Project Nexus menyediakan implementasi dan kustomisasi sistem sesuai kebutuhan institusi.
-            </div>
+        <div class="premium-footer-card">
+            <div class="footer-kicker">AUTOMATION STUDIO</div>
+            <div class="footer-title">Satu Material Hub → Quiz + LKPD + Media Ajar.</div>
+            <div class="footer-copy">Tujuannya bukan sekadar membuat file, tetapi menjaga sumber pembelajaran tetap konsisten antar-output.</div>
+        </div>
+        """, unsafe_allow_html=True)
+# ==============================================================================
+
+    with tab4:
+        st.markdown("""
+        <div class="premium-hero automation-hero">
+            <div class="premium-kicker">UPN • ASSESSMENT INTELLIGENCE</div>
+            <div class="premium-title">📚 RoboMANTAP <span>Bank Soal</span></div>
+            <div class="premium-subtitle">Upload kisi-kisi ujian → baca blueprint → buat variasi → validasi → export DOCX.</div>
+            <div class="premium-pills"><span>Blueprint First</span><span>Variant Engine</span><span>AI QA</span><span>Traceability</span><span>DOCX Ready</span></div>
         </div>
         """, unsafe_allow_html=True)
 
-# ==============================================================================
+        st.markdown("""
+        <div class="source-warning">
+            <div class="source-warning-title">🎯 Prinsip Bank Soal</div>
+            <b>Kisi-kisi adalah sumber kebenaran.</b> ATP, indikator, bentuk soal, dan nomor
+            dipertahankan. Filter guru hanya mengatur jenjang dan jumlah variasi.
+        </div>
+        """, unsafe_allow_html=True)
+
+        bank_file = st.file_uploader(
+            "📥 Upload Kisi-Kisi Ujian (.docx)",
+            type=["docx"],
+            key="bank_blueprint_upload",
+            help="Gunakan DOCX dengan tabel NO • ATP • INDIKATOR SOAL • [Level Kognitif/C1–C6] • PG • Isian • Uraian. Level C1–C6 akan menjadi constraint generator dan QA bila tersedia.",
+        )
+
+        if bank_file is not None:
+            raw_bank_bytes = bank_file.getvalue()
+            current_hash = hashlib.sha256(raw_bank_bytes).hexdigest()
+            if st.session_state.get("bank_blueprint_hash") != current_hash:
+                with st.spinner("RoboMANTAP membaca struktur tabel kisi-kisi..."):
+                    parsed_blueprint = extract_blueprint_from_docx(raw_bank_bytes)
+                st.session_state.bank_blueprint = parsed_blueprint
+                st.session_state.bank_blueprint_hash = current_hash
+                st.session_state.bank_questions = []
+                st.session_state.bank_report = None
+                st.session_state.bank_docx_bytes = None
+                st.session_state.bank_docx_config_signature = None
+
+        blueprint = st.session_state.get("bank_blueprint")
+
+        if blueprint:
+            summary = blueprint_summary(blueprint)
+            metadata = blueprint.get("metadata", {})
+
+            st.markdown("#### 1. Blueprint berhasil dibaca")
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: st.metric("Blueprint", summary["blueprint_count"])
+            with c2: st.metric("Slot Kisi-Kisi", summary["base_slots"])
+            with c3: st.metric("PG", summary["slots_by_form"].get("PG", 0))
+            with c4: st.metric("Isian + Uraian", summary["slots_by_form"].get("Isian", 0) + summary["slots_by_form"].get("Uraian", 0))
+            st.caption(
+                f"📄 {bank_file.name if bank_file else 'Kisi-kisi tersimpan'} • "
+                f"{metadata.get('assessment') or 'Asesmen'} • Tahun {metadata.get('school_year') or '-'}"
+            )
+            cognitive_counts = summary.get("cognitive_levels", {})
+            if cognitive_counts:
+                level_text = " • ".join(f"{level}: {count}" for level, count in cognitive_counts.items())
+                st.info(f"🧠 Level kognitif terbaca: **{level_text}**. Level ini menjadi constraint generator dan QA.")
+
+            if blueprint.get("warnings"):
+                for warning in blueprint["warnings"]:
+                    st.warning(warning)
+
+            with st.expander("🔎 Lihat Blueprint yang Dibaca", expanded=True):
+                rows = extract_blueprint_preview_rows(blueprint)
+                if rows:
+                    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                st.caption("Ekstraksi menggunakan struktur tabel DOCX. Jika tersedia, Level Kognitif C1–C6 ikut menjadi constraint generator dan QA.")
+
+            st.markdown("#### 2. Konfigurasi Generator")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                bank_jenjang = st.selectbox("🏫 Jenjang", ["SD", "SMP", "SMA", "MTs", "MA"], key="bank_jenjang")
+            with c2:
+                bank_mapel = st.text_input("📚 Mata Pelajaran", value=metadata.get("subject") or "Matematika", key="bank_mapel")
+            with c3:
+                bank_kelas = st.text_input("🎓 Kelas / Tingkat", value=metadata.get("grade") or "", key="bank_kelas")
+
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                bank_variants = st.number_input(
+                    "🔁 Jumlah Variasi per Blueprint", min_value=1, max_value=10, value=3, step=1,
+                    key="bank_variants",
+                    help="3 berarti setiap blueprint dibuat menjadi 3 variasi berbeda dengan kompetensi yang sama.",
+                )
+            with c2:
+                bank_language = st.selectbox("🌐 Bahasa Soal", ["Bahasa Indonesia", "Bahasa Arab", "Indonesia + Arab", "English"], key="bank_language")
+
+            estimated = summary["base_slots"] * int(bank_variants)
+            st.info(
+                f"📐 Estimasi: **{summary['base_slots']} slot dasar × {int(bank_variants)} variasi = {estimated} soal**. "
+                "Jika satu blueprint memiliki beberapa bentuk soal, semua bentuk tetap dipertahankan."
+            )
+
+            if st.button("🚀 GENERATE BANK SOAL • BLUEPRINT QA", type="primary", use_container_width=True, key="generate_bank_soal"):
+                if not bank_mapel.strip():
+                    st.error("Mata pelajaran wajib diisi.")
+                elif not blueprint.get("blueprints"):
+                    st.error("Blueprint belum terbaca.")
+                else:
+                    with st.spinner(f"RoboMANTAP membuat {estimated} soal dan menjalankan QA blueprint..."):
+                        questions, report = generate_bank_soal(
+                            blueprint, variants=int(bank_variants), jenjang=bank_jenjang,
+                            mapel=bank_mapel.strip(), kelas=bank_kelas.strip(), language=bank_language,
+                        )
+                    st.session_state.bank_questions = questions
+                    st.session_state.bank_report = report
+                    st.session_state.bank_docx_bytes = None
+                    st.session_state.bank_docx_config_signature = None
+                    if report.get("deterministic_ok") and report.get("review_count", 0) == 0:
+                        st.success(f"✅ Bank soal selesai: {len(questions)} soal.")
+                    elif questions:
+                        st.warning(f"⚠️ {len(questions)} soal tersedia; {report.get('review_count', 0)} berstatus REVIEW.")
+                    else:
+                        st.error("❌ Bank soal belum berhasil dibuat lengkap.")
+
+            questions = st.session_state.get("bank_questions", [])
+            report = st.session_state.get("bank_report") or {}
+            if questions:
+                st.markdown("---")
+                st.markdown("#### 3. QA & Preview")
+                c1, c2, c3, c4 = st.columns(4)
+                with c1: st.metric("Generated", report.get("generated_total", len(questions)))
+                with c2: st.metric("Expected", report.get("expected_total", estimated))
+                with c3: st.metric("QA PASS", report.get("pass_count", 0))
+                with c4: st.metric("Review", report.get("review_count", 0))
+
+                qa = report.get("ai_qa") or {}
+                if qa.get("notes"):
+                    st.caption("QA: " + " • ".join(map(str, qa.get("notes", [])[:3])))
+
+                tabs = st.tabs(["Pilihan Ganda", "Isian", "Uraian"])
+                for form_code, tab in zip(["PG", "Isian", "Uraian"], tabs):
+                    with tab:
+                        form_questions = [q for q in questions if q.get("question_type") == form_code]
+                        if not form_questions:
+                            st.info("Tidak ada soal dengan bentuk ini pada kisi-kisi.")
+                            continue
+                        for i, q in enumerate(form_questions, start=1):
+                            icon = "✅" if q.get("_qa_status") == "pass" else "⚠️"
+                            with st.expander(
+                                f"{icon} {i:02d} • {q.get('blueprint_id')} • V{q.get('variant')} • No. {q.get('source_number')}",
+                                expanded=(i == 1),
+                            ):
+                                st.caption(f"Blueprint {q.get('blueprint_id')} • Variasi {q.get('variant')} • Level {q.get('cognitive_level') or '—'} • Bentuk {q.get('question_type')}")
+                                st.markdown(q.get("question", ""))
+                                for opt in q.get("options", []):
+                                    st.markdown(f"- {opt}")
+                                st.success(f"Jawaban: **{q.get('correct_answer', '')}**")
+                                with st.expander("Lihat Pembahasan"):
+                                    st.markdown(q.get("solution_basis", "Belum tersedia."))
+
+                st.markdown("#### 4. Download Word")
+                include_key = st.checkbox(
+                    "Sertakan kunci jawaban & pembahasan",
+                    value=True,
+                    key="bank_include_key",
+                    help="Jika dicentang, bagian Kunci dan Pembahasan ikut dimasukkan ke DOCX.",
+                )
+                include_map = st.checkbox(
+                    "Sertakan Peta Blueprint / Traceability",
+                    value=True,
+                    key="bank_include_map",
+                    help="Jika dicentang, Peta Blueprint dan Lampiran Traceability ikut dimasukkan ke DOCX.",
+                )
+
+                # A DOCX is tied to the exact checkbox/configuration used when it
+                # was built. This prevents Streamlit reruns from offering an old
+                # file after the teacher changes a checkbox.
+                current_docx_signature = (
+                    bool(include_key),
+                    bool(include_map),
+                    int(bank_variants),
+                    str(bank_jenjang),
+                    str(bank_mapel.strip()),
+                    str(bank_kelas.strip()),
+                    len(questions),
+                )
+                built_signature = st.session_state.get("bank_docx_config_signature")
+                if st.session_state.get("bank_docx_bytes") and built_signature != current_docx_signature:
+                    st.session_state.bank_docx_bytes = None
+                    st.session_state.bank_docx_config_signature = None
+                    st.info("ℹ️ Pilihan download berubah. Klik **BUILD BANK SOAL (.DOCX)** kembali agar dokumen mengikuti centang terbaru.")
+
+                if st.button("📄 BUILD BANK SOAL (.DOCX)", type="primary", use_container_width=True, key="build_bank_docx"):
+                    with st.spinner("Menata Bank Soal ke Word..."):
+                        st.session_state.bank_docx_bytes = build_bank_soal_docx(
+                            blueprint, questions, jenjang=bank_jenjang, mapel=bank_mapel.strip(),
+                            kelas=bank_kelas.strip(), variants=int(bank_variants),
+                            include_answer_key=bool(include_key), include_blueprint_map=bool(include_map),
+                            logo_path=(os.path.join(os.path.dirname(__file__), "logo.png") if os.path.exists(os.path.join(os.path.dirname(__file__), "logo.png")) else None),
+                        )
+                    st.session_state.bank_docx_config_signature = current_docx_signature
+                    st.success(
+                        "✅ Dokumen Bank Soal siap dengan konfigurasi: "
+                        f"kunci/pembahasan={'YA' if include_key else 'TIDAK'} • "
+                        f"peta/traceability={'YA' if include_map else 'TIDAK'}."
+                    )
+
+                if (
+                    st.session_state.get("bank_docx_bytes")
+                    and st.session_state.get("bank_docx_config_signature") == current_docx_signature
+                ):
+                    safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", bank_mapel.strip() or "Bank_Soal")
+                    st.download_button(
+                        "⬇️ DOWNLOAD BANK SOAL WORD",
+                        data=st.session_state.bank_docx_bytes,
+                        file_name=f"RoboMANTAP_Bank_Soal_{safe_name}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        key="download_bank_docx",
+                    )
+
+            st.markdown("""
+            <div class="premium-footer-card">
+                <div class="footer-kicker">ROBO MANTAP • U.PROJECT NEXUS</div>
+                <div class="footer-title">Blueprint → Variants → QA → Exam-Ready Document.</div>
+                <div class="footer-copy">Setiap soal dapat ditelusuri kembali ke blueprint, variasi, level kognitif, bentuk, dan nomor sumber.</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+
 # 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
 # ==============================================================================
 elif st.session_state.page == "select_mapel":
@@ -2724,7 +3352,7 @@ elif st.session_state.page == "setup":
 # ==============================================================================
 elif st.session_state.page == "setup_custom":
     pkg = st.session_state.get("custom_pkg", {})
-    cfg = pkg.get("config", {})
+    cfg = normalize_custom_timer_config(pkg.get("config", {}) or {})
     
     st.markdown(f"""
     <div style="font-size: 23px; font-weight: bold; line-height: 1.4; margin-bottom: 10px;">
@@ -2963,7 +3591,9 @@ elif st.session_state.page == "quiz":
             try:
                 update_progress_siswa(
                     sess_id, n_siswa, j_jang, m_pel,
-                    c_idx, detail, "BERJALAN", is_custom=c_custom
+                    c_idx, detail, "BERJALAN", is_custom=c_custom,
+                    user_answers_dict=dict(st.session_state.user_answers),
+                    quiz_data_list=list(quiz_data),
                 )
             except Exception:
                 pass  # Jika DB sibuk, hindari membuat UI siswa crash
@@ -3085,7 +3715,9 @@ elif st.session_state.page == "result":
         total_soal,
         detail,
         "SELESAI",
-        is_custom=st.session_state.get("is_custom_quiz", False)
+        is_custom=st.session_state.get("is_custom_quiz", False),
+        user_answers_dict=dict(user_answers),
+        quiz_data_list=list(quiz_data),
     )
 
     # Ekstraksi Nama Panggilan Siswa
@@ -3256,4 +3888,3 @@ elif st.session_state.page == "result":
 
                     if streamed_solution and "⚠️" not in str(streamed_solution):
                         st.session_state.ai_solution_cache[solution_key] = str(streamed_solution)
-

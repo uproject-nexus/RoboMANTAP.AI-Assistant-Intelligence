@@ -3,6 +3,9 @@ import io
 import json
 import re
 import time
+import hashlib
+import subprocess
+import tempfile
 import pandas as pd
 import streamlit as st
 from google import genai
@@ -13,7 +16,6 @@ from dotenv import load_dotenv
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-
 # Import Python-Docx & XML Parser untuk Word
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
@@ -203,6 +205,118 @@ def format_latex_options(options):
         formatted.append(opt)
     return formatted
 
+
+# ==============================================================================
+# KEBIJAKAN OPSI JAWABAN & PROFIL BAHASA MADRASAH
+# ==============================================================================
+OPTION_LABELS_MTS = ("A", "B", "C", "D")
+OPTION_LABELS_MA = ("A", "B", "C", "D", "E")
+
+
+def option_labels_for_jenjang(jenjang: str) -> tuple[str, ...]:
+    """MTs -> A-D, MA -> A-E. Default aman mengikuti MTs untuk jenjang tidak dikenal."""
+    value = str(jenjang or "").strip().lower()
+    if "ma" in value or "aliyah" in value:
+        return OPTION_LABELS_MA
+    return OPTION_LABELS_MTS
+
+
+def option_count_for_jenjang(jenjang: str) -> int:
+    return len(option_labels_for_jenjang(jenjang))
+
+
+def normalize_custom_timer_config(config: dict | None) -> dict:
+    """Normalisasi durasi kuis custom ke satu sumber kebenaran: timer_seconds.
+
+    Tetap mempertahankan timer_h/timer_m/timer_s untuk kompatibilitas UI lama,
+    tetapi engine CBT harus membaca total detik agar durasi 1-23 jam tidak
+    terpotong menjadi timer_m saja.
+    """
+    cfg = dict(config or {})
+    try:
+        stored_seconds = cfg.get("timer_seconds")
+        stored_total = int(stored_seconds or 0) if stored_seconds is not None else 0
+        h = max(0, int(cfg.get("timer_h", 0) or 0))
+        m = max(0, int(cfg.get("timer_m", 0) or 0))
+        sec = max(0, int(cfg.get("timer_s", 0) or 0))
+        component_total = h * 3600 + m * 60 + sec
+        # timer_seconds menjadi sumber utama bila bernilai positif. Bila 0
+        # tetapi komponen jam/menit/detik berisi nilai, pulihkan dari komponen
+        # agar konfigurasi lama yang tidak konsisten tidak berubah menjadi
+        # "tanpa batas waktu".
+        total = stored_total if stored_total > 0 else component_total
+    except (TypeError, ValueError):
+        total = 0
+
+    cfg["timer_seconds"] = total
+    cfg["timer_h"] = total // 3600
+    cfg["timer_m"] = (total % 3600) // 60
+    cfg["timer_s"] = total % 60
+    return cfg
+
+
+def _split_option_label(value: str, fallback_index: int = 0):
+    text = str(value or "").strip()
+    match = re.match(r"^\s*([A-Ea-e])\s*[\.\)\:\-]\s*(.*)$", text, flags=re.DOTALL)
+    if match:
+        return match.group(1).upper(), match.group(2).strip()
+    fallback = chr(65 + fallback_index)
+    return fallback, text
+
+
+def normalize_quiz_options(options, jenjang: str):
+    """Normalisasi label opsi ke A. ... / B. ... tanpa mengubah isi pilihan."""
+    expected = option_labels_for_jenjang(jenjang)
+    normalized = []
+    for idx, raw in enumerate(options or []):
+        label, body = _split_option_label(raw, idx)
+        normalized.append(f"{label}. {body}" if body else f"{label}.")
+    return normalized, expected
+
+
+def _is_arabic_subject(mapel: str, bahasa: str = "") -> bool:
+    hay = f"{mapel or ''} {bahasa or ''}".lower()
+    keys = (
+        "bahasa arab", "nahwu", "sharaf", "qawaid", "muhadatsah",
+        "insya", "balaghah", "mufradat", "qiraah", "qiroah", "imla"
+    )
+    return any(k in hay for k in keys)
+
+
+def _is_religious_subject(mapel: str, konteks: str = "") -> bool:
+    hay = f"{mapel or ''} {konteks or ''}".lower()
+    keys = (
+        "fiqih", "fikih", "aqidah", "akidah", "akhlak", "al-qur", "alqur",
+        "hadis", "hadits", "ski", "sejarah kebudayaan islam", "keislaman",
+        "ushul", "tarikh", "waris", "zakat", "ibadah"
+    )
+    return any(k in hay for k in keys)
+
+
+def build_language_guidance(mapel: str, bahasa: str = "", konteks: str = "", source_pack: dict | None = None) -> str:
+    """Instruksi bahasa yang tegas tetapi hanya mengaktifkan Arab penuh pada konteks yang relevan."""
+    arabic_subject = _is_arabic_subject(mapel, bahasa)
+    religious_subject = _is_religious_subject(mapel, konteks)
+    if arabic_subject:
+        return (
+            "MODE BAHASA ARAB MADRASAH: Karena mata pelajaran/konfigurasi berhubungan langsung dengan Bahasa Arab, "
+            "gunakan Bahasa Arab Fusha/Modern Standard Arabic yang natural, gramatikal, dan modern. Pertahankan seluruh "
+            "teks soal, pilihan jawaban, dan solution_basis dalam aksara Arab; jangan gunakan transliterasi Latin. "
+            "Gunakan harakat secara selektif pada kosakata/struktur yang berpotensi ambigu. Pertahankan simbol matematika "
+            "dan satuan secara jelas. Untuk kutipan keagamaan, jangan mengarang teks Arab dan jangan memparafrasekan sebagai kutipan langsung."
+        )
+    if religious_subject:
+        return (
+            "MODE MATERI KEAGAMAAN: Bahasa utama mengikuti pilihan guru. Gunakan istilah, ungkapan, atau kutipan Arab asli "
+            "hanya saat memang relevan dengan konsep/materi. Jika menyertakan teks Al-Qur'an, Hadis, doa, atau istilah Arab, "
+            "tulis aksara Arab dengan benar dan jangan membuat kutipan Arab yang tidak didukung sumber. Sertakan penjelasan "
+            "yang mudah dipahami dalam bahasa utama. Jangan memaksa seluruh soal menjadi Bahasa Arab."
+        )
+    return (
+        "MODE UMUM MADRASAH: Gunakan bahasa utama yang dipilih guru. Bahasa Arab hanya digunakan untuk istilah yang memang "
+        "relevan, bukan sebagai hiasan. Jangan menggunakan transliterasi Latin jika suatu istilah Arab asli memang diperlukan."
+    )
+
 def clean_json_text(text: str) -> str:
     if not text:
         return ""
@@ -264,8 +378,489 @@ def stream_ai_text(prompt: str, max_output_tokens: int = STREAM_HINT_MAX_TOKENS)
         max_output_tokens=max_output_tokens,
     )
 
+# ============================================================================
+# MATERIAL HUB • FILE DROP • SOURCE GROUNDING • MEDIA AJAR STUDIO
+# ============================================================================
+
+SUPPORTED_MATERIAL_EXTENSIONS = {
+    ".pdf": "application/pdf",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
+
+
+def normalize_material_trigger(value: str) -> bool:
+    normalized = re.sub(r"\s+", " ", str(value or "").strip().lower())
+    return normalized == "materi dilampirkan"
+
+
+def _trim_text(value: str, max_chars: int = 30000) -> str:
+    value = str(value or "").strip()
+    return value if len(value) <= max_chars else value[:max_chars] + "\n...[dipotong untuk menjaga konteks AI]"
+
+
+def _extract_docx_content(raw_bytes: bytes) -> str:
+    from docx import Document as _Document
+    doc = _Document(io.BytesIO(raw_bytes))
+    blocks = []
+    for paragraph in doc.paragraphs:
+        text_value = paragraph.text.strip()
+        if text_value:
+            blocks.append(text_value)
+    for idx, table in enumerate(doc.tables, start=1):
+        rows = []
+        for row in table.rows:
+            rows.append(" | ".join(cell.text.strip() for cell in row.cells))
+        if rows:
+            blocks.append(f"[TABEL {idx}]\n" + "\n".join(rows))
+    return _trim_text("\n\n".join(blocks), 40000)
+
+
+def _convert_legacy_ppt_to_pptx(raw_bytes: bytes):
+    workdir = tempfile.mkdtemp(prefix="robomantap_ppt_")
+    source_path = os.path.join(workdir, "source.ppt")
+    with open(source_path, "wb") as handle:
+        handle.write(raw_bytes)
+    try:
+        result = subprocess.run(
+            ["soffice", "--headless", "--convert-to", "pptx", "--outdir", workdir, source_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=45,
+            check=False,
+        )
+        output_path = os.path.join(workdir, "source.pptx")
+        if result.returncode == 0 and os.path.exists(output_path):
+            with open(output_path, "rb") as handle:
+                return handle.read()
+    except Exception:
+        pass
+    return None
+
+
+def _extract_pptx_content(raw_bytes: bytes):
+    from pptx import Presentation as _Presentation
+    prs = _Presentation(io.BytesIO(raw_bytes))
+    slides = []
+    images = []
+    for slide_no, slide in enumerate(prs.slides, start=1):
+        texts = []
+        for shape in slide.shapes:
+            if getattr(shape, "has_text_frame", False):
+                text_value = shape.text.strip()
+                if text_value:
+                    texts.append(text_value)
+            try:
+                if getattr(shape, "shape_type", None) == 13 and getattr(shape, "image", None):
+                    images.append({
+                        "slide": slide_no,
+                        "mime_type": shape.image.content_type or "image/png",
+                        "bytes": shape.image.blob,
+                    })
+            except Exception:
+                pass
+        notes = ""
+        try:
+            notes = slide.notes_slide.notes_text_frame.text.strip()
+        except Exception:
+            pass
+        slides.append({"slide": slide_no, "text": "\n".join(texts), "notes": notes})
+    return {"slides": slides, "images": images}
+
+
+def _extract_pdf_content(raw_bytes: bytes):
+    import fitz
+    pdf = fitz.open(stream=raw_bytes, filetype="pdf")
+    pages = []
+    image_pages = []
+    for page_no, page in enumerate(pdf, start=1):
+        text_value = page.get_text("text").strip()
+        pages.append({"page": page_no, "text": _trim_text(text_value, 7000)})
+        if len(text_value) < 80 and len(image_pages) < 6:
+            pix = page.get_pixmap(matrix=fitz.Matrix(1.35, 1.35), alpha=False)
+            image_pages.append({"page": page_no, "mime_type": "image/png", "bytes": pix.tobytes("png")})
+    return {"pages": pages, "images": image_pages}
+
+
+def _call_gemini_contents(contents, is_json: bool = False, max_output_tokens: int = 12000):
+    clients = get_gemini_clients()
+    if not clients:
+        return None
+    for client in clients:
+        for model_name in QUIZ_MODELS:
+            try:
+                config_kwargs = {"max_output_tokens": max_output_tokens}
+                if is_json:
+                    config_kwargs["response_mime_type"] = "application/json"
+                if model_name.startswith("gemini-3."):
+                    config_kwargs["thinking_config"] = types.ThinkingConfig(thinking_level="high")
+                else:
+                    config_kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=0, include_thoughts=False)
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=types.GenerateContentConfig(**config_kwargs),
+                )
+                if response and response.text:
+                    return response.text
+            except Exception:
+                continue
+    return None
+
+
+def _vision_describe(image_bytes: bytes, mime_type: str, source_label: str) -> str:
+    prompt = f"""
+Anda adalah Vision Reader RoboMANTAP.
+Sumber visual: {source_label}
+Analisis fakta yang benar-benar terlihat pada gambar. Baca teks, angka, label, tabel, diagram, grafik, rumus, dan struktur visual yang relevan. Jangan mengarang bagian yang tidak terlihat. Gunakan Bahasa Indonesia yang rapi dan detail yang cukup untuk menjadi sumber soal serta media ajar.
+"""
+    try:
+        part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+        response = _call_gemini_contents([prompt, part], is_json=False, max_output_tokens=5000)
+        return _trim_text(response or "", 8000)
+    except Exception as exc:
+        print(f"Vision material gagal: {exc}")
+        return ""
+
+
+def build_material_knowledge_pack(uploaded_files) -> dict:
+    files = []
+    for item in uploaded_files or []:
+        name = str(getattr(item, "name", "material"))
+        ext = os.path.splitext(name)[1].lower()
+        if ext not in SUPPORTED_MATERIAL_EXTENSIONS:
+            continue
+        raw = item.getvalue() if hasattr(item, "getvalue") else bytes(item)
+        record = {
+            "name": name,
+            "extension": ext,
+            "mime_type": SUPPORTED_MATERIAL_EXTENSIONS[ext],
+            "size": len(raw),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "content": "",
+            "locator_map": [],
+            "visual_analysis": [],
+        }
+        try:
+            if ext == ".docx":
+                record["content"] = _extract_docx_content(raw)
+                record["locator_map"] = [{"type": "document", "locator": "paragraphs/tables"}]
+            elif ext in {".pptx", ".ppt"}:
+                pptx_bytes = raw if ext == ".pptx" else _convert_legacy_ppt_to_pptx(raw)
+                if not pptx_bytes:
+                    record["content"] = "Format .ppt lama diterima, tetapi runtime tidak menyediakan konverter LibreOffice. Gunakan .pptx untuk ekstraksi otomatis."
+                else:
+                    parsed = _extract_pptx_content(pptx_bytes)
+                    blocks = []
+                    for slide in parsed["slides"]:
+                        block = f"[SLIDE {slide['slide']}]\n{slide['text']}"
+                        if slide.get("notes"):
+                            block += f"\n[CATATAN PEMBICARA]\n{slide['notes']}"
+                        blocks.append(block)
+                        record["locator_map"].append({"type": "slide", "locator": slide["slide"]})
+                    record["content"] = _trim_text("\n\n".join(blocks), 50000)
+                    for image in parsed["images"][:6]:
+                        analysis = _vision_describe(image["bytes"], image["mime_type"], f"{name}, slide {image['slide']}")
+                        if analysis:
+                            record["visual_analysis"].append({"locator": f"slide {image['slide']}", "analysis": analysis})
+            elif ext == ".pdf":
+                parsed = _extract_pdf_content(raw)
+                pages = []
+                for page in parsed["pages"]:
+                    pages.append(f"[HALAMAN {page['page']}]\n{page['text']}")
+                    record["locator_map"].append({"type": "page", "locator": page["page"]})
+                record["content"] = _trim_text("\n\n".join(pages), 50000)
+                for image in parsed["images"][:6]:
+                    analysis = _vision_describe(image["bytes"], image["mime_type"], f"{name}, halaman {image['page']}")
+                    if analysis:
+                        record["visual_analysis"].append({"locator": f"halaman {image['page']}", "analysis": analysis})
+            else:
+                analysis = _vision_describe(raw, record["mime_type"], name)
+                record["content"] = analysis
+                if analysis:
+                    record["visual_analysis"].append({"locator": "image", "analysis": analysis})
+        except Exception as exc:
+            record["content"] = f"Ekstraksi gagal untuk {name}: {exc}"
+        files.append(record)
+
+    source_blocks = []
+    for record in files:
+        source_blocks.append(
+            f"### FILE: {record['name']}\n"
+            f"Format: {record['extension']}\n"
+            f"SHA-256: {record['sha256']}\n"
+            f"Konten:\n{record.get('content','')}"
+        )
+        for visual in record.get("visual_analysis", []):
+            source_blocks.append(f"Visual {visual['locator']}:\n{visual['analysis']}")
+    return {
+        "files": files,
+        "file_count": len(files),
+        "source_text": _trim_text("\n\n".join(source_blocks), 110000),
+    }
+
+
+def save_material_bundle_to_db(bundle_code: str, bundle: dict, config: dict | None = None) -> bool:
+    conn = init_db_connection()
+    if not conn:
+        return False
+    query = """
+    INSERT INTO material_hub (bundle_code, config, bundle_data, created_at, updated_at)
+    VALUES (:code, :cfg, :data, NOW() AT TIME ZONE 'Asia/Jakarta', NOW() AT TIME ZONE 'Asia/Jakarta')
+    ON CONFLICT (bundle_code) DO UPDATE SET
+        config = EXCLUDED.config,
+        bundle_data = EXCLUDED.bundle_data,
+        updated_at = NOW() AT TIME ZONE 'Asia/Jakarta';
+    """
+    try:
+        with conn.session as session:
+            session.execute(text(query), {
+                "code": bundle_code.strip().upper(),
+                "cfg": json.dumps(config or {}, ensure_ascii=False, default=str),
+                "data": json.dumps(bundle, ensure_ascii=False, default=str),
+            })
+            session.commit()
+        return True
+    except Exception as exc:
+        print(f"Error save_material_bundle_to_db: {exc}")
+        return False
+
+
+def get_material_bundle_from_db(bundle_code: str):
+    conn = init_db_connection()
+    if not conn:
+        return None
+    try:
+        with conn.session as session:
+            row = session.execute(
+                text("SELECT bundle_data, config FROM material_hub WHERE UPPER(bundle_code)=UPPER(:code)"),
+                {"code": bundle_code.strip()},
+            ).fetchone()
+        if not row:
+            return None
+        bundle = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        config = row[1] if isinstance(row[1], dict) else json.loads(row[1] or "{}")
+        bundle["config"] = config
+        bundle["bundle_code"] = bundle_code.strip().upper()
+        return bundle
+    except Exception as exc:
+        print(f"Error get_material_bundle_from_db: {exc}")
+        return None
+
+
+def _source_context_for_prompt(source_pack: dict | None, max_chars: int = 90000) -> str:
+    if not source_pack:
+        return "Tidak ada sumber materi terlampir."
+    return _trim_text(source_pack.get("source_text", ""), max_chars)
+
+
+def validate_and_repair_quiz(quiz: list, source_pack: dict | None, config: dict) -> list:
+    if not quiz:
+        return []
+    count = len(quiz)
+    jenjang = str(config.get("jenjang", "MTs"))
+    mapel = str(config.get("mapel", ""))
+    bahasa = str(config.get("bahasa", ""))
+    konteks = str(config.get("konteks", ""))
+    expected_labels = option_labels_for_jenjang(jenjang)
+    option_count = len(expected_labels)
+    language_guidance = build_language_guidance(mapel, bahasa, konteks, source_pack)
+    source_locator_rule = "Tambahkan source_locator bila sumber tersedia; jangan memalsukan nomor halaman/slide."
+    prompt = f"""
+Anda adalah QA Validator RoboMANTAP untuk kuis madrasah.
+Periksa lalu perbaiki draft soal. Pertahankan tepat {count} soal.
+Konfigurasi: {json.dumps(config, ensure_ascii=False)}
+
+KEBIJAKAN OPSI BERDASARKAN JENJANG:
+- Jenjang MTs: tepat 4 opsi, label A-D.
+- Jenjang MA: tepat 5 opsi, label A-E.
+- Opsi harus berupa pilihan yang masuk akal dan hanya satu yang benar.
+- Bila draft MA masih berisi 4 opsi, WAJIB tambahkan satu distraktor berkualitas menjadi E tanpa mengubah kebenaran jawaban.
+- Bila draft memiliki format label yang tidak rapi, normalkan menjadi A. ... hingga label terakhir.
+
+ATURAN BAHASA:
+{language_guidance}
+
+SUMBER UTAMA:
+{_source_context_for_prompt(source_pack)}
+
+DRAFT:
+{json.dumps(quiz, ensure_ascii=False)}
+
+ATURAN KUALITAS:
+- Tepat {count} soal.
+- Tepat {option_count} opsi per soal: {', '.join(expected_labels)}.
+- correct_answer harus persis sama dengan salah satu opsi lengkap.
+- Hindari ambiguitas, petunjuk jawaban yang terlalu mudah, duplikasi, dan pilihan yang tumpang tindih.
+- Untuk soal numerik, solution_basis harus memuat proses hitungan inti dan hasil akhir.
+- Jangan mengarang fakta inti yang tidak didukung sumber ketika sumber tersedia.
+- {source_locator_rule}
+- Keluarkan JSON murni.
+
+FORMAT:
+{{"quiz":[{{"id":1,"question":"...","options":["{expected_labels[0]}. ...", "{expected_labels[1]}. ...", "{expected_labels[2]}. ...", "{expected_labels[3]}. ..."{', "' + expected_labels[4] + '. ...' if option_count == 5 else ''}],"correct_answer":"{expected_labels[0]}. ...","solution_basis":"...","source_locator":"..."}}]}}
+"""
+    raw = call_gemini_with_rotation(prompt, is_json=True)
+    if not raw:
+        return quiz
+    try:
+        payload = json.loads(clean_json_text(raw), strict=False)
+        validated = payload.get("quiz", [])
+        return validated if isinstance(validated, list) and len(validated) == count else quiz
+    except Exception:
+        return quiz
+
+def generate_media_ajar_ai(*, mapel: str, jenjang: str, kelas: str, topik: str, jumlah_slide: int,
+                           durasi_menit: int, bahasa: str = "Bahasa Indonesia", gaya: str = "Premium UPN",
+                           mode_presentasi: str = "Interactive", source_pack: dict | None = None):
+    prompt = f"""
+Anda adalah RoboMANTAP Media Architect. Rancang storyboard PPTX siap kelas.
+Mapel: {mapel}
+Jenjang: {jenjang}
+Kelas: {kelas}
+Topik: {topik}
+Jumlah slide: tepat {jumlah_slide}
+Durasi: {durasi_menit} menit
+Bahasa: {bahasa}
+Gaya: {gaya}
+Mode presenter: {mode_presentasi}
+SUMBER UTAMA:
+{_source_context_for_prompt(source_pack)}
+Prinsip: gunakan sumber sebagai fakta utama; jangan memenuhi slide dengan paragraf; variasikan konsep, visual/diagram, contoh, aktivitas, HOTS/diskusi, mini quiz, rangkuman/refleksi; setiap slide non-cover memiliki ide visual shape sederhana; speaker_notes harus memberi arahan guru.
+JSON murni:
+{{"deck_title":"...","deck_subtitle":"...","slides":[{{"slide":1,"type":"cover","title":"...","subtitle":"...","body":[],"visual_type":"hero","visual_content":"...","speaker_notes":"...","source_locator":"..."}}]}}
+"""
+    raw = call_gemini_with_rotation(prompt, is_json=True)
+    if not raw:
+        return None
+    try:
+        data = json.loads(clean_json_text(raw), strict=False)
+        slides = data.get("slides", [])
+        if not isinstance(slides, list) or len(slides) != jumlah_slide:
+            return None
+        for index, slide in enumerate(slides, start=1):
+            slide["slide"] = index
+            slide.setdefault("body", [])
+            slide.setdefault("visual_type", "concept")
+            slide.setdefault("visual_content", "")
+            slide.setdefault("speaker_notes", "")
+            slide.setdefault("source_locator", "")
+        return data
+    except Exception:
+        return None
+
+
+def build_media_ajar_pptx(storyboard: dict, config: dict, logo_path: str | None = None) -> bytes:
+    from pptx import Presentation
+    from pptx.dml.color import RGBColor as PptRGBColor
+    from pptx.enum.shapes import MSO_SHAPE
+    from pptx.enum.text import PP_ALIGN
+    from pptx.util import Inches as PptInches, Pt as PptPt
+
+    prs = Presentation()
+    prs.slide_width = PptInches(13.333333)
+    prs.slide_height = PptInches(7.5)
+    NAVY = PptRGBColor(7, 15, 35)
+    NAVY2 = PptRGBColor(15, 23, 42)
+    EMERALD = PptRGBColor(16, 185, 129)
+    MINT = PptRGBColor(167, 243, 208)
+    WHITE = PptRGBColor(248, 250, 252)
+    SLATE = PptRGBColor(148, 163, 184)
+    GOLD = PptRGBColor(245, 158, 11)
+    BLUE = PptRGBColor(59, 130, 246)
+
+    def text_box(slide, value, x, y, w, h, size=20, bold=False, color=WHITE, align=PP_ALIGN.LEFT):
+        shape = slide.shapes.add_textbox(PptInches(x), PptInches(y), PptInches(w), PptInches(h))
+        frame = shape.text_frame
+        frame.clear(); frame.word_wrap = True
+        paragraph = frame.paragraphs[0]
+        paragraph.text = str(value or "")
+        paragraph.alignment = align
+        run = paragraph.runs[0]
+        run.font.size = PptPt(size); run.font.bold = bold; run.font.color.rgb = color
+        return shape
+
+    def background(slide, color):
+        fill = slide.background.fill; fill.solid(); fill.fore_color.rgb = color
+
+    def card(slide, value, x, y, w, h, accent=EMERALD, size=14):
+        shape = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, PptInches(x), PptInches(y), PptInches(w), PptInches(h))
+        shape.fill.solid(); shape.fill.fore_color.rgb = NAVY2; shape.line.color.rgb = PptRGBColor(51,65,85)
+        strip = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, PptInches(x), PptInches(y), PptInches(0.08), PptInches(h))
+        strip.fill.solid(); strip.fill.fore_color.rgb = accent; strip.line.fill.background()
+        text_box(slide, value, x+0.22, y+0.15, w-0.4, h-0.25, size, False, WHITE)
+
+    for data in storyboard.get("slides", []):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        slide_type = str(data.get("type", "concept")).lower()
+        title = data.get("title", "RoboMANTAP Media")
+        if slide_type == "cover":
+            background(slide, NAVY)
+            text_box(slide, "U.PROJECT NEXUS • ROBOMANTAP", 0.7, 0.7, 7.5, 0.3, 12, True, MINT)
+            text_box(slide, title, 0.7, 1.7, 10.4, 1.35, 34, True, WHITE)
+            text_box(slide, data.get("subtitle", ""), 0.72, 3.15, 9.8, 0.75, 18, False, SLATE)
+            pill = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, PptInches(0.72), PptInches(4.3), PptInches(2.7), PptInches(0.52))
+            pill.fill.solid(); pill.fill.fore_color.rgb = EMERALD; pill.line.fill.background()
+            text_box(slide, f"{config.get('kelas','')} • {config.get('mapel','')}", 0.86, 4.43, 2.45, 0.2, 10, True, NAVY)
+        else:
+            background(slide, NAVY)
+            text_box(slide, "ROBOMANTAP • MEDIA STUDIO", 0.55, 0.25, 4.8, 0.25, 10, True, MINT)
+            text_box(slide, title, 0.55, 0.75, 11.9, 0.72, 25, True, WHITE)
+            line = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, PptInches(0.55), PptInches(1.52), PptInches(1.1), PptInches(0.05))
+            line.fill.solid(); line.fill.fore_color.rgb = EMERALD; line.line.fill.background()
+            visual_type = str(data.get("visual_type", "concept")).lower()
+            visual = str(data.get("visual_content", ""))
+            body = [str(x) for x in (data.get("body") or []) if str(x).strip()]
+            if visual_type in {"diagram", "flow", "process"}:
+                steps = body[:5] or [visual]
+                width = 11.7 / max(1, len(steps))
+                for i, item in enumerate(steps):
+                    card(slide, item, 0.7 + i*width, 2.15, width-0.22, 2.0, EMERALD if i % 2 == 0 else GOLD, 13)
+            elif visual_type == "table":
+                rows = [r for r in visual.splitlines() if r.strip()] or body
+                y = 2.05
+                for row in rows[:6]:
+                    parts = [p.strip() for p in row.split("|")]
+                    if len(parts) <= 1:
+                        card(slide, row, 0.8, y, 11.7, 0.6, EMERALD, 13)
+                    else:
+                        cell_w = 11.7 / min(3, len(parts))
+                        for c, value in enumerate(parts[:3]):
+                            card(slide, value, 0.8 + c*cell_w, y, cell_w-0.12, 0.6, EMERALD if c == 0 else BLUE, 12)
+                    y += 0.74
+            elif visual_type in {"activity", "discussion", "quiz"}:
+                card(slide, visual or (body[0] if body else "Diskusikan dengan kelompok."), 0.75, 2.0, 11.7, 1.55, GOLD, 18)
+                for i, item in enumerate(body[1:5]):
+                    card(slide, item, 0.75 + (i % 2)*5.95, 3.9 + (i//2)*1.0, 5.65, 0.8, EMERALD, 13)
+            else:
+                text_box(slide, visual, 0.8, 2.0, 11.55, 1.25, 23, True, MINT)
+                y = 3.35
+                for i, item in enumerate(body[:5]):
+                    card(slide, item, 0.8, y, 11.55, 0.56, EMERALD if i % 2 == 0 else BLUE, 12)
+                    y += 0.67
+            source = data.get("source_locator", "")
+            if source:
+                text_box(slide, f"Sumber: {source}", 9.1, 7.02, 3.6, 0.2, 8, False, SLATE, PP_ALIGN.RIGHT)
+        try:
+            slide.notes_slide.notes_text_frame.text = data.get("speaker_notes", "") or ""
+        except Exception:
+            pass
+
+    output = io.BytesIO()
+    prs.save(output)
+    return output.getvalue()
+
+
 def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri: list):
     submateri_text = ", ".join(selected_submateri) if selected_submateri else "Semua Submateri Terintegrasi"
+    option_labels = option_labels_for_jenjang(jenjang)
+    option_count = len(option_labels)
+    language_guidance = build_language_guidance(mapel, "", "OMI / Olimpiade")
 
     stage_descriptions = {
         "Internal": "Internal: Fokus pada diagnostik, pemetaan bidang, dan penguatan konsep dasar.",
@@ -275,49 +870,51 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
     }
     stage_description = stage_descriptions.get(stage, "Fokus pada penguatan konsep OMI.")
 
+    if _is_arabic_subject(mapel):
+        arabic_distribution = "Semua soal dapat menggunakan Bahasa Arab Fusha yang natural; jangan membatasi jumlah soal berbahasa Arab."
+    elif _is_religious_subject(mapel):
+        arabic_distribution = "Gunakan istilah/kutipan Arab asli hanya pada bagian yang memang berkaitan dengan materi keagamaan dan didukung sumber/konsep."
+    else:
+        arabic_distribution = "Bahasa utama tetap Bahasa Indonesia; Bahasa Arab hanya untuk istilah yang relevan."
+
     system_prompt = f"""
-    Anda adalah Pelatih Utama Bina Prestasi OMI 2026 (Olimpiade Sains & Matematika Al Irsyad) untuk tingkat {jenjang}.
-    Rancanglah 1 paket latihan CBT berisi TEPAT 10 SOAL PILIHAN GANDA yang orisinal, presisi, dan tematik OMI.
+Anda adalah Pelatih Utama Bina Prestasi OMI 2026 (Olimpiade Sains & Matematika Al Irsyad) untuk tingkat {jenjang}.
+Rancang 1 paket latihan CBT berisi TEPAT 10 SOAL PILIHAN GANDA yang orisinal, presisi, dan tematik OMI.
 
-    Spesifikasi Soal OMI 2026:
-    - Jenjang: {jenjang}
-    - Bidang / Mata Pelajaran: {mapel}
-    - Tahap Pembinaan: {stage} ({stage_description})
-    - Cakupan Submateri: {submateri_text}
+Spesifikasi:
+- Jenjang: {jenjang}
+- Bidang / Mata Pelajaran: {mapel}
+- Tahap Pembinaan: {stage} ({stage_description})
+- Cakupan Submateri: {submateri_text}
+- Jumlah opsi WAJIB: {option_count} opsi, dengan label {', '.join(option_labels)}.
 
-    INTEGRASI TEMATIK & BAHASA ARAB OMI (BIARKAN PANJANG DAN NATURAL):
-    1. Konteks Tematik: Wajib mengintegrasikan materi dengan tema Lingkungan, Teknologi, Kehidupan Sehari-hari, atau Nilai-Nilai Keislaman (seperti Zakat, Waktu Shalat, Penanggalan Hijriyah, Arah Kiblat, Waris, atau Sejarah Islam).
-    2. Aturan Porsi & Variasi Bahasa (SANGAT PENTING):
-    - Jika submateri berisi "Semua Submateri" (ALL) atau secara acak: UTAMAKAN karakteristik khusus OMI!
-    - Dari total 10 soal yang dibuat, 7 soal WAJIB menggunakan Full Bahasa Indonesia berkonteks Keislaman, Lingkungan, Teknologi atau Umum.
-    - HANYA MAKSIMAL 3 SOAL SAJA yang diperbolehkan menggunakan Variasi Bahasa Arab.
-    - WAJIB AKSARA ARAB ASLI: Semua teks Bahasa Arab WAJIB ditulis menggunakan Aksara Arab asli (contoh: "خمسونا"). DILARANG menggunakan transliterasi/Ejaan Arab Latin (SEPERTI: "khamsuna mitran", "miatun", "uqtiridhat", dll).
-    - Variasi Bahasa Arab yang diperbolehkan: Teks Soal ditulis dalam Aksara Arab asli tanpa harakat (atau harakat minimal), sedangkan Pilihan Jawaban A, B, C, D dalam Bahasa Indonesia (atau sebaliknya).
-    - Jangan pernah membuat Teks Soal ditulis dalam Bahasa Arab dan Pilihan Jawaban ditulis dalam Bahasa Arab juga.
-    - Jangan pernah membuat lebih dari 3 soal berbahasa Arab dalam satu paket kuis.
+INTEGRASI TEMATIK & BAHASA MADRASAH:
+- Konteks boleh mengaitkan Lingkungan, Teknologi, Kehidupan Sehari-hari, atau Nilai-Nilai Keislaman bila relevan.
+- {language_guidance}
+- {arabic_distribution}
+- Jangan menggunakan transliterasi Latin untuk istilah Arab yang memang harus ditulis dalam aksara Arab.
 
-    ATURAN KHUSUS FORMATTING & KECEPATAN (SANGAT PENTING):
-    - JANGAN sertakan field `hint` atau `solution` di sini. Fokus saja merancang 10 teks soal cerita dan jawaban agar proses AI kencang.
-    - Angka biasa, nominal uang (Contoh: "Rp 60.000.000"), satuan (Contoh: "14 meter", "12 detik", "50 kg"), dan jam (Contoh: "19.00 WIB") WAJIB ditulis sebagai TEKS BIASA TANPA simbol '$' dan TANPA backslash '\'.
-    - DILARANG KERAS membuat perintah LaTeX ilegal seperti '\60.000.000' atau '\14'.
-    - Gunakan format LaTeX $...$ HANYA untuk rumus matematika asli, pecahan, akar, dan variabel (Contoh: "$\\pi = \\tfrac{{22}}{{7}}$", "$\\sqrt{{3}}$", "$x^2 = 16$").
-    - DILARANG KERAS memasukkan kata/kalimat Bahasa Indonesia ke dalam format $...$.
+ATURAN FORMATTING:
+- Jangan sertakan field hint atau solution di sini.
+- Angka biasa, nominal uang, satuan, dan jam ditulis sebagai teks biasa tanpa backslash.
+- LaTeX $...$ hanya untuk rumus matematika asli, pecahan, akar, dan variabel.
+- Jangan menaruh kalimat bahasa Indonesia di dalam delimiter matematika.
+- Jangan membuat perintah LaTeX ilegal seperti '\\60.000.000' atau '\\14'.
 
-    Format keluaran WAJIB berupa objek JSON murni:
+Format keluaran JSON murni:
+{{
+  "quiz": [
     {{
-        "quiz": [
-            {{
-                "id": 1,
-                "question": "Teks soal cerita nomor 1 lengkap dan mendalam",
-                "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-                "correct_answer": "Pilihan jawaban tepat (harus persis sama dengan salah satu opsi)"
-            }}
-        ]
+      "id": 1,
+      "question": "...",
+      "options": ["{option_labels[0]}. ...", "{option_labels[1]}. ...", "{option_labels[2]}. ...", "{option_labels[3]}. ..."{', "' + option_labels[4] + '. ...' if option_count == 5 else ''}],
+      "correct_answer": "{option_labels[0]}. ..."
     }}
-    """
+  ]
+}}
+"""
 
     raw_response = call_gemini_with_rotation(system_prompt, is_json=True)
-
     if not raw_response:
         show_error("⚠️ Waduh kuota sedang penuh nih. Silakan coba klik lagi ya...")
         return []
@@ -326,15 +923,28 @@ def generate_quiz_batch(jenjang: str, mapel: str, stage: str, selected_submateri
         cleaned_response = clean_json_text(raw_response)
         data = json.loads(cleaned_response, strict=False)
         quiz_list = data.get("quiz", [])
-        for q in quiz_list:
-            if "options" in q:
-                q["options"] = format_latex_options(q["options"])
-            if "correct_answer" in q:
-                for opt in q["options"]:
-                    if opt.startswith(q["correct_answer"][:2]):
-                        q["correct_answer"] = opt
-                        break
-        return quiz_list
+        if not isinstance(quiz_list, list) or len(quiz_list) != 10:
+            return []
+        normalized = []
+        for idx, q in enumerate(quiz_list, start=1):
+            options = q.get("options", []) if isinstance(q, dict) else []
+            norm_options, _ = normalize_quiz_options(options, jenjang)
+            if len(norm_options) != option_count:
+                return []
+            answer = str(q.get("correct_answer", "")).strip()
+            answer_label, answer_body = _split_option_label(answer, 0)
+            answer_match = next((opt for opt in norm_options if opt.startswith(f"{answer_label}.")), None)
+            if answer_match is None:
+                answer_match = next((opt for opt in norm_options if opt == answer), "")
+            if not answer_match:
+                return []
+            normalized.append({
+                "id": idx,
+                "question": str(q.get("question", "")).strip(),
+                "options": format_latex_options(norm_options),
+                "correct_answer": answer_match,
+            })
+        return normalized
     except Exception as e:
         show_error(f"Gagal memproses format soal: {e}")
         return []
@@ -458,6 +1068,14 @@ def create_table_if_not_exists():
         quiz_data JSONB NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS material_hub (
+        bundle_code VARCHAR(32) PRIMARY KEY,
+        config JSONB DEFAULT '{}'::jsonb,
+        bundle_data JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
     """
     try:
         with conn.session as s:
@@ -467,6 +1085,7 @@ def create_table_if_not_exists():
         print(f"Error create_table_if_not_exists: {e}")
 
 def publish_custom_quiz_to_db(kode_kuis: str, config: dict, quiz_data: list) -> bool:
+    config = normalize_custom_timer_config(config)
     conn = init_db_connection()
     if not conn: 
         return False
@@ -502,6 +1121,7 @@ def get_custom_quiz_from_db(kode_kuis: str):
             result = s.execute(text(query), {"kode": kode_kuis.strip()}).fetchone()
             if result:
                 cfg = result[0] if isinstance(result[0], dict) else json.loads(result[0])
+                cfg = normalize_custom_timer_config(cfg)
                 quiz = result[1] if isinstance(result[1], list) else json.loads(result[1])
                 return {"config": cfg, "quiz": quiz}
     except Exception as e:
@@ -680,7 +1300,8 @@ def touch_session_heartbeat(session_id: str) -> bool:
         print(f"Error touch_session_heartbeat: {e}")
         return False
 
-def generate_lkpd_content(mapel: str, kelas: str, topik: str):
+def generate_lkpd_content(mapel: str, kelas: str, topik: str, source_pack: dict | None = None):
+    source_context = _source_context_for_prompt(source_pack, 65000)
     prompt = f"""
     Anda adalah Tim Ahli Kurikulum Lembaga Pendidikan Al-Irsyad Al-Islamiyah Putri Bondowoso.
     Rancanglah isi Lembar Kerja Peserta Didik (LKPD) berbasis HOTS dan Terintegrasi Keislaman.
@@ -689,6 +1310,9 @@ def generate_lkpd_content(mapel: str, kelas: str, topik: str):
     - Mata Pelajaran: {mapel}
     - Kelas / Jenjang: {kelas}
     - Topik / Materi Utama: {topik}
+
+    SUMBER MATERI UTAMA (gunakan sebagai dasar fakta bila tersedia):
+    {source_context}
 
     ATURAN NOTASI MATEMATIKA, FISIKA, KIMIA & LATEX (SANGAT PENTING):
     1. DILARANG KERAS menggunakan simbol dollar ($) atau backslash (\\) untuk rumus/variabel!
@@ -749,53 +1373,73 @@ def generate_custom_quiz_ai(
     bahasa: str,
     konteks: str,
     timer_seconds: int,
+    source_pack: dict | None = None,
 ):
+    option_labels = option_labels_for_jenjang(jenjang)
+    option_count = len(option_labels)
+    source_context = _source_context_for_prompt(source_pack, 90000)
+    language_guidance = build_language_guidance(mapel, bahasa, konteks, source_pack)
+    option_example = ', '.join([f'"{label}. ..."' for label in option_labels])
     prompt = f"""
-    Anda adalah Question Architect RoboMANTAP untuk guru.
-    Buat tepat {jumlah_soal} soal pilihan ganda berkualitas tinggi untuk pembelajaran.
-    
-    KONFIGURASI:
-    - Mata Pelajaran: {mapel}
-    - Jenjang: {jenjang}
-    - Kelas: {kelas}
-    - Materi: {materi}
-    - Submateri: {submateri or 'Tidak ditentukan / semua yang relevan'}
-    - Tingkat Kesulitan: {kesulitan}
-    - Tipe Soal: {tipe_soal}
-    - Bahasa: {bahasa}
-    - Konteks: {konteks}
-    - Batas Waktu Sesi: {timer_seconds} detik
-    
-    ATURAN KUALITAS:
-    1. Tepat {jumlah_soal} soal, jangan kurang dan jangan lebih.
-    2. Setiap soal memiliki tepat 4 opsi: A, B, C, D.
-    3. Hanya satu opsi yang benar.
-    4. correct_answer harus persis sama dengan salah satu opsi lengkap.
-    5. Hindari ambiguitas, data yang kurang, dan asumsi yang tidak disebutkan.
-    6. Untuk soal numerik, solution_basis harus memuat proses hitungan inti dan hasil akhir.
-    7. Untuk HOTS/olimpiade, gunakan penalaran yang benar-benar relevan dengan level.
-    8. Jangan memasukkan jawaban atau pembahasan yang saling bertentangan.
-    9. Jika menggunakan LaTeX, gunakan $...$ dan escape backslash secara valid untuk JSON.
-    10. JANGAN menambahkan markdown atau teks pembuka di luar JSON.
-    11. Untuk matriks/array, WAJIB gunakan blok $$...$$
-    12. Jangan menulis environment matriks tanpa delimiter matematika.
-    
-    OUTPUT JSON MURNI:
+Anda adalah Question Architect RoboMANTAP untuk guru madrasah.
+Buat tepat {jumlah_soal} soal pilihan ganda berkualitas tinggi untuk pembelajaran.
+
+KONFIGURASI:
+- Mata Pelajaran: {mapel}
+- Jenjang: {jenjang}
+- Kelas: {kelas}
+- Materi: {materi}
+- Submateri: {submateri or 'Tidak ditentukan / semua yang relevan'}
+- Tingkat Kesulitan: {kesulitan}
+- Tipe Soal: {tipe_soal}
+- Bahasa: {bahasa}
+- Konteks: {konteks}
+- Batas Waktu Sesi: {timer_seconds} detik
+
+KEBIJAKAN OPSI WAJIB:
+- {jenjang}: tepat {option_count} pilihan jawaban.
+- Label wajib: {', '.join(option_labels)}.
+- MTs = A-D (4 pilihan).
+- MA = A-E (5 pilihan).
+- Jangan pernah menghasilkan opsi tambahan di luar label yang ditentukan.
+- Hanya satu opsi benar.
+
+KEBIJAKAN BAHASA:
+{language_guidance}
+
+SUMBER MATERI TERLAMPIR / SOURCE GROUNDING:
+{source_context}
+
+ATURAN KUALITAS:
+0. Bila sumber materi terlampir tersedia, jadikan sumber tersebut sebagai sumber fakta utama. Jangan mengarang fakta inti di luar sumber.
+1. Tepat {jumlah_soal} soal, jangan kurang dan jangan lebih.
+2. Setiap soal memiliki tepat {option_count} opsi: {', '.join(option_labels)}.
+3. Hanya satu opsi yang benar.
+4. correct_answer harus persis sama dengan salah satu opsi lengkap.
+5. Hindari ambiguitas, data yang kurang, dan asumsi yang tidak disebutkan.
+6. Untuk soal numerik, solution_basis harus memuat proses hitungan inti dan hasil akhir.
+7. Untuk HOTS/olimpiade, gunakan penalaran yang benar-benar relevan dengan level.
+8. Jangan memasukkan jawaban atau pembahasan yang saling bertentangan.
+9. Jika menggunakan LaTeX, gunakan $...$ dan escape backslash secara valid untuk JSON.
+10. Jangan menambahkan markdown atau teks pembuka di luar JSON.
+11. Untuk matriks/array, gunakan blok $$...$$ dan jangan menulis environment matriks tanpa delimiter.
+12. Hindari transliterasi Latin untuk kosakata Arab yang memang harus ditulis dalam aksara Arab.
+13. Untuk Bahasa Arab, gunakan Bahasa Arab Fusha/Modern Standard Arabic yang natural, dengan harakat selektif jika membantu kejelasan. Jangan membuat kutipan agama yang tidak didukung sumber.
+
+OUTPUT JSON MURNI:
+{{
+  "quiz": [
     {{
-      "quiz": [
-        {{
-          "id": 1,
-          "question": "...",
-          "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-          "correct_answer": "C. ...",
-          "solution_basis": "..."
-        }}
-      ],
-      "config": {{
-        "duration_seconds": {timer_seconds}
-      }}
+      "id": 1,
+      "question": "...",
+      "options": [{option_example}],
+      "correct_answer": "{option_labels[0]}. ...",
+      "solution_basis": "..."
     }}
-    """
+  ],
+  "config": {{"duration_seconds": {timer_seconds}}}
+}}
+"""
 
     raw_response = call_gemini_with_rotation(prompt, is_json=True)
     if not raw_response:
@@ -818,43 +1462,81 @@ def generate_custom_quiz_ai(
         return []
 
     normalized = []
-    expected_prefixes = ("A.", "B.", "C.", "D.")
-
     for idx, item in enumerate(quiz, start=1):
         if not isinstance(item, dict):
             return []
-
         question = str(item.get("question", "")).strip()
-        options = item.get("options", [])
+        raw_options = item.get("options", [])
         answer = str(item.get("correct_answer", "")).strip()
         solution_basis = str(item.get("solution_basis", "")).strip()
-
-        if not question or not isinstance(options, list) or len(options) != 4:
-            return []
-        if not solution_basis:
+        if not question or not isinstance(raw_options, list) or not solution_basis:
             return []
 
-        options = format_latex_options([str(x).strip() for x in options])
-        if any(not x for x in options):
+        options, _ = normalize_quiz_options(raw_options, jenjang)
+        # Beri kesempatan validator memperbaiki draft yang jumlah opsinya belum tepat.
+        if len(options) not in (option_count, 4, 5):
             return []
-        if not all(any(x.startswith(prefix) for prefix in expected_prefixes) for x in options):
+        answer_label, _ = _split_option_label(answer, 0)
+        answer_match = next((x for x in options if x.startswith(f"{answer_label}.")), None)
+        if answer_match is None and answer in options:
+            answer_match = answer
+        if answer_match is None:
             return []
-        if answer not in options:
-            matching = [x for x in options if x[:1].upper() == answer[:1].upper()]
-            if len(matching) == 1:
-                answer = matching[0]
-            else:
-                return []
-
         normalized.append({
             "id": idx,
             "question": question,
-            "options": options,
-            "correct_answer": answer,
+            "options": format_latex_options(options),
+            "correct_answer": answer_match,
             "solution_basis": solution_basis,
+            "source_locator": str(item.get("source_locator", "")).strip(),
         })
 
-    return normalized
+    validation_config = {
+        "mapel": mapel,
+        "jenjang": jenjang,
+        "kelas": kelas,
+        "materi": materi,
+        "submateri": submateri,
+        "kesulitan": kesulitan,
+        "tipe_soal": tipe_soal,
+        "bahasa": bahasa,
+        "konteks": konteks,
+        "option_count": option_count,
+        "option_labels": option_labels,
+    }
+    validated = validate_and_repair_quiz(normalized, source_pack, validation_config)
+
+    final_items = []
+    for idx, item in enumerate(validated, start=1):
+        if not isinstance(item, dict):
+            continue
+        opts, _ = normalize_quiz_options(item.get("options", []), jenjang)
+        if len(opts) != option_count:
+            continue
+        opts = format_latex_options(opts)
+        ans = str(item.get("correct_answer", "")).strip()
+        ans_label, _ = _split_option_label(ans, 0)
+        matching = next((x for x in opts if x.startswith(f"{ans_label}.")), None)
+        if matching is None:
+            exact = next((x for x in opts if x == ans), None)
+            matching = exact
+        if matching is None:
+            continue
+        final_items.append({
+            "id": idx,
+            "question": str(item.get("question", "")).strip(),
+            "options": opts,
+            "correct_answer": matching,
+            "solution_basis": str(item.get("solution_basis", "")).strip(),
+            "source_locator": str(item.get("source_locator", "")).strip(),
+        })
+
+    if len(final_items) == jumlah_soal:
+        return final_items
+    # Hanya boleh fallback ke raw draft jika raw draft sudah memenuhi aturan jenjang secara utuh.
+    if all(len(x.get("options", [])) == option_count for x in normalized):
+        return normalized
+    return []
 
 def check_active_session_from_db(nama_siswa: str, mapel: str):
     conn = init_db_connection()
@@ -1012,36 +1694,44 @@ def generate_individual_analysis_ai(nama_siswa: str, mapel: str, jenjang: str, n
 # HELPER PARSER MATHEMATICA & OMML WORD EQUATION
 # ==============================================================================
 def clean_math_string(text: str) -> str:
-    """Pembersih simbol & notasi matematika dasar untuk teks biasa."""
+    """Pembersih notasi matematika/LaTeX untuk output Word dan dokumen."""
     if not text:
         return ""
-    
-    text = re.sub(r'\\(?:rightarrow|to)\b', '→', text)
-    text = re.sub(r'\\Rightarrow\b', '⇒', text)
-    text = re.sub(r'\\leftarrow\b', '←', text)
-    text = re.sub(r'\\leftrightarrow\b', '↔', text)
+    text = str(text)
+
+    # Operator penting pada fungsi/invers, relasi, kalkulus, dll.
+    replacements = {
+        r"\rightarrow": "→", r"\to": "→", r"\Rightarrow": "⇒",
+        r"\leftarrow": "←", r"\leftrightarrow": "↔",
+        r"\circ": "∘", r"\circl": "∘",
+        r"\times": "×", r"\cdot": "·", r"\div": "÷",
+        r"\neq": "≠", r"\leq": "≤", r"\geq": "≥",
+        r"\le": "≤", r"\ge": "≥", r"\pm": "±", r"\mp": "∓",
+        r"\infty": "∞", r"\pi": "π", r"\alpha": "α", r"\beta": "β",
+        r"\gamma": "γ", r"\delta": "δ", r"\theta": "θ",
+        r"\lambda": "λ", r"\mu": "μ", r"\sigma": "σ",
+        r"\subset": "⊂", r"\subseteq": "⊆", r"\supset": "⊃", r"\supseteq": "⊇",
+        r"\in": "∈", r"\notin": "∉", r"\forall": "∀", r"\exists": "∃",
+        r"\emptyset": "∅", r"\angle": "∠", r"\perp": "⊥", r"\parallel": "∥",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    # Jika AI mengirim token mentah "circl" dari \circ yang terpotong, normalkan juga.
+    text = re.sub(r"(?<![A-Za-z])circl(?![A-Za-z])", "∘", text)
 
     text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
     text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
     text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
-
     text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
     text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
 
     sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
     sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄⁵₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
-
     text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sup_map), text)
     text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sub_map), text)
 
-    replacements = {
-        r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
-        r"\leq": "≤", r"\geq": "≥", r"\pm": "±", r"\infty": "∞",
-        r"\pi": "π", r"\alpha": "α", r"\beta": "β", r"\theta": "θ", "$": ""
-    }
-    for old, new in replacements.items():
-        text = text.replace(old, new)
-
+    text = text.replace("$", "")
     text = text.replace("left(", "(").replace("right)", ")").replace("dots", "…")
     text = text.replace("{", "").replace("}", "")
     text = re.sub(r'\\([a-zA-Z]+)', r'\1', text).replace("\\", "")
