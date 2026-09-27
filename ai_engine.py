@@ -1089,6 +1089,7 @@ def publish_custom_quiz_to_db(kode_kuis: str, config: dict, quiz_data: list) -> 
     config = normalize_custom_timer_config(config)
     conn = init_db_connection()
     if not conn: 
+        st.error("❌ Gagal terhubung ke database.")
         return False
 
     query = """
@@ -1096,37 +1097,69 @@ def publish_custom_quiz_to_db(kode_kuis: str, config: dict, quiz_data: list) -> 
     VALUES (:kode, :cfg, :quiz, NOW() AT TIME ZONE 'Asia/Jakarta')
     ON CONFLICT (kode_kuis) DO UPDATE SET
         config = EXCLUDED.config,
-        quiz_data = EXCLUDED.quiz_data;
+        quiz_data = EXCLUDED.quiz_data,
+        created_at = NOW() AT TIME ZONE 'Asia/Jakarta';
     """
     try:
+        clean_code = kode_kuis.strip().upper()
         with conn.session as s:
             s.execute(text(query), {
-                "kode": kode_kuis.strip().upper(),
+                "kode": clean_code,
                 "cfg": json.dumps(config, default=str),
                 "quiz": json.dumps(quiz_data, default=str)
             })
             s.commit()
             return True
     except Exception as e:
+        st.error(f"❌ Error publish_custom_quiz_to_db: {e}")
         print(f"Error publish_custom_quiz_to_db: {e}")
         return False
 
 def get_custom_quiz_from_db(kode_kuis: str):
     conn = init_db_connection()
     if not conn: 
+        st.error("❌ Gagal terhubung ke database.")
         return None
 
-    query = "SELECT config, quiz_data FROM kuis_custom WHERE UPPER(kode_kuis) = UPPER(:kode)"
+    clean_code = kode_kuis.strip().upper()
+    query = "SELECT config, quiz_data FROM kuis_custom WHERE UPPER(TRIM(kode_kuis)) = :kode LIMIT 1"
+    
     try:
         with conn.session as s:
-            result = s.execute(text(query), {"kode": kode_kuis.strip()}).fetchone()
+            result = s.execute(text(query), {"kode": clean_code}).fetchone()
             if result:
-                cfg = result[0] if isinstance(result[0], dict) else json.loads(result[0])
+                raw_cfg, raw_quiz = result[0], result[1]
+
+                # 1. Parsing Safe Config (menangani string & double-encoded JSON)
+                if isinstance(raw_cfg, str):
+                    cfg = json.loads(raw_cfg)
+                    if isinstance(cfg, str):
+                        cfg = json.loads(cfg)
+                else:
+                    cfg = raw_cfg
+                
                 cfg = normalize_custom_timer_config(cfg)
-                quiz = result[1] if isinstance(result[1], list) else json.loads(result[1])
-                return {"config": cfg, "quiz": quiz}
+
+                # 2. Parsing Safe Quiz Data
+                if isinstance(raw_quiz, str):
+                    quiz = json.loads(raw_quiz)
+                    if isinstance(quiz, str):
+                        quiz = json.loads(quiz)
+                else:
+                    quiz = raw_quiz
+
+                # 3. Kembalikan KEDUA key ('quiz_data' dan 'quiz') agar kompatibel dengan seluruh bagian CBT
+                return {
+                    "config": cfg, 
+                    "quiz_data": quiz, 
+                    "quiz": quiz
+                }
+            else:
+                print(f"[DEBUG] Kode kuis '{clean_code}' tidak ditemukan di DB.")
     except Exception as e:
+        st.error(f"⚠️ Error membaca kuis dari DB: {e}")
         print(f"Error get_custom_quiz_from_db: {e}")
+        
     return None
 
 def update_progress_siswa(
