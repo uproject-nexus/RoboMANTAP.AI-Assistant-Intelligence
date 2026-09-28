@@ -1696,14 +1696,14 @@ if st.session_state.page == "landing":
 # ==============================================================================
 #=========================================================================================================
 elif st.session_state.page == "student_intelligence":
-    st.write("---")
-    if st.button("⬅️ Kembali ke Beranda", use_container_width=True):
-        st.session_state.page = "landing"
-        st.rerun()
     render_student_intelligence_dashboard(
         st.session_state.get("student_intelligence_name", ""),
         st.session_state.get("student_intelligence_grade", "Semua Jenjang"),
     )
+
+    if st.button("⬅️ Kembali ke Beranda", use_container_width=True):
+        st.session_state.page = "landing"
+        st.rerun()
 
 # ==============================================================================
 # 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
