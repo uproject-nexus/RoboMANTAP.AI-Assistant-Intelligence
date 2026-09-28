@@ -639,7 +639,9 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     # -------------------------------------------------------------------------
     left, right = st.columns(2)
     with left:
+        # Judul Ringkas & Ukuran Pas untuk HP (15px)
         st.markdown('<div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
+        
         if profile["subject_mastery"]:
             import plotly.express as px
             
@@ -647,7 +649,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
                 [{"Mata Pelajaran": k, "Mastery": v} for k, v in profile["subject_mastery"].items()]
             ).sort_values("Mastery", ascending=True)
 
-            # Grafik Horizontal: Nama Mapel Dibaca Mendatar dari Kiri ke Kanan
+            # Grafik Horizontal Plotly
             fig = px.bar(
                 df_subject, 
                 x="Mastery", 
@@ -663,13 +665,14 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
                 yaxis_title="",
                 xaxis=dict(range=[0, 115], showgrid=False, showticklabels=False),
                 yaxis=dict(autorange="reversed"),
-                margin=dict(l=10, r=10, t=10, b=10),
-                height=220,
+                margin=dict(l=10, r=15, t=10, b=10),
+                height=180,
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#e2e8f0', size=12),
+                font=dict(color='#e2e8f0', size=11),
                 coloraxis_showscale=False
             )
+            
             # MEMBUNGKUS GRAFIK DENGAN KARTU BORDER GLASSMORPHISM
             chart_html = f"""
             <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 8px; backdrop-filter: blur(8px);">
