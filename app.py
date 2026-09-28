@@ -1700,7 +1700,7 @@ elif st.session_state.page == "student_intelligence":
         st.session_state.get("student_intelligence_name", ""),
         st.session_state.get("student_intelligence_grade", "Semua Jenjang"),
     )
-
+    st.write("---")
     if st.button("⬅️ Kembali ke Beranda", use_container_width=True):
         st.session_state.page = "landing"
         st.rerun()
@@ -1725,6 +1725,7 @@ elif st.session_state.page == "guru_login":
             st.rerun()
         else:
             st.error("PIN Salah. Silakhan coba lagi!")
+    st.write("---")
     if st.button("⬅️ Kembali ke Beranda", use_container_width=True):
         st.session_state.page = "landing"
         st.rerun()
