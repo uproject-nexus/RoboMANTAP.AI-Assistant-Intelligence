@@ -132,7 +132,6 @@ def _question_topic(question: str, mapel: str) -> str:
     q = re.sub(r"\s+", " ", str(question or "")).strip()
     if not q:
         return str(mapel or "Umum")
-    # Prefer explicit educational phrases when present.
     patterns = [
         r"(?:materi|topik|konsep)\s*[:\-]\s*([^.!?]{3,60})",
         r"tentang\s+([^.!?]{3,60})",
@@ -149,7 +148,6 @@ def build_student_profile(sessions: list[dict]) -> dict:
     total_attempts = len(completed)
     scores = [float(s.get("nilai_akhir") or 0) for s in completed]
 
-    # Custom quizzes use 0-100. Standard OMI uses 40 max. Normalize to 0-100.
     normalized_scores = []
     for s in completed:
         score = float(s.get("nilai_akhir") or 0)
@@ -232,7 +230,6 @@ def build_student_profile(sessions: list[dict]) -> dict:
     weakest_subject = min(subject_mastery, key=subject_mastery.get) if subject_mastery else None
     weakest_topics = sorted(topic_mastery.items(), key=lambda x: x[1])[:5]
 
-    # Risk is descriptive, not a clinical/disciplinary judgement.
     risk_points = 0
     if avg_score < 60:
         risk_points += 2
@@ -324,29 +321,27 @@ def _subject_recommendations(profile: dict) -> list[str]:
     recs = []
     weakest = profile.get("weakest_subject")
     if weakest:
-        recs.append(f"Fokuskan sesi berikutnya pada {weakest} sebelum menambah target baru.")
+        recs.append(f"Fokuskan sesi berikutnya pada **{weakest}** sebelum menambah target baru.")
     for topic, mastery in profile.get("weakest_topics", [])[:2]:
         if mastery < 70:
-            recs.append(f"Latih kembali topik {topic} dengan soal bertahap dari dasar ke aplikasi.")
+            recs.append(f"Latih kembali topik **{topic}** dengan soal bertahap dari dasar ke aplikasi.")
     if profile.get("trend") == "declining":
-        recs.append("Gunakan sesi pendek 20–30 menit dan review kesalahan setelah latihan.")
+        recs.append("Gunakan sesi pendek **20–30 menit** dan review kesalahan setelah latihan.")
     if profile.get("answer_completion", 100) < 80:
-        recs.append("Latih strategi penyelesaian agar lebih banyak soal terjawab sebelum waktu berakhir.")
+        recs.append("Latih **strategi penyelesaian** agar lebih banyak soal terjawab sebelum waktu berakhir.")
     if not recs:
         recs.append("Pertahankan pola latihan dan gunakan pembahasan untuk memperdalam konsep yang masih ragu.")
     return recs[:4]
 
 
 def _start_adaptive_practice(name: str, grade: str, profile: dict) -> tuple[bool, str]:
-    """Generate a real practice session from the student's weakest recorded areas."""
     focus = profile.get("weakest_subject")
     topics = [topic for topic, mastery in profile.get("weakest_topics", []) if mastery < 80][:3]
     if not focus or grade == "Semua Jenjang":
         return False, "Pilih jenjang yang spesifik agar generator latihan dapat memilih kisi-kisi yang tepat."
 
-    # Custom teacher quizzes are not silently converted into OMI subjects.
     if "(Quiz)" in str(focus):
-        return False, "Area terlemah berasal dari Kuis GuruMANTAP. Gunakan latihan adaptif dari sesi guru terlebih dahulu; generator OMI tidak akan mengubah kuis custom secara otomatis."
+        return False, "Area terlemah berasal dari Kuis GuruMANTAP. Gunakan latihan adaptif dari sesi guru terlebih dahulu."
 
     try:
         from ai_engine import generate_quiz_batch, update_progress_siswa
@@ -379,9 +374,148 @@ def _start_adaptive_practice(name: str, grade: str, profile: dict) -> tuple[bool
 
 
 def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "Semua Jenjang") -> None:
-    """Render the additive Student Intelligence workspace."""
+    """Render the additive Student Intelligence workspace with World-Class Responsive UI."""
+    
+    # -------------------------------------------------------------------------
+    # 1. INJECT HIGH-END GLASSMORPHIC & SCORECARD CSS
+    # -------------------------------------------------------------------------
+    ui_css = """
+    <style>
+    /* Metric Scorecard Grid */
+    .eval-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin: 15px 0 22px 0;
+    }
+    @media (max-width: 640px) {
+        .eval-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+    }
+    .eval-card {
+        border-radius: 12px;
+        padding: 14px 10px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(8px);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .eval-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+    .eval-title {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .eval-value {
+        font-size: 22px;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+
+    /* Custom Glassmorphic Alert Banners */
+    .status-banner {
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin-bottom: 25px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.5;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .status-banner-red {
+        background: linear-gradient(135deg, rgba(127, 29, 29, 0.4) 0%, rgba(69, 10, 10, 0.7) 100%);
+        border: 1px solid rgba(239, 68, 68, 0.5);
+        color: #fca5a5;
+    }
+    .status-banner-yellow {
+        background: linear-gradient(135deg, rgba(120, 53, 15, 0.4) 0%, rgba(69, 26, 3, 0.7) 100%);
+        border: 1px solid rgba(245, 158, 11, 0.5);
+        color: #fde68a;
+    }
+    .status-banner-green {
+        background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(2, 44, 34, 0.7) 100%);
+        border: 1px solid rgba(5, 150, 105, 0.5);
+        color: #a7f3d0;
+    }
+
+    /* Modern Progress Bar Wrapper for Topics */
+    .topic-item {
+        background: rgba(30, 41, 59, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin-bottom: 10px;
+    }
+    .topic-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 6px;
+        color: #e2e8f0;
+    }
+    .topic-bar-bg {
+        width: 100%;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .topic-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+
+    /* Action Recommendation List */
+    .rec-card {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-left: 4px solid #10b981;
+        border-radius: 10px;
+        padding: 12px 16px;
+        margin-bottom: 10px;
+        font-size: 13px;
+        color: #f1f5f9;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    .rec-num {
+        background: rgba(16, 185, 129, 0.2);
+        color: #34d399;
+        font-weight: 800;
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        flex-shrink: 0;
+    }
+    </style>
+    """
+    st.markdown(ui_css, unsafe_allow_html=True)
+
+    # -------------------------------------------------------------------------
+    # 2. HERO HEADER
+    # -------------------------------------------------------------------------
     st.markdown("""
-    <div class="premium-hero automation-hero">
+    <div class="premium-hero automation-hero" style="margin-bottom: 20px;">
       <div class="premium-kicker">UPN • STUDENT INTELLIGENCE</div>
       <div class="premium-title">My Learning <span>Intelligence</span></div>
       <div class="premium-subtitle">Bukan sekadar melihat nilai. Sistem RoboMANTAP membaca riwayat pengerjaan Kamu untuk membantu menentukan fokus belajar berikutnya!</div>
@@ -393,15 +527,19 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
       </div>
     </div>
     """, unsafe_allow_html=True)
-    
 
+    # -------------------------------------------------------------------------
+    # 3. IDENTITY FORM
+    # -------------------------------------------------------------------------
     with st.form("student_intelligence_identity", clear_on_submit=False):
         c1, c2 = st.columns([2.2, 1.2])
         with c1:
-            entered_name = st.text_input("Nama siswa", value=nama_siswa, placeholder="Masukkan nama yang digunakan saat kuis")
+            entered_name = st.text_input("Nama Siswa", value=nama_siswa, placeholder="Masukkan nama yang digunakan saat kuis")
         with c2:
-            grade = st.selectbox("Jenjang", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], index=(["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"].index(jenjang) if jenjang in ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"] else 0))
-        submitted = st.form_submit_button("BUKA INTELLIGENCE SAYA", type="primary", use_container_width=True)
+            grade_options = ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"]
+            selected_index = grade_options.index(jenjang) if jenjang in grade_options else 0
+            grade = st.selectbox("Jenjang", grade_options, index=selected_index)
+        submitted = st.form_submit_button("🔍 BUKA INTELLIGENCE SAYA", type="primary", use_container_width=True)
 
     if not submitted and not entered_name.strip():
         st.info("💡 Masukkan Nama Lengkap Kamu untuk membaca riwayat belajar yang sudah tersimpan.")
@@ -410,34 +548,96 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     name = entered_name.strip()
     sessions = fetch_student_sessions(name, grade)
     if not sessions:
-        st.warning("Belum ditemukan sesi belajar dengan nama tersebut. Pastikan nama sama seperti saat mengerjakan kuis.")
+        st.warning("⚠️ Belum ditemukan sesi belajar dengan nama tersebut. Pastikan nama sama seperti saat mengerjakan kuis.")
         return
 
     profile = build_student_profile(sessions)
     save_student_profile(name, grade, profile)
 
-    # Persist identity only for this active app session.
     st.session_state.student_intelligence_name = name
     st.session_state.student_intelligence_grade = grade
 
+    # -------------------------------------------------------------------------
+    # 4. SCORECARD GRID METRICS (MODERN MOBILE-FRIENDLY UI)
+    # -------------------------------------------------------------------------
     avg = profile["average_score"]
+    attempts = profile["attempts"]
+    completion = profile["answer_completion"]
+    trend_raw = profile["trend"]
     risk = profile["risk_label"]
-    trend_icon = {"improving": "📈", "declining": "📉", "stable": "➡️"}.get(profile["trend"], "➡️")
 
-    st.markdown("### 🎯 Kondisi Belajar Saat Ini")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Rata-rata", f"{avg:.0f}%")
-    m2.metric("Sesi Selesai", profile["attempts"])
-    m3.metric("Kelengkapan Jawaban", f"{profile['answer_completion']:.0f}%")
-    m4.metric("Tren", f"{trend_icon} {profile['trend'].title()}")
+    trend_icon = {"improving": "📈", "declining": "📉", "stable": "➡️"}.get(trend_raw, "➡️")
+    trend_title = {"improving": "Improving", "declining": "Declining", "stable": "Stable"}.get(trend_raw, "Stable")
 
-    if risk == "HIGH ATTENTION":
-        st.warning("🚨 **HIGH ATTENTION** — terdapat beberapa sinyal akademik yang layak ditindaklanjuti pada sesi belajar berikutnya.")
-    elif risk == "WATCH":
-        st.info("👀 **WATCH** — ada beberapa area yang sebaiknya dipantau dan dilatih kembali.")
+    # Dynamic styling for trend card
+    if trend_raw == "improving":
+        trend_card_bg = "background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%); border: 1px solid rgba(5, 150, 105, 0.45);"
+        trend_title_color = "#a7f3d0"
+        trend_val_color = "#34d399"
+    elif trend_raw == "declining":
+        trend_card_bg = "background: linear-gradient(135deg, rgba(127, 29, 29, 0.35) 0%, rgba(69, 10, 10, 0.65) 100%); border: 1px solid rgba(239, 68, 68, 0.4);"
+        trend_title_color = "#fca5a5"
+        trend_val_color = "#f87171"
     else:
-        st.success("🟢 **ON TRACK** — pola belajar yang tercatat relatif stabil berdasarkan data yang tersedia.")
+        trend_card_bg = "background: linear-gradient(135deg, rgba(55, 65, 81, 0.35) 0%, rgba(31, 41, 55, 0.65) 100%); border: 1px solid rgba(156, 163, 175, 0.35);"
+        trend_title_color = "#d1d5db"
+        trend_val_color = "#9ca3af"
 
+    eval_html = f"""
+    <div class="eval-grid">
+        <!-- Rata-rata Skor -->
+        <div class="eval-card" style="background: linear-gradient(135deg, rgba(120, 53, 15, 0.45) 0%, rgba(69, 26, 3, 0.75) 100%); border: 1px solid rgba(245, 158, 11, 0.5);">
+            <div class="eval-title" style="color: #fde68a;">🎯 Rata-Rata</div>
+            <div class="eval-value" style="color: #fbbf24;">{avg:.0f}%</div>
+        </div>
+        <!-- Sesi Selesai -->
+        <div class="eval-card" style="background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%); border: 1px solid rgba(5, 150, 105, 0.45);">
+            <div class="eval-title" style="color: #a7f3d0;">🎓 Sesi Selesai</div>
+            <div class="eval-value" style="color: #34d399;">{attempts}</div>
+        </div>
+        <!-- Kelengkapan Jawaban -->
+        <div class="eval-card" style="background: linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.75) 100%); border: 1px solid rgba(59, 130, 246, 0.45);">
+            <div class="eval-title" style="color: #bfdbfe;">📊 Kelengkapan</div>
+            <div class="eval-value" style="color: #60a5fa;">{completion:.0f}%</div>
+        </div>
+        <!-- Tren Performa -->
+        <div class="eval-card" style="{trend_card_bg}">
+            <div class="eval-title" style="color: {trend_title_color};">{trend_icon} Tren</div>
+            <div class="eval-value" style="color: {trend_val_color}; font-size: 18px;">{trend_title}</div>
+        </div>
+    </div>
+    """
+    st.markdown("### 🎯 Kondisi Belajar Saat Ini")
+    st.markdown(eval_html, unsafe_allow_html=True)
+
+    # -------------------------------------------------------------------------
+    # 5. STATUS RISK BANNER
+    # -------------------------------------------------------------------------
+    if risk == "HIGH ATTENTION":
+        st.markdown("""
+        <div class="status-banner status-banner-red">
+            <span style="font-size: 18px;">🚨</span>
+            <div><b>HIGH ATTENTION</b> — Terdapat beberapa sinyal akademik yang layak ditindaklanjuti pada sesi belajar berikutnya.</div>
+        </div>
+        """, unsafe_allow_html=True)
+    elif risk == "WATCH":
+        st.markdown("""
+        <div class="status-banner status-banner-yellow">
+            <span style="font-size: 18px;">👀</span>
+            <div><b>WATCH</b> — Ada beberapa area akademik yang sebaiknya dipantau dan dilatih kembali.</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div class="status-banner status-banner-green">
+            <span style="font-size: 18px;">🟢</span>
+            <div><b>ON TRACK</b> — Pola belajar yang tercatat relatif stabil berdasarkan data yang tersedia.</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # -------------------------------------------------------------------------
+    # 6. MASTERY & TOPIC BREAKDOWN
+    # -------------------------------------------------------------------------
     left, right = st.columns(2)
     with left:
         st.markdown("### 📚 Mastery per Mata Pelajaran")
@@ -454,16 +654,41 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         weak = profile["weakest_topics"]
         if weak:
             for topic, mastery in weak[:5]:
-                st.markdown(f"**{topic}** — {mastery:.0f}%")
-                st.progress(min(1.0, max(0.0, mastery / 100)))
+                m_val = min(100.0, max(0.0, mastery))
+                bar_color = "#f87171" if m_val < 50 else "#fbbf24" if m_val < 75 else "#34d399"
+                
+                topic_html = f"""
+                <div class="topic-item">
+                    <div class="topic-header">
+                        <span>{topic}</span>
+                        <span style="color: {bar_color};">{m_val:.0f}%</span>
+                    </div>
+                    <div class="topic-bar-bg">
+                        <div class="topic-bar-fill" style="width: {m_val}%; background: {bar_color};"></div>
+                    </div>
+                </div>
+                """
+                st.markdown(topic_html, unsafe_allow_html=True)
         else:
             st.caption("Detail topik akan semakin kaya setelah sesi baru menyimpan data soal.")
 
+    # -------------------------------------------------------------------------
+    # 7. ACTION RECOMMENDATIONS & ADAPTIVE PRACTICE
+    # -------------------------------------------------------------------------
+    st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("### 🚀 What Should I Do Now?")
     recommendations = _subject_recommendations(profile)
-    for idx, recommendation in enumerate(recommendations, 1):
-        st.markdown(f"**{idx}.** {recommendation}")
+    
+    for idx, rec_text in enumerate(recommendations, 1):
+        rec_html = f"""
+        <div class="rec-card">
+            <div class="rec-num">{idx}</div>
+            <div>{rec_text}</div>
+        </div>
+        """
+        st.markdown(rec_html, unsafe_allow_html=True)
 
+    st.markdown("<br>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
         if st.button("🔄 MULAI LATIHAN ADAPTIF", type="primary", use_container_width=True):
@@ -478,8 +703,11 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     with c2:
         if st.button("📝 SIMPAN RENCANA BELAJAR", use_container_width=True):
             record_student_action(name, grade, "STUDY_PLAN", "Rencana belajar siswa", {"recommendations": recommendations})
-            st.success("Rencana belajar tersimpan sebagai aktivitas Student Intelligence.")
+            st.success("✅ Rencana belajar tersimpan sebagai aktivitas Student Intelligence.")
 
+    # -------------------------------------------------------------------------
+    # 8. AUDIT SESSION HISTORY
+    # -------------------------------------------------------------------------
     with st.expander("🔎 Lihat riwayat sesi yang menjadi dasar analisis"):
         rows = []
         for s in sessions[:20]:
