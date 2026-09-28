@@ -624,7 +624,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         st.markdown("""
         <div class="status-banner status-banner-yellow">
             <span style="font-size: 18px;">⚡</span>
-            <div><b>PERLU DITINGKATKAN</b> — Pemahamanmu sudah cukup baik, tapi masih ada beberapa area yang bisa ditingkatkan lagi agar hasilmu makin maksimal.</div>
+            <div><b>PERLU DITINGKATKAN</b> — Pemahamanmu sudah cukup baik, tapi masih ada beberapa materi yang bisa ditingkatkan lagi agar hasilmu makin maksimal.</div>
         </div>
         """, unsafe_allow_html=True)
     else:
@@ -642,10 +642,36 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     with left:
         st.markdown("### 📚 Mastery per Mata Pelajaran")
         if profile["subject_mastery"]:
+            import plotly.express as px
+            
             df_subject = pd.DataFrame(
-                [{"Mata Pelajaran": k, "Mastery (%)": v} for k, v in profile["subject_mastery"].items()]
-            ).sort_values("Mastery (%)")
-            st.bar_chart(df_subject.set_index("Mata Pelajaran"))
+                [{"Mata Pelajaran": k, "Mastery": v} for k, v in profile["subject_mastery"].items()]
+            ).sort_values("Mastery", ascending=True)
+
+            # Grafik Horizontal: Nama Mapel Dibaca Mendatar dari Kiri ke Kanan
+            fig = px.bar(
+                df_subject, 
+                x="Mastery", 
+                y="Mata Pelajaran", 
+                orientation='h',
+                text="Mastery",
+                color="Mastery",
+                color_continuous_scale=["#f87171", "#fbbf24", "#34d399"]
+            )
+            fig.update_traces(texttemplate='%{text:.0f}%', textposition='outside', marker_line_width=0)
+            fig.update_layout(
+                xaxis_title="",
+                yaxis_title="",
+                xaxis=dict(range=[0, 115], showgrid=False, showticklabels=False),
+                yaxis=dict(autorange="reversed"),
+                margin=dict(l=10, r=10, t=10, b=10),
+                height=220,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#e2e8f0', size=12),
+                coloraxis_showscale=False
+            )
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
         else:
             st.caption("Data mastery per mata pelajaran belum cukup.")
 
