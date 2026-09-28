@@ -567,7 +567,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     risk = profile["risk_label"]
 
     trend_icon = {"improving": "📈", "declining": "📉", "stable": "➡️"}.get(trend_raw, "➡️")
-    trend_title = {"improving": "Improving", "declining": "Declining", "stable": "Stable"}.get(trend_raw, "Stable")
+    trend_title = {"improving": "Meningkat", "declining": "Menurun", "stable": "Stabil"}.get(trend_raw, "Stable")
 
     # Dynamic styling for trend card
     if trend_raw == "improving":
@@ -597,12 +597,12 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         </div>
         <!-- Kelengkapan Jawaban -->
         <div class="eval-card" style="background: linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.75) 100%); border: 1px solid rgba(59, 130, 246, 0.45);">
-            <div class="eval-title" style="color: #bfdbfe;">📊 Kelengkapan</div>
+            <div class="eval-title" style="color: #bfdbfe;">✅ Akurasi Jawaban</div>
             <div class="eval-value" style="color: #60a5fa;">{completion:.0f}%</div>
         </div>
         <!-- Tren Performa -->
         <div class="eval-card" style="{trend_card_bg}">
-            <div class="eval-title" style="color: {trend_title_color};">{trend_icon} Tren</div>
+            <div class="eval-title" style="color: {trend_title_color};">{trend_icon} Perkembangan</div>
             <div class="eval-value" style="color: {trend_val_color}; font-size: 18px;">{trend_title}</div>
         </div>
     </div>
@@ -617,21 +617,21 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         st.markdown("""
         <div class="status-banner status-banner-red">
             <span style="font-size: 18px;">🚨</span>
-            <div><b>HIGH ATTENTION</b> — Terdapat beberapa sinyal akademik yang layak ditindaklanjuti pada sesi belajar berikutnya.</div>
+            <div><b>PERLU PERHATIAN EKSTRA</b> — Ada beberapa materi yang nilainya masih di bawah target, Yuk luangkan waktu untuk mempelajari dan latihan ulang topik tersebut!</div>
         </div>
         """, unsafe_allow_html=True)
     elif risk == "WATCH":
         st.markdown("""
         <div class="status-banner status-banner-yellow">
-            <span style="font-size: 18px;">👀</span>
-            <div><b>WATCH</b> — Ada beberapa area akademik yang sebaiknya dipantau dan dilatih kembali.</div>
+            <span style="font-size: 18px;">⚡</span>
+            <div><b>PERLU DITINGKATKAN</b> — Pemahamanmu sudah cukup baik, tapi masih ada beberapa area yang bisa ditingkatkan lagi agar hasilmu makin maksimal.</div>
         </div>
         """, unsafe_allow_html=True)
     else:
         st.markdown("""
         <div class="status-banner status-banner-green">
             <span style="font-size: 18px;">🟢</span>
-            <div><b>ON TRACK</b> — Pola belajar yang tercatat relatif stabil berdasarkan data yang tersedia.</div>
+            <div><b>PERFORMA SANGAT BAIK</b> — Luar biasa! Progres dan nilai belajarmu sudah sangat baik serta konsisten, Pertahankan semangat belajarmu!</div>
         </div>
         """, unsafe_allow_html=True)
 
