@@ -639,7 +639,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     # -------------------------------------------------------------------------
     left, right = st.columns(2)
     with left:
-        st.markdown("### 📚 Mastery per Mata Pelajaran")
+        st.markdown('<div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
         if profile["subject_mastery"]:
             import plotly.express as px
             
@@ -670,12 +670,21 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
                 font=dict(color='#e2e8f0', size=12),
                 coloraxis_showscale=False
             )
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            # MEMBUNGKUS GRAFIK DENGAN KARTU BORDER GLASSMORPHISM
+            chart_html = f"""
+            <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 8px; backdrop-filter: blur(8px);">
+            </div>
+            """
+            # Tampilkan Grafik di dalam container
+            with st.container():
+                st.markdown('<div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px;">', unsafe_allow_html=True)
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.caption("Data mastery per mata pelajaran belum cukup.")
+            st.caption("Data pemahaman per mata pelajaran belum cukup.")
 
     with right:
-        st.markdown("### 🧩 Topik yang Perlu Perhatian")
+        st.markdown('<div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🧩 Topik Perlu Perhatian</div>', unsafe_allow_html=True)
         weak = profile["weakest_topics"]
         if weak:
             for topic, mastery in weak[:5]:
