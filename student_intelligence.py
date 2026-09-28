@@ -642,24 +642,40 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     with left:
         # Judul Ringkas & Ukuran Pas untuk HP (15px)
         st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
-        
+
         if profile["subject_mastery"]:
-            for mapel, mastery in sorted(profile["subject_mastery"].items(), key=lambda x: x[1]):
-                m_val = min(100.0, max(0.0, mastery))
-                bar_color = "#f87171" if m_val < 50 else "#fbbf24" if m_val < 75 else "#34d399"
-                
-                mapel_html = f"""
-                <div class="topic-item" style="margin-bottom: 8px;">
-                    <div class="topic-header">
-                        <span style="font-size: 12px; font-weight: 700;">{mapel}</span>
-                        <span style="color: {bar_color}; font-size: 12px; font-weight: 800;">{m_val:.0f}%</span>
-                    </div>
-                    <div class="topic-bar-bg" style="height: 8px;">
-                        <div class="topic-bar-fill" style="width: {m_val}%; background: {bar_color};"></div>
-                    </div>
-                </div>
-                """
-                st.markdown(mapel_html, unsafe_allow_html=True)
+            import plotly.express as px
+            
+            df_subject = pd.DataFrame(
+                [{"Mata Pelajaran": k, "Mastery": v} for k, v in profile["subject_mastery"].items()]
+            ).sort_values("Mastery", ascending=True)
+
+            fig = px.bar(
+                df_subject, 
+                x="Mastery", 
+                y="Mata Pelajaran", 
+                orientation='h',
+                text="Mastery",
+                color="Mastery",
+                color_continuous_scale=["#f87171", "#fbbf24", "#34d399"]
+            )
+            fig.update_traces(texttemplate='%{text:.0f}%', textposition='outside', marker_line_width=0)
+            fig.update_layout(
+                xaxis_title="",
+                yaxis_title="",
+                xaxis=dict(range=[0, 115], showgrid=False, showticklabels=False),
+                yaxis=dict(autorange="reversed"),
+                margin=dict(l=5, r=15, t=5, b=5),
+                height=160,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#e2e8f0', size=11),
+                coloraxis_showscale=False
+            )
+            
+            # Bingkai Bawaan Streamlit (Bebas Glitch)
+            with st.container(border=True):
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
         else:
             st.caption("Data pemahaman per mata pelajaran belum cukup.")
 
@@ -684,7 +700,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
                 """
                 st.markdown(topic_html, unsafe_allow_html=True)
         else:
-            st.caption("Detail topik akan semakin kaya setelah sesi baru menyimpan data soal.")
+            st.success("🎉 Luar biasa! Semua topik yang kamu kerjakan nilainya sudah di atas target (≥80%).")
 
     # -------------------------------------------------------------------------
     # 7. ACTION RECOMMENDATIONS & ADAPTIVE PRACTICE
