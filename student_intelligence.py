@@ -393,6 +393,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
       </div>
     </div>
     """, unsafe_allow_html=True)
+    
 
     with st.form("student_intelligence_identity", clear_on_submit=False):
         c1, c2 = st.columns([2.2, 1.2])
