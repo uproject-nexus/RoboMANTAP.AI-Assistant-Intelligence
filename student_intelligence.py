@@ -606,7 +606,8 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         </div>
     </div>
     """
-    st.markdown("### 🎯 Kondisi Belajar Saat Ini")
+    
+    st.markdown('<div style="font-size: 19px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🎯 Kondisi Belajar Saat Ini</div>', unsafe_allow_html=True)
     st.markdown(eval_html, unsafe_allow_html=True)
 
     # -------------------------------------------------------------------------
@@ -640,7 +641,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     left, right = st.columns(2)
     with left:
         # Judul Ringkas & Ukuran Pas untuk HP (15px)
-        st.markdown('<div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size: 19px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
         
         if profile["subject_mastery"]:
             import plotly.express as px
@@ -687,7 +688,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
             st.caption("Data pemahaman per mata pelajaran belum cukup.")
 
     with right:
-        st.markdown('<div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🧩 Topik Perlu Perhatian</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size: 19px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🧩 Topik Perlu Perhatian</div>', unsafe_allow_html=True)
         weak = profile["weakest_topics"]
         if weak:
             for topic, mastery in weak[:5]:
@@ -713,7 +714,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     # 7. ACTION RECOMMENDATIONS & ADAPTIVE PRACTICE
     # -------------------------------------------------------------------------
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("### 🚀 What Should I Do Now?")
+    st.markdown('<div style="font-size: 19px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🚀 What Should I Do Now?</div>', unsafe_allow_html=True)
     recommendations = _subject_recommendations(profile)
     
     for idx, rec_text in enumerate(recommendations, 1):
