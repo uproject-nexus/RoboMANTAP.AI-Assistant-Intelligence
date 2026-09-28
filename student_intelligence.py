@@ -607,7 +607,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     </div>
     """
     
-    st.markdown('<div style="font-size: 19px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🎯 Kondisi Belajar Saat Ini</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🎯 Kondisi Belajar Saat Ini</div>', unsafe_allow_html=True)
     st.markdown(eval_html, unsafe_allow_html=True)
 
     # -------------------------------------------------------------------------
@@ -641,54 +641,30 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     left, right = st.columns(2)
     with left:
         # Judul Ringkas & Ukuran Pas untuk HP (15px)
-        st.markdown('<div style="font-size: 19px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
         
         if profile["subject_mastery"]:
-            import plotly.express as px
-            
-            df_subject = pd.DataFrame(
-                [{"Mata Pelajaran": k, "Mastery": v} for k, v in profile["subject_mastery"].items()]
-            ).sort_values("Mastery", ascending=True)
-
-            # Grafik Horizontal Plotly
-            fig = px.bar(
-                df_subject, 
-                x="Mastery", 
-                y="Mata Pelajaran", 
-                orientation='h',
-                text="Mastery",
-                color="Mastery",
-                color_continuous_scale=["#f87171", "#fbbf24", "#34d399"]
-            )
-            fig.update_traces(texttemplate='%{text:.0f}%', textposition='outside', marker_line_width=0)
-            fig.update_layout(
-                xaxis_title="",
-                yaxis_title="",
-                xaxis=dict(range=[0, 115], showgrid=False, showticklabels=False),
-                yaxis=dict(autorange="reversed"),
-                margin=dict(l=10, r=15, t=10, b=10),
-                height=180,
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#e2e8f0', size=11),
-                coloraxis_showscale=False
-            )
-            
-            # MEMBUNGKUS GRAFIK DENGAN KARTU BORDER GLASSMORPHISM
-            chart_html = f"""
-            <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 8px; backdrop-filter: blur(8px);">
-            </div>
-            """
-            # Tampilkan Grafik di dalam container
-            with st.container():
-                st.markdown('<div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px;">', unsafe_allow_html=True)
-                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-                st.markdown('</div>', unsafe_allow_html=True)
+            for mapel, mastery in sorted(profile["subject_mastery"].items(), key=lambda x: x[1]):
+                m_val = min(100.0, max(0.0, mastery))
+                bar_color = "#f87171" if m_val < 50 else "#fbbf24" if m_val < 75 else "#34d399"
+                
+                mapel_html = f"""
+                <div class="topic-item" style="margin-bottom: 8px;">
+                    <div class="topic-header">
+                        <span style="font-size: 12px; font-weight: 700;">{mapel}</span>
+                        <span style="color: {bar_color}; font-size: 12px; font-weight: 800;">{m_val:.0f}%</span>
+                    </div>
+                    <div class="topic-bar-bg" style="height: 8px;">
+                        <div class="topic-bar-fill" style="width: {m_val}%; background: {bar_color};"></div>
+                    </div>
+                </div>
+                """
+                st.markdown(mapel_html, unsafe_allow_html=True)
         else:
             st.caption("Data pemahaman per mata pelajaran belum cukup.")
 
     with right:
-        st.markdown('<div style="font-size: 19px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🧩 Topik Perlu Perhatian</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🧩 Topik Perlu Perhatian</div>', unsafe_allow_html=True)
         weak = profile["weakest_topics"]
         if weak:
             for topic, mastery in weak[:5]:
@@ -714,7 +690,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     # 7. ACTION RECOMMENDATIONS & ADAPTIVE PRACTICE
     # -------------------------------------------------------------------------
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div style="font-size: 19px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🚀 What Should I Do Now?</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🚀 What Should I Do Now?</div>', unsafe_allow_html=True)
     recommendations = _subject_recommendations(profile)
     
     for idx, rec_text in enumerate(recommendations, 1):
