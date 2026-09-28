@@ -1023,7 +1023,7 @@ def init_db_connection():
 
     if db_url:
         if db_url.startswith("postgres://"):
-            db_url = db_url.replace("postgres://", "postgresql://", 1)
+            db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
         try:
             engine = create_engine(db_url, pool_pre_ping=True)
             _db_conn_cache = DBWrapper(engine)
