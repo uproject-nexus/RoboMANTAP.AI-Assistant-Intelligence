@@ -1672,7 +1672,7 @@ if st.session_state.page == "landing":
     st.markdown("""
     <div class="guru-card" style="background: linear-gradient(135deg, #172554 0%, #312e81 100%); border-color: #6366f1;">
         <h2 style="margin:0; font-size: 20px;">🎓 My Learning Intelligence</h2>
-        <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Evaluasi secara mendalam pola belajarmu, identifikasi materi yang butuh perbaikan, lalu susun rencana strategis untuk langkah pembelajaran berikutnya!</p>
+        <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Evaluasi pola belajarmu, identifikasi materi yang butuh perbaikan, lalu susun rencana strategis untuk langkah pembelajaran berikutnya!</p>
     </div>
     """, unsafe_allow_html=True)
     if st.button("Masuk Portal Siswa ➔", use_container_width=True, type="primary"):
