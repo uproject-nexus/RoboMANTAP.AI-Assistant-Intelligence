@@ -1696,7 +1696,7 @@ if st.session_state.page == "landing":
 # ==============================================================================
 #=========================================================================================================
 elif st.session_state.page == "student_intelligence":
-    st.markdown("### Student Intelligence")
+    st.write("---")
     if st.button("⬅️ Kembali ke Beranda", use_container_width=True):
         st.session_state.page = "landing"
         st.rerun()
@@ -1725,6 +1725,9 @@ elif st.session_state.page == "guru_login":
             st.rerun()
         else:
             st.error("PIN Salah. Silakhan coba lagi!")
+    if st.button("⬅️ Kembali ke Beranda", use_container_width=True):
+        st.session_state.page = "landing"
+        st.rerun()
 
 elif st.session_state.page == "guru_dashboard":
     if not st.session_state.guru_auth:
