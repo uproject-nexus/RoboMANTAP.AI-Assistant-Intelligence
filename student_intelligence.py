@@ -665,19 +665,19 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
 
     with right:
         st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🧩 Topik Perlu Perhatian</div>', unsafe_allow_html=True)
-        weak = profile["weakest_topics"]
+        weak = [(topic, mastery) for topic, mastery in profile.get("weakest_topics", []) if mastery < 80]    
         if weak:
             for topic, mastery in weak[:5]:
                 m_val = min(100.0, max(0.0, mastery))
-                bar_color = "#f87171" if m_val < 50 else "#fbbf24" if m_val < 75 else "#34d399"
+                bar_color = "#f87171" if m_val < 50 else "#fbbf24"
                 
                 topic_html = f"""
-                <div class="topic-item">
+                <div class="topic-item" style="margin-bottom: 8px;">
                     <div class="topic-header">
-                        <span>{topic}</span>
-                        <span style="color: {bar_color};">{m_val:.0f}%</span>
+                        <span style="font-size: 12px; font-weight: 700;">{topic}</span>
+                        <span style="color: {bar_color}; font-size: 12px; font-weight: 800;">{m_val:.0f}%</span>
                     </div>
-                    <div class="topic-bar-bg">
+                    <div class="topic-bar-bg" style="height: 8px;">
                         <div class="topic-bar-fill" style="width: {m_val}%; background: {bar_color};"></div>
                     </div>
                 </div>
