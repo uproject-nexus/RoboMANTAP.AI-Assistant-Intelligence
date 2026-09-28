@@ -384,7 +384,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     <div class="premium-hero automation-hero">
       <div class="premium-kicker">UPN • STUDENT INTELLIGENCE</div>
       <div class="premium-title">My Learning <span>Intelligence</span></div>
-      <div class="premium-subtitle">Bukan sekadar melihat nilai. Sistem membaca riwayat pengerjaan Kamu untuk membantu menentukan fokus belajar berikutnya!</div>
+      <div class="premium-subtitle">Bukan sekadar melihat nilai. Sistem RoboMANTAP membaca riwayat pengerjaan Kamu untuk membantu menentukan fokus belajar berikutnya!</div>
       <div class="premium-pills">
         <span class="chip chip-green">🎓 Mastery</span>
         <span class="chip chip-blue">🎯 Prioritas</span>
@@ -403,7 +403,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         submitted = st.form_submit_button("BUKA INTELLIGENCE SAYA", type="primary", use_container_width=True)
 
     if not submitted and not entered_name.strip():
-        st.info("Masukkan Nama Lengkap Kamu untuk membaca riwayat belajar yang sudah tersimpan.")
+        st.info("💡 Masukkan Nama Lengkap Kamu untuk membaca riwayat belajar yang sudah tersimpan.")
         return
 
     name = entered_name.strip()
