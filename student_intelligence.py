@@ -641,7 +641,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     left, right = st.columns(2)
     with left:
         # Judul Ringkas & Ukuran Pas untuk HP (15px)
-        st.markdown('<div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
         
         if profile["subject_mastery"]:
             for mapel, mastery in sorted(profile["subject_mastery"].items(), key=lambda x: x[1]):
