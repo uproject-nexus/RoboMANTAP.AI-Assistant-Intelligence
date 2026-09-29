@@ -320,14 +320,14 @@ def _subject_recommendations(profile: dict) -> list[str]:
     recs = []
     weakest = profile.get("weakest_subject")
     if weakest:
-        recs.append(f"Fokuskan sesi berikutnya pada **{weakest}** sebelum menambah target baru.")
+        recs.append(f"Fokuskan sesi berikutnya pada *{weakest}* sebelum menambah target baru.")
     for topic, mastery in profile.get("weakest_topics", [])[:2]:
         if mastery < 70:
-            recs.append(f"Latih kembali topik **{topic}** dengan soal bertahap dari dasar ke aplikasi.")
+            recs.append(f"Latih kembali topik *{topic}* dengan soal bertahap dari dasar ke aplikasi.")
     if profile.get("trend") == "declining":
-        recs.append("Gunakan sesi pendek **20–30 menit** dan review kesalahan setelah latihan.")
+        recs.append("Gunakan sesi pendek *20–30 menit* dan review kesalahan setelah latihan.")
     if profile.get("answer_completion", 100) < 80:
-        recs.append("Latih **strategi penyelesaian** agar lebih banyak soal terjawab sebelum waktu berakhir.")
+        recs.append("Latih *strategi penyelesaian* agar lebih banyak soal terjawab sebelum waktu berakhir.")
     if not recs:
         recs.append("Pertahankan pola latihan dan gunakan pembahasan untuk memperdalam konsep yang masih ragu.")
     return recs[:4]
