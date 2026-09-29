@@ -705,6 +705,73 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         """
         st.markdown(rec_html, unsafe_allow_html=True)
 
+    # -------------------------------------------------------------------------
+    # BANNER WHATSAPP BOT INTEGRATION
+    # -------------------------------------------------------------------------
+    # 1. Masukkan nomor WhatsApp Bot Anda (Gunakan format internasional tanpa '+', contoh: 6281234567890)
+    NO_WA_BOT = "6283141694735"  # <-- Ganti dengan nomor WA Bot Anda
+    
+    # 2. Pesan otomatis awal dari siswa
+    # Pesan awal yang ringkas & bersih
+    pesan_otomatis = f"Halo RoboMANTAP! Saya {name} ({grade}), ingin latihan soal dan belajar lewat WhatsApp."
+    import urllib.parse
+    pesan_encoded = urllib.parse.quote(pesan_ototmatis)
+    wa_link = f"https://wa.me/{NO_WA_BOT}?text={pesan_encoded}"
+    
+    # 3. HTML Banner Bergaya Modern & Responsive
+    wa_card_html = f"""
+    <a href="{wa_link}" target="_blank" style="text-decoration: none;">
+        <div style="
+            background: linear-gradient(135deg, rgba(6, 78, 59, 0.5) 0%, rgba(2, 44, 34, 0.8) 100%);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            border-radius: 12px;
+            padding: 14px 18px;
+            margin: 15px 0 20px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+            transition: all 0.2s ease;
+        ">
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <div style="
+                    background: #25D366; 
+                    width: 42px; 
+                    height: 42px; 
+                    border-radius: 50%; 
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center;
+                    font-size: 22px;
+                    flex-shrink: 0;
+                ">💬</div>
+                <div>
+                    <div style="font-size: 14px; font-weight: 800; color: #a7f3d0; margin-bottom: 2px;">
+                        Latihan Kuis via WhatsApp Bot
+                    </div>
+                    <div style="font-size: 11px; color: #cbd5e1; line-height: 1.3;">
+                        Lebih praktis & hemat kuota. Kirim pesan ke RoboMANTAP Bot untuk mulai kuis langsung di WA!
+                    </div>
+                </div>
+            </div>
+            <div style="
+                background: #25D366;
+                color: #022c22;
+                font-size: 12px;
+                font-weight: 800;
+                padding: 8px 14px;
+                border-radius: 8px;
+                white-space: nowrap;
+                margin-left: 10px;
+            ">
+                Chat WA →
+            </div>
+        </div>
+    </a>
+    """
+    
+    st.markdown(wa_card_html, unsafe_allow_html=True)
+
     st.markdown("<br>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
