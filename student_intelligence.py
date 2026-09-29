@@ -11,6 +11,7 @@ import json
 import math
 import re
 import uuid
+import urllib.parse
 from collections import Counter, defaultdict
 from datetime import datetime
 from typing import Any
@@ -714,7 +715,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     # 2. Pesan otomatis awal dari siswa
     # Pesan awal yang ringkas & bersih
     pesan_otomatis = f"Halo RoboMANTAP! Saya {name} ({grade}), ingin latihan soal dan belajar lewat WhatsApp."
-    import urllib.parse
+    
     pesan_encoded = urllib.parse.quote(pesan_otomatis)
     wa_link = f"https://wa.me/{NO_WA_BOT}?text={pesan_encoded}"
     
