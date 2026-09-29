@@ -3334,9 +3334,29 @@ elif st.session_state.page == "setup":
             )
             
             st.markdown("<br>", unsafe_allow_html=True)
+            # Injeksi CSS membatasi st.pills maksimal 3 baris + scrollbar halus
+            st.markdown("""
+            <style>
+            div[data-testid="stPills"] {
+                max-height: 115px !important; /* Batas tinggi setara ~3 baris */
+                overflow-y: auto !important;  /* Scroll otomatis jika lebih dari 3 baris */
+                padding: 4px 2px;
+            }
             
+            /* Scrollbar tipis & halus khusus area pills */
+            div[data-testid="stPills"]::-webkit-scrollbar {
+                width: 4px;
+            }
+            div[data-testid="stPills"]::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 4px;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # Widget Pills
             available_submateri = KISI_KISI_OMI[st.session_state.jenjang][st.session_state.mapel]
-            # Menggunakan st.pills dengan mode multi-select
+            
             submateri_input = st.pills(
                 "Pilih Submateri (Kosongkan jika memilih semua):",
                 options=available_submateri,
@@ -3344,6 +3364,7 @@ elif st.session_state.page == "setup":
                 default=[]
             )
 
+        st.write("---")
         with c2:
             st.markdown('<div style="font-size: 22px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">2. Petunjuk CBT RoboMANTAP</div>', unsafe_allow_html=True)
             
@@ -3352,7 +3373,7 @@ elif st.session_state.page == "setup":
             <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 14px; font-size: 12px; color: #cbd5e1; line-height: 1.6;">
                 <div style="margin-bottom: 6px;">🎯 <b>Jumlah Soal:</b> TEPAT 10 Soal Pilihan Ganda</div>
                 <div style="margin-bottom: 6px;">📜 <b>Standar Pembinaan:</b> Mengacu Juknis OMI 2026 (Sains, Keislaman, & Literasi Data)</div>
-                <div>📊 <b>Skoring:</b> Benar (<span style="color:#34d399; font-weight:700;">+4</span>), Salah (<span style="color:#f87171; font-weight:700;">-1</span>), Kosong (0).</div>
+                <div>📊 <b>Skoring:</b> Benar (<span style="color:#34d399; font-weight:700;">+4</span>), Salah (<span style="color:#f87171; font-weight:700;">-1</span>), Kosong (0)</div>
             </div>
             """
             st.markdown(petunjuk_html, unsafe_allow_html=True)
