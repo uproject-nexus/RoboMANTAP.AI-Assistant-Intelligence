@@ -3334,13 +3334,14 @@ elif st.session_state.page == "setup":
             )
             
             st.markdown("<br>", unsafe_allow_html=True)
-            available_submateri = KISI_KISI_OMI[st.session_state.jenjang][st.session_state.mapel]
             
-            submateri_input = st.multiselect(
+            available_submateri = KISI_KISI_OMI[st.session_state.jenjang][st.session_state.mapel]
+            # Menggunakan st.pills dengan mode multi-select
+            submateri_input = st.pills(
                 "Pilih Submateri (Kosongkan jika memilih semua):",
-                available_submateri,
-                default=[],
-                placeholder="Pilih submateri di sini..."
+                options=available_submateri,
+                selection_mode="multi",
+                default=[]
             )
 
         with c2:
