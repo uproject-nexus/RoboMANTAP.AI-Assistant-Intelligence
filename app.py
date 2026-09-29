@@ -3278,6 +3278,25 @@ elif st.session_state.page == "select_mapel":
                 st.session_state.page = "setup"
                 st.rerun()
 
+# Injeksi CSS membatasi st.pills maksimal 3 baris + scrollbar halus
+st.markdown("""
+<style>
+div[data-testid="stPills"] {
+max-height: 115px !important; /* Batas tinggi setara ~3 baris */
+overflow-y: auto !important;  /* Scroll otomatis jika lebih dari 3 baris */
+padding: 4px 2px;
+}
+
+/* Scrollbar tipis & halus khusus area pills */
+div[data-testid="stPills"]::-webkit-scrollbar {
+width: 4px;
+}
+div[data-testid="stPills"]::-webkit-scrollbar-thumb {
+background: rgba(255, 255, 255, 0.2);
+border-radius: 4px;
+}
+</style>
+""", unsafe_allow_html=True)
 # ==============================================================================
 # 4. SETUP CBT & BIODATA SISWA
 # ==============================================================================
@@ -3332,28 +3351,7 @@ elif st.session_state.page == "setup":
                 index=0,
                 horizontal=True
             )
-            
-
-            # Injeksi CSS membatasi st.pills maksimal 3 baris + scrollbar halus
-            st.markdown("""
-            <style>
-            div[data-testid="stPills"] {
-                max-height: 115px !important; /* Batas tinggi setara ~3 baris */
-                overflow-y: auto !important;  /* Scroll otomatis jika lebih dari 3 baris */
-                padding: 4px 2px;
-            }
-            
-            /* Scrollbar tipis & halus khusus area pills */
-            div[data-testid="stPills"]::-webkit-scrollbar {
-                width: 4px;
-            }
-            div[data-testid="stPills"]::-webkit-scrollbar-thumb {
-                background: rgba(255, 255, 255, 0.2);
-                border-radius: 4px;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
+                       
             # Widget Pills
             available_submateri = KISI_KISI_OMI[st.session_state.jenjang][st.session_state.mapel]
             
