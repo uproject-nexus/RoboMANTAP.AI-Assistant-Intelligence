@@ -3288,7 +3288,7 @@ elif st.session_state.page == "setup":
     col_h1, col_h2 = st.columns([3, 1])
     with col_h1:
         st.markdown(f"""
-        <div style="font-size: 22px; font-weight: 800; line-height: 1.3; color: #f8fafc;">
+        <div style="font-size: 25px; font-weight: 800; line-height: 1.3; color: #f8fafc;">
             ⚙️ Persiapan CBT<br>
             <span style="font-size: 15px; color: #34d399; font-weight: 600;">
                 {st.session_state.mapel} &bull; {st.session_state.jenjang}
@@ -3297,7 +3297,7 @@ elif st.session_state.page == "setup":
         """, unsafe_allow_html=True)
     with col_h2:
         st.write("")
-        if st.button("⬅️ Ganti Mapel", use_container_width=True):
+        if st.button("⬅️ Kembali Ganti Bidang", use_container_width=True):
             st.session_state.page = "select_mapel"
             st.rerun()
 
@@ -3309,11 +3309,11 @@ elif st.session_state.page == "setup":
     with st.form(key="cbt_setup_form", clear_on_submit=False):
         
         # --- DATA DIRI ---
-        st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">📝 Data Diri Siswa</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size: 22px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">📝 Data Diri Siswa</div>', unsafe_allow_html=True)
         nama_input = st.text_input(
             "Nama Lengkap:", 
             value=st.session_state.get("nama_siswa", ""), 
-            placeholder="Contoh: Fulanah binti Fulan",
+            placeholder="Masukkan Nama Lengkap Kamu",
             label_visibility="collapsed"
         )
 
@@ -3323,7 +3323,7 @@ elif st.session_state.page == "setup":
         c1, c2 = st.columns([6, 6])
 
         with c1:
-            st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">1. Konfigurasi Ujian</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size: 22px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">1. Konfigurasi Ujian</div>', unsafe_allow_html=True)
             
             # Opsi Radio Horizontal agar ringkas di HP
             stage_input = st.radio(
@@ -3344,13 +3344,13 @@ elif st.session_state.page == "setup":
             )
 
         with c2:
-            st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">2. Petunjuk CBT RoboMANTAP</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size: 22px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">2. Petunjuk CBT RoboMANTAP</div>', unsafe_allow_html=True)
             
             # Card Petunjuk Bergaya Glassmorphism Dark
             petunjuk_html = """
             <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 14px; font-size: 12px; color: #cbd5e1; line-height: 1.6;">
-                <div style="margin-bottom: 6px;">🎯 <b>Jumlah Soal:</b> TEPAT 10 Soal Pilihan Ganda.</div>
-                <div style="margin-bottom: 6px;">📜 <b>Standar:</b> Mengacu Juknis OMI 2026 (Sains, Keislaman, & Literasi Data).</div>
+                <div style="margin-bottom: 6px;">🎯 <b>Jumlah Soal:</b> TEPAT 10 Soal Pilihan Ganda</div>
+                <div style="margin-bottom: 6px;">📜 <b>Standar Pembinaan:</b> Mengacu Juknis OMI 2026 (Sains, Keislaman, & Literasi Data)</div>
                 <div>📊 <b>Skoring:</b> Benar (<span style="color:#34d399; font-weight:700;">+4</span>), Salah (<span style="color:#f87171; font-weight:700;">-1</span>), Kosong (0).</div>
             </div>
             """
