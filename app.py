@@ -3601,9 +3601,7 @@ elif st.session_state.page == "quiz":
 
     timer_seconds = st.session_state.get("custom_timer_seconds", 0)
     if is_custom and timer_seconds > 0:
-        render_custom_timer(st.session_state.start_time_wib, timer_seconds)
-
- 
+        render_custom_timer(st.session_state.start_time_wib, timer_seconds) 
 
     # Render Soal & Radio Pilihan Jawaban
     st.markdown(f"#### **Soal No. {curr_idx + 1}**")
@@ -3623,10 +3621,6 @@ elif st.session_state.page == "quiz":
 
     if selected_option:
         st.session_state.user_answers[curr_idx] = selected_option
-
-
-    
-    # Navigasi Utama (Berikutnya, Sebelumnya, Submit)
 
     # Helper Async Sync (Letakkan di dalam atau di luar blok quiz)
     def sync_to_db_async():
@@ -3660,8 +3654,6 @@ elif st.session_state.page == "quiz":
     
         # Eksekusi thread mandiri (bebas antrean)
         threading.Thread(target=worker, daemon=True).start()
-    
-
     
     # Navigasi Utama
     col_nav1, col_nav2, col_nav3 = st.columns([3, 6, 3])
