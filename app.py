@@ -1607,7 +1607,6 @@ if st.session_state.page == "landing":
 
     st.markdown("<h3 style='text-align: center; font-size: 25px;'>🏆 BINA PRESTASI OMI 2026</h3>", unsafe_allow_html=True)
     st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
-    st.write("---")
 
     col1, col2 = st.columns(2)
     with col1:
