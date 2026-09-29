@@ -3282,73 +3282,129 @@ elif st.session_state.page == "select_mapel":
 # 4. SETUP CBT & BIODATA SISWA
 # ==============================================================================
 elif st.session_state.page == "setup":
-    st.markdown(f"""
-    <div style="font-size: 23px; font-weight: bold; line-height: 1.4; margin-bottom: 10px;">
-        ⚙️ Persiapan CBT:<br>
-        <span style="font-size: 17px; color: #059669; font-weight: 600;">
-            {st.session_state.mapel} ({st.session_state.jenjang})
-        </span>
-    </div>
-    """, unsafe_allow_html=True)
-    if st.button("⬅️ Ganti Mata Pelajaran"):
-        st.session_state.page = "select_mapel"
-        st.rerun()
+    # -------------------------------------------------------------------------
+    # 1. HEADER PERSIAPAN & TOMBOL KEMBALI
+    # -------------------------------------------------------------------------
+    col_h1, col_h2 = st.columns([3, 1])
+    with col_h1:
+        st.markdown(f"""
+        <div style="font-size: 22px; font-weight: 800; line-height: 1.3; color: #f8fafc;">
+            ⚙️ Persiapan CBT<br>
+            <span style="font-size: 15px; color: #34d399; font-weight: 600;">
+                {st.session_state.mapel} &bull; {st.session_state.jenjang}
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_h2:
+        st.write("")
+        if st.button("⬅️ Ganti Mapel", use_container_width=True):
+            st.session_state.page = "select_mapel"
+            st.rerun()
 
-    st.write("---")
-    st.markdown("#### 📝 Masukkan Data Diri Kamu")
-    st.session_state.nama_siswa = st.text_input("Nama Lengkap:", value=st.session_state.nama_siswa, placeholder="Contoh: Fulanah binti Fulan")
-    st.write("---")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    c1, c2 = st.columns([5, 7])
-
-    with c1:
-        st.subheader("1. Konfigurasi Ujian")
-        st.session_state.stage = st.radio("Pilih Tahap Pembinaan:", ["Internal", "Kab/Kota", "Provinsi", "Nasional"])
+    # -------------------------------------------------------------------------
+    # 2. FORM UTAMA (MENCEGAH RERUN SETIAP KLIK/KETIK)
+    # -------------------------------------------------------------------------
+    with st.form(key="cbt_setup_form", clear_on_submit=False):
         
-        available_submateri = KISI_KISI_OMI[st.session_state.jenjang][st.session_state.mapel]
-        st.session_state.selected_submateri = st.multiselect(
-            "Pilih Submateri: (Click (Select all) untuk memilih semua Submateri)",
-            available_submateri,
-            default=[],
-            placeholder="Pilih submateri di sini..."
+        # --- DATA DIRI ---
+        st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">📝 Data Diri Siswa</div>', unsafe_allow_html=True)
+        nama_input = st.text_input(
+            "Nama Lengkap:", 
+            value=st.session_state.get("nama_siswa", ""), 
+            placeholder="Contoh: Fulanah binti Fulan",
+            label_visibility="collapsed"
         )
 
-    with c2:
-        st.subheader("2. Petunjuk CBT RoboMANTAP")
-        st.markdown("""
-        * **Jumlah Soal:** TEPAT 10 Soal Pilihan Ganda Terintegrasi per Sesi.
-        * **Standar Pembinaan:** Mengacu Juknis OMI 2026 (Sains, Keislaman, & Literasi Data).
-        * **Skoring:** Benar (+4), Salah (-1), Kosong (0).
-        """)
-        st.write("")
-        if st.button("🚀 MARI MULAI SESI TEST SEKARANG!", type="primary", use_container_width=True):
-            nama_input = st.session_state.nama_siswa.strip()
-            jumlah_huruf = len([c for c in nama_input if c.isalpha()])
+        st.markdown("<hr style='margin: 15px 0; border-color: rgba(255,255,255,0.08);'>", unsafe_allow_html=True)
+
+        # --- GRID KONFIGURASI & PETUNJUK ---
+        c1, c2 = st.columns([6, 6])
+
+        with c1:
+            st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">1. Konfigurasi Ujian</div>', unsafe_allow_html=True)
             
-            if jumlah_huruf < 4:
-                st.error("⚠️ Masukkan nama lengkap yang valid!")
-            else:
-                st.session_state.session_id = str(uuid.uuid4())
-                with st.spinner(f"RoboMANTAP sedang merancang 10 soal {st.session_state.mapel} Kamu. Tunggu sebentar ya... (nggak lama kok, hanya butuh waktu sekitar 15 detik saja! 😊)"):
-                    quiz = generate_quiz_batch(
-                        st.session_state.jenjang,
-                        st.session_state.mapel,
-                        st.session_state.stage,
-                        st.session_state.selected_submateri
+            # Opsi Radio Horizontal agar ringkas di HP
+            stage_input = st.radio(
+                "Pilih Tahap Pembinaan:", 
+                ["Internal", "Kab/Kota", "Provinsi", "Nasional"],
+                index=0,
+                horizontal=True
+            )
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            available_submateri = KISI_KISI_OMI[st.session_state.jenjang][st.session_state.mapel]
+            
+            submateri_input = st.multiselect(
+                "Pilih Submateri (Kosongkan jika memilih semua):",
+                available_submateri,
+                default=[],
+                placeholder="Pilih submateri di sini..."
+            )
+
+        with c2:
+            st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">2. Petunjuk CBT RoboMANTAP</div>', unsafe_allow_html=True)
+            
+            # Card Petunjuk Bergaya Glassmorphism Dark
+            petunjuk_html = """
+            <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 14px; font-size: 12px; color: #cbd5e1; line-height: 1.6;">
+                <div style="margin-bottom: 6px;">🎯 <b>Jumlah Soal:</b> TEPAT 10 Soal Pilihan Ganda.</div>
+                <div style="margin-bottom: 6px;">📜 <b>Standar:</b> Mengacu Juknis OMI 2026 (Sains, Keislaman, & Literasi Data).</div>
+                <div>📊 <b>Skoring:</b> Benar (<span style="color:#34d399; font-weight:700;">+4</span>), Salah (<span style="color:#f87171; font-weight:700;">-1</span>), Kosong (0).</div>
+            </div>
+            """
+            st.markdown(petunjuk_html, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # --- TOMBOL SUBMIT (SATU-SATUNYA PEMICU RERUN) ---
+        submitted = st.form_submit_button(
+            "🚀 MARI MULAI SESI TEST SEKARANG!", 
+            type="primary", 
+            use_container_width=True
+        )
+
+    # -------------------------------------------------------------------------
+    # 3. EKSEKUSI PEMBUATAN SOAL SETELAH TOMBOL DIKLIK
+    # -------------------------------------------------------------------------
+    if submitted:
+        # Simpan nilai dari form ke session_state
+        st.session_state.nama_siswa = nama_input
+        st.session_state.stage = stage_input
+        st.session_state.selected_submateri = submateri_input
+
+        nama_clean = nama_input.strip()
+        jumlah_huruf = len([c for c in nama_clean if c.isalpha()])
+        
+        if jumlah_huruf < 4:
+            st.error("⚠️ Masukkan nama lengkap yang valid (minimal 4 huruf)!")
+        else:
+            st.session_state.session_id = str(uuid.uuid4())
+            with st.spinner(f"RoboMANTAP sedang merancang 10 soal {st.session_state.mapel} Kamu. Tunggu sebentar ya... (sekitar 15 detik) 😊"):
+                quiz = generate_quiz_batch(
+                    st.session_state.jenjang,
+                    st.session_state.mapel,
+                    st.session_state.stage,
+                    st.session_state.selected_submateri
+                )
+                if quiz and len(quiz) == 10:
+                    st.session_state.quiz_data = quiz
+                    st.session_state.user_answers = {}
+                    st.session_state.current_index = 0
+                    
+                    # Sinkronisasi awal ke DB
+                    update_progress_siswa(
+                        st.session_state.session_id, 
+                        st.session_state.nama_siswa,
+                        st.session_state.jenjang, 
+                        st.session_state.mapel, 
+                        1, [], "BERJALAN"
                     )
-                    if quiz and len(quiz) == 10:
-                        st.session_state.quiz_data = quiz
-                        st.session_state.user_answers = {}
-                        st.session_state.current_index = 0
-                        # Sinkronisasi awal ke DB
-                        update_progress_siswa(
-                            st.session_state.session_id, st.session_state.nama_siswa,
-                            st.session_state.jenjang, st.session_state.mapel, 1, [], "BERJALAN"
-                        )
-                        st.session_state.page = "quiz"
-                        st.rerun()
-                    else:
-                        st.error("Gagal membuat paket soal. Silakan klik tombol sekali lagi.")
+                    st.session_state.page = "quiz"
+                    st.rerun()
+                else:
+                    st.error("❌ Gagal membuat paket soal. Silakan klik tombol sekali lagi.")
 
 # ==============================================================================
 # 4b. SETUP KUIS CUSTOM & BIODATA SISWA (SAMPUL MASUK SISWA)
