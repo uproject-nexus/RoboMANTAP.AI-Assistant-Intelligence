@@ -3333,7 +3333,7 @@ elif st.session_state.page == "setup":
                 horizontal=True
             )
             
-            st.markdown("<br>", unsafe_allow_html=True)
+
             # Injeksi CSS membatasi st.pills maksimal 3 baris + scrollbar halus
             st.markdown("""
             <style>
@@ -3363,8 +3363,9 @@ elif st.session_state.page == "setup":
                 selection_mode="multi",
                 default=[]
             )
+            st.write("---")
 
-        st.write("---")
+        
         with c2:
             st.markdown('<div style="font-size: 22px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">2. Petunjuk CBT RoboMANTAP</div>', unsafe_allow_html=True)
             
