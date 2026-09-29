@@ -1600,25 +1600,6 @@ def create_5_quiz_packages(master_quiz):
         
     return packages
 
-# Injeksi CSS membatasi st.pills maksimal 3 baris + scrollbar halus
-st.markdown("""
-<style>
-    div[data-testid="stPills"] {
-    max-height: 115px !important; /* Batas tinggi setara ~3 baris */
-    overflow-y: auto !important;  /* Scroll otomatis jika lebih dari 3 baris */
-    padding: 4px 2px;
-    }
-    
-    /* Scrollbar tipis & halus khusus area pills */
-    div[data-testid="stPills"]::-webkit-scrollbar {
-    width: 4px;
-    }
-    div[data-testid="stPills"]::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-    }
-</style>
-""", unsafe_allow_html=True)
 # ==============================================================================
 # 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
 # ==============================================================================
@@ -3325,6 +3306,18 @@ elif st.session_state.page == "setup":
     # -------------------------------------------------------------------------
     # 2. FORM UTAMA (MENCEGAH RERUN SETIAP KLIK/KETIK)
     # -------------------------------------------------------------------------
+    # Insert CSS ini di bagian atas setup form Anda
+    st.markdown("""
+    <style>
+    /* Mematikan pemicu keyboard HP pada st.multiselect */
+    div[data-baseweb="select"] input {
+        pointer-events: none !important;
+    }
+    div[data-baseweb="select"] {
+        cursor: pointer !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     with st.form(key="cbt_setup_form", clear_on_submit=False):
         
         # --- DATA DIRI ---
@@ -3351,17 +3344,17 @@ elif st.session_state.page == "setup":
                 index=0,
                 horizontal=True
             )
-                       
-            # Widget Pills
+            
+            # Kode multiselect Anda tetap sama
             available_submateri = KISI_KISI_OMI[st.session_state.jenjang][st.session_state.mapel]
             
-            submateri_input = st.pills(
+            submateri_input = st.multiselect(
                 "Pilih Submateri (Kosongkan jika memilih semua):",
-                options=available_submateri,
-                selection_mode="multi",
-                default=[]
+                available_submateri,
+                default=[],
+                placeholder="Pilih submateri di sini..."
             )
-            st.write("---")
+
 
         
         with c2:
