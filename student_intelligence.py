@@ -642,7 +642,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     with left:
         # Judul Ringkas & Ukuran Pas untuk HP (15px)
         st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
-        
+        st.markdown('<div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Rata-rata nilai akhir ujian, kuis atau pengerjaan secara keseluruhan</div>', unsafe_allow_html=True)
         if profile["subject_mastery"]:
             for mapel, mastery in sorted(profile["subject_mastery"].items(), key=lambda x: x[1]):
                 m_val = min(100.0, max(0.0, mastery))
@@ -665,6 +665,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
 
     with right:
         st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🧩 Topik Perlu Perhatian</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Akurasi kebenaran menjawab soal dibawah 80% (< 80%)</div>', unsafe_allow_html=True)
         weak = [(topic, mastery) for topic, mastery in profile.get("weakest_topics", []) if mastery < 80]    
         if weak:
             for topic, mastery in weak[:5]:
