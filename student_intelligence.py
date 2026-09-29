@@ -320,16 +320,17 @@ def _subject_recommendations(profile: dict) -> list[str]:
     recs = []
     weakest = profile.get("weakest_subject")
     if weakest:
-        recs.append(f"Fokuskan sesi berikutnya pada *{weakest}* sebelum menambah target baru.")
+        recs.append(f"🎯 <b>[PRIORITAS UTAMA]</b> Alokasikan 60% waktu belajar berikutnya untuk <b>{weakest}</b> sebelum berpindah ke matapelajaran baru.")
+        
     for topic, mastery in profile.get("weakest_topics", [])[:2]:
         if mastery < 70:
-            recs.append(f"Latih kembali topik *{topic}* dengan soal bertahap dari dasar ke aplikasi.")
+            recs.append(f"🧩 <b>[PEMAHAMAN KONSEP]</b> Kuatkan kembali topik <b>{topic}</b> (Akurasi: {mastery:.0f}%). Gunakan metode latihan bertahap dari soal dasar ke penalaran.")
     if profile.get("trend") == "declining":
-        recs.append("Gunakan sesi pendek *20–30 menit* dan review kesalahan setelah latihan.")
+        recs.append("⏱️ <b>[MANAJEMEN ENERGI]</b> Performa tercatat menurun. Terapkan teknik <b>Pomodoro</b> (25 menit latihan + 5 menit istirahat) dan evaluasi setiap pembahasan.")
     if profile.get("answer_completion", 100) < 80:
-        recs.append("Latih *strategi penyelesaian* agar lebih banyak soal terjawab sebelum waktu berakhir.")
+        recs.append("⚡ <b>[STRATEGI EKSEKUSI]</b> Akurasi jawaban masih di bawah 80%. Prioritaskan <b>eliminasi jawaban</b> yang pasti salah sebelum memilih opsi akhir.")
     if not recs:
-        recs.append("Pertahankan pola latihan dan gunakan pembahasan untuk memperdalam konsep yang masih ragu.")
+        recs.append("🌟 <b>[OPTIMASI PERFORMA]</b> Pemahaman dasar sudah sangat baik, Tantang dirimu dengan simulasi soal tingkat kesulitan tinggi.")
     return recs[:4]
 
 
