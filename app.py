@@ -3306,18 +3306,6 @@ elif st.session_state.page == "setup":
     # -------------------------------------------------------------------------
     # 2. FORM UTAMA (MENCEGAH RERUN SETIAP KLIK/KETIK)
     # -------------------------------------------------------------------------
-    # Insert CSS ini di bagian atas setup form Anda
-    st.markdown("""
-    <style>
-    /* Mematikan pemicu keyboard HP pada st.multiselect */
-    div[data-baseweb="select"] input {
-        pointer-events: none !important;
-    }
-    div[data-baseweb="select"] {
-        cursor: pointer !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
     with st.form(key="cbt_setup_form", clear_on_submit=False):
         
         # --- DATA DIRI ---
@@ -3344,7 +3332,7 @@ elif st.session_state.page == "setup":
                 index=0,
                 horizontal=True
             )
-            
+          
             # Kode multiselect Anda tetap sama
             available_submateri = KISI_KISI_OMI[st.session_state.jenjang][st.session_state.mapel]
             
@@ -3354,8 +3342,7 @@ elif st.session_state.page == "setup":
                 default=[],
                 placeholder="Pilih submateri di sini..."
             )
-
-
+            st.write("---")
         
         with c2:
             st.markdown('<div style="font-size: 22px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">2. Petunjuk CBT RoboMANTAP</div>', unsafe_allow_html=True)
