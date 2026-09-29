@@ -715,7 +715,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     # Pesan awal yang ringkas & bersih
     pesan_otomatis = f"Halo RoboMANTAP! Saya {name} ({grade}), ingin latihan soal dan belajar lewat WhatsApp."
     import urllib.parse
-    pesan_encoded = urllib.parse.quote(pesan_ototmatis)
+    pesan_encoded = urllib.parse.quote(pesan_otomatis)
     wa_link = f"https://wa.me/{NO_WA_BOT}?text={pesan_encoded}"
     
     # 3. HTML Banner Bergaya Modern & Responsive
