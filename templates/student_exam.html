@@ -26,6 +26,12 @@
             min-height: 260px;
         }
 
+        /* CBT UX: jangan tampilkan LaTeX mentah saat soal sedang dipindahkan */
+        #question-text.math-pending,
+        #options-container.math-pending {
+            visibility: hidden;
+        }
+
         /* FIX KATEX: Mencegah rumus matematika terdistorsi */
         .katex, .katex-html {
             text-align: left !important;
@@ -505,9 +511,31 @@
         let raguState = {};
         let timerInterval = null;
 
-        function triggerKaTeX(targetElem) {
+        function waitForMathRenderer(timeoutMs = 2500) {
+            return new Promise(resolve => {
+                if (window.renderMathInElement) {
+                    resolve(true);
+                    return;
+                }
+
+                const started = Date.now();
+                const poll = () => {
+                    if (window.renderMathInElement) {
+                        resolve(true);
+                    } else if (Date.now() - started >= timeoutMs) {
+                        resolve(false);
+                    } else {
+                        requestAnimationFrame(poll);
+                    }
+                };
+                poll();
+            });
+        }
+
+        async function triggerKaTeX(targetElem) {
             const container = targetElem || document.getElementById("question-box") || document.body;
-            if (window.renderMathInElement && container) {
+            const ready = await waitForMathRenderer();
+            if (ready && container) {
                 renderMathInElement(container, {
                     delimiters: [
                         {left: "$$", right: "$$", display: true},
@@ -516,6 +544,7 @@
                     throwOnError: false
                 });
             }
+            return ready;
         }
 
         function toggleNavModal(show) {
@@ -545,79 +574,166 @@
             document.getElementById("form-submit-exam").submit();
         }
 
-        function renderQuestion(index) {
+        let questionRenderToken = 0;
+        let selectedOptionIndex = null;
+        let answerSaveQueue = Promise.resolve();
+
+        function setOptionVisualState(btn, selected) {
+            if (!btn) return;
+
+            btn.classList.toggle("bg-emerald-500/10", selected);
+            btn.classList.toggle("border-emerald-500", selected);
+            btn.classList.toggle("text-emerald-300", selected);
+            btn.classList.toggle("font-medium", selected);
+            btn.classList.toggle("shadow-[0_0_10px_rgba(16,185,129,0.15)]", selected);
+
+            btn.classList.toggle("bg-slate-950", !selected);
+            btn.classList.toggle("border-slate-800", !selected);
+            btn.classList.toggle("text-slate-300", !selected);
+            btn.classList.toggle("active:border-slate-700", !selected);
+
+            const badge = btn.querySelector("[data-option-badge]");
+            if (badge) {
+                badge.classList.toggle("border-emerald-500", selected);
+                badge.classList.toggle("bg-emerald-500", selected);
+                badge.classList.toggle("text-slate-950", selected);
+            }
+        }
+
+        function queueAnswerSave(index, opt) {
+            /*
+             * Jangan membuat klik pilihan menunggu network.
+             * Request diserialkan agar klik cepat A -> B -> C tidak tiba
+             * di server dalam urutan acak.
+             */
+            const payload = {
+                session_id: sessionId,
+                q_index: index,
+                answer: opt
+            };
+
+            answerSaveQueue = answerSaveQueue
+                .catch(() => {})
+                .then(() => {
+                    const formData = new FormData();
+                    formData.append("session_id", payload.session_id);
+                    formData.append("q_index", payload.q_index);
+                    formData.append("answer", payload.answer);
+
+                    return fetch("/api/save-answer", {
+                        method: "POST",
+                        body: formData,
+                        keepalive: true
+                    }).catch(() => {});
+                });
+        }
+
+        async function renderQuestion(index) {
+            if (index < 0 || index >= quizData.length) return;
+
+            const token = ++questionRenderToken;
             currentIndex = index;
+            selectedOptionIndex = null;
+
             const item = quizData[index];
-
-            if (document.activeElement) document.activeElement.blur();
-            
-            document.getElementById("label-no-soal").textContent = `Soal No. ${index + 1} dari ${quizData.length}`;
-            document.getElementById("question-text").innerHTML = item.question;
-
+            const questionText = document.getElementById("question-text");
             const optsDiv = document.getElementById("options-container");
+
+            /*
+             * Kunci tampilan konten soal selama perpindahan.
+             * Ini mencegah flash LaTeX mentah -> KaTeX bagus.
+             * Tombol navigasi tetap terlihat sehingga layout tidak meloncat.
+             */
+            questionText.classList.add("math-pending");
+            optsDiv.classList.add("math-pending");
+
+            document.getElementById("label-no-soal").textContent =
+                `Soal No. ${index + 1} dari ${quizData.length}`;
+
+            questionText.innerHTML = item.question;
             optsDiv.innerHTML = "";
 
             item.options.forEach((opt, optIdx) => {
                 const isSelected = String(answers[index]) === String(opt);
+                if (isSelected) selectedOptionIndex = optIdx;
+
                 const btn = document.createElement("button");
                 btn.type = "button";
                 btn.id = `opt-btn-${optIdx}`;
-                btn.className = `w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm transition flex items-start space-x-3 ${
-                    isSelected 
-                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-medium shadow-[0_0_10px_rgba(16,185,129,0.15)]' 
-                    : 'bg-slate-950 border-slate-800 text-slate-300 active:border-slate-700'
-                }`;
-                btn.onclick = (e) => {
-                    e.preventDefault();
-                    selectAnswer(index, opt, optIdx);
-                };
+                btn.dataset.optionIndex = String(optIdx);
+                btn.className =
+                    "w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm " +
+                    "transition flex items-start space-x-3 " +
+                    "bg-slate-950 border-slate-800 text-slate-300 active:border-slate-700";
+
                 btn.innerHTML = `
-                    <span class="w-6 h-6 rounded-full border border-slate-700 flex-shrink-0 flex items-center justify-center text-[11px] font-bold mt-0.5 ${isSelected ? 'border-emerald-500 bg-emerald-500 text-slate-950' : ''}">
+                    <span data-option-badge
+                        class="w-6 h-6 rounded-full border border-slate-700 flex-shrink-0
+                               flex items-center justify-center text-[11px] font-bold mt-0.5">
                         ${opt.charAt(0)}
                     </span>
                     <span class="leading-relaxed">${opt}</span>
                 `;
+
+                btn.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectAnswer(index, opt, optIdx);
+                });
+
+                setOptionVisualState(btn, isSelected);
                 optsDiv.appendChild(btn);
             });
 
             updateNavButtons();
             updateRaguButtonUI();
-            
-            // Render KaTeX pada soal & opsi
-            setTimeout(() => triggerKaTeX(document.getElementById("question-box")), 30);
 
-            // Reset Form Hint AI
             document.getElementById("hint-curr-idx").value = index;
             document.getElementById("hint-question").value = item.question;
             document.getElementById("hint-attempt-input").value = "";
             document.getElementById("hint-result").innerHTML = "";
+
+            /*
+             * Render KaTeX sekali setelah DOM final.
+             * Token mencegah render soal lama membuka kembali konten
+             * setelah user sudah pindah ke soal berikutnya.
+             */
+            await triggerKaTeX(document.getElementById("question-box"));
+
+            if (token === questionRenderToken) {
+                requestAnimationFrame(() => {
+                    if (token !== questionRenderToken) return;
+                    questionText.classList.remove("math-pending");
+                    optsDiv.classList.remove("math-pending");
+                });
+            }
         }
 
         function selectAnswer(index, opt, optIdx) {
+            if (index !== currentIndex || !quizData[index]) return;
+
+            const previousIndex = selectedOptionIndex;
             answers[index] = opt;
+            selectedOptionIndex = optIdx;
 
-            quizData[index].options.forEach((_, idx) => {
-                const btn = document.getElementById(`opt-btn-${idx}`);
-                if (!btn) return;
-                const isSelected = idx === optIdx;
-                btn.className = `w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm transition flex items-start space-x-3 ${
-                    isSelected 
-                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-medium shadow-[0_0_10px_rgba(16,185,129,0.15)]' 
-                    : 'bg-slate-950 border-slate-800 text-slate-300 active:border-slate-700'
-                }`;
-                const badge = btn.querySelector('span');
-                if (badge) {
-                    badge.className = `w-6 h-6 rounded-full border border-slate-700 flex-shrink-0 flex items-center justify-center text-[11px] font-bold mt-0.5 ${
-                        isSelected ? 'border-emerald-500 bg-emerald-500 text-slate-950' : ''
-                    }`;
-                }
-            });
+            /*
+             * Hanya ubah state visual tombol.
+             * Tidak ada innerHTML ulang, tidak ada renderQuestion(),
+             * dan tidak ada render KaTeX ulang.
+             */
+            if (previousIndex !== null && previousIndex !== optIdx) {
+                setOptionVisualState(
+                    document.getElementById(`opt-btn-${previousIndex}`),
+                    false
+                );
+            }
 
-            const formData = new FormData();
-            formData.append("session_id", sessionId);
-            formData.append("q_index", index);
-            formData.append("answer", opt);
-            fetch("/api/save-answer", { method: "POST", body: formData });
+            setOptionVisualState(
+                document.getElementById(`opt-btn-${optIdx}`),
+                true
+            );
+
+            queueAnswerSave(index, opt);
         }
 
         function toggleRagu() {
@@ -638,7 +754,7 @@
             const btnPrev = document.getElementById("btn-prev");
             const btnNextSubmit = document.getElementById("btn-next-submit");
 
-            btnPrev.disabled = currentIndex === 0;
+            btnPrev.disabled = currentIndex === 0 || navigationBusy;
 
             if (currentIndex === quizData.length - 1) {
                 btnNextSubmit.textContent = "🚀 Selesai Kuis";
@@ -647,15 +763,54 @@
                 btnNextSubmit.textContent = "Next →";
                 btnNextSubmit.className = "flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center";
             }
+
+            btnNextSubmit.disabled = navigationBusy;
         }
 
-        function prevQuestion() {
-            if (currentIndex > 0) renderQuestion(currentIndex - 1);
+        let navigationBusy = false;
+
+        function setNavigationBusy(busy) {
+            navigationBusy = busy;
+
+            const prev = document.getElementById("btn-prev");
+            const next = document.getElementById("btn-next-submit");
+
+            if (prev) {
+                prev.disabled = busy || currentIndex === 0;
+                prev.setAttribute("aria-busy", busy ? "true" : "false");
+            }
+
+            if (next) {
+                next.disabled = busy;
+                next.setAttribute("aria-busy", busy ? "true" : "false");
+                next.classList.toggle("opacity-80", busy);
+                next.classList.toggle("cursor-wait", busy);
+            }
         }
 
-        function handleNextOrSubmit() {
+        async function prevQuestion() {
+            if (navigationBusy || currentIndex <= 0) return;
+
+            setNavigationBusy(true);
+            try {
+                await renderQuestion(currentIndex - 1);
+            } finally {
+                setNavigationBusy(false);
+                updateNavButtons();
+            }
+        }
+
+        async function handleNextOrSubmit() {
+            if (navigationBusy) return;
+
             if (currentIndex < quizData.length - 1) {
-                renderQuestion(currentIndex + 1);
+                setNavigationBusy(true);
+                try {
+                    await renderQuestion(currentIndex + 1);
+                } finally {
+                    setNavigationBusy(false);
+                    updateNavButtons();
+                }
             } else {
                 toggleSubmitModal(true);
             }
@@ -682,9 +837,16 @@
                     isCurrent ? 'ring-2 ring-emerald-400 border-emerald-400' : ''
                 }`;
                 btn.textContent = idx + 1;
-                btn.onclick = () => {
-                    renderQuestion(idx);
+                btn.onclick = async () => {
+                    if (navigationBusy) return;
                     toggleNavModal(false);
+                    setNavigationBusy(true);
+                    try {
+                        await renderQuestion(idx);
+                    } finally {
+                        setNavigationBusy(false);
+                        updateNavButtons();
+                    }
                 };
                 grid.appendChild(btn);
             });
