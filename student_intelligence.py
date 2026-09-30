@@ -748,10 +748,10 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
                 ">💬</div>
                 <div>
                     <div style="font-size: 14px; font-weight: 800; color: #a7f3d0; margin-bottom: 2px;">
-                        Latihan Kuis via WhatsApp Bot
+                        Latihan Kuis, Belajar kapanpun dan dimanapun via WhatsApp RoboMANTAP
                     </div>
                     <div style="font-size: 11px; color: #cbd5e1; line-height: 1.3;">
-                        Lebih praktis & hemat kuota. Kirim pesan ke RoboMANTAP Bot untuk mulai kuis langsung di WA!
+                        Lebih praktis & hemat kuota. Kirim pesan ke RoboMANTAP untuk mulai diskusi, belajar serta latihan kuis langsung di WA!
                     </div>
                 </div>
             </div>
