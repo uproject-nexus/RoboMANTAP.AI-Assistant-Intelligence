@@ -1338,7 +1338,6 @@ def _generate_blueprint_batch(
         raw = call_gemini_with_rotation(
             prompt,
             is_json=True,
-            thinking_level="high",
             max_output_tokens=36000
         )
         data = _parse_ai_json(raw)
