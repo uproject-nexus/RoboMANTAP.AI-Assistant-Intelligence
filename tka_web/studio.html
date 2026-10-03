@@ -1,67 +1,167 @@
 <!doctype html>
 <html lang="id">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RoboMANTAP • TKA Studio Guru</title>
 <style>
-:root{--bg:#020617;--panel:#0f172a;--panel2:#111c32;--line:#334155;--text:#e2e8f0;--muted:#94a3b8;--green:#10b981;--green2:#059669;--red:#f87171;--blue:#60a5fa;--amber:#fbbf24}
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:linear-gradient(180deg,#020617,#06101f);color:var(--text)}
-.wrap{max-width:1120px;margin:auto;padding:28px 18px 60px}.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.brand h1{margin:0;font-size:30px}.brand p{margin:7px 0;color:var(--muted)}.badge{display:inline-flex;padding:6px 10px;border-radius:999px;background:#064e3b;color:#a7f3d0;font-size:12px;font-weight:800}.card{background:rgba(15,23,42,.96);border:1px solid var(--line);border-radius:16px;padding:20px;margin:16px 0;box-shadow:0 10px 30px rgba(0,0,0,.16)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.stepbar{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:18px 0}.step{padding:9px 7px;border:1px solid var(--line);border-radius:10px;text-align:center;font-size:12px;color:var(--muted)}.step.active{border-color:var(--green);color:#d1fae5;background:#064e3b}.step.done{color:#a7f3d0}.section-title{display:flex;justify-content:space-between;align-items:center;gap:10px}.section-title h2{margin:0}.muted{color:var(--muted)}.hint{font-size:13px;color:var(--muted);line-height:1.55}.warn{padding:12px 14px;border:1px solid #854d0e;background:#422006;color:#fde68a;border-radius:10px;font-size:13px}.ok{padding:12px 14px;border:1px solid #047857;background:#052e26;color:#a7f3d0;border-radius:10px;font-size:13px}.error{padding:12px 14px;border:1px solid #991b1b;background:#450a0a;color:#fecaca;border-radius:10px;font-size:13px}label{display:block;font-size:13px;color:#cbd5e1;margin:8px 0 5px}input,select,textarea{width:100%;padding:12px;border-radius:10px;border:1px solid #475569;background:#0b1220;color:var(--text);font:inherit}textarea{min-height:110px;resize:vertical}button{padding:12px 15px;border:0;border-radius:10px;background:linear-gradient(135deg,var(--green),var(--green2));color:#fff;font-weight:800;cursor:pointer}button.secondary{background:#1e293b;border:1px solid #475569}button.danger{background:#7f1d1d}button:disabled{opacity:.5;cursor:not-allowed}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.actions button{width:auto}.hidden{display:none!important}.question{border:1px solid var(--line);border-radius:13px;padding:15px;margin:12px 0;background:#0b1426}.question h3{margin:0 0 10px}.option-row{display:grid;grid-template-columns:70px 1fr;gap:8px;margin:7px 0}.mini{font-size:12px;color:var(--muted)}.access-row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;margin:9px 0}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#1e293b;color:#cbd5e1;font-size:12px}.exam-head{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap}.big-id{font-family:ui-monospace,monospace;background:#020617;border:1px dashed #475569;padding:10px 12px;border-radius:9px}.footer-note{font-size:12px;color:#64748b;margin-top:20px}@media(max-width:760px){.grid,.grid3,.access-row{grid-template-columns:1fr}.stepbar{grid-template-columns:repeat(3,1fr)}.top{display:block}.actions button{width:100%}}
-</style></head>
-<body><div class="wrap">
-<div class="top"><div class="brand"><span class="badge">GURU • TKA STUDIO</span><h1>RoboMANTAP TKA Studio</h1><p>Buat, siapkan, validasi, terbitkan, dan bagikan akses TKA kepada siswa.</p></div></div>
+:root{--bg:#020617;--panel:#0b1220;--panel2:#0f172a;--line:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--green:#10b981;--green2:#059669;--danger:#ef4444;--warn:#f59e0b}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#020617,#07111f);color:var(--text);font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1120px;margin:auto;padding:22px}.top{display:flex;justify-content:space-between;gap:18px;align-items:flex-end;margin-bottom:18px}
+h1,h2,h3{margin:0 0 7px}.brand h1{font-size:29px}.brand p,.hint{color:var(--muted)}.badge,.pill{display:inline-flex;align-items:center;border:1px solid #334155;background:#0f172a;color:#a7f3d0;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:800}
+.card{background:rgba(11,18,32,.94);border:1px solid var(--line);border-radius:16px;padding:18px;margin:14px 0;box-shadow:0 10px 30px #0003}
+.hidden{display:none!important}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+label{display:block;color:#cbd5e1;font-weight:700;font-size:13px;margin:8px 0 6px}
+input,select,textarea{width:100%;border:1px solid #334155;background:#07101e;color:var(--text);border-radius:10px;padding:11px 12px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:#10b981;box-shadow:0 0 0 3px #10b98118}textarea{min-height:105px;resize:vertical}
+button{border:0;border-radius:10px;padding:11px 15px;background:linear-gradient(135deg,var(--green),var(--green2));color:white;font-weight:800;cursor:pointer}
+button.secondary{background:#172033;border:1px solid #334155}button.danger{background:#7f1d1d}button:disabled{opacity:.45;cursor:not-allowed}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}.section{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.steps{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin:14px 0}.step{padding:9px 7px;text-align:center;border:1px solid var(--line);border-radius:10px;background:#07101e;color:#64748b;font-size:12px;font-weight:800}.step.active{background:#052e25;color:#a7f3d0;border-color:#059669}.step.done{color:#cbd5e1;border-color:#334155}
+.notice{border:1px solid #334155;background:#081323;border-radius:12px;padding:12px;color:#cbd5e1}.notice.warn{border-color:#854d0e;background:#1c1405}.notice.ok{border-color:#065f46;background:#052e25}.notice.error{border-color:#7f1d1d;background:#2b0b0b}
+.blueprint{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:10px}.trace{font:12px ui-monospace,monospace;color:#94a3b8;background:#020617;border:1px dashed #334155;padding:10px;border-radius:10px}
+.question{border:1px solid #263449;border-radius:13px;padding:15px;margin:12px 0;background:#091321}.option{display:grid;grid-template-columns:42px 1fr;gap:8px;align-items:center;margin:7px 0}.letter{border-radius:9px;background:#172033;padding:10px;text-align:center;font-weight:900}.list{display:grid;gap:7px}.listrow{display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid #1e293b;border-radius:10px;padding:9px 11px}.big{font:700 13px ui-monospace,monospace;background:#020617;border:1px dashed #475569;padding:9px 11px;border-radius:9px;word-break:break-all}
+@media(max-width:800px){.grid,.grid3,.blueprint{grid-template-columns:1fr}.steps{grid-template-columns:repeat(3,1fr)}.top{display:block}.actions button{width:100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="brand">
+    <span class="badge">GURU • TKA STUDIO</span>
+    <h1>RoboMANTAP TKA Studio</h1>
+    <p>Alur authoring TKA: Struktur → Blueprint → Stimulus → Soal → Review & Publish → Sesi & Akses.</p>
+  </div>
+</header>
 
-<div id="technical" class="card">
-  <div class="section-title"><div><h2>Akses Studio</h2><p class="hint">Kunci di bawah adalah <b>credential teknis server</b>, bukan password akun Guru dan bukan kode siswa. Karena API saat ini memakai header ini, kunci harus diberikan oleh admin/operator. Setelah disimpan di browser ini, Guru tidak perlu mengetiknya lagi pada setiap langkah.</p></div></div>
-  <div class="grid"><div><label>Kunci Studio</label><input id="secret" type="password" placeholder="Masukkan kunci teknis dari admin"></div><div style="display:flex;align-items:end"><button onclick="saveSecret()">Simpan Akses Studio</button></div></div>
-  <div id="authMsg" class="hint" style="margin-top:10px"></div>
+<div id="connection" class="card">
+  <div class="section">
+    <div>
+      <h2>Studio siap digunakan</h2>
+      <p class="hint">Credential teknis tidak menjadi bagian dari alur Guru. Karena kontrak API saat ini masih mensyaratkan header studio, bagian ini hanya untuk admin/operator saat konfigurasi.</p>
+    </div>
+    <span class="pill">SERVER AUTHORITY</span>
+  </div>
+  <details>
+    <summary style="cursor:pointer;color:#a7f3d0;font-weight:800">Admin connection</summary>
+    <div class="grid" style="margin-top:10px">
+      <div><label>Studio credential</label><input id="secret" type="password" autocomplete="off" placeholder="Diisi operator/admin"></div>
+      <div style="display:flex;align-items:end"><button onclick="connect()">Hubungkan</button></div>
+    </div>
+    <div id="authMsg" style="margin-top:9px"></div>
+  </details>
 </div>
 
 <div id="workspace" class="hidden">
-<div class="stepbar"><div class="step active" id="s1">1 • Identitas</div><div class="step" id="s2">2 • Stimulus</div><div class="step" id="s3">3 • Soal</div><div class="step" id="s4">4 • Package</div><div class="step" id="s5">5 • Terbitkan</div><div class="step" id="s6">6 • Akses Siswa</div></div>
+  <div class="steps">
+    <div class="step active" id="s1">01 STRUKTUR</div><div class="step" id="s2">02 BLUEPRINT</div>
+    <div class="step" id="s3">03 STIMULUS</div><div class="step" id="s4">04 SOAL</div>
+    <div class="step" id="s5">05 REVIEW & PUBLISH</div><div class="step" id="s6">06 SESI & AKSES</div>
+  </div>
 
-<div id="examInfo" class="card"><div class="section-title"><div><h2>1. Buat TKA</h2><p class="hint">Isi informasi ujian. Jenjang menentukan jumlah opsi PG: MTs = A–D, MA = A–E.</p></div></div>
-<div class="grid"><div><label>Nama TKA</label><input id="title" placeholder="Contoh: TKA Matematika MA 2026"></div><div><label>Jenjang</label><select id="jenjang"><option value="MA">MA</option><option value="MTs">MTs</option></select></div><div><label>Mata Pelajaran</label><input id="subject" placeholder="Contoh: MATEMATIKA"></div><div><label>Durasi (menit)</label><input id="duration" type="number" min="1" value="120"></div></div>
-<div class="actions"><button onclick="createExam()">＋ Buat TKA</button></div><div id="examMsg"></div></div>
+  <section class="card">
+    <div class="section"><div><h2>01 • Struktur TKA</h2><p class="hint">Struktur portal mengikuti kontrak TKA yang telah dibekukan: MTs dan MA; server menjadi sumber kebenaran ujian.</p></div><span class="pill" id="status">DRAFT</span></div>
+    <div class="grid3">
+      <div><label>Nama TKA</label><input id="title" placeholder="Contoh: TKA Matematika MA"></div>
+      <div><label>Jenjang</label><select id="jenjang"><option value="MA">MA</option><option value="MTs">MTs</option></select></div>
+      <div><label>Mata Uji</label><input id="subject" placeholder="Contoh: MATEMATIKA"></div>
+    </div>
+    <div class="grid" style="margin-top:2px">
+      <div><label>Durasi (menit)</label><input id="duration" type="number" min="1" value="70"></div>
+      <div><label>Catatan struktur</label><input value="Server authoritative • timezone/session ditentukan server" disabled></div>
+    </div>
+    <div class="actions"><button onclick="createExam()">Buat TKA</button></div>
+    <div id="examMsg"></div>
+  </section>
 
-<div id="current" class="card hidden"><div class="exam-head"><div><h2 id="examTitle"></h2><p class="muted" id="examMeta"></p></div><div><span class="pill" id="statusPill">DRAFT</span><div class="big-id" id="examId"></div></div></div></div>
+  <section id="blueprintCard" class="card hidden">
+    <div class="section"><div><h2>02 • Blueprint</h2><p class="hint">Blueprint berasal dari spesifikasi resmi TKA 2026. Guru mengikat authoring pada blueprint/constraint yang dipakai; bukan mengunggah dokumen kisi-kisi.</p></div><span class="pill">OFFICIAL SPECIFICATION</span></div>
+    <div class="notice">Tidak ada upload PDF/DOCX/XLSX kisi-kisi. Constraint blueprint menjadi metadata traceability dan harus dipatuhi oleh server/generation engine.</div>
+    <div class="blueprint" style="margin-top:10px">
+      <div><label>Identitas blueprint / kode referensi</label><input id="bpRef" placeholder="Kode/rujukan blueprint yang digunakan sekolah"></div>
+      <div><label>Bentuk soal</label><select id="bpType"><option value="PG">PG</option><option value="MCMA">MCMA</option><option value="CATEGORY">CATEGORY</option></select></div>
+      <div><label>Jumlah butir</label><input id="bpCount" type="number" min="1" value="1"></div>
+    </div>
+    <div class="grid">
+      <div><label>Materi / kompetensi sesuai blueprint</label><input id="bpCompetency" placeholder="Masukkan sesuai blueprint resmi yang dipakai"></div>
+      <div><label>Catatan constraint</label><input id="bpNotes" placeholder="Catatan validasi / karakteristik butir"></div>
+    </div>
+    <div class="notice warn" style="margin-top:10px">Generator AI tidak boleh menentukan blueprint sendiri. Blueprint/constraint tetap berasal dari spesifikasi yang dipilih dan divalidasi server.</div>
+    <div class="actions"><button class="secondary" onclick="saveBlueprint()">Simpan Blueprint</button></div>
+    <div id="bpMsg"></div>
+  </section>
 
-<div id="stimulusCard" class="card hidden"><div class="section-title"><div><h2>2. Stimulus</h2><p class="hint">Stimulus adalah bahan pendukung soal: teks, gambar, grafik, tabel, diagram, atau gabungan.</p></div></div>
-<div class="grid"><div><label>Jenis Stimulus</label><select id="stimType"><option>TEXT</option><option>IMAGE</option><option>GRAPH</option><option>TABLE</option><option>DIAGRAM</option><option>MIXED</option></select></div><div><label>Judul/ID (opsional)</label><input id="stimId" placeholder="Kosongkan untuk dibuat otomatis"></div></div>
-<label>Isi Stimulus</label><textarea id="stimContent" placeholder="Tulis teks stimulus atau URL/data yang akan dipakai soal."></textarea><div class="actions"><button onclick="addStimulus()">Simpan Stimulus</button></div><div id="stimMsg"></div><div id="stimList" class="hint"></div></div>
+  <section id="stimulusCard" class="card hidden">
+    <div class="section"><div><h2>03 • Stimulus</h2><p class="hint">Stimulus adalah entity first-class dan dapat dipakai oleh beberapa butir: teks, gambar, grafik, tabel, diagram, atau mixed.</p></div><span class="pill">STIMULUS FIRST-CLASS</span></div>
+    <div class="grid">
+      <div><label>Jenis</label><select id="stimType"><option>TEXT</option><option>IMAGE</option><option>GRAPH</option><option>TABLE</option><option>DIAGRAM</option><option>MIXED</option></select></div>
+      <div><label>Judul / ID opsional</label><input id="stimId" placeholder="Otomatis bila dikosongkan"></div>
+    </div>
+    <label>Konten / referensi asset</label><textarea id="stimContent" placeholder="Teks stimulus atau referensi asset yang akan dipakai oleh soal."></textarea>
+    <div class="actions"><button onclick="addStimulus()">Simpan Stimulus</button></div>
+    <div id="stimMsg"></div><div id="stimList" class="list" style="margin-top:10px"></div>
+  </section>
 
-<div id="questionCard" class="card hidden"><div class="section-title"><div><h2>3. Soal</h2><p class="hint">Answer key wajib diisi. Untuk PG, opsi otomatis mengikuti jenjang.</p></div><button onclick="addQuestionBlock()">＋ Tambah Soal</button></div><div id="questions"></div><div class="actions"><button onclick="sendAllQuestions()">Simpan Semua Soal</button></div><div id="questionMsg"></div></div>
+  <section id="questionCard" class="card hidden">
+    <div class="section"><div><h2>04 • Soal</h2><p class="hint">Primary workflow dirancang untuk GenerationRequest → structured output → canonicalization → validation. Editor manual di bawah adalah fallback/review, bukan alur utama.</p></div><span class="pill">PG • MCMA • CATEGORY</span></div>
+    <div class="notice warn">Endpoint GenerationRequest TKA belum tersedia pada kontrak API yang sedang terpasang di service ini. Karena itu saya tidak memalsukan tombol “Generate”. Editor di bawah tetap menggunakan endpoint Question resmi yang sudah ada dan menjaga traceability blueprint.</div>
+    <div class="actions"><button class="secondary" onclick="addQuestionBlock()">＋ Tambah butir review/manual</button></div>
+    <div id="questions"></div>
+    <div class="actions"><button onclick="saveQuestions()">Simpan semua butir</button></div>
+    <div id="questionMsg"></div>
+  </section>
 
-<div id="packageCard" class="card hidden"><div class="section-title"><div><h2>4. Package</h2><p class="hint">TKA memakai 5 package. Setelah soal tersimpan, pilih soal yang masuk ke masing-masing package.</p></div></div><div id="packages"></div><div class="actions"><button onclick="savePackages()">Simpan 5 Package</button></div><div id="packageMsg"></div></div>
+  <section id="reviewCard" class="card hidden">
+    <div class="section"><div><h2>05 • Review & Publish</h2><p class="hint">Setelah soal tersimpan, susun 5 persistent package, validasi lifecycle, lalu publish.</p></div></div>
+    <div id="packageArea"></div>
+    <div class="actions"><button class="secondary" onclick="savePackages()">Simpan 5 Package</button><button class="secondary" onclick="transition('VALIDATED')">Validasi</button><button onclick="publishExam()">Publish</button></div>
+    <div id="publishMsg"></div>
+  </section>
 
-<div id="publishCard" class="card hidden"><h2>5. Validasi & Terbitkan</h2><p class="hint">Urutan server: DRAFT → REVIEW → VALIDATED → PUBLISHED. Jangan terbitkan sebelum soal dan 5 package lengkap.</p><div class="actions"><button onclick="transition('REVIEW')">Kirim ke REVIEW</button><button onclick="transition('VALIDATED')">Validasi TKA</button><button onclick="publishExam()">Terbitkan TKA</button></div><div id="publishMsg"></div></div>
-
-<div id="sessionCard" class="card hidden"><h2>Buat Sesi Ujian</h2><p class="hint">Setelah TKA terbit, buat satu sesi. Token sesi ini dibagikan Guru kepada peserta bersama ID Peserta dan Kode Akses.</p><div class="grid"><div><label>Mulai (opsional)</label><input id="startsAt" type="datetime-local"></div><div style="display:flex;align-items:end"><button onclick="createSession()">Buat Sesi & Token</button></div></div><div id="sessionMsg"></div></div>
-
-<div id="accessCard" class="card hidden"><h2>6. Akses Siswa</h2><p class="hint">Setiap siswa membutuhkan <b>3 data</b>: Token Sesi (sama untuk satu sesi), ID Peserta, dan Kode Akses Siswa (unik). Berikan ketiganya melalui kartu/daftar akses yang Anda bagikan kepada siswa.</p><div class="access-row"><div><label>ID Peserta</label><input id="studentId" placeholder="Contoh: S001"></div><div><label>Kode Akses (min. 8 karakter)</label><input id="accessCode" placeholder="Contoh: TKA-7K9P2Q"></div><div></div><button onclick="provisionAccess()">Aktifkan Akses</button></div><div id="accessMsg"></div><div id="accessCardView" class="hidden card"><h3>Kartu Akses Siswa</h3><div id="accessValues"></div><p class="hint">Siswa membuka Portal TKA → pilih “Masuk TKA” → masukkan ketiga data di atas.</p></div></div>
+  <section id="sessionCard" class="card hidden">
+    <div class="section"><div><h2>06 • Sesi & Akses Siswa</h2><p class="hint">Token adalah credential sesi, bukan identity siswa. Identity siswa tetap berasal dari student_id/person mapping.</p></div><span class="pill">SERVER SESSION</span></div>
+    <div class="grid">
+      <div><label>Waktu mulai (opsional)</label><input id="startsAt" type="datetime-local"></div>
+      <div style="display:flex;align-items:end"><button onclick="createSession()">Buat Sesi</button></div>
+    </div>
+    <div id="sessionMsg"></div>
+    <div id="accessBox" class="hidden" style="margin-top:12px">
+      <div class="notice ok"><b>Token Sesi</b><div class="big" id="sessionToken"></div></div>
+      <div class="grid" style="margin-top:10px">
+        <div><label>ID Peserta</label><input id="studentId" placeholder="ID peserta resmi"></div>
+        <div><label>Kode Akses pribadi</label><input id="accessCode" placeholder="Kode akses unik siswa"></div>
+      </div>
+      <div class="actions"><button onclick="provision()">Aktifkan Akses Siswa</button></div>
+      <div id="accessMsg"></div>
+      <div id="accessCard" class="hidden notice" style="margin-top:10px"></div>
+    </div>
+  </section>
 </div>
-<p class="footer-note">RoboMANTAP TKA • Kunci teknis tetap di server/admin; Guru hanya mengelola konten dan sesi ujian.</p>
 </div>
+
 <script>
-const $=id=>document.getElementById(id); let examId='', status='DRAFT', secret=localStorage.getItem('rm_tka_studio_secret')||''; let stimuli=[]; let questions=[]; let session=null;
-if(secret){$('secret').value=secret; showWorkspace();}
-function msg(id,text,kind='hint'){ $(id).innerHTML='<div class="'+kind+'">'+esc(text)+'</div>'; }
-function saveSecret(){secret=$('secret').value.trim();if(!secret){msg('authMsg','Kunci Studio belum diisi.','error');return}localStorage.setItem('rm_tka_studio_secret',secret);msg('authMsg','Akses Studio tersimpan di browser ini. Guru tidak perlu memasukkan ulang pada setiap langkah.','ok');showWorkspace();}
-function showWorkspace(){if(!secret)return;$('workspace').classList.remove('hidden');}
-function headers(){return {'Content-Type':'application/json','X-TKA-Studio-Secret':secret}}
-async function api(url,opt={}){let r=await fetch(url,{...opt,headers:{...headers(),...(opt.headers||{})}});let d={};try{d=await r.json()}catch{}if(!r.ok)throw Error(d.detail||d.reason||'Permintaan gagal ('+r.status+')');return d}
-async function createExam(){try{let d=await api('/api/tka/studio/exams',{method:'POST',body:JSON.stringify({title:$('title').value.trim(),jenjang:$('jenjang').value,subject_id:$('subject').value.trim(),duration_seconds:Number($('duration').value)*60})});examId=d.exam_id;status=d.status;renderExamHeader(d);['stimulusCard','questionCard','packageCard','publishCard'].forEach(x=>$(x).classList.remove('hidden'));addQuestionBlock();renderPackages();setStep(2);msg('examMsg','TKA berhasil dibuat. Sekarang tambahkan stimulus dan soal.','ok')}catch(e){msg('examMsg',e.message,'error')}}
-function renderExamHeader(d){$('current').classList.remove('hidden');$('examTitle').textContent=d.title;$('examMeta').textContent=d.jenjang+' • '+d.subject_id+' • '+Math.round(d.duration_seconds/60)+' menit';$('statusPill').textContent=d.status;$('examId').textContent=d.exam_id}
-async function addStimulus(){try{let d=await api('/api/tka/studio/exams/'+examId+'/stimuli',{method:'POST',body:JSON.stringify({stimulus_id:$('stimId').value.trim()||null,stimulus_type:$('stimType').value,content:$('stimContent').value.trim()})});stimuli.push(d);$('stimId').value='';$('stimContent').value='';$('stimList').innerHTML=stimuli.map((x,i)=>'<div class="pill">Stimulus '+(i+1)+' • '+esc(x.stimulus_type||x.type||'')+' • '+esc(x.stimulus_id||'')+'</div> ').join('');setStep(3);msg('stimMsg','Stimulus tersimpan.','ok')}catch(e){msg('stimMsg',e.message,'error')}}
-function optionCount(){return $('jenjang').value==='MA'?5:4}
-function addQuestionBlock(){let n=$('questions').children.length+1;let opts='';for(let i=0;i<optionCount();i++)opts+='<div class="option-row"><div class="pill">'+String.fromCharCode(65+i)+'</div><input class="qopt" placeholder="Opsi '+String.fromCharCode(65+i)+'"></div>';let el=document.createElement('div');el.className='question';el.innerHTML='<h3>Soal '+n+'</h3><div class="grid"><div><label>Tipe</label><select class="qtype"><option>PG</option><option>MCMA</option><option>CATEGORY</option></select></div><div><label>Nomor</label><input class="qnum" type="number" value="'+n+'"></div></div><label>Stimulus (opsional)</label><select class="qstim"><option value="">Tanpa stimulus</option>'+stimuli.map(x=>'<option value="'+esc(x.stimulus_id)+'">'+esc(x.stimulus_id)+'</option>').join('')+'</select><label>Pertanyaan</label><textarea class="qprompt" placeholder="Tulis pertanyaan"></textarea><div class="qoptions">'+opts+'</div><label>Kunci Jawaban</label><input class="qkey" placeholder="PG: A/B/C/D/E • MCMA: A,B • CATEGORY: nilai kategori"><div class="mini">Untuk PG gunakan satu huruf. Untuk MCMA pisahkan beberapa huruf dengan koma.</div>';$('questions').appendChild(el)}
-async function sendAllQuestions(){try{let blocks=[...document.querySelectorAll('.question')];if(!blocks.length)throw Error('Belum ada soal.');for(const b of blocks){let type=b.querySelector('.qtype').value,opts=[...b.querySelectorAll('.qopt')].map(x=>x.value.trim()).filter(Boolean);let key=b.querySelector('.qkey').value.trim();let correct=type==='MCMA'?key.split(',').map(x=>x.trim()).filter(Boolean):key;let metadata={correct_response:correct};if(type==='CATEGORY')metadata.categories=opts;let d=await api('/api/tka/studio/exams/'+examId+'/questions',{method:'POST',body:JSON.stringify({number:Number(b.querySelector('.qnum').value),question_type:type,prompt:b.querySelector('.qprompt').value.trim(),options:opts,stimulus_id:b.querySelector('.qstim').value||null,metadata})});questions.push(d)}msg('questionMsg',questions.length+' soal berhasil disimpan.','ok');setStep(4);renderPackages()}catch(e){msg('questionMsg',e.message,'error')}}
-function renderPackages(){let html='';for(let i=1;i<=5;i++){html+='<div class="card"><b>Package '+i+'</b><div class="hint">Pilih nomor soal yang masuk package ini.</div><input id="pkg'+i+'" placeholder="Contoh: 1,2,3,4,5"></div>'}$('packages').innerHTML=html}
-async function savePackages(){try{for(let i=1;i<=5;i++){let ids=$('pkg'+i).value.split(',').map(x=>x.trim()).filter(Boolean);let qids=[];ids.forEach(num=>{let q=questions.find(x=>String(x.number)===String(num));if(q)qids.push(q.question_id)});if(!qids.length)throw Error('Package '+i+' belum berisi soal yang valid.');await api('/api/tka/studio/exams/'+examId+'/packages',{method:'POST',body:JSON.stringify({package_index:i,question_ids:qids})})}msg('packageMsg','5 package berhasil disimpan. Lanjutkan ke validasi.','ok');setStep(5)}catch(e){msg('packageMsg',e.message,'error')}}
-async function transition(target){try{let d=await api('/api/tka/studio/exams/'+examId+'/transition?target='+encodeURIComponent(target),{method:'POST'});status=d.status||target;$('statusPill').textContent=status;msg('publishMsg','Status TKA sekarang: '+status,'ok');if(target==='VALIDATED')setStep(5)}catch(e){msg('publishMsg',e.message,'error')}}
-async function publishExam(){try{let d=await api('/api/tka/studio/exams/'+examId+'/publish',{method:'POST'});status=d.status||'PUBLISHED';$('statusPill').textContent=status;$('sessionCard').classList.remove('hidden');msg('publishMsg','TKA berhasil diterbitkan. Sekarang buat sesi ujian.','ok');setStep(6)}catch(e){msg('publishMsg',e.message,'error')}}
-async function createSession(){try{let v=$('startsAt').value;let url='/api/tka/studio/exams/'+examId+'/sessions'+(v?'?starts_at='+encodeURIComponent(new Date(v).toISOString()):'');session=await api(url,{method:'POST'});$('accessCard').classList.remove('hidden');$('sessionMsg').innerHTML='<div class="ok"><b>Token Sesi:</b> '+esc(session.token||'')+'<br><span class="mini">Token ini sama untuk semua siswa pada sesi ini.</span></div>';setStep(6)}catch(e){msg('sessionMsg',e.message,'error')}}
-async function provisionAccess(){try{if(!session)throw Error('Buat sesi terlebih dahulu.');let sid=$('studentId').value.trim(),code=$('accessCode').value.trim();if(!sid||!code)throw Error('ID Peserta dan Kode Akses wajib diisi.');await api('/api/tka/studio/students/access',{method:'POST',body:JSON.stringify({student_id:sid,access_code:code})});$('accessValues').innerHTML='<p><b>Token Sesi</b><br><span class="big-id">'+esc(session.token)+'</span></p><p><b>ID Peserta</b><br><span class="big-id">'+esc(sid)+'</span></p><p><b>Kode Akses</b><br><span class="big-id">'+esc(code)+'</span></p>';$('accessCardView').classList.remove('hidden');msg('accessMsg','Akses siswa berhasil diaktifkan. Berikan tiga data pada Kartu Akses kepada siswa.','ok')}catch(e){msg('accessMsg',e.message,'error')}}
-function setStep(n){for(let i=1;i<=6;i++)$('s'+i).classList.toggle('active',i===n)}
+const $=id=>document.getElementById(id);
+let secret=localStorage.getItem('rm_tka_studio_secret')||'', examId='', session=null, stimuli=[], questions=[], blueprint=null;
+if(secret){$('secret').value=secret;}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-</script></body></html>
+function show(id,text,kind='notice'){ $(id).innerHTML='<div class="'+kind+'">'+esc(text)+'</div>'}
+function headers(){return {'Content-Type':'application/json','X-TKA-Studio-Secret':secret}}
+async function api(url,opt={}){const r=await fetch(url,{...opt,headers:{...headers(),...(opt.headers||{})}});let d={};try{d=await r.json()}catch{}if(!r.ok)throw Error(d.detail||d.reason||('Permintaan gagal ('+r.status+')'));return d}
+function connect(){secret=$('secret').value.trim();if(!secret){show('authMsg','Credential admin belum diisi.','notice error');return}localStorage.setItem('rm_tka_studio_secret',secret);$('workspace').classList.remove('hidden');show('authMsg','Terhubung ke TKA API. Credential hanya disimpan lokal untuk kebutuhan kontrak API saat ini.','notice ok')}
+function step(n){for(let i=1;i<=6;i++)$('s'+i).className='step '+(i===n?'active':'done')}
+async function createExam(){try{const title=$('title').value.trim(),subject=$('subject').value.trim();if(!title||!subject)throw Error('Nama TKA dan Mata Uji wajib diisi.');const d=await api('/api/tka/studio/exams',{method:'POST',body:JSON.stringify({title,jenjang:$('jenjang').value,subject_id:subject,duration_seconds:Number($('duration').value)*60})});examId=d.exam_id;$('status').textContent=d.status;['blueprintCard','stimulusCard','questionCard','reviewCard'].forEach(x=>$(x).classList.remove('hidden'));show('examMsg','TKA berhasil dibuat. Lanjutkan ke Blueprint.','notice ok');step(2)}catch(e){show('examMsg',e.message,'notice error')}}
+function saveBlueprint(){blueprint={blueprint_ref:$('bpRef').value.trim(),question_type:$('bpType').value,question_count:Number($('bpCount').value),competency:$('bpCompetency').value.trim(),notes:$('bpNotes').value.trim()};if(!blueprint.blueprint_ref)show('bpMsg','Isi identitas/kode blueprint yang menjadi acuan.','notice error');else{show('bpMsg','Blueprint disimpan sebagai constraint/traceability untuk authoring sesi ini.','notice ok');step(3)}}
+async function addStimulus(){try{if(!examId)throw Error('Buat TKA terlebih dahulu.');const content=$('stimContent').value.trim();if(!content)throw Error('Konten stimulus wajib diisi.');const d=await api('/api/tka/studio/exams/'+examId+'/stimuli',{method:'POST',body:JSON.stringify({stimulus_id:$('stimId').value.trim()||null,stimulus_type:$('stimType').value,content})});stimuli.push(d);$('stimId').value='';$('stimContent').value='';renderStimuli();show('stimMsg','Stimulus tersimpan.','notice ok');step(4)}catch(e){show('stimMsg',e.message,'notice error')}}
+function renderStimuli(){$('stimList').innerHTML=stimuli.map((x,i)=>'<div class="listrow"><span><b>Stimulus '+(i+1)+'</b> • '+esc(x.stimulus_type||x.type||'')+'</span><span class="pill">'+esc(x.stimulus_id||'')+'</span></div>').join('')}
+function optionCount(){return $('jenjang').value==='MA'?5:4}
+function addQuestionBlock(){const n=$('questions').children.length+1,opts=optionCount();let s='<div class="question" data-q="'+n+'"><div class="section"><h3>Butir '+n+'</h3><span class="pill">REVIEW / FALLBACK</span></div><div class="grid"><div><label>Nomor</label><input class="qnum" type="number" value="'+n+'"></div><div><label>Tipe</label><select class="qtype"><option>PG</option><option>MCMA</option><option>CATEGORY</option></select></div></div><label>Stimulus</label><select class="qstim"><option value="">Tanpa stimulus</option>'+stimuli.map(x=>'<option value="'+esc(x.stimulus_id)+'">'+esc(x.stimulus_id)+'</option>').join('')+'</select><label>Pertanyaan</label><textarea class="qprompt" placeholder="Isi butir setelah proses generation/review atau sebagai fallback manual."></textarea><div class="qopts">';for(let i=0;i<opts;i++)s+='<div class="option"><div class="letter">'+String.fromCharCode(65+i)+'</div><input class="qopt" placeholder="Opsi '+String.fromCharCode(65+i)+'"></div>';s+='</div><label>Kunci / response rule</label><input class="qkey" placeholder="PG: A • MCMA: A,B • CATEGORY: gunakan response rule yang sesuai"><label>Blueprint trace</label><div class="trace">'+esc(blueprint?JSON.stringify(blueprint):'Blueprint belum disimpan')+'</div></div>';$('questions').insertAdjacentHTML('beforeend',s)}
+async function saveQuestions(){try{if(!blueprint)throw Error('Simpan Blueprint terlebih dahulu.');const blocks=[...document.querySelectorAll('.question')];if(!blocks.length)throw Error('Belum ada butir.');for(const b of blocks){const type=b.querySelector('.qtype').value,opts=[...b.querySelectorAll('.qopt')].map(x=>x.value.trim()),key=b.querySelector('.qkey').value.trim();if(!b.querySelector('.qprompt').value.trim())throw Error('Ada butir tanpa pertanyaan.');const correct=type==='MCMA'?key.split(',').map(x=>x.trim()).filter(Boolean):key;const metadata={blueprint_ref:blueprint.blueprint_ref,blueprint_constraints:blueprint,correct_response:correct};if(type==='CATEGORY')metadata.categories=opts;const d=await api('/api/tka/studio/exams/'+examId+'/questions',{method:'POST',body:JSON.stringify({number:Number(b.querySelector('.qnum').value),question_type:type,prompt:b.querySelector('.qprompt').value.trim(),options:opts,stimulus_id:b.querySelector('.qstim').value||null,metadata})});questions.push(d)};renderPackages();show('questionMsg',questions.length+' butir tersimpan dan memiliki trace blueprint.','notice ok');step(5)}catch(e){show('questionMsg',e.message,'notice error')}}
+function renderPackages(){let h='<div class="notice">5 package harus persistent. Masukkan nomor soal untuk masing-masing package.</div>';for(let i=1;i<=5;i++)h+='<div class="card"><b>Package '+i+'</b><input id="pkg'+i+'" placeholder="Contoh: 1,2,3,4"></div>';$('packageArea').innerHTML=h}
+async function savePackages(){try{if(!questions.length)throw Error('Belum ada soal.');for(let i=1;i<=5;i++){const nums=$('pkg'+i).value.split(',').map(x=>x.trim()).filter(Boolean),ids=[];for(const num of nums){const q=questions.find(x=>String(x.number)===String(num));if(q)ids.push(q.question_id)}if(!ids.length)throw Error('Package '+i+' belum memiliki soal valid.');await api('/api/tka/studio/exams/'+examId+'/packages',{method:'POST',body:JSON.stringify({package_index:i,question_ids:ids})})}show('publishMsg','Lima package tersimpan. Jalankan Validasi lalu Publish.','notice ok')}catch(e){show('publishMsg',e.message,'notice error')}}
+async function transition(target){try{const d=await api('/api/tka/studio/exams/'+examId+'/transition?target='+encodeURIComponent(target),{method:'POST'});$('status').textContent=d.status||target;show('publishMsg','Lifecycle TKA sekarang: '+(d.status||target),'notice ok');step(5)}catch(e){show('publishMsg',e.message,'notice error')}}
+async function publishExam(){try{const d=await api('/api/tka/studio/exams/'+examId+'/publish',{method:'POST'});$('status').textContent=d.status||'PUBLISHED';$('sessionCard').classList.remove('hidden');show('publishMsg','TKA berhasil diterbitkan. Sekarang buat sesi.','notice ok');step(6)}catch(e){show('publishMsg',e.message,'notice error')}}
+async function createSession(){try{let v=$('startsAt').value,url='/api/tka/studio/exams/'+examId+'/sessions'+(v?'?starts_at='+encodeURIComponent(new Date(v).toISOString()):'');session=await api(url,{method:'POST'});$('sessionToken').textContent=session.token||session.session_token||'';$('accessBox').classList.remove('hidden');show('sessionMsg','Sesi berhasil dibuat.','notice ok')}catch(e){show('sessionMsg',e.message,'notice error')}}
+async function provision(){try{if(!session)throw Error('Buat sesi terlebih dahulu.');const sid=$('studentId').value.trim(),code=$('accessCode').value.trim();if(!sid||!code)throw Error('ID Peserta dan Kode Akses wajib diisi.');await api('/api/tka/studio/students/access',{method:'POST',body:JSON.stringify({student_id:sid,access_code:code})});const token=session.token||session.session_token||'';$('accessCard').innerHTML='<b>Kartu Akses Siswa</b><p>Token Sesi</p><div class="big">'+esc(token)+'</div><p>ID Peserta</p><div class="big">'+esc(sid)+'</div><p>Kode Akses</p><div class="big">'+esc(code)+'</div><p class="hint">Bagikan tiga data ini kepada siswa melalui kanal yang aman.</p>';$('accessCard').classList.remove('hidden');show('accessMsg','Akses siswa berhasil diaktifkan.','notice ok')}catch(e){show('accessMsg',e.message,'notice error')}}
+</script>
+</body>
+</html>
