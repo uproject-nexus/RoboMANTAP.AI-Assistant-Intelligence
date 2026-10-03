@@ -1,0 +1,1 @@
+create table if not exists legacy_identity_mappings (mapping_id uuid primary key, source_table text not null, source_key text not null, person_id uuid not null references persons(person_id), confidence text not null default 'EXPLICIT', created_at timestamptz not null default now(), unique(source_table,source_key));

@@ -1,0 +1,1 @@
+create table if not exists tka_packages (package_id uuid primary key, exam_id uuid not null references tka_exams(exam_id), package_index integer not null check(package_index between 1 and 5), question_ids jsonb not null, unique(exam_id,package_index));

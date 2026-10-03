@@ -1,0 +1,1 @@
+create table if not exists automation_events (event_id uuid primary key, event_type text not null, source_id text not null, person_id uuid not null references persons(person_id), payload jsonb not null, occurred_at timestamptz not null default now(), created_at timestamptz not null default now(), unique(event_type,source_id));
