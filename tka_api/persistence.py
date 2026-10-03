@@ -50,6 +50,33 @@ class TKAProductionStore:
             cur.execute('update tka_exams set status=%s,published_version=coalesce(%s,published_version) where exam_id=%s returning *', (status,version,exam_id))
             return cur.fetchone()
 
+    def add_stimulus(self, row):
+        with self._conn() as c, c.cursor() as cur:
+            cur.execute('''insert into tka_stimuli(stimulus_id,exam_id,stimulus_type,content)
+                           values(%s,%s,%s,%s) returning *''',
+                        (row['stimulus_id'],row['exam_id'],row['stimulus_type'],row['content']))
+            return cur.fetchone()
+
+    def stimulus(self, stimulus_id):
+        with self._conn() as c, c.cursor() as cur:
+            cur.execute('select * from tka_stimuli where stimulus_id=%s', (stimulus_id,))
+            return cur.fetchone()
+
+    def stimuli_for_exam(self, exam_id):
+        with self._conn() as c, c.cursor() as cur:
+            cur.execute('''select s.* from tka_stimuli s where s.exam_id=%s order by s.created_at''', (exam_id,))
+            return cur.fetchall()
+
+    def questions_for_exam(self, exam_id):
+        with self._conn() as c, c.cursor() as cur:
+            cur.execute('select * from tka_questions where exam_id=%s order by number', (exam_id,))
+            return cur.fetchall()
+
+    def packages_for_exam(self, exam_id):
+        with self._conn() as c, c.cursor() as cur:
+            cur.execute('select * from tka_packages where exam_id=%s order by package_index', (exam_id,))
+            return cur.fetchall()
+
     def add_question(self, row):
         with self._conn() as c, c.cursor() as cur:
             cur.execute('''insert into tka_questions(question_id,exam_id,number,question_type,prompt,options,stimulus_id,metadata)
@@ -68,6 +95,11 @@ class TKAProductionStore:
             cur.execute('''insert into tka_packages(package_id,exam_id,package_index,question_ids)
                            values(%s,%s,%s,%s) returning *''', (row['package_id'],row['exam_id'],row['package_index'],Json(row['question_ids'])))
             return cur.fetchone()
+
+    def package_index_exists(self, exam_id, package_index):
+        with self._conn() as c, c.cursor() as cur:
+            cur.execute('select 1 from tka_packages where exam_id=%s and package_index=%s', (exam_id,package_index))
+            return bool(cur.fetchone())
 
     def package_count(self, exam_id):
         with self._conn() as c, c.cursor() as cur:

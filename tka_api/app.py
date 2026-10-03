@@ -5,7 +5,8 @@ from fastapi.responses import HTMLResponse
 from contextlib import asynccontextmanager
 from pathlib import Path
 from pydantic import BaseModel, Field
-from tka.validation import validate_question
+from tka.validation import validate_question, validate_exam_for_publish
+from tka.models import Question, QuestionType
 from tka.scoring import score_question, standard_100, achievement
 from .persistence import TKAProductionStore
 
@@ -41,6 +42,7 @@ def student_guard(x_tka_access_token: str|None = Header(default=None)):
     return sess
 
 class ExamIn(BaseModel): title:str; jenjang:str; subject_id:str; duration_seconds:int=Field(ge=60,le=86400)
+class StimulusIn(BaseModel): stimulus_id:str|None=None; stimulus_type:str; content:str
 class QuestionIn(BaseModel): question_id:str|None=None; number:int=Field(ge=1); question_type:str; prompt:str; options:list[str]=[]; stimulus_id:str|None=None; metadata:dict={}
 class PackageIn(BaseModel): package_index:int=Field(ge=1,le=5); question_ids:list[str]
 class StudentLogin(BaseModel): session_token:str; student_id:str; access_code:str
@@ -86,6 +88,31 @@ def create_exam(x:ExamIn):
     row={'exam_id':str(uuid.uuid4()),'title':x.title,'jenjang':jen,'subject_id':x.subject_id,'status':'DRAFT','duration_seconds':x.duration_seconds,'timezone_name':'Asia/Jakarta'}
     return dict(store().create_exam(row))
 
+@app.get('/api/tka/studio/exams/{exam_id}', dependencies=[Depends(studio_guard)])
+def get_exam(exam_id:str):
+    e=store().exam(exam_id)
+    if not e: raise HTTPException(404,'EXAM_NOT_FOUND')
+    qs=store().questions_for_exam(exam_id)
+    ps=store().packages_for_exam(exam_id)
+    # Stimuli are returned only to the authenticated Studio, including content.
+    stimuli=[dict(x) for x in store().stimuli_for_exam(exam_id)]
+    return {
+        'exam':dict(e),
+        'questions':[dict(q) for q in qs],
+        'packages':[dict(x) for x in ps],
+        'stimuli':stimuli,
+    }
+
+@app.post('/api/tka/studio/exams/{exam_id}/stimuli', dependencies=[Depends(studio_guard)])
+def add_stimulus(exam_id:str,x:StimulusIn):
+    if not store().exam(exam_id): raise HTTPException(404,'EXAM_NOT_FOUND')
+    from tka.models import Stimulus,StimulusType
+    try: st=StimulusType(x.stimulus_type)
+    except ValueError: raise HTTPException(422,'UNSUPPORTED_STIMULUS_TYPE')
+    if not str(x.content or '').strip(): raise HTTPException(422,'STIMULUS_CONTENT_REQUIRED')
+    row={'stimulus_id':x.stimulus_id or str(uuid.uuid4()),'exam_id':exam_id,'stimulus_type':st.value,'content':x.content.strip()}
+    return dict(store().add_stimulus(row))
+
 @app.post('/api/tka/studio/exams/{exam_id}/questions', dependencies=[Depends(studio_guard)])
 def add_question(exam_id:str,x:QuestionIn):
     e=store().exam(exam_id)
@@ -93,6 +120,8 @@ def add_question(exam_id:str,x:QuestionIn):
     from tka.models import Question,QuestionType
     try: qt=QuestionType(x.question_type)
     except ValueError: raise HTTPException(422,'UNSUPPORTED_QUESTION_TYPE')
+    if x.stimulus_id and not store().stimulus(x.stimulus_id):
+        raise HTTPException(422,'STIMULUS_NOT_FOUND')
     q=Question(x.question_id or str(uuid.uuid4()),x.number,qt,x.prompt,x.options,x.stimulus_id,x.metadata,exam_id)
     try: validate_question(q,e['jenjang'])
     except ValueError as exc: raise HTTPException(422,str(exc))
@@ -103,7 +132,8 @@ def add_question(exam_id:str,x:QuestionIn):
 def add_package(exam_id:str,x:PackageIn):
     if not store().exam(exam_id): raise HTTPException(404,'EXAM_NOT_FOUND')
     if store().package_count(exam_id)>=5: raise HTTPException(409,'FIVE_PACKAGES_ALREADY_DEFINED')
-    if x.package_index in []: raise HTTPException(422,'INVALID_PACKAGE_INDEX')
+    if store().package_count(exam_id) >= 5 or x.package_index not in range(1,6): raise HTTPException(422,'INVALID_PACKAGE_INDEX')
+    if store().package_index_exists(exam_id,x.package_index): raise HTTPException(409,'PACKAGE_INDEX_ALREADY_DEFINED')
     if not x.question_ids: raise HTTPException(422,'PACKAGE_MUST_HAVE_QUESTIONS')
     if store().package_question_exam_mismatch(exam_id,x.question_ids): raise HTTPException(422,'PACKAGE_QUESTION_MUST_BELONG_TO_EXAM')
     row={'package_id':str(uuid.uuid4()),'exam_id':exam_id,'package_index':x.package_index,'question_ids':x.question_ids}
@@ -116,6 +146,13 @@ def transition(exam_id:str,target:str):
     if not e: raise HTTPException(404,'EXAM_NOT_FOUND')
     allowed={'DRAFT':{'REVIEW'},'REVIEW':{'VALIDATED','DRAFT'},'VALIDATED':{'DRAFT'},'PUBLISHED':set()}
     if target not in allowed.get(e['status'],set()): raise HTTPException(422,'INVALID_STATUS_TRANSITION')
+    if target == 'VALIDATED':
+        try:
+            qs=store().questions_for_exam(exam_id)
+            ps=store().packages_for_exam(exam_id)
+            stimulus_ids={str(r['stimulus_id']) for r in store().stimuli_for_exam(exam_id)}
+            validate_exam_for_publish(e, [Question(str(q['question_id']),q['number'],QuestionType(q['question_type']),q['prompt'],q['options'],str(q['stimulus_id']) if q['stimulus_id'] else None,q['metadata'] or {},exam_id) for q in qs], ps, stimulus_ids)
+        except ValueError as exc: raise HTTPException(422,str(exc))
     return dict(store().update_exam_status(exam_id,target))
 
 @app.post('/api/tka/studio/exams/{exam_id}/publish', dependencies=[Depends(studio_guard)])
@@ -123,7 +160,12 @@ def publish(exam_id:str):
     e=store().exam(exam_id)
     if not e: raise HTTPException(404,'EXAM_NOT_FOUND')
     if e['status']!='VALIDATED': raise HTTPException(409,'EXAM_NOT_VALIDATED')
-    if store().package_count(exam_id)!=5: raise HTTPException(409,'FIVE_PACKAGES_REQUIRED')
+    try:
+        qs=store().questions_for_exam(exam_id)
+        ps=store().packages_for_exam(exam_id)
+        stimulus_ids={str(r['stimulus_id']) for r in store().stimuli_for_exam(exam_id)}
+        validate_exam_for_publish(e, [Question(str(q['question_id']),q['number'],QuestionType(q['question_type']),q['prompt'],q['options'],str(q['stimulus_id']) if q['stimulus_id'] else None,q['metadata'] or {},exam_id) for q in qs], ps, stimulus_ids)
+    except ValueError as exc: raise HTTPException(422,str(exc))
     return dict(store().update_exam_status(exam_id,'PUBLISHED',1))
 
 @app.post('/api/tka/studio/exams/{exam_id}/sessions', dependencies=[Depends(studio_guard)])
@@ -160,7 +202,8 @@ def exam_for_student(attempt_id:str, x_tka_access_token=Depends(student_guard)):
     s=store().session(a['session_id']); e=store().exam(s['exam_id'])
     qids=set(store().package_questions(e['exam_id'],a['package_index']))
     rows=[q for q in store().questions_for_attempt(attempt_id) if str(q['question_id']) in qids]
-    return {'exam':{'exam_id':str(e['exam_id']),'title':e['title'],'jenjang':e['jenjang'],'subject_id':e['subject_id']},'attempt':{'attempt_id':str(a['attempt_id']),'package_index':a['package_index'],'expires_at':a['expires_at'].isoformat()},'questions':[{'question_id':str(q['question_id']),'number':q['number'],'question_type':q['question_type'],'prompt':q['prompt'],'options':q['options'],'stimulus_id':str(q['stimulus_id']) if q['stimulus_id'] else None} for q in rows]}
+    stimuli={str(st['stimulus_id']): {'stimulus_id':str(st['stimulus_id']),'stimulus_type':st['stimulus_type'],'content':st['content']} for st in store().stimuli_for_exam(e['exam_id'])}
+    return {'exam':{'exam_id':str(e['exam_id']),'title':e['title'],'jenjang':e['jenjang'],'subject_id':e['subject_id']},'attempt':{'attempt_id':str(a['attempt_id']),'package_index':a['package_index'],'expires_at':a['expires_at'].isoformat()},'stimuli':stimuli,'questions':[{'question_id':str(q['question_id']),'number':q['number'],'question_type':q['question_type'],'prompt':q['prompt'],'options':q['options'],'stimulus_id':str(q['stimulus_id']) if q['stimulus_id'] else None} for q in rows]}
 
 @app.put('/api/tka/student/attempts/{attempt_id}/answers/{question_id}')
 def save_answer(attempt_id:str,question_id:str,x:AnswerIn,x_tka_access_token=Depends(student_guard)):

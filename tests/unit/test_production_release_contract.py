@@ -9,7 +9,7 @@ def test_production_routes_and_migrations_exist():
     assert '/api/tka/student/login' in routes
     assert '/api/tka/student/attempts/{attempt_id}/submit' in routes
     migrations=sorted(p.name for p in Path('migrations').glob('*.sql'))
-    assert migrations[0].startswith('001_') and migrations[-1].startswith('013_')
+    assert migrations[0].startswith('001_') and migrations[-1].startswith('014_')
 
 def test_student_exam_route_has_no_answer_key_field():
     source=Path('tka_api/app.py').read_text(encoding='utf-8')

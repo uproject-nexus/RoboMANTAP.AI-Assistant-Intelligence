@@ -1635,6 +1635,24 @@ if st.session_state.page == "landing":
             st.rerun()
             
     st.write("---")
+    st.markdown("#### 🎓 TKA RoboMANTAP")
+    st.markdown("""
+    <div class="guru-card" style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); border-color: #10b981;">
+        <h2 style="margin:0; font-size: 20px; color:#ecfdf5;">🎓 Portal Tes Kemampuan Akademik</h2>
+        <p style="font-size: 10px; opacity:0.9; margin-top:5px; color:#d1fae5;">Masuk ke portal TKA siswa menggunakan token sesi dan kode akses yang diberikan GuruMANTAP.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown(
+        """
+        <a href="https://robomantap-tka.onrender.com/tka/student" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+            <div style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#020617;padding:14px 20px;border-radius:12px;text-align:center;font-weight:800;font-size:15px;margin:8px 0 20px;">
+                🚀 MASUK PORTAL TKA SISWA →
+            </div>
+        </a>
+        """, unsafe_allow_html=True
+    )
+
+    st.write("---")
     st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
     st.caption("Klik tombol dibawah ini untuk menuju Portal Kuis!")
     
@@ -1736,7 +1754,7 @@ elif st.session_state.page == "guru_dashboard":
         st.stop()
 
     st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
-    tab1, tab2, tab3, tab4 = st.tabs(["🔴 Live Monitoring", "✨ Quiz Custom", "⚡ Automation", "📚 Bank Soal"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔴 Live Monitoring", "✨ Quiz Custom", "⚡ Automation", "📚 Bank Soal", "🎓 TKA Studio"])
     with tab1:
         st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Evaluasi Siswa</p>", unsafe_allow_html=True)
 
@@ -3256,6 +3274,22 @@ elif st.session_state.page == "guru_dashboard":
 
 # 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
 # ==============================================================================
+
+    with tab5:
+        st.markdown("<div style='background:linear-gradient(135deg,#064e3b 0%,#022c22 100%);border:1px solid #10b981;border-radius:14px;padding:18px;margin:4px 0 16px;'>"
+                    "<div style='font-size:12px;color:#a7f3d0;font-weight:800;'>ROBO MANTAP · TKA</div>"
+                    "<div style='font-size:23px;font-weight:800;color:#ecfdf5;margin-top:4px;'>🎓 TKA Studio Guru</div>"
+                    "<div style='font-size:12px;color:#d1fae5;margin-top:6px;'>Buat TKA, stimulus, soal, 5 paket, validasi, terbitkan sesi, token siswa, dan kode akses.</div>"
+                    "</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:14px;margin-bottom:12px;">
+            <b>Alur Guru</b><br>
+            <span style="font-size:12px;opacity:.85;">Buat TKA → isi stimulus & soal → siapkan 5 paket → Validasi → Terbitkan → buat sesi/token → aktifkan kode akses siswa.</span>
+        </div>
+        """, unsafe_allow_html=True)
+        st.link_button("🚀 BUKA TKA STUDIO GURU", "https://robomantap-tka.onrender.com/tka/studio", use_container_width=True)
+        st.caption("Portal TKA berjalan sebagai service terpisah agar CBT/Quiz lama tetap stabil. URL siswa: https://robomantap-tka.onrender.com/tka/student")
+
 elif st.session_state.page == "select_mapel":
     st.markdown(f"### 📚 Pilih Bidang OMI 2026 -<br><span style='color: #059669; display: inline-block;'>{st.session_state.jenjang}</span>", unsafe_allow_html=True)
     if st.button("⬅️ Kembali Pilih Jenjang"):
