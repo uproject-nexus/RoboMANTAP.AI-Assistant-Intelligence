@@ -1,3 +1,0 @@
-create table if not exists persons (person_id uuid primary key, person_type text not null check (person_type in ('STUDENT','TEACHER','ADMIN')), display_name text not null, created_at timestamptz not null default now());
-create table if not exists student_identities (student_id uuid primary key, person_id uuid not null unique references persons(person_id), jenjang text not null check (jenjang in ('MTs','MA')), created_at timestamptz not null default now());
-create table if not exists teacher_identities (teacher_id uuid primary key, person_id uuid not null unique references persons(person_id), created_at timestamptz not null default now());

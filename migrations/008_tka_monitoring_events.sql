@@ -1,1 +1,0 @@
-create table if not exists tka_monitoring_events (event_id uuid primary key, session_id uuid not null references tka_sessions(session_id), attempt_id uuid references tka_attempts(attempt_id), event_type text not null, occurred_at timestamptz not null default now(), metadata jsonb not null default '{}'::jsonb);
