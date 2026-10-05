@@ -3041,7 +3041,7 @@ elif st.session_state.page == "guru_dashboard":
         <div class="premium-hero automation-hero">
             <div class="premium-kicker">UPN • ASSESSMENT INTELLIGENCE</div>
             <div class="premium-title">📚 RoboMANTAP <span>Bank Soal</span></div>
-            <div class="premium-subtitle">Upload kisi-kisi ujian → baca blueprint → buat variasi → validasi → export DOCX.</div>
+            <div class="premium-subtitle">Upload kisi-kisi → baca blueprint → buat variasi → validasi → export</div>
             <div class="premium-pills"><span>Blueprint First</span><span>Variant Engine</span><span>AI QA</span><span>Traceability</span><span>DOCX Ready</span></div>
         </div>
         """, unsafe_allow_html=True)
@@ -3049,7 +3049,7 @@ elif st.session_state.page == "guru_dashboard":
         st.markdown("""
         <div class="source-warning">
             <div class="source-warning-title">🎯 Prinsip Bank Soal</div>
-            <b>Kisi-kisi adalah acuan utama. Filter guru hanya mengatur jenjang dan jumlah variasi.
+            <b>Kisi-kisi adalah acuan utama.</b> Filter guru hanya mengatur jenjang dan jumlah variasi.
         </div>
         """, unsafe_allow_html=True)
 
