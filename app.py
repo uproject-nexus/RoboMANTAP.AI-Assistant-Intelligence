@@ -1644,7 +1644,7 @@ if st.session_state.page == "landing":
     """, unsafe_allow_html=True)
 
     if st.button("🚀 MASUK PORTAL TKA SISWA →", type="primary"):
-    st.info("Fitur ini masih dalam pengembangan.")
+        st.info("Fitur ini masih dalam pengembangan.")
 
     st.write("---")
     st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
