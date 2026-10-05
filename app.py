@@ -1636,7 +1636,7 @@ if st.session_state.page == "landing":
             
     st.write("---")
     st.markdown("#### 🎓 TKA RoboMANTAP")
-    st.warning("🚧 **Akses Portal TKA Siswa** saat ini masih dalam tahap pengembangan.", icon="🚀")
+    st.warning("**Akses Portal TKA RoboMANTAP** saat ini masih dalam tahap pengembangan.", icon="⛔")
 
 
     st.write("---")
