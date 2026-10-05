@@ -1636,8 +1636,7 @@ if st.session_state.page == "landing":
             
     st.write("---")
     st.markdown("#### 🎓 TKA RoboMANTAP")
-    st.warning("**Akses Portal TKA RoboMANTAP** saat ini masih dalam tahap pengembangan.", icon="⛔")
-
+    st.warning("**Akses TKA RoboMANTAP** saat ini masih dalam tahap pengembangan.", icon="⛔")
 
     st.write("---")
     st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
@@ -3263,19 +3262,21 @@ elif st.session_state.page == "guru_dashboard":
 # ==============================================================================
 
     with tab5:
-        st.markdown("<div style='background:linear-gradient(135deg,#064e3b 0%,#022c22 100%);border:1px solid #10b981;border-radius:14px;padding:18px;margin:4px 0 16px;'>"
-                    "<div style='font-size:12px;color:#a7f3d0;font-weight:800;'>ROBO MANTAP · TKA</div>"
-                    "<div style='font-size:23px;font-weight:800;color:#ecfdf5;margin-top:4px;'>🎓 TKA Studio Guru</div>"
-                    "<div style='font-size:12px;color:#d1fae5;margin-top:6px;'>Buat TKA, stimulus, soal, 5 paket, validasi, terbitkan sesi, token siswa, dan kode akses.</div>"
-                    "</div>", unsafe_allow_html=True)
         st.markdown("""
-        <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:14px;margin-bottom:12px;">
-            <b>Alur Guru</b><br>
-            <span style="font-size:12px;opacity:.85;">Buat TKA → isi stimulus & soal → siapkan 5 paket → Validasi → Terbitkan → buat sesi/token → aktifkan kode akses siswa.</span>
+        <div class="premium-hero automation-hero">
+            <div class="premium-kicker">UPN • TKA CUSTOM INTELLIGENCE</div>
+            <div class="premium-title">🏆 RoboMANTAP <span>TKA STUDIO</span></div>
+            <div class="premium-subtitle">Buat TKA → upload gambar custom → buat soal → validasi → export</div>
+            <div class="premium-pills"><span>Juknis TKA 2026</span><span>Gambar Custom</span><span>AI Grounded</span><span>QA Validator</span></div>
         </div>
         """, unsafe_allow_html=True)
-        st.link_button("🚀 BUKA TKA STUDIO GURU", "https://robomantap-tka.onrender.com/tka/studio", use_container_width=True)
-        st.caption("Portal TKA berjalan sebagai service terpisah agar CBT/Quiz lama tetap stabil. URL siswa: https://robomantap-tka.onrender.com/tka/student")
+
+        st.markdown("""
+        <div class="source-warning">
+            <div class="source-warning-title">⛔ DALAM PENGEMBANGAN</div>
+            <b>Fitur TKA STUDIO</b> saat ini masih dalam tahap pengembangan.
+        </div>
+        """, unsafe_allow_html=True)
 
 elif st.session_state.page == "select_mapel":
     st.markdown(f"### 📚 Pilih Bidang OMI 2026 -<br><span style='color: #059669; display: inline-block;'>{st.session_state.jenjang}</span>", unsafe_allow_html=True)
