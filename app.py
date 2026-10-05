@@ -2511,7 +2511,7 @@ elif st.session_state.page == "guru_dashboard":
 
         st.markdown("""
         <div class="premium-hero">
-            <div class="premium-kicker">UPN • QUIZ-Intelligence</div>
+            <div class="premium-kicker">UPN • QUIZ INTELLIGENCE</div>
             <div class="premium-title">🧩 RoboMANTAP <span>Quiz Custom</span></div>
             <div class="premium-subtitle">Susun soal presisi dari topik manual atau langsung dari materi GuruMANTAP yang dilampirkan.</div>
             <div class="premium-pills">
@@ -3049,8 +3049,7 @@ elif st.session_state.page == "guru_dashboard":
         st.markdown("""
         <div class="source-warning">
             <div class="source-warning-title">🎯 Prinsip Bank Soal</div>
-            <b>Kisi-kisi adalah sumber kebenaran.</b> ATP, indikator, bentuk soal, dan nomor
-            dipertahankan. Filter guru hanya mengatur jenjang dan jumlah variasi.
+            <b>Kisi-kisi adalah acuan utama. Filter guru hanya mengatur jenjang dan jumlah variasi.
         </div>
         """, unsafe_allow_html=True)
 
@@ -3264,7 +3263,7 @@ elif st.session_state.page == "guru_dashboard":
     with tab5:
         st.markdown("""
         <div class="premium-hero automation-hero">
-            <div class="premium-kicker">UPN • TKA CUSTOM INTELLIGENCE</div>
+            <div class="premium-kicker">UPN • TKA INTELLIGENCE</div>
             <div class="premium-title">🏆 RoboMANTAP <span>TKA STUDIO</span></div>
             <div class="premium-subtitle">Buat TKA → upload gambar custom → buat soal → validasi → export</div>
             <div class="premium-pills"><span>Juknis TKA 2026</span><span>Gambar Custom</span><span>AI Grounded</span><span>QA Validator</span></div>
