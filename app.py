@@ -1636,15 +1636,8 @@ if st.session_state.page == "landing":
             
     st.write("---")
     st.markdown("#### 🎓 TKA RoboMANTAP")
-    st.markdown("""
-    <div class="guru-card" style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); border-color: #10b981;">
-        <h2 style="margin:0; font-size: 20px; color:#ecfdf5;">🎓 Portal Tes Kemampuan Akademik</h2>
-        <p style="font-size: 10px; opacity:0.9; margin-top:5px; color:#d1fae5;">Masuk ke portal TKA siswa menggunakan token sesi dan kode akses yang diberikan GuruMANTAP.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.warning("🚧 **Akses Portal TKA Siswa** saat ini masih dalam tahap pengembangan.", icon="🚀")
 
-    if st.button("🚀 MASUK PORTAL TKA SISWA →", type="primary"):
-        st.info("Fitur ini masih dalam pengembangan.")
 
     st.write("---")
     st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
