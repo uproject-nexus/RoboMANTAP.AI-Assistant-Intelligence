@@ -1004,7 +1004,6 @@ class DBWrapper:
             return pd.read_sql(text(sql_query), connection)
 
 _db_conn_cache = None
-
 def init_db_connection():
     global _db_conn_cache
     if _db_conn_cache is not None:
@@ -1025,7 +1024,14 @@ def init_db_connection():
         if db_url.startswith("postgres://"):
             db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
         try:
-            engine = create_engine(db_url, pool_pre_ping=True)
+            engine = create_engine(
+                db_url,
+                pool_pre_ping=True,
+                pool_size=5,          # Batasi jumlah koneksi aktif
+                max_overflow=10,       # Toleransi lonjakan koneksi sementara
+                pool_recycle=1800,     # Refresh koneksi setiap 30 menit
+                connect_args={"connect_timeout": 5}  # Batas waktu tunggu koneksi maksimal 5 detik
+            )
             _db_conn_cache = DBWrapper(engine)
             return _db_conn_cache
         except Exception as e:
