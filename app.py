@@ -1642,15 +1642,9 @@ if st.session_state.page == "landing":
         <p style="font-size: 10px; opacity:0.9; margin-top:5px; color:#d1fae5;">Masuk ke portal TKA siswa menggunakan token sesi dan kode akses yang diberikan GuruMANTAP.</p>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown(
-        """
-        <a href="https://robomantap-tka.onrender.com/tka/student" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-            <div style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#020617;padding:14px 20px;border-radius:12px;text-align:center;font-weight:800;font-size:15px;margin:8px 0 20px;">
-                🚀 MASUK PORTAL TKA SISWA →
-            </div>
-        </a>
-        """, unsafe_allow_html=True
-    )
+
+    if st.button("🚀 MASUK PORTAL TKA SISWA →", type="primary"):
+    st.info("Fitur ini masih dalam pengembangan.")
 
     st.write("---")
     st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
