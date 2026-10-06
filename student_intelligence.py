@@ -72,6 +72,16 @@ def ensure_student_intelligence_tables() -> bool:
 def _norm_name(value: str) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip()).casefold()
 
+def _is_practice_100_scale(mapel: str) -> bool:
+    """Quiz Custom dan TKA sudah menyimpan nilai langsung pada skala 0-100."""
+    value = str(mapel or "")
+    return "(Quiz)" in value or "(TKA)" in value
+
+
+def _clean_activity_marker(mapel: str) -> str:
+    value = str(mapel or "")
+    return value.replace(" (Quiz)", "").replace(" (TKA)", "").strip()
+
 
 def student_key(nama_siswa: str, jenjang: str = "") -> str:
     return f"{_norm_name(nama_siswa)}|{_norm_name(jenjang)}"
@@ -153,7 +163,7 @@ def build_student_profile(sessions: list[dict]) -> dict:
     for s in completed:
         score = float(s.get("nilai_akhir") or 0)
         mapel = str(s.get("mapel") or "")
-        if "(Quiz)" not in mapel and score <= 40:
+        if not _is_practice_100_scale(mapel) and score <= 40:
             score = max(0.0, min(100.0, score / 40.0 * 100.0))
         normalized_scores.append(score)
 
@@ -167,7 +177,7 @@ def build_student_profile(sessions: list[dict]) -> dict:
         detail = payload.get("detail_boolean") or []
         answers = payload.get("user_answers") or {}
         quiz = payload.get("quiz_data") or []
-        mapel = str(session.get("mapel") or "Umum").replace(" (Quiz)", "").strip()
+        mapel = _clean_activity_marker(session.get("mapel") or "Umum")
 
         for value in detail:
             if value is True:
@@ -179,7 +189,7 @@ def build_student_profile(sessions: list[dict]) -> dict:
 
         if str(session.get("status", "")).upper() == "SELESAI":
             score = float(session.get("nilai_akhir") or 0)
-            if "(Quiz)" not in str(session.get("mapel") or "") and score <= 40:
+            if not _is_practice_100_scale(session.get("mapel") or "") and score <= 40:
                 score = max(0.0, min(100.0, score / 40.0 * 100.0))
             by_subject[mapel].append(score)
 
@@ -342,7 +352,7 @@ def _start_adaptive_practice(name: str, grade: str, profile: dict) -> tuple[bool
     if not focus or grade == "Semua Jenjang":
         return False, "Pilih jenjang yang spesifik agar generator latihan dapat memilih kisi-kisi yang tepat."
 
-    if "(Quiz)" in str(focus):
+    if "(Quiz)" in str(focus) or "(TKA)" in str(focus):
         return False, "Area terlemah berasal dari Kuis GuruMANTAP. Gunakan latihan adaptif dari sesi guru terlebih dahulu."
 
     try:
@@ -797,11 +807,11 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         rows = []
         for s in sessions[:20]:
             score = float(s.get("nilai_akhir") or 0)
-            if "(Quiz)" not in str(s.get("mapel") or "") and score <= 40:
+            if not _is_practice_100_scale(s.get("mapel") or "") and score <= 40:
                 score = max(0.0, min(100.0, score / 40 * 100))
             rows.append({
                 "Waktu": s.get("updated_at") or s.get("created_at"),
-                "Mapel": str(s.get("mapel") or "").replace(" (Quiz)", ""),
+                "Mapel": _clean_activity_marker(s.get("mapel") or ""),
                 "Status": s.get("status"),
                 "Skor": round(score, 1),
             })
