@@ -2513,7 +2513,7 @@ elif st.session_state.page == "guru_dashboard":
         <div class="premium-hero">
             <div class="premium-kicker">UPN • QUIZ INTELLIGENCE</div>
             <div class="premium-title">🧩 RoboMANTAP <span>Quiz Custom</span></div>
-            <div class="premium-subtitle">Susun soal dari topik manual atau langsung dari materi yang dilampirkan.</div>
+            <div class="premium-subtitle">Buat soal secara manual atau dari materi yang dilampirkan.</div>
             <div class="premium-pills">
                 <span>AI Grounded</span><span>QA Validator</span><span>Mobile Ready</span><span>Teacher First</span>
             </div>
@@ -2529,12 +2529,12 @@ elif st.session_state.page == "guru_dashboard":
         """, unsafe_allow_html=True)
 
         st.markdown("#### 📚 Material Hub • File Drop Guru")
-        st.caption("Satu paket materi yang dapat dipakai kembali untuk Quiz, LKPD, dan Media Ajar!")
+        st.caption("Paket materi serbaguna untuk Quiz, LKPD, dan Media Ajar!")
 
         upload_col, status_col = st.columns([1.7, 1], gap="large")
         with upload_col:
             material_files = st.file_uploader(
-                "Drag & drop materi guru di sini",
+                "Drag & drop materi GuruMANTAP di sini",
                 type=["pdf", "pptx", "ppt", "docx", "png", "jpg", "jpeg", "webp"],
                 accept_multiple_files=True,
                 key="guru_material_drop",
@@ -2852,7 +2852,7 @@ elif st.session_state.page == "guru_dashboard":
         <div class="premium-hero automation-hero">
             <div class="premium-kicker">UPN • AUTOMATION STUDIO</div>
             <div class="premium-title">⚡ RoboMANTAP <span>Automation</span></div>
-            <div class="premium-subtitle">Buat LKPD dan media ajar dari topik manual atau File Drop yang sama.</div>
+            <div class="premium-subtitle">Buat LKPD dan media ajar dari topik manual atau berkas terlampir.</div>
             <div class="premium-pills"><span>LKPD PDF</span><span>Media PPTX</span><span>Speaker Notes</span><span>Material Reuse</span></div>
         </div>
         """, unsafe_allow_html=True)
@@ -2863,7 +2863,7 @@ elif st.session_state.page == "guru_dashboard":
 
         with auto1:
             st.markdown("#### 📄 LKPD Studio")
-            st.caption("LKPD generatif dengan layout premium, logo UPN, dan grounding materi yang sama dengan Quiz Custom.")
+            st.caption("LKPD generatif berdesain premium dapat disesuaikan dengan Material Hub.")
             lk_source_col, lk_code_col = st.columns([1.4, 1])
             with lk_source_col:
                 topic_lkpd = st.text_input("Topik / Materi Pembelajaran", value="", placeholder="Contoh: Persamaan Kuadrat", key="lkpd_topic")
@@ -2908,7 +2908,7 @@ elif st.session_state.page == "guru_dashboard":
 
         with auto2:
             st.markdown("#### 📊 Media Ajar Studio")
-            st.caption("Storyboard → visual shape → speaker notes → PPTX 16:9 siap presentasi.")
+            st.caption("Storyboard → visual shape → speaker notes → Siap presentasi!")
             media_source_col, media_info_col = st.columns([1.5, 1])
             with media_source_col:
                 media_topic = st.text_input("Topik Presentasi", value="", placeholder="Contoh: Sistem Persamaan Linear", key="media_topic")
