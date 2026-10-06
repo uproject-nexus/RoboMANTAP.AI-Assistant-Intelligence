@@ -54,6 +54,10 @@ from ai_engine import (
 )
 
 from student_intelligence import ensure_student_intelligence_tables, render_student_intelligence_dashboard
+from tka_engine import ensure_tka_tables, update_tka_progress
+from tka_studio import render_tka_studio
+
+TKA_PORTAL_URL = os.getenv("TKA_PORTAL_URL", "https://robomantap-tka.onrender.com")
 
 # Interseptor Deep Link dari CBT Engine Render
 if "review_session" in st.query_params:
@@ -69,7 +73,9 @@ if "review_session" in st.query_params:
             st.session_state.mapel = review_data["mapel"]
             st.session_state.jenjang = review_data["jenjang"]
             st.session_state.nama_siswa = review_data["nama"]
+            st.session_state.session_id = review_id
             st.session_state.is_custom_quiz = True
+            st.session_state.is_tka_session = (review_data.get("activity_type") == "TKA")
             st.session_state.loaded_review_id = review_id
 
 st.set_page_config(
@@ -83,6 +89,7 @@ st.set_page_config(
 create_table_if_not_exists()
 # Student Intelligence uses additive tables only; existing CBT tables remain unchanged.
 ensure_student_intelligence_tables()
+ensure_tka_tables()
 # ==============================================================================
 # ANTI-COPAS & DISABLE KLIK KANAN (PERLINDUNGAN HALAMAN KUIS)
 # ==============================================================================
@@ -735,21 +742,21 @@ with st.sidebar:
         only_latest = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Gabungkan multi-sesi: 1 nama hanya muncul 1 kali (pengerjaan terbaru).", key="filter_latest")
         # Filter Jenjang & Mapel
         selected_jenjang_filter = st.selectbox("🏫 Filter Jenjang:", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], key="filter_jenjang")
-        # SETING KHUSUS KUIS
+        # SETING AKTIVITAS CUSTOM: QUIZ + TKA
 
         # -------------------------------------------------------------------------
-        # BACA KHUSUS MAPEL KUIS CUSTOM BERLABEL (Quiz) SECARA DINAMIS DARI DATABASE
+        # BACA MAPEL AKTIVITAS CUSTOM BERLABEL (Quiz)/(TKA) SECARA DINAMIS
         # -------------------------------------------------------------------------
         quiz_custom_mapels = []
         conn_filter = init_db_connection()
         if conn_filter:
             try:
-                # Hanya tarik mapel yang mengandung kata '(Quiz)' di tabel sesi_ujian
+                # Tarik mapel aktivitas custom (Quiz/TKA) dari tabel sesi_ujian
                 df_quiz_db = conn_filter.query(
                     """
                     SELECT DISTINCT mapel 
                     FROM sesi_ujian 
-                    WHERE mapel LIKE '%(Quiz)%' 
+                    WHERE (mapel LIKE '%(Quiz)%' OR mapel LIKE '%(TKA)%') 
                       AND status NOT IN ('ARCHIVED', 'TRIAL', 'DRAFT', 'HIDDEN')
                     """, 
                     ttl=5
@@ -767,7 +774,7 @@ with st.sidebar:
         else:
             base_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys()) + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
 
-        # Gabungkan Mapel Standar OMI + Mapel Kuis Custom yang aktif
+        # Gabungkan Mapel Standar OMI + Mapel Quiz/TKA Custom yang aktif
         combined_mapels = sorted(list(set(base_mapels + quiz_custom_mapels)))
         mapel_options = ["Semua Mapel"] + combined_mapels
 
@@ -1636,7 +1643,11 @@ if st.session_state.page == "landing":
             
     st.write("---")
     st.markdown("#### 🎓 TKA RoboMANTAP")
-    st.warning("**Akses TKA RoboMANTAP** saat ini masih dalam tahap pengembangan.", icon="⛔")
+    st.caption("Portal latihan TKA 24/7 dan latihan yang diterbitkan GuruMANTAP.")
+    st.markdown(
+        f"""<a href="{TKA_PORTAL_URL}" target="_blank" style="text-decoration:none;"><div style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#020617;padding:14px 24px;border-radius:12px;text-align:center;font-weight:800;font-size:15px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;margin-bottom:20px;cursor:pointer;">🎓 MASUK PORTAL TKA →</div></a>""",
+        unsafe_allow_html=True,
+    )
 
     st.write("---")
     st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
@@ -3261,21 +3272,7 @@ elif st.session_state.page == "guru_dashboard":
 # ==============================================================================
 
     with tab5:
-        st.markdown("""
-        <div class="premium-hero automation-hero">
-            <div class="premium-kicker">UPN • TKA INTELLIGENCE</div>
-            <div class="premium-title">🏆 RoboMANTAP <span>TKA STUDIO</span></div>
-            <div class="premium-subtitle">Buat TKA → upload gambar custom → buat soal → validasi → export</div>
-            <div class="premium-pills"><span>Juknis TKA 2026</span><span>Gambar Custom</span><span>AI Grounded</span><span>QA Validator</span></div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("""
-        <div class="source-warning">
-            <div class="source-warning-title">⛔ DALAM PENGEMBANGAN</div>
-            <b>Fitur TKA STUDIO</b> saat ini masih dalam tahap pengembangan.
-        </div>
-        """, unsafe_allow_html=True)
+        render_tka_studio()
 
 elif st.session_state.page == "select_mapel":
     st.markdown(f"### 📚 Pilih Bidang OMI 2026 -<br><span style='color: #059669; display: inline-block;'>{st.session_state.jenjang}</span>", unsafe_allow_html=True)
@@ -3748,8 +3745,9 @@ elif st.session_state.page == "result":
     user_answers = st.session_state.user_answers
     total_soal = len(quiz_data)
     is_custom = st.session_state.get("is_custom_quiz", False)
+    is_tka = st.session_state.get("is_tka_session", False)
 
-    title_prefix = "Kuis Custom" if is_custom else "CBT OMI"
+    title_prefix = "TKA" if is_tka else ("Kuis Custom" if is_custom else "CBT OMI")
     st.subheader(f"📊 Evaluasi {title_prefix}: {st.session_state.mapel} ({st.session_state.jenjang})")
 
     if st.session_state.get("is_timeout", False):
@@ -3780,19 +3778,33 @@ elif st.session_state.page == "result":
         max_skor = 40
         skor_display_str = f"{total_skor} / 40"
 
-    # Sinkronisasi Status SELESAI ke Database Guru
-    update_progress_siswa(
-        st.session_state.session_id,
-        st.session_state.nama_siswa,
-        st.session_state.jenjang,
-        st.session_state.mapel,
-        total_soal,
-        detail,
-        "SELESAI",
-        is_custom=st.session_state.get("is_custom_quiz", False),
-        user_answers_dict=dict(user_answers),
-        quiz_data_list=list(quiz_data),
-    )
+    # Sinkronisasi Status SELESAI ke Database Guru.
+    # Review TKA harus tetap memakai marker (TKA), jangan ditulis ulang sebagai (Quiz).
+    if is_tka:
+        update_tka_progress(
+            session_id=st.session_state.session_id,
+            nama=st.session_state.nama_siswa,
+            jenjang=st.session_state.jenjang,
+            mapel=st.session_state.mapel,
+            soal_sekarang=total_soal,
+            detail_jawaban=detail,
+            status="SELESAI",
+            user_answers=dict(user_answers),
+            questions=list(quiz_data),
+        )
+    else:
+        update_progress_siswa(
+            st.session_state.session_id,
+            st.session_state.nama_siswa,
+            st.session_state.jenjang,
+            st.session_state.mapel,
+            total_soal,
+            detail,
+            "SELESAI",
+            is_custom=st.session_state.get("is_custom_quiz", False),
+            user_answers_dict=dict(user_answers),
+            quiz_data_list=list(quiz_data),
+        )
 
     # Ekstraksi Nama Panggilan Siswa
     nama_lengkap = st.session_state.get('nama_siswa', '').strip()
