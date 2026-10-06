@@ -2852,7 +2852,7 @@ elif st.session_state.page == "guru_dashboard":
         <div class="premium-hero automation-hero">
             <div class="premium-kicker">UPN • AUTOMATION STUDIO</div>
             <div class="premium-title">⚡ RoboMANTAP <span>Automation</span></div>
-            <div class="premium-subtitle">Buat Media ajar dari topik manual atau berkas terlampir.</div>
+            <div class="premium-subtitle">Buat Media ajar dari topik manual atau berkas yang terlampir.</div>
             <div class="premium-pills"><span>LKPD PDF</span><span>Media PPTX</span><span>Speaker Notes</span><span>Material Reuse</span></div>
         </div>
         """, unsafe_allow_html=True)
@@ -2863,7 +2863,7 @@ elif st.session_state.page == "guru_dashboard":
 
         with auto1:
             st.markdown("#### 📄 LKPD Studio")
-            st.caption("LKPD generatif premium yang disesuaikan dengan Material Hub.")
+            st.caption("LKPD generatif premium yang sesuai dengan Material Hub.")
             lk_source_col, lk_code_col = st.columns([1.4, 1])
             with lk_source_col:
                 topic_lkpd = st.text_input("Topik / Materi Pembelajaran", value="", placeholder="Contoh: Persamaan Kuadrat", key="lkpd_topic")
