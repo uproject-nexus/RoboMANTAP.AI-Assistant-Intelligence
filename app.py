@@ -2513,7 +2513,7 @@ elif st.session_state.page == "guru_dashboard":
         <div class="premium-hero">
             <div class="premium-kicker">UPN • QUIZ INTELLIGENCE</div>
             <div class="premium-title">🧩 RoboMANTAP <span>Quiz Custom</span></div>
-            <div class="premium-subtitle">Susun soal presisi dari topik manual atau langsung dari materi GuruMANTAP yang dilampirkan.</div>
+            <div class="premium-subtitle">Susun soal dari topik manual atau langsung dari materi yang dilampirkan.</div>
             <div class="premium-pills">
                 <span>AI Grounded</span><span>QA Validator</span><span>Mobile Ready</span><span>Teacher First</span>
             </div>
@@ -2529,7 +2529,7 @@ elif st.session_state.page == "guru_dashboard":
         """, unsafe_allow_html=True)
 
         st.markdown("#### 📚 Material Hub • File Drop Guru")
-        st.caption("Satu paket materi dapat berisi PDF, PPTX, DOCX, PNG, JPG, atau WEBP. Materi yang sama dapat dipakai kembali untuk Quiz, LKPD, dan Media Ajar.")
+        st.caption("Satu paket materi yang dapat dipakai kembali untuk Quiz, LKPD, dan Media Ajar!")
 
         upload_col, status_col = st.columns([1.7, 1], gap="large")
         with upload_col:
@@ -2852,7 +2852,7 @@ elif st.session_state.page == "guru_dashboard":
         <div class="premium-hero automation-hero">
             <div class="premium-kicker">UPN • AUTOMATION STUDIO</div>
             <div class="premium-title">⚡ RoboMANTAP <span>Automation</span></div>
-            <div class="premium-subtitle">Bangun LKPD dan media presentasi dari topik manual atau File Drop yang sama.</div>
+            <div class="premium-subtitle">Buat LKPD dan media ajar dari topik manual atau File Drop yang sama.</div>
             <div class="premium-pills"><span>LKPD PDF</span><span>Media PPTX</span><span>Speaker Notes</span><span>Material Reuse</span></div>
         </div>
         """, unsafe_allow_html=True)
