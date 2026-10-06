@@ -1636,10 +1636,12 @@ def load_session_review_from_db(session_id: str):
                     except ValueError:
                         formatted_user_answers[k] = v
 
+                raw_mapel = str(mapel or "")
                 return {
                     "nama": nama,
                     "jenjang": jenjang or "MA",
-                    "mapel": mapel.replace(" (Quiz)", "") if mapel else "Kuis",
+                    "mapel": raw_mapel.replace(" (Quiz)", "").replace(" (TKA)", "") if raw_mapel else "Kuis",
+                    "activity_type": "TKA" if "(TKA)" in raw_mapel else ("Quiz" if "(Quiz)" in raw_mapel else "OMI"),
                     "quiz_data": quiz_data,
                     "user_answers": formatted_user_answers,
                     "nilai": nilai
