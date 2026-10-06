@@ -2888,7 +2888,7 @@ elif st.session_state.page == "guru_dashboard":
                     if not ai_content:
                         st.error("LKPD belum berhasil dibuat. Silakan coba ulangi.")
                     else:
-                        pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, effective_topic, ai_content, logo_mantap_b64
+                        pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, effective_topic, ai_content, logo_mantap_b64)
                         st.session_state.lkpd_pdf_bytes = pdf_buffer.getvalue()
                         st.session_state.lkpd_filename = f"RoboMANTAP_LKPD_{mapel_lkpd}_{effective_topic.replace(' ', '_')}.pdf"
                         st.session_state.lkpd_source_code = lk_material_code.strip().upper()
