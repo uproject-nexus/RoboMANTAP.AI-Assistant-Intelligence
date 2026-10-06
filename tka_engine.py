@@ -186,6 +186,22 @@ def list_tka_images(source_type: str | None = None, owner_key: str | None = None
         return []
 
 
+def _coerce_image_bytes(image_data: Any) -> bytes | None:
+    """Normalize PostgreSQL BYTEA values for Streamlit/FastAPI/Gemini consumers."""
+    if image_data is None:
+        return None
+    if isinstance(image_data, memoryview):
+        return image_data.tobytes()
+    if isinstance(image_data, bytearray):
+        return bytes(image_data)
+    if isinstance(image_data, bytes):
+        return image_data
+    try:
+        return bytes(image_data)
+    except Exception:
+        return None
+
+
 def get_tka_image(image_id: str) -> dict | None:
     conn = init_db_connection()
     if not conn:
@@ -199,7 +215,11 @@ def get_tka_image(image_id: str) -> dict | None:
                 WHERE image_id = :id AND is_active = TRUE
                 LIMIT 1
             """), {"id": str(image_id)}).mappings().first()
-        return dict(row) if row else None
+        if not row:
+            return None
+        record = dict(row)
+        record["image_data"] = _coerce_image_bytes(record.get("image_data"))
+        return record
     except Exception as exc:
         print(f"[TKA IMAGE GET] {exc}")
         return None
