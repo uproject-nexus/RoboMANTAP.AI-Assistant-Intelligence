@@ -2954,7 +2954,7 @@ elif st.session_state.page == "guru_dashboard":
                                 "mapel": mapel_lkpd if 'mapel_lkpd' in locals() else "Umum",
                                 "kelas": kelas_lkpd if 'kelas_lkpd' in locals() else "X MA",
                             },
-                            logo_path=UPN_MARK_LOGO,
+                            logo_mantap_b64,
                         )
                         st.session_state.media_ppt_bytes = ppt_bytes
                         st.session_state.media_ppt_filename = f"RoboMANTAP_Media_{re.sub(r'[^A-Za-z0-9_-]+','_',effective_media_topic)}.pptx"
@@ -3014,8 +3014,8 @@ elif st.session_state.page == "guru_dashboard":
                     if not pack_lkpd or not pack_story:
                         st.error("Paket belum lengkap. Silakan ulangi sekali lagi.")
                     else:
-                        pack_pdf = create_lkpd_pdf_buffer(package_mapel, package_kelas, effective_package_topic, pack_lkpd, logo_path=UPN_PRIMARY_LOGO).getvalue()
-                        pack_ppt = build_media_ajar_pptx(pack_story, {"mapel": package_mapel, "kelas": package_kelas}, logo_path=UPN_MARK_LOGO)
+                        pack_pdf = create_lkpd_pdf_buffer(package_mapel, package_kelas, effective_package_topic, pack_lkpd, logo_mantap_b64).getvalue()
+                        pack_ppt = build_media_ajar_pptx(pack_story, {"mapel": package_mapel, "kelas": package_kelas}, logo_mantap_b64)
                         st.session_state.package_lkpd_bytes = pack_pdf
                         st.session_state.package_ppt_bytes = pack_ppt
                         st.success("✅ Paket Pembelajaran selesai dibuat dari sumber yang sama.")
