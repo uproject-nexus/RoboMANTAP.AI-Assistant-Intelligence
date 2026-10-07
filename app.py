@@ -107,11 +107,40 @@ st.set_page_config(
     initial_sidebar_state="auto"
 )
 
-# Inisialisasi Tabel Database saat aplikasi pertama kali dimuat
-create_table_if_not_exists()
-# Student Intelligence uses additive tables only; existing CBT tables remain unchanged.
-ensure_student_intelligence_tables()
-ensure_tka_tables()
+# -----------------------------------------------------------------------------
+# ONE-TIME DATABASE INITIALIZATION
+# Streamlit reruns the script frequently. DDL/table checks must NOT execute on
+# every widget interaction. cache_resource keeps this initialization process-
+# wide while preserving the existing database functions unchanged.
+# -----------------------------------------------------------------------------
+@st.cache_resource(show_spinner=False)
+def _initialize_database_once():
+    create_table_if_not_exists()
+    # Student Intelligence uses additive tables only; existing CBT tables remain unchanged.
+    ensure_student_intelligence_tables()
+    ensure_tka_tables()
+    return True
+
+_initialize_database_once()
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _cached_dashboard_custom_mapels():
+    conn = init_db_connection()
+    if not conn:
+        return []
+    try:
+        df = conn.query(
+            """
+            SELECT DISTINCT mapel
+            FROM sesi_ujian
+            WHERE (mapel LIKE '%(Quiz)%' OR mapel LIKE '%(TKA)%')
+              AND status NOT IN ('ARCHIVED', 'TRIAL', 'DRAFT', 'HIDDEN')
+            """,
+            ttl=30,
+        )
+        return df['mapel'].dropna().astype(str).tolist() if not df.empty else []
+    except Exception:
+        return []
 # ==============================================================================
 # ANTI-COPAS & DISABLE KLIK KANAN (PERLINDUNGAN HALAMAN KUIS)
 # ==============================================================================
@@ -758,50 +787,31 @@ with st.sidebar:
     # -------------------------------------------------------------------------
     if st.session_state.page == "guru_dashboard":
         st.markdown("### ⚙️ Panel Kontrol & Filter")
-        # Filter Rentang Waktu
-        time_filter = st.radio("⏳ Rentang Waktu:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], key="filter_time")
-        # Toggle Sesi & Auto-Refresh
-        only_latest = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Gabungkan multi-sesi: 1 nama hanya muncul 1 kali (pengerjaan terbaru).", key="filter_latest")
-        # Filter Jenjang & Mapel
-        selected_jenjang_filter = st.selectbox("🏫 Filter Jenjang:", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], key="filter_jenjang")
-        # SETING AKTIVITAS CUSTOM: QUIZ + TKA
+        # IMPORTANT: these filters are intentionally inside a Streamlit form.
+        # Changing a filter no longer reruns the entire teacher dashboard.
+        with st.form("guru_dashboard_filter_form", clear_on_submit=False):
+            time_filter_input = st.radio("⏳ Rentang Waktu:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], key="filter_time")
+            only_latest_input = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Gabungkan multi-sesi: 1 nama hanya muncul 1 kali (pengerjaan terbaru).", key="filter_latest")
+            selected_jenjang_input = st.selectbox("🏫 Filter Jenjang:", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], key="filter_jenjang")
 
-        # -------------------------------------------------------------------------
-        # BACA MAPEL AKTIVITAS CUSTOM BERLABEL (Quiz)/(TKA) SECARA DINAMIS
-        # -------------------------------------------------------------------------
-        quiz_custom_mapels = []
-        conn_filter = init_db_connection()
-        if conn_filter:
-            try:
-                # Tarik mapel aktivitas custom (Quiz/TKA) dari tabel sesi_ujian
-                df_quiz_db = conn_filter.query(
-                    """
-                    SELECT DISTINCT mapel 
-                    FROM sesi_ujian 
-                    WHERE (mapel LIKE '%(Quiz)%' OR mapel LIKE '%(TKA)%') 
-                      AND status NOT IN ('ARCHIVED', 'TRIAL', 'DRAFT', 'HIDDEN')
-                    """, 
-                    ttl=5
-                )
-                if not df_quiz_db.empty:
-                    quiz_custom_mapels = df_quiz_db['mapel'].dropna().tolist()
-            except Exception:
-                quiz_custom_mapels = []
+            quiz_custom_mapels = _cached_dashboard_custom_mapels()
+            if selected_jenjang_input == "MTs (Sederajat SMP)":
+                base_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys())
+            elif selected_jenjang_input == "MA (Sederajat SMA)":
+                base_mapels = list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
+            else:
+                base_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys()) + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
+            mapel_options = ["Semua Mapel"] + sorted(set(base_mapels + quiz_custom_mapels))
+            selected_mapel_input = st.selectbox("📚 Filter Mata Pelajaran:", mapel_options, key="filter_mapel")
+            selected_status_input = st.selectbox("📌 Filter Status:", ["Semua Status", "BERJALAN", "SELESAI", "EXPIRED"], key="filter_status")
+            apply_dashboard_filters = st.form_submit_button("🔎 TERAPKAN FILTER", use_container_width=True, type="primary")
 
-        # Tentukan mapel dasar OMI berdasarkan jenjang
-        if selected_jenjang_filter == "MTs (Sederajat SMP)":
-            base_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys())
-        elif selected_jenjang_filter == "MA (Sederajat SMA)":
-            base_mapels = list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
-        else:
-            base_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys()) + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
-
-        # Gabungkan Mapel Standar OMI + Mapel Quiz/TKA Custom yang aktif
-        combined_mapels = sorted(list(set(base_mapels + quiz_custom_mapels)))
-        mapel_options = ["Semua Mapel"] + combined_mapels
-
-        selected_mapel_filter = st.selectbox("📚 Filter Mata Pelajaran:", mapel_options, key="filter_mapel")
-        selected_status_filter = st.selectbox("📌 Filter Status:", ["Semua Status", "BERJALAN", "SELESAI", "EXPIRED"], key="filter_status")
+        # Form values are committed only when the teacher presses Apply.
+        time_filter = st.session_state.get("filter_time", "Hari Ini")
+        only_latest = st.session_state.get("filter_latest", True)
+        selected_jenjang_filter = st.session_state.get("filter_jenjang", "Semua Jenjang")
+        selected_mapel_filter = st.session_state.get("filter_mapel", "Semua Mapel")
+        selected_status_filter = st.session_state.get("filter_status", "Semua Status")
 
     else:
         st.markdown("""
@@ -1777,8 +1787,10 @@ elif st.session_state.page == "guru_login":
     </div>
     """, unsafe_allow_html=True)
     
-    pin_input = st.text_input("Masukkan PIN Akses:", type="password", placeholder="Masukkan PIN GuruMANTAP...")
-    if st.button("Login", type="primary"):
+    with st.form("guru_login_form", clear_on_submit=False):
+        pin_input = st.text_input("Masukkan PIN Akses:", type="password", placeholder="Masukkan PIN GuruMANTAP...")
+        login_submit = st.form_submit_button("Login", type="primary", use_container_width=True)
+    if login_submit:
         if pin_input == "MANTAP2026":
             st.session_state.guru_auth = True
             st.session_state.page = "guru_dashboard"
@@ -2637,8 +2649,10 @@ elif st.session_state.page == "guru_dashboard":
                             st.warning(f"✅ Materi berhasil dibaca untuk sesi ini. Kode aktif: **{new_code}** (penyimpanan database belum terhubung).")
                         st.rerun()
         with recall_col:
-            recall_input = st.text_input("🔑 Ambil File Drop", value=material_code, placeholder="Contoh: MD-7K29FA", key="material_recall_code")
-            if st.button("↻ MUAT FILE DROP", use_container_width=True, key="btn_recall_material_hub"):
+            with st.form("material_recall_form", clear_on_submit=False):
+                recall_input = st.text_input("🔑 Ambil File Drop", value=material_code, placeholder="Contoh: MD-7K29FA", key="material_recall_code")
+                recall_submit = st.form_submit_button("↻ MUAT FILE DROP", use_container_width=True)
+            if recall_submit:
                 code = recall_input.strip().upper()
                 recalled = get_material_bundle_from_db(code) if code else None
                 if recalled:
@@ -2870,18 +2884,20 @@ elif st.session_state.page == "guru_dashboard":
             st.markdown("#### 🚀 Terbitkan Kuis ke Siswa")
             if "default_quiz_code" not in st.session_state:
                 st.session_state.default_quiz_code = f"MNT-{uuid.uuid4().hex[:4].upper()}"
-            col_pub1, col_pub2 = st.columns([2, 1])
-            with col_pub1:
-                st.text_input(
-                    "🔑 Buat Kode Kuis Unik (opsional)",
-                    value=st.session_state.default_quiz_code,
-                    max_chars=15,
-                    key="user_quiz_code",
-                    help="Contoh: MTK-KLS10",
-                )
-            with col_pub2:
-                st.write("")
-                if st.button("🚀 TERBITKAN KUIS", type="primary", use_container_width=True):
+            with st.form("publish_quiz_form", clear_on_submit=False):
+                col_pub1, col_pub2 = st.columns([2, 1])
+                with col_pub1:
+                    st.text_input(
+                        "🔑 Buat Kode Kuis Unik (opsional)",
+                        value=st.session_state.default_quiz_code,
+                        max_chars=15,
+                        key="user_quiz_code",
+                        help="Contoh: MTK-KLS10",
+                    )
+                with col_pub2:
+                    st.write("")
+                    publish_quiz_submit = st.form_submit_button("🚀 TERBITKAN KUIS", type="primary", use_container_width=True)
+            if publish_quiz_submit:
                     clean_code = st.session_state.user_quiz_code.strip().upper()
                     if not clean_code:
                         st.warning("⚠️ Kode kuis tidak boleh kosong.")
@@ -2920,36 +2936,37 @@ elif st.session_state.page == "guru_dashboard":
         with auto1:
             st.markdown("#### 📄 LKPD Studio")
             st.caption("LKPD generatif premium yang sesuai dengan Material Hub.")
-            lk_source_col, lk_code_col = st.columns([1.4, 1])
-            with lk_source_col:
-                topic_lkpd = st.text_input("Topik / Materi Pembelajaran", value="", placeholder="Contoh: Persamaan Kuadrat", key="lkpd_topic")
-            with lk_code_col:
-                lk_material_code = st.text_input("File Drop (opsional)", value=shared_code, placeholder="MD-XXXXXX", key="lkpd_material_code")
-            col_lkpd1, col_lkpd2 = st.columns(2)
-            with col_lkpd1:
-                kelas_lkpd = st.selectbox("Kelas / Jenjang", ["VII MTs", "VIII MTs", "IX MTs", "X MA", "XI MA", "XII MA"], key="lkpd_kelas")
-            with col_lkpd2:
-                mapel_lkpd = st.selectbox("Mata Pelajaran", ["Matematika", "IPA", "IPS", "PAI & Bahasa Arab", "Fisika", "Biologi", "Kimia", "Bahasa Indonesia", "Bahasa Inggris"], key="lkpd_mapel")
-
-            if st.button("✨ GENERATE LKPD PREMIUM", type="primary", use_container_width=True, key="generate_lkpd_premium"):
-                source_for_lkpd = shared_pack if lk_material_code.strip().upper() == shared_code and shared_pack else None
-                if lk_material_code.strip():
-                    source_for_lkpd = get_material_bundle_from_db(lk_material_code.strip().upper()) or source_for_lkpd
-                if not topic_lkpd.strip() and not source_for_lkpd:
-                    st.warning("Isi topik atau masukkan File Drop yang sudah disimpan.")
-                else:
-                    effective_topic = topic_lkpd.strip() or "Materi terlampir"
-                    with st.spinner("RoboMANTAP sedang menyusun LKPD • mengikat sumber • menata layout..."):
-                        ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, effective_topic, source_pack=source_for_lkpd)
-                    if not ai_content:
-                        st.error("LKPD belum berhasil dibuat. Silakan coba ulangi.")
+            with st.form("lkpd_generation_form", clear_on_submit=False):
+                lk_source_col, lk_code_col = st.columns([1.4, 1])
+                with lk_source_col:
+                    topic_lkpd = st.text_input("Topik / Materi Pembelajaran", value="", placeholder="Contoh: Persamaan Kuadrat", key="lkpd_topic")
+                with lk_code_col:
+                    lk_material_code = st.text_input("File Drop (opsional)", value=shared_code, placeholder="MD-XXXXXX", key="lkpd_material_code")
+                col_lkpd1, col_lkpd2 = st.columns(2)
+                with col_lkpd1:
+                    kelas_lkpd = st.selectbox("Kelas / Jenjang", ["VII MTs", "VIII MTs", "IX MTs", "X MA", "XI MA", "XII MA"], key="lkpd_kelas")
+                with col_lkpd2:
+                    mapel_lkpd = st.selectbox("Mata Pelajaran", ["Matematika", "IPA", "IPS", "PAI & Bahasa Arab", "Fisika", "Biologi", "Kimia", "Bahasa Indonesia", "Bahasa Inggris"], key="lkpd_mapel")
+    
+                if st.form_submit_button("✨ GENERATE LKPD PREMIUM", type="primary", use_container_width=True):
+                    source_for_lkpd = shared_pack if lk_material_code.strip().upper() == shared_code and shared_pack else None
+                    if lk_material_code.strip():
+                        source_for_lkpd = get_material_bundle_from_db(lk_material_code.strip().upper()) or source_for_lkpd
+                    if not topic_lkpd.strip() and not source_for_lkpd:
+                        st.warning("Isi topik atau masukkan File Drop yang sudah disimpan.")
                     else:
-                        pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, effective_topic, ai_content, logo_mantap_b64)
-                        st.session_state.lkpd_pdf_bytes = pdf_buffer.getvalue()
-                        st.session_state.lkpd_filename = f"RoboMANTAP_LKPD_{mapel_lkpd}_{effective_topic.replace(' ', '_')}.pdf"
-                        st.session_state.lkpd_source_code = lk_material_code.strip().upper()
-                        st.success("✅ LKPD premium berhasil dibuat.")
-
+                        effective_topic = topic_lkpd.strip() or "Materi terlampir"
+                        with st.spinner("RoboMANTAP sedang menyusun LKPD • mengikat sumber • menata layout..."):
+                            ai_content = generate_lkpd_content(mapel_lkpd, kelas_lkpd, effective_topic, source_pack=source_for_lkpd)
+                        if not ai_content:
+                            st.error("LKPD belum berhasil dibuat. Silakan coba ulangi.")
+                        else:
+                            pdf_buffer = create_lkpd_pdf_buffer(mapel_lkpd, kelas_lkpd, effective_topic, ai_content, logo_mantap_b64)
+                            st.session_state.lkpd_pdf_bytes = pdf_buffer.getvalue()
+                            st.session_state.lkpd_filename = f"RoboMANTAP_LKPD_{mapel_lkpd}_{effective_topic.replace(' ', '_')}.pdf"
+                            st.session_state.lkpd_source_code = lk_material_code.strip().upper()
+                            st.success("✅ LKPD premium berhasil dibuat.")
+    
             if st.session_state.get("lkpd_pdf_bytes"):
                 st.markdown("<div class='result-card'><div class='result-card-title'>✅ LKPD READY</div><div class='result-card-copy'>Dokumen siap dicetak atau dibagikan ke guru/siswa.</div></div>", unsafe_allow_html=True)
                 st.download_button(
@@ -2965,58 +2982,59 @@ elif st.session_state.page == "guru_dashboard":
         with auto2:
             st.markdown("#### 📊 Media Ajar Studio")
             st.caption("Storyboard → visual shape → speaker notes → Siap presentasi!")
-            media_source_col, media_info_col = st.columns([1.5, 1])
-            with media_source_col:
-                media_topic = st.text_input("Topik Presentasi", value="", placeholder="Contoh: Sistem Persamaan Linear", key="media_topic")
-                media_material_code = st.text_input("File Drop (opsional)", value=shared_code, placeholder="MD-XXXXXX", key="media_material_code")
-            with media_info_col:
-                media_slide_count = st.number_input("Jumlah Slide", min_value=6, max_value=30, value=12, step=1, key="media_slide_count")
-                media_duration = st.number_input("Durasi Kelas (menit)", min_value=15, max_value=180, value=60, step=5, key="media_duration")
-            m1, m2, m3 = st.columns(3)
-            with m1:
-                media_lang = st.selectbox("Bahasa", ["Bahasa Indonesia", "Indonesia + Arab", "English"], key="media_lang")
-            with m2:
-                media_style = st.selectbox("Gaya Visual", ["Premium UPN", "Academic Clean", "Modern Madrasah", "Minimal Executive"], key="media_style")
-            with m3:
-                media_mode = st.selectbox("Mode Presenter", ["Interactive", "Expository", "HOTS / Discussion"], key="media_mode")
-
-            if st.button("🚀 BUILD MEDIA AJAR • PPTX", type="primary", use_container_width=True, key="generate_media_ppt"):
-                source_for_media = shared_pack if media_material_code.strip().upper() == shared_code and shared_pack else None
-                if media_material_code.strip():
-                    source_for_media = get_material_bundle_from_db(media_material_code.strip().upper()) or source_for_media
-                if not media_topic.strip() and not source_for_media:
-                    st.warning("Isi topik presentasi atau masukkan File Drop.")
-                else:
-                    effective_media_topic = media_topic.strip() or "Materi terlampir"
-                    with st.spinner(f"RoboMANTAP sedang membangun storyboard {media_slide_count} slide + speaker notes..."):
-                        storyboard = generate_media_ajar_ai(
-                            mapel=mapel_lkpd if 'mapel_lkpd' in locals() else "Umum",
-                            jenjang=st.session_state.get("jenjang") or "MA",
-                            kelas=kelas_lkpd if 'kelas_lkpd' in locals() else "X MA",
-                            topik=effective_media_topic,
-                            jumlah_slide=int(media_slide_count),
-                            durasi_menit=int(media_duration),
-                            bahasa=media_lang,
-                            gaya=media_style,
-                            mode_presentasi=media_mode,
-                            source_pack=source_for_media,
-                        )
-                    if not storyboard:
-                        st.error("Storyboard PPT belum berhasil dibuat. Coba ulangi.")
+            with st.form("media_generation_form", clear_on_submit=False):
+                media_source_col, media_info_col = st.columns([1.5, 1])
+                with media_source_col:
+                    media_topic = st.text_input("Topik Presentasi", value="", placeholder="Contoh: Sistem Persamaan Linear", key="media_topic")
+                    media_material_code = st.text_input("File Drop (opsional)", value=shared_code, placeholder="MD-XXXXXX", key="media_material_code")
+                with media_info_col:
+                    media_slide_count = st.number_input("Jumlah Slide", min_value=6, max_value=30, value=12, step=1, key="media_slide_count")
+                    media_duration = st.number_input("Durasi Kelas (menit)", min_value=15, max_value=180, value=60, step=5, key="media_duration")
+                m1, m2, m3 = st.columns(3)
+                with m1:
+                    media_lang = st.selectbox("Bahasa", ["Bahasa Indonesia", "Indonesia + Arab", "English"], key="media_lang")
+                with m2:
+                    media_style = st.selectbox("Gaya Visual", ["Premium UPN", "Academic Clean", "Modern Madrasah", "Minimal Executive"], key="media_style")
+                with m3:
+                    media_mode = st.selectbox("Mode Presenter", ["Interactive", "Expository", "HOTS / Discussion"], key="media_mode")
+    
+                if st.form_submit_button("🚀 BUILD MEDIA AJAR • PPTX", type="primary", use_container_width=True):
+                    source_for_media = shared_pack if media_material_code.strip().upper() == shared_code and shared_pack else None
+                    if media_material_code.strip():
+                        source_for_media = get_material_bundle_from_db(media_material_code.strip().upper()) or source_for_media
+                    if not media_topic.strip() and not source_for_media:
+                        st.warning("Isi topik presentasi atau masukkan File Drop.")
                     else:
-                        ppt_bytes = build_media_ajar_pptx(
-                            storyboard,
-                            {
-                                "mapel": mapel_lkpd if 'mapel_lkpd' in locals() else "Umum",
-                                "kelas": kelas_lkpd if 'kelas_lkpd' in locals() else "X MA",
-                            },
-                            logo_mantap_b64,
-                        )
-                        st.session_state.media_ppt_bytes = ppt_bytes
-                        st.session_state.media_ppt_filename = f"RoboMANTAP_Media_{re.sub(r'[^A-Za-z0-9_-]+','_',effective_media_topic)}.pptx"
-                        st.session_state.media_storyboard = storyboard
-                        st.success("✅ Media Ajar PPT siap digunakan di kelas.")
-
+                        effective_media_topic = media_topic.strip() or "Materi terlampir"
+                        with st.spinner(f"RoboMANTAP sedang membangun storyboard {media_slide_count} slide + speaker notes..."):
+                            storyboard = generate_media_ajar_ai(
+                                mapel=mapel_lkpd if 'mapel_lkpd' in locals() else "Umum",
+                                jenjang=st.session_state.get("jenjang") or "MA",
+                                kelas=kelas_lkpd if 'kelas_lkpd' in locals() else "X MA",
+                                topik=effective_media_topic,
+                                jumlah_slide=int(media_slide_count),
+                                durasi_menit=int(media_duration),
+                                bahasa=media_lang,
+                                gaya=media_style,
+                                mode_presentasi=media_mode,
+                                source_pack=source_for_media,
+                            )
+                        if not storyboard:
+                            st.error("Storyboard PPT belum berhasil dibuat. Coba ulangi.")
+                        else:
+                            ppt_bytes = build_media_ajar_pptx(
+                                storyboard,
+                                {
+                                    "mapel": mapel_lkpd if 'mapel_lkpd' in locals() else "Umum",
+                                    "kelas": kelas_lkpd if 'kelas_lkpd' in locals() else "X MA",
+                                },
+                                logo_mantap_b64,
+                            )
+                            st.session_state.media_ppt_bytes = ppt_bytes
+                            st.session_state.media_ppt_filename = f"RoboMANTAP_Media_{re.sub(r'[^A-Za-z0-9_-]+','_',effective_media_topic)}.pptx"
+                            st.session_state.media_storyboard = storyboard
+                            st.success("✅ Media Ajar PPT siap digunakan di kelas.")
+    
             if st.session_state.get("media_storyboard"):
                 story = st.session_state.media_storyboard
                 st.markdown(f"<div class='result-card'><div class='result-card-title'>{html.escape(story.get('deck_title','Media Ajar RoboMANTAP'))}</div><div class='result-card-copy'>{html.escape(story.get('deck_subtitle','PPTX siap presentasi • speaker notes terpasang'))}</div></div>", unsafe_allow_html=True)
@@ -3035,47 +3053,48 @@ elif st.session_state.page == "guru_dashboard":
         with auto3:
             st.markdown("#### 📦 Paket Pembelajaran Terintegrasi")
             st.caption("Gunakan satu topik / satu File Drop untuk menghasilkan LKPD PDF dan Media Ajar PPT dalam satu alur kerja.")
-            package_topic = st.text_input("Topik Paket", placeholder="Contoh: Fungsi Kuadrat", key="package_topic")
-            package_code = st.text_input("File Drop Paket (opsional)", value=shared_code, placeholder="MD-XXXXXX", key="package_code")
-            pc1, pc2, pc3 = st.columns(3)
-            with pc1:
-                package_mapel = st.text_input("Mapel", value="Matematika", key="package_mapel")
-            with pc2:
-                package_kelas = st.selectbox("Kelas", ["VII MTs", "VIII MTs", "IX MTs", "X MA", "XI MA", "XII MA"], key="package_kelas")
-            with pc3:
-                package_slides = st.number_input("Slide PPT", min_value=6, max_value=24, value=12, step=1, key="package_slides")
-
-            if st.button("⚡ GENERATE PAKET LKPD + PPT", type="primary", use_container_width=True, key="generate_package"):
-                pack_source = shared_pack if package_code.strip().upper() == shared_code and shared_pack else None
-                if package_code.strip():
-                    pack_source = get_material_bundle_from_db(package_code.strip().upper()) or pack_source
-                if not package_topic.strip() and not pack_source:
-                    st.warning("Isi topik paket atau pilih File Drop yang tersimpan.")
-                else:
-                    effective_package_topic = package_topic.strip() or "Materi terlampir"
-                    with st.spinner("Membangun Paket Pembelajaran: LKPD + Storyboard + PPTX..."):
-                        pack_lkpd = generate_lkpd_content(package_mapel, package_kelas, effective_package_topic, source_pack=pack_source)
-                        pack_story = generate_media_ajar_ai(
-                            mapel=package_mapel,
-                            jenjang=package_kelas.split()[-1] if package_kelas else "MA",
-                            kelas=package_kelas,
-                            topik=effective_package_topic,
-                            jumlah_slide=int(package_slides),
-                            durasi_menit=60,
-                            bahasa="Bahasa Indonesia",
-                            gaya="Premium UPN",
-                            mode_presentasi="Interactive",
-                            source_pack=pack_source,
-                        )
-                    if not pack_lkpd or not pack_story:
-                        st.error("Paket belum lengkap. Silakan ulangi sekali lagi.")
+            with st.form("package_generation_form", clear_on_submit=False):
+                package_topic = st.text_input("Topik Paket", placeholder="Contoh: Fungsi Kuadrat", key="package_topic")
+                package_code = st.text_input("File Drop Paket (opsional)", value=shared_code, placeholder="MD-XXXXXX", key="package_code")
+                pc1, pc2, pc3 = st.columns(3)
+                with pc1:
+                    package_mapel = st.text_input("Mapel", value="Matematika", key="package_mapel")
+                with pc2:
+                    package_kelas = st.selectbox("Kelas", ["VII MTs", "VIII MTs", "IX MTs", "X MA", "XI MA", "XII MA"], key="package_kelas")
+                with pc3:
+                    package_slides = st.number_input("Slide PPT", min_value=6, max_value=24, value=12, step=1, key="package_slides")
+    
+                if st.form_submit_button("⚡ GENERATE PAKET LKPD + PPT", type="primary", use_container_width=True):
+                    pack_source = shared_pack if package_code.strip().upper() == shared_code and shared_pack else None
+                    if package_code.strip():
+                        pack_source = get_material_bundle_from_db(package_code.strip().upper()) or pack_source
+                    if not package_topic.strip() and not pack_source:
+                        st.warning("Isi topik paket atau pilih File Drop yang tersimpan.")
                     else:
-                        pack_pdf = create_lkpd_pdf_buffer(package_mapel, package_kelas, effective_package_topic, pack_lkpd, logo_mantap_b64).getvalue()
-                        pack_ppt = build_media_ajar_pptx(pack_story, {"mapel": package_mapel, "kelas": package_kelas}, logo_mantap_b64)
-                        st.session_state.package_lkpd_bytes = pack_pdf
-                        st.session_state.package_ppt_bytes = pack_ppt
-                        st.success("✅ Paket Pembelajaran selesai dibuat dari sumber yang sama.")
-
+                        effective_package_topic = package_topic.strip() or "Materi terlampir"
+                        with st.spinner("Membangun Paket Pembelajaran: LKPD + Storyboard + PPTX..."):
+                            pack_lkpd = generate_lkpd_content(package_mapel, package_kelas, effective_package_topic, source_pack=pack_source)
+                            pack_story = generate_media_ajar_ai(
+                                mapel=package_mapel,
+                                jenjang=package_kelas.split()[-1] if package_kelas else "MA",
+                                kelas=package_kelas,
+                                topik=effective_package_topic,
+                                jumlah_slide=int(package_slides),
+                                durasi_menit=60,
+                                bahasa="Bahasa Indonesia",
+                                gaya="Premium UPN",
+                                mode_presentasi="Interactive",
+                                source_pack=pack_source,
+                            )
+                        if not pack_lkpd or not pack_story:
+                            st.error("Paket belum lengkap. Silakan ulangi sekali lagi.")
+                        else:
+                            pack_pdf = create_lkpd_pdf_buffer(package_mapel, package_kelas, effective_package_topic, pack_lkpd, logo_mantap_b64).getvalue()
+                            pack_ppt = build_media_ajar_pptx(pack_story, {"mapel": package_mapel, "kelas": package_kelas}, logo_mantap_b64)
+                            st.session_state.package_lkpd_bytes = pack_pdf
+                            st.session_state.package_ppt_bytes = pack_ppt
+                            st.success("✅ Paket Pembelajaran selesai dibuat dari sumber yang sama.")
+    
             if st.session_state.get("package_lkpd_bytes") and st.session_state.get("package_ppt_bytes"):
                 pdl, pdp = st.columns(2)
                 with pdl:
@@ -3160,53 +3179,54 @@ elif st.session_state.page == "guru_dashboard":
                     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
                 st.caption("Ekstraksi menggunakan struktur tabel DOCX. Jika tersedia, Level Kognitif C1–C6 ikut menjadi constraint generator dan QA.")
 
-            st.markdown("#### 2. Konfigurasi Generator")
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                bank_jenjang = st.selectbox("🏫 Jenjang", ["SD", "SMP", "SMA", "MTs", "MA"], key="bank_jenjang")
-            with c2:
-                bank_mapel = st.text_input("📚 Mata Pelajaran", value=metadata.get("subject") or "Matematika", key="bank_mapel")
-            with c3:
-                bank_kelas = st.text_input("🎓 Kelas / Tingkat", value=metadata.get("grade") or "", key="bank_kelas")
-
-            c1, c2 = st.columns([1, 2])
-            with c1:
-                bank_variants = st.number_input(
-                    "🔁 Jumlah Variasi per Blueprint", min_value=1, max_value=10, value=3, step=1,
-                    key="bank_variants",
-                    help="3 berarti setiap blueprint dibuat menjadi 3 variasi berbeda dengan kompetensi yang sama.",
+            with st.form("bank_generation_form", clear_on_submit=False):
+                st.markdown("#### 2. Konfigurasi Generator")
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    bank_jenjang = st.selectbox("🏫 Jenjang", ["SD", "SMP", "SMA", "MTs", "MA"], key="bank_jenjang")
+                with c2:
+                    bank_mapel = st.text_input("📚 Mata Pelajaran", value=metadata.get("subject") or "Matematika", key="bank_mapel")
+                with c3:
+                    bank_kelas = st.text_input("🎓 Kelas / Tingkat", value=metadata.get("grade") or "", key="bank_kelas")
+    
+                c1, c2 = st.columns([1, 2])
+                with c1:
+                    bank_variants = st.number_input(
+                        "🔁 Jumlah Variasi per Blueprint", min_value=1, max_value=10, value=3, step=1,
+                        key="bank_variants",
+                        help="3 berarti setiap blueprint dibuat menjadi 3 variasi berbeda dengan kompetensi yang sama.",
+                    )
+                with c2:
+                    bank_language = st.selectbox("🌐 Bahasa Soal", ["Bahasa Indonesia", "Bahasa Arab", "Indonesia + Arab", "English"], key="bank_language")
+    
+                estimated = summary["base_slots"] * int(bank_variants)
+                st.info(
+                    f"📐 Estimasi: **{summary['base_slots']} slot dasar × {int(bank_variants)} variasi = {estimated} soal**. "
+                    "Jika satu blueprint memiliki beberapa bentuk soal, semua bentuk tetap dipertahankan."
                 )
-            with c2:
-                bank_language = st.selectbox("🌐 Bahasa Soal", ["Bahasa Indonesia", "Bahasa Arab", "Indonesia + Arab", "English"], key="bank_language")
-
-            estimated = summary["base_slots"] * int(bank_variants)
-            st.info(
-                f"📐 Estimasi: **{summary['base_slots']} slot dasar × {int(bank_variants)} variasi = {estimated} soal**. "
-                "Jika satu blueprint memiliki beberapa bentuk soal, semua bentuk tetap dipertahankan."
-            )
-
-            if st.button("🚀 GENERATE BANK SOAL • BLUEPRINT QA", type="primary", use_container_width=True, key="generate_bank_soal"):
-                if not bank_mapel.strip():
-                    st.error("Mata pelajaran wajib diisi.")
-                elif not blueprint.get("blueprints"):
-                    st.error("Blueprint belum terbaca.")
-                else:
-                    with st.spinner(f"RoboMANTAP membuat {estimated} soal dan menjalankan QA blueprint..."):
-                        questions, report = generate_bank_soal(
-                            blueprint, variants=int(bank_variants), jenjang=bank_jenjang,
-                            mapel=bank_mapel.strip(), kelas=bank_kelas.strip(), language=bank_language,
-                        )
-                    st.session_state.bank_questions = questions
-                    st.session_state.bank_report = report
-                    st.session_state.bank_docx_bytes = None
-                    st.session_state.bank_docx_config_signature = None
-                    if report.get("deterministic_ok") and report.get("review_count", 0) == 0:
-                        st.success(f"✅ Bank soal selesai: {len(questions)} soal.")
-                    elif questions:
-                        st.warning(f"⚠️ {len(questions)} soal tersedia; {report.get('review_count', 0)} berstatus REVIEW.")
+    
+                if st.form_submit_button("🚀 GENERATE BANK SOAL • BLUEPRINT QA", type="primary", use_container_width=True):
+                    if not bank_mapel.strip():
+                        st.error("Mata pelajaran wajib diisi.")
+                    elif not blueprint.get("blueprints"):
+                        st.error("Blueprint belum terbaca.")
                     else:
-                        st.error("❌ Bank soal belum berhasil dibuat lengkap.")
-
+                        with st.spinner(f"RoboMANTAP membuat {estimated} soal dan menjalankan QA blueprint..."):
+                            questions, report = generate_bank_soal(
+                                blueprint, variants=int(bank_variants), jenjang=bank_jenjang,
+                                mapel=bank_mapel.strip(), kelas=bank_kelas.strip(), language=bank_language,
+                            )
+                        st.session_state.bank_questions = questions
+                        st.session_state.bank_report = report
+                        st.session_state.bank_docx_bytes = None
+                        st.session_state.bank_docx_config_signature = None
+                        if report.get("deterministic_ok") and report.get("review_count", 0) == 0:
+                            st.success(f"✅ Bank soal selesai: {len(questions)} soal.")
+                        elif questions:
+                            st.warning(f"⚠️ {len(questions)} soal tersedia; {report.get('review_count', 0)} berstatus REVIEW.")
+                        else:
+                            st.error("❌ Bank soal belum berhasil dibuat lengkap.")
+    
             questions = st.session_state.get("bank_questions", [])
             report = st.session_state.get("bank_report") or {}
             if questions:
@@ -3244,22 +3264,23 @@ elif st.session_state.page == "guru_dashboard":
                                     st.markdown(q.get("solution_basis", "Belum tersedia."))
 
                 st.markdown("#### 4. Download Word")
-                include_key = st.checkbox(
-                    "Sertakan kunci jawaban & pembahasan",
-                    value=True,
-                    key="bank_include_key",
-                    help="Jika dicentang, bagian Kunci dan Pembahasan ikut dimasukkan ke DOCX.",
-                )
-                include_map = st.checkbox(
-                    "Sertakan Peta Blueprint / Traceability",
-                    value=True,
-                    key="bank_include_map",
-                    help="Jika dicentang, Peta Blueprint dan Lampiran Traceability ikut dimasukkan ke DOCX.",
-                )
+                with st.form("bank_docx_form", clear_on_submit=False):
+                    include_key = st.checkbox(
+                        "Sertakan kunci jawaban & pembahasan",
+                        value=True,
+                        key="bank_include_key",
+                        help="Jika dicentang, bagian Kunci dan Pembahasan ikut dimasukkan ke DOCX.",
+                    )
+                    include_map = st.checkbox(
+                        "Sertakan Peta Blueprint / Traceability",
+                        value=True,
+                        key="bank_include_map",
+                        help="Jika dicentang, Peta Blueprint dan Lampiran Traceability ikut dimasukkan ke DOCX.",
+                    )
 
-                # A DOCX is tied to the exact checkbox/configuration used when it
-                # was built. This prevents Streamlit reruns from offering an old
-                # file after the teacher changes a checkbox.
+                    # A DOCX is tied to the exact checkbox/configuration used when it
+                    # was built. This prevents Streamlit reruns from offering an old
+                    # file after the teacher changes a checkbox.
                 current_docx_signature = (
                     bool(include_key),
                     bool(include_map),
@@ -3275,7 +3296,8 @@ elif st.session_state.page == "guru_dashboard":
                     st.session_state.bank_docx_config_signature = None
                     st.info("ℹ️ Pilihan download berubah. Klik **BUILD BANK SOAL (.DOCX)** kembali agar dokumen mengikuti centang terbaru.")
 
-                if st.button("📄 BUILD BANK SOAL (.DOCX)", type="primary", use_container_width=True, key="build_bank_docx"):
+                build_bank_docx_submit = st.form_submit_button("📄 BUILD BANK SOAL (.DOCX)", type="primary", use_container_width=True)
+                if build_bank_docx_submit:
                     with st.spinner("Menata Bank Soal ke Word..."):
                         st.session_state.bank_docx_bytes = build_bank_soal_docx(
                             blueprint, questions, jenjang=bank_jenjang, mapel=bank_mapel.strip(),
@@ -3290,19 +3312,19 @@ elif st.session_state.page == "guru_dashboard":
                         f"peta/traceability={'YA' if include_map else 'TIDAK'}."
                     )
 
-                if (
-                    st.session_state.get("bank_docx_bytes")
-                    and st.session_state.get("bank_docx_config_signature") == current_docx_signature
-                ):
-                    safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", bank_mapel.strip() or "Bank_Soal")
-                    st.download_button(
-                        "⬇️ DOWNLOAD BANK SOAL WORD",
-                        data=st.session_state.bank_docx_bytes,
-                        file_name=f"RoboMANTAP_Bank_Soal_{safe_name}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        use_container_width=True,
-                        key="download_bank_docx",
-                    )
+            if (
+                st.session_state.get("bank_docx_bytes")
+                and st.session_state.get("bank_docx_config_signature") == current_docx_signature
+            ):
+                safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", bank_mapel.strip() or "Bank_Soal")
+                st.download_button(
+                    "⬇️ DOWNLOAD BANK SOAL WORD",
+                    data=st.session_state.bank_docx_bytes,
+                    file_name=f"RoboMANTAP_Bank_Soal_{safe_name}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                    key="download_bank_docx",
+                )
 
             st.markdown("""
             <div class="premium-footer-card">
@@ -3494,11 +3516,15 @@ elif st.session_state.page == "setup_custom":
 
     st.write("---")
     st.markdown("#### 📝 Masukkan Data Diri Kamu")
-    st.session_state.nama_siswa = st.text_input(
-        "Nama Lengkap Siswa:", 
-        value=st.session_state.nama_siswa, 
-        placeholder="Masukkan Nama Lengkap Kamu disini..."
-    )
+    with st.form("custom_student_identity_form", clear_on_submit=False):
+        nama_siswa_input = st.text_input(
+            "Nama Lengkap Siswa:",
+            value=st.session_state.nama_siswa,
+            placeholder="Masukkan Nama Lengkap Kamu disini..."
+        )
+        save_identity = st.form_submit_button("💾 Simpan Nama", use_container_width=True)
+    if save_identity:
+        st.session_state.nama_siswa = nama_siswa_input.strip()
     
     st.write("---")  
     timer_sec = cfg.get("timer_seconds", 0)
@@ -3745,11 +3771,13 @@ elif st.session_state.page == "quiz":
     with st.expander("Kamu bingung? Konsultasi di sini sama aku, RoboMANTAP! 🧕🏼"):
         st.caption("Fungsi kolom ini: Tulis ide awal atau rumus yang mau kamu coba, nanti RoboMANTAP bakal kasih petunjuk jalan keluarnya tanpa langsung bocorin jawaban!")
         
-        attempt_input = st.text_input(
-            "Gagasan / Ide Logika Kamu apa coba?:",
-            placeholder="Contoh: Arti Bahasa Arab-nya apa?😟",
-            key=f"hint_in_{curr_idx}"
-        )
+        with st.form(f"hint_form_{curr_idx}", clear_on_submit=False):
+            attempt_input = st.text_input(
+                "Gagasan / Ide Logika Kamu apa coba?:",
+                placeholder="Contoh: Arti Bahasa Arab-nya apa?😟",
+                key=f"hint_in_{curr_idx}"
+            )
+            discuss_hint = st.form_submit_button("Diskusikan Yuk!", use_container_width=True)
         
         hint_key = (
             st.session_state.mapel,
@@ -3762,7 +3790,7 @@ elif st.session_state.page == "quiz":
             st.markdown("🧕🏼 **RoboMANTAP:**")
             st.markdown(st.session_state.ai_hint_cache[hint_key])
 
-        if st.button("Diskusikan Yuk!", key=f"btn_hint_{curr_idx}"):
+        if discuss_hint:
             if attempt_input.strip():
                 if hint_key in st.session_state.ai_hint_cache:
                     st.markdown("🧕🏼 **RoboMANTAP:**")
@@ -3953,7 +3981,10 @@ elif st.session_state.page == "result":
         col_act1, col_act2 = st.columns(2)
         with col_act1:
             if st.button("🔄 LATIHAN SOAL LAGI DONG! (SESI BARU)", type="primary", use_container_width=True):
-                st.cache_data.clear()
+                # Do not clear the entire Streamlit cache here. That would also
+                # evict unrelated dashboard/image caches and make the next screen
+                # needlessly slow. generate_quiz_batch already creates a fresh set
+                # from the current inputs.
                 with st.spinner("Sabar ya, RoboMANTAP sedang menyiapkan soal baru Kamu.. (nggak lama kok, hanya butuh waktu sekitar 15 detik saja! 😊)"):
                     new_quiz = generate_quiz_batch(st.session_state.jenjang, st.session_state.mapel, st.session_state.stage, st.session_state.selected_submateri)
                     if new_quiz and len(new_quiz) == 10:

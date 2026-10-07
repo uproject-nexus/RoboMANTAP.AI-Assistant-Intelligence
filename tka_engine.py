@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import random
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -14,7 +13,6 @@ from ai_engine import (
     init_db_connection,
     get_gemini_clients,
     option_labels_for_jenjang,
-    option_count_for_jenjang,
     normalize_quiz_options,
     clean_json_text,
     _split_option_label,
@@ -104,6 +102,27 @@ def infer_tka_topic(
     return stem[:160].strip().title() or "Stimulus TKA"
 
 
+def infer_tka_tags(
+    topic: str,
+    mapel: str | None = None,
+    jenjang: str | None = None,
+) -> list[str]:
+    """Build deterministic search tags from existing metadata without changing the filename."""
+    stopwords = {
+        "dan", "atau", "pada", "dengan", "untuk", "dari", "yang",
+        "dalam", "tentang", "sebagai", "soal", "stimulus", "gambar",
+        "diagram", "tabel", "grafik", "ilustrasi", "materi", "konsep",
+    }
+    parts = []
+    for value in (mapel, jenjang, topic):
+        for token in re.findall(r"[A-Za-zÀ-ÿ0-9]+", str(value or "").lower()):
+            if len(token) < 3 or token in stopwords:
+                continue
+            if token not in parts:
+                parts.append(token)
+    return parts[:12]
+
+
 def ensure_tka_tables() -> bool:
     conn = init_db_connection()
 
@@ -131,11 +150,16 @@ def ensure_tka_tables() -> bool:
             jenjang VARCHAR(40),
             mapel VARCHAR(100),
             topic VARCHAR(160),
+            description VARCHAR(500),
             tags JSONB NOT NULL DEFAULT '[]'::jsonb,
             is_active BOOLEAN NOT NULL DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+        """,
+        """
+        ALTER TABLE tka_image_library
+            ADD COLUMN IF NOT EXISTS description VARCHAR(500)
         """,
         """
         CREATE INDEX IF NOT EXISTS idx_tka_image_library_source
@@ -171,6 +195,7 @@ def save_tka_image(
     jenjang: str = "",
     mapel: str = "",
     topic: str = "",
+    description: str = "",
     tags: list[str] | None = None,
 ) -> str | None:
 
@@ -200,6 +225,7 @@ def save_tka_image(
         jenjang,
         mapel,
         topic,
+        description,
         tags,
         is_active,
         created_at,
@@ -216,8 +242,10 @@ def save_tka_image(
         :jenjang,
         :mapel,
         :topic,
+        :description,
         :tags,
         TRUE,
+        
         NOW() AT TIME ZONE 'Asia/Jakarta',
         NOW() AT TIME ZONE 'Asia/Jakarta'
       )
@@ -250,13 +278,24 @@ def save_tka_image(
                     ),
                     "topic": (
                         str(topic or "").strip()[:160]
-                        or infer_tka_topic(
-                            filename,
-                            jenjang,
-                            mapel,
-                        )
+                        or infer_tka_topic(filename, jenjang, mapel)
                     ),
-                    "tags": json.dumps(tags or []),
+                    "description": (
+                        str(description or "").strip()[:500]
+                        or str(topic or "").strip()[:500]
+                        or infer_tka_topic(filename, jenjang, mapel)
+                    ),
+                    "tags": json.dumps(
+                        tags
+                        if tags
+                        else infer_tka_tags(
+                            str(topic or "").strip()
+                            or infer_tka_topic(filename, jenjang, mapel),
+                            mapel,
+                            jenjang,
+                        ),
+                        ensure_ascii=False,
+                    ),
                 },
             )
 
@@ -333,6 +372,7 @@ def list_tka_images(
         jenjang,
         mapel,
         topic,
+        description,
         tags,
         created_at
       FROM tka_image_library
@@ -356,93 +396,73 @@ def list_tka_images(
         return []
 
 
-def backfill_tka_image_topics(limit: int = 500) -> int:
-    """
-    Fill blank topic metadata from the already-descriptive filename;
-    no image bytes are changed.
-    """
+def backfill_tka_image_metadata(limit: int = 500) -> int:
+    """Fill missing topic/description/tags from existing metadata and filenames.
 
+    This never renames files or changes image bytes.
+    """
     conn = init_db_connection()
-
     if not conn:
         return 0
-
     try:
         with conn.session as s:
             rows = (
                 s.execute(
-                    text(
-                        """
-                        SELECT
-                            image_id,
-                            filename,
-                            jenjang,
-                            mapel
+                    text("""
+                        SELECT image_id, filename, jenjang, mapel,
+                               topic, description, tags
                         FROM tka_image_library
-                        WHERE
-                            is_active = TRUE
-                            AND (
-                                topic IS NULL
-                                OR BTRIM(topic) = ''
-                            )
+                        WHERE is_active = TRUE
+                          AND (
+                              topic IS NULL OR BTRIM(topic) = ''
+                              OR description IS NULL OR BTRIM(description) = ''
+                              OR tags IS NULL OR tags = '[]'::jsonb
+                          )
                         ORDER BY created_at ASC
                         LIMIT :limit
-                        """
-                    ),
+                    """),
+                    {"limit": max(1, min(int(limit), 1000))},
+                ).mappings().all()
+            )
+            updated = 0
+            for row in rows:
+                topic = str(row.get("topic") or "").strip() or infer_tka_topic(
+                    row.get("filename"), row.get("jenjang"), row.get("mapel")
+                )
+                description = str(row.get("description") or "").strip() or topic
+                existing_tags = _json(row.get("tags"), [])
+                tags = (
+                    existing_tags if isinstance(existing_tags, list) and existing_tags
+                    else infer_tka_tags(topic, row.get("mapel"), row.get("jenjang"))
+                )
+                result = s.execute(
+                    text("""
+                        UPDATE tka_image_library
+                        SET topic = :topic,
+                            description = :description,
+                            tags = :tags::jsonb,
+                            updated_at = NOW() AT TIME ZONE 'Asia/Jakarta'
+                        WHERE image_id = :id
+                    """),
                     {
-                        "limit": max(
-                            1,
-                            min(int(limit), 500),
-                        )
+                        "id": str(row["image_id"]),
+                        "topic": topic[:160],
+                        "description": description[:500],
+                        "tags": json.dumps(tags, ensure_ascii=False),
                     },
                 )
-                .mappings()
-                .all()
-            )
-
-            updated = 0
-
-            for row in rows:
-                topic = infer_tka_topic(
-                    row.get("filename"),
-                    row.get("jenjang"),
-                    row.get("mapel"),
-                )
-
-                if topic:
-                    result = s.execute(
-                        text(
-                            """
-                            UPDATE tka_image_library
-                            SET
-                                topic = :topic,
-                                updated_at =
-                                    NOW()
-                                    AT TIME ZONE 'Asia/Jakarta'
-                            WHERE
-                                image_id = :id
-                                AND (
-                                    topic IS NULL
-                                    OR BTRIM(topic) = ''
-                                )
-                            """
-                        ),
-                        {
-                            "id": str(row["image_id"]),
-                            "topic": topic[:160],
-                        },
-                    )
-
-                    updated += int(result.rowcount or 0)
-
+                updated += int(result.rowcount or 0)
             if updated:
                 s.commit()
-
             return updated
-
     except Exception as exc:
-        print(f"[TKA TOPIC BACKFILL] {exc}")
+        print(f"[TKA METADATA BACKFILL] {exc}")
         return 0
+
+
+def backfill_tka_image_topics(limit: int = 500) -> int:
+    """Backward-compatible wrapper used by older callers."""
+    return backfill_tka_image_metadata(limit=limit)
 
 
 def get_tka_image(image_id: str) -> dict | None:
@@ -467,6 +487,7 @@ def get_tka_image(image_id: str) -> dict | None:
                             jenjang,
                             mapel,
                             topic,
+                            description,
                             tags,
                             created_at
                         FROM tka_image_library
@@ -653,8 +674,8 @@ def can_delete_tka_image(
             [],
         )
 
-    if source_type == "GURU" and owner_key:
-        if (
+    if source_type == "GURU":
+        if not owner_key or (
             image_owner.lower()
             != str(owner_key).strip().lower()
         ):
@@ -685,6 +706,13 @@ def delete_tka_image(
     owner_key: str | None = None,
     allow_system: bool = False,
 ) -> bool:
+    allowed, _message, _usages = can_delete_tka_image(
+        image_id=image_id,
+        owner_key=owner_key,
+        allow_system=allow_system,
+    )
+    if not allowed:
+        return False
 
     conn = init_db_connection()
 
@@ -988,7 +1016,6 @@ OUTPUT JSON MURNI:
       "question_type": "{"PG|MCMA|KATEGORI" if qtype == "MIXED" else qtype}",
       "question": "...",
       {schema},
-      "category_items": [],
       "stimulus_text": null,
       "stimulus_group": null,
       "image_id": null,
@@ -1722,6 +1749,13 @@ def validate_tka_30(
                         f"Respons kategori "
                         f"nomor {idx}.{pos} "
                         "tidak valid.",
+                    )
+
+                if str(answers[pos - 1]).strip() != correct:
+                    return (
+                        False,
+                        f"Kunci kategori nomor {idx}.{pos} "
+                        "tidak sinkron dengan correct_response.",
                     )
 
         if not q.get("topic"):
