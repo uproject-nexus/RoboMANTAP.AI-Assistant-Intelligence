@@ -1665,9 +1665,32 @@ if st.session_state.page == "landing":
             
     st.write("---")
     st.markdown("#### 🎓 TKA RoboMANTAP")
-    st.caption("Portal latihan TKA 24/7 dan latihan yang diterbitkan GuruMANTAP.")
+    st.caption("Portal latihan TKA Mandiri dan latihan yang diterbitkan GuruMANTAP.")
     st.markdown(
-        f"""<a href="{TKA_PORTAL_URL}" target="_blank" style="text-decoration:none;"><div style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#020617;padding:14px 24px;border-radius:12px;text-align:center;font-weight:800;font-size:15px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;margin-bottom:20px;cursor:pointer;">🎓 MASUK PORTAL TKA →</div></a>""",
+        f"""
+        <a href="{TKA_PORTAL_URL}" target="_blank" style="text-decoration: none; color: #020617;">
+            <div style="
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: #020617 !important;
+                padding: 14px 24px;
+                border-radius: 12px;
+                text-align: center;
+                font-weight: 800;
+                font-size: 15px;
+                letter-spacing: 0.5px;
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                margin-top: 8px;
+                margin-bottom: 20px;
+                cursor: pointer;
+            ">
+                MASUK PORTAL TKA →
+            </div>
+        </a>
+        """,
         unsafe_allow_html=True,
     )
 
@@ -1697,7 +1720,7 @@ if st.session_state.page == "landing":
                 margin-bottom: 20px;
                 cursor: pointer;
             ">
-                🚀 MASUK PORTAL KUIS →
+                MASUK PORTAL KUIS →
             </div>
         </a>
         """,
