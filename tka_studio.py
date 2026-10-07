@@ -17,6 +17,7 @@ from tka_engine import (
     delete_tka_image_safe,
     generate_tka_30,
     get_tka_image,
+    get_tka_image_usage,
     infer_tka_topic,
     list_tka_images,
     publish_tka_to_db,
@@ -110,6 +111,30 @@ def _image_for_streamlit(data):
             return None
 
     return data
+
+
+@st.cache_data(ttl=30, max_entries=4, show_spinner=False)
+def _cached_tka_library(limit: int = 200):
+    return list_tka_images(limit=limit)
+
+
+@st.cache_data(ttl=3600, max_entries=500, show_spinner=False)
+def _cached_stimulus_preview(image_id: str, cache_key: str = ""):
+    record = get_tka_image(image_id)
+    if not record:
+        return None
+
+    image = _image_for_streamlit(record.get("image_data"))
+    if image is None:
+        return None
+
+    try:
+        image = image.copy()
+        image.thumbnail((560, 420), Image.Resampling.LANCZOS)
+    except Exception:
+        pass
+
+    return image
 
 
 def _mapel_controls(
@@ -910,40 +935,25 @@ def render_tka_studio():
     # =========================================================
 
     st.markdown("---")
-
-    st.markdown(
-        "### 🗂️ Library Gambar TKA"
-    )
-
+    st.markdown("### 🗂️ Library Gambar TKA")
     st.caption(
-        "Gambar Guru tersimpan dan dapat dipakai ulang oleh pemiliknya; "
-        "Gambar Sistem UPN adalah aset bersama. Pada Portal GuruMANTAP "
-        "versi ini, akses pengelolaan berada di balik autentikasi portal. "
-        "Penghapusan stimulus yang sudah dipakai TKA published tetap diblokir."
+        "Kelola stimulus dengan filter metadata yang ringan. "
+        "Preview hanya dirender untuk halaman yang sedang dibuka; "
+        "gambar yang sudah dipakai TKA aktif akan meminta konfirmasi "
+        "dan tetap dilindungi sampai masa aktifnya selesai."
     )
 
-    all_images = list_tka_images(
-        limit=200
-    )
+    all_images = _cached_tka_library(200)
 
     if all_images:
-
         st.dataframe(
             [
                 {
                     "File": x["filename"],
-                    "Sumber": x.get(
-                        "source_type"
-                    ),
-                    "Pemilik": x.get(
-                        "owner_key"
-                    ) or "-",
-                    "Jenjang": x.get(
-                        "jenjang"
-                    ) or "-",
-                    "Mapel": x.get(
-                        "mapel"
-                    ) or "-",
+                    "Sumber": x.get("source_type"),
+                    "Pemilik": x.get("owner_key") or "-",
+                    "Jenjang": x.get("jenjang") or "-",
+                    "Mapel": x.get("mapel") or "-",
                     "Topik": (
                         x.get("topic")
                         or infer_tka_topic(
@@ -959,371 +969,215 @@ def render_tka_studio():
             hide_index=True,
         )
 
-        st.markdown(
-            "#### 🗑️ Kelola Stimulus"
+        st.markdown("#### 🗑️ Kelola Stimulus")
+        st.caption(
+            "Mode kelola dibuat ringan: daftar di bawah hanya memuat metadata, "
+            "bukan me-render ulang seluruh gambar. Preview gambar hanya dimuat "
+            "saat Anda memilih satu stimulus."
         )
 
-        current_teacher = (
-            teacher_name.strip()
-            or "GuruMANTAP"
+        current_teacher = teacher_name.strip() or "GuruMANTAP"
+
+        page_size = 50
+        page_count = max(1, (len(all_images) + page_size - 1) // page_size)
+        page_options = list(range(1, page_count + 1))
+        page = st.selectbox(
+            "Halaman stimulus",
+            page_options,
+            key="tka_manage_library_page",
+            format_func=lambda n: (
+                f"Halaman {n} • "
+                f"{min(page_size, len(all_images) - (n-1)*page_size)} gambar"
+            ),
         )
 
-        for record in all_images:
+        start = (page - 1) * page_size
+        page_images = all_images[start:start + page_size]
 
-            image_id = str(
-                record.get(
-                    "image_id"
-                ) or ""
+        # Preview hanya SATU gambar jika memang diperlukan. Dengan default False,
+        # klik hapus tidak memaksa Streamlit mengirim ulang puluhan gambar.
+        preview_options = {
+            str(r.get("image_id")): r
+            for r in page_images
+            if r.get("image_id")
+        }
+        preview_ids = list(preview_options.keys())
+        if preview_ids:
+            preview_choice = st.selectbox(
+                "Preview stimulus (opsional)",
+                [""] + preview_ids,
+                key="tka_manage_preview_id",
+                format_func=lambda image_id: (
+                    "— Tidak menampilkan preview —"
+                    if not image_id
+                    else str(preview_options[image_id].get("filename") or image_id)
+                ),
             )
-
-            filename = str(
-                record.get(
-                    "filename"
-                ) or "Stimulus"
-            )
-
-            source_type = str(
-                record.get(
-                    "source_type"
+            if preview_choice:
+                preview_record = preview_options.get(preview_choice, {})
+                preview = _cached_stimulus_preview(
+                    preview_choice,
+                    str(
+                        preview_record.get("updated_at")
+                        or preview_record.get("created_at")
+                        or ""
+                    ),
                 )
-                or "GURU"
-            ).upper()
+                if preview is not None:
+                    st.image(
+                        preview,
+                        caption=str(preview_record.get("filename") or "Stimulus"),
+                        width=360,
+                    )
 
-            owner_key = str(
-                record.get(
-                    "owner_key"
-                ) or ""
-            )
+        # Tidak ada st.image() di dalam loop daftar. Ini adalah titik penting untuk
+        # performa: satu klik hapus sekarang hanya merender metadata + tombol.
+        for record in page_images:
+            image_id = str(record.get("image_id") or "")
+            filename = str(record.get("filename") or "Stimulus")
+            source_type = str(record.get("source_type") or "GURU").upper()
+            owner_key = str(record.get("owner_key") or "")
 
             if not image_id:
                 continue
 
-            # Portal GuruMANTAP pada baseline ini hanya memiliki satu
-            # gate autentikasi (guru_auth) dan belum memiliki role Admin UPN
-            # terpisah. Karena itu SYSTEM dapat dikelola dari area yang
-            # sudah terautentikasi; engine tetap memblokir penghapusan jika
-            # stimulus sudah dipakai paket TKA published.
             can_show_delete = (
                 source_type == "SYSTEM"
                 or (
                     source_type == "GURU"
-                    and owner_key.lower()
-                    == current_teacher.lower()
+                    and owner_key.lower() == current_teacher.lower()
                 )
             )
+            allow_system_delete = source_type == "SYSTEM"
 
-            allow_system_delete = (
-                source_type == "SYSTEM"
-            )
-
-            with st.container(
-                border=True
-            ):
-
-                col_img, col_info, col_action = st.columns(
-                    [1.5, 4, 1.5],
+            with st.container(border=True):
+                col_info, col_action = st.columns(
+                    [7, 1.5],
                     vertical_alignment="center",
                 )
 
-                with col_img:
-
-                    record_full = get_tka_image(
-                        image_id
-                    )
-
-                    if record_full:
-
-                        image_preview = (
-                            _image_for_streamlit(
-                                record_full.get(
-                                    "image_data"
-                                )
-                            )
-                        )
-
-                        if image_preview is not None:
-                            st.image(
-                                image_preview,
-                                caption=filename,
-                                use_container_width=True,
-                            )
-
                 with col_info:
-
-                    st.markdown(
-                        f"**{filename}**"
-                    )
-
+                    st.markdown(f"**{filename}**")
                     st.caption(
-                        f"{source_type} • "
-                        f"{record.get('jenjang') or '-'} • "
+                        f"{source_type} • {record.get('jenjang') or '-'} • "
                         f"{record.get('mapel') or '-'}"
                     )
-
                     topic = (
                         record.get("topic")
                         or infer_tka_topic(
                             filename,
-                            record.get(
-                                "jenjang"
-                            ),
-                            record.get(
-                                "mapel"
-                            ),
+                            record.get("jenjang"),
+                            record.get("mapel"),
                         )
                     )
-
-                    st.caption(
-                        f"Topik: {topic}"
-                    )
-
-                    if source_type == "SYSTEM":
-
-                        st.caption(
-                            "🛡️ Gambar Sistem UPN adalah aset bersama. "
-                            "Karena Portal GuruMANTAP pada versi ini "
-                            "menggunakan satu autentikasi portal, aset SYSTEM "
-                            "dapat dikelola dari area terautentikasi. "
-                            "Penghapusan tetap diblokir bila stimulus sudah "
-                            "digunakan oleh TKA yang diterbitkan."
-                        )
+                    st.caption(f"Topik: {topic}")
 
                 with col_action:
-
                     if can_show_delete:
-
-                        delete_key = (
-                            f"delete_tka_image_"
-                            f"{image_id}"
-                        )
-
                         if st.button(
                             "🗑️ Hapus",
-                            key=delete_key,
+                            key=f"delete_tka_image_{image_id}",
                             use_container_width=True,
                         ):
+                            # Cek penggunaan hanya saat tombol benar-benar ditekan.
+                            # Hasilnya disimpan agar tombol konfirmasi tidak melakukan
+                            # query usage kedua kali.
+                            usages = get_tka_image_usage(image_id)
+                            st.session_state[f"tka_delete_pending_{image_id}"] = {
+                                "usages": usages,
+                                "allow_system": allow_system_delete,
+                                "owner_key": (
+                                    None if allow_system_delete else current_teacher
+                                ),
+                            }
 
-                            allowed, message, usages = (
-                                can_delete_tka_image(
-                                    image_id=image_id,
-                                    owner_key=(
-                                        None
-                                        if allow_system_delete
-                                        else current_teacher
-                                    ),
-                                    allow_system=allow_system_delete,
-                                )
-                            )
+                    elif source_type == "GURU":
+                        st.caption("🔒 Bukan milik Anda")
 
-                            if not allowed:
-
-                                st.session_state[
-                                    f"tka_delete_warning_{image_id}"
-                                ] = {
-                                    "message": message,
-                                    "usages": usages,
-                                }
-
-                                st.rerun(
-                                    scope="fragment"
-                                )
-
-                            st.session_state[
-                                f"tka_delete_confirm_{image_id}"
-                            ] = True
-
-                            st.rerun(
-                                scope="fragment"
-                            )
-
-                    else:
-
-                        if source_type == "GURU":
-                            st.caption(
-                                "🔒 Bukan milik Anda"
-                            )
-
-                # -------------------------------------------------
-                # Confirmation
-                # -------------------------------------------------
-
-                if st.session_state.get(
-                    f"tka_delete_confirm_{image_id}",
-                    False,
-                ):
-
-                    st.warning(
-                        f"⚠️ Hapus **{filename}** "
-                        "dari Library TKA?"
-                    )
-
-                    confirm_col, cancel_col = (
-                        st.columns(2)
-                    )
-
-                    with confirm_col:
-
-                        if st.button(
-                            "✅ Ya, Hapus",
-                            key=(
-                                f"confirm_delete_"
-                                f"{image_id}"
-                            ),
-                            type="primary",
-                            use_container_width=True,
-                        ):
-
-                            deleted, delete_message, usages = (
-                                delete_tka_image_safe(
-                                    image_id=image_id,
-                                    owner_key=(
-                                        None
-                                        if allow_system_delete
-                                        else current_teacher
-                                    ),
-                                    allow_system=allow_system_delete,
-                                )
-                            )
-
-                            st.session_state.pop(
-                                f"tka_delete_confirm_{image_id}",
-                                None,
-                            )
-
-                            if deleted:
-
-                                st.success(
-                                    delete_message
-                                )
-
-                                current_selection = [
-                                    str(x)
-                                    for x in (
-                                        st.session_state.get(
-                                            "tka_library_selection",
-                                            [],
-                                        )
-                                    )
-                                ]
-
-                                st.session_state[
-                                    "tka_library_selection"
-                                ] = [
-                                    x
-                                    for x in current_selection
-                                    if x != image_id
-                                ]
-
-                                st.session_state[
-                                    "tka_selected_image_ids"
-                                ] = [
-                                    str(x)
-                                    for x in (
-                                        st.session_state.get(
-                                            "tka_selected_image_ids",
-                                            [],
-                                        )
-                                    )
-                                    if str(x)
-                                    != image_id
-                                ]
-
-                                st.rerun(
-                                    scope="fragment"
-                                )
-
-                            else:
-
-                                st.session_state[
-                                    f"tka_delete_warning_{image_id}"
-                                ] = {
-                                    "message": delete_message,
-                                    "usages": usages,
-                                }
-
-                                st.rerun(
-                                    scope="fragment"
-                                )
-
-                    with cancel_col:
-
-                        if st.button(
-                            "Batal",
-                            key=(
-                                f"cancel_delete_"
-                                f"{image_id}"
-                            ),
-                            use_container_width=True,
-                        ):
-
-                            st.session_state.pop(
-                                f"tka_delete_confirm_{image_id}",
-                                None,
-                            )
-
-                            st.rerun(
-                                scope="fragment"
-                            )
-
-                # -------------------------------------------------
-                # Usage warning
-                # -------------------------------------------------
-
-                warning_payload = st.session_state.get(
-                    f"tka_delete_warning_{image_id}"
+                pending = st.session_state.get(
+                    f"tka_delete_pending_{image_id}"
                 )
 
-                if warning_payload:
+                if pending is not None:
+                    usages = pending.get("usages") or []
+                    now = _now_wib()
+                    active_usages = []
+                    expired_usages = []
 
-                    st.error(
-                        "🚫 "
-                        + warning_payload.get(
-                            "message",
-                            "Gambar tidak dapat dihapus.",
+                    for usage in usages:
+                        is_active = bool(usage.get("is_active_window", True))
+                        if is_active:
+                            active_usages.append(usage)
+                        else:
+                            expired_usages.append(usage)
+
+                    st.warning(f"⚠️ Konfirmasi penghapusan **{filename}**")
+
+                    if active_usages:
+                        st.error(
+                            "Stimulus masih digunakan oleh TKA yang masa aktifnya "
+                            "belum selesai. Tunggu sampai TKA expired sebelum menghapus."
                         )
-                    )
-
-                    usages = (
-                        warning_payload.get(
-                            "usages"
+                        for usage in active_usages:
+                            st.caption(
+                                f"• {usage.get('kode_tka', '-')} • "
+                                f"{usage.get('mapel', '-')} • aktif sampai "
+                                f"{usage.get('active_until') or '-'}"
+                            )
+                    elif expired_usages:
+                        st.info(
+                            "TKA yang pernah memakai stimulus ini sudah expired. "
+                            "Stimulus dapat dikeluarkan dari Library aktif."
                         )
-                        or []
-                    )
+                    else:
+                        st.info("Stimulus belum digunakan oleh paket TKA lain.")
 
-                    if usages:
+                    confirm_col, cancel_col = st.columns(2)
 
-                        st.markdown(
-                            "**Gambar ini digunakan "
-                            "oleh paket TKA:**"
-                        )
-
-                        for usage in usages:
-
-                            st.markdown(
-                                f"- **{usage.get('kode_tka', '-')}** "
-                                f"• {usage.get('jenjang', '-')} "
-                                f"• {usage.get('mapel', '-')}"
+                    with confirm_col:
+                        if st.button(
+                            "✅ Ya, Hapus dari Library",
+                            key=f"confirm_delete_{image_id}",
+                            type="primary",
+                            use_container_width=True,
+                            disabled=bool(active_usages),
+                        ):
+                            deleted, delete_message, delete_usages = delete_tka_image_safe(
+                                image_id=image_id,
+                                owner_key=pending.get("owner_key"),
+                                allow_system=bool(pending.get("allow_system")),
+                                known_usages=usages,
                             )
 
-                    if st.button(
-                        "Tutup",
-                        key=(
-                            f"close_delete_warning_"
-                            f"{image_id}"
-                        ),
-                    ):
+                            st.session_state.pop(
+                                f"tka_delete_pending_{image_id}",
+                                None,
+                            )
+                            _cached_tka_library.clear()
+                            _cached_stimulus_preview.clear()
 
-                        st.session_state.pop(
-                            f"tka_delete_warning_{image_id}",
-                            None,
-                        )
+                            if deleted:
+                                st.success(delete_message)
+                            else:
+                                st.error(delete_message)
+                                for usage in delete_usages or []:
+                                    st.caption(
+                                        f"• {usage.get('kode_tka', '-')} • "
+                                        f"aktif sampai {usage.get('active_until') or '-'}"
+                                    )
 
-                        st.rerun(
-                            scope="fragment"
-                        )
+                    with cancel_col:
+                        if st.button(
+                            "Batal",
+                            key=f"cancel_delete_{image_id}",
+                            use_container_width=True,
+                        ):
+                            st.session_state.pop(
+                                f"tka_delete_pending_{image_id}",
+                                None,
+                            )
+                            st.info("Penghapusan dibatalkan.")
 
     else:
+        st.info("Library Gambar TKA belum memiliki stimulus.")
 
-        st.info(
-            "Library Gambar TKA belum memiliki stimulus."
-        )
