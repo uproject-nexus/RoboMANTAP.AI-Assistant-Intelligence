@@ -1643,7 +1643,7 @@ if st.session_state.page == "landing":
             
     st.write("---")
     st.markdown("#### 🎓 TKA RoboMANTAP")
-    st.caption("Portal latihan TKA kapan saja dimana saja dan latihan yang diterbitkan GuruMANTAP.")
+    st.caption("Portal latihan TKA Mandiri dan latihan yang diterbitkan GuruMANTAP.")
     st.markdown(
         f"""
         <a href="{TKA_PORTAL_URL}" target="_blank" style="text-decoration: none; color: #020617;">
@@ -1665,7 +1665,7 @@ if st.session_state.page == "landing":
                 margin-bottom: 20px;
                 cursor: pointer;
             ">
-                🎓 MASUK PORTAL TKA →
+                MASUK PORTAL TKA →
             </div>
         </a>
         """,
@@ -1698,7 +1698,7 @@ if st.session_state.page == "landing":
                 margin-bottom: 20px;
                 cursor: pointer;
             ">
-                🚀 MASUK PORTAL KUIS →
+                MASUK PORTAL KUIS →
             </div>
         </a>
         """,
@@ -3068,8 +3068,8 @@ elif st.session_state.page == "guru_dashboard":
             <div class="footer-copy">Tujuannya bukan sekadar membuat file, tetapi menjaga sumber pembelajaran tetap konsisten antar-output.</div>
         </div>
         """, unsafe_allow_html=True)
+        
 # ==============================================================================
-
     with tab4:
         st.markdown("""
         <div class="premium-hero automation-hero">
@@ -3290,10 +3290,7 @@ elif st.session_state.page == "guru_dashboard":
             </div>
             """, unsafe_allow_html=True)
 
-
-# 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
 # ==============================================================================
-
     with tab5:
         render_tka_studio()
 
