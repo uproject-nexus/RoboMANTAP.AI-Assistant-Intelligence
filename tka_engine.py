@@ -621,6 +621,215 @@ def get_tka_image_usage(image_id: str) -> list[dict]:
         return []
 
 
+def get_tka_images_usage_bulk(image_ids: list[str]) -> dict[str, list[dict]]:
+    """Cari penggunaan banyak stimulus dalam satu query PostgreSQL."""
+    ids = [str(x or "").strip() for x in (image_ids or []) if str(x or "").strip()]
+    if not ids:
+        return {}
+
+    conn = init_db_connection()
+    if not conn:
+        return {image_id: [] for image_id in ids}
+
+    try:
+        with conn.session as s:
+            rows = (
+                s.execute(
+                    text(
+                        """
+                        SELECT
+                            t.kode_tka,
+                            t.config,
+                            t.created_at,
+                            t.updated_at,
+                            q->>'image_id' AS image_id
+                        FROM tka_custom AS t
+                        CROSS JOIN LATERAL jsonb_array_elements(
+                            CASE
+                                WHEN jsonb_typeof(COALESCE(t.tka_data, '[]'::jsonb)) = 'array'
+                                THEN t.tka_data
+                                ELSE '[]'::jsonb
+                            END
+                        ) AS q
+                        WHERE q->>'image_id' = ANY(:image_ids)
+                        ORDER BY t.created_at DESC
+                        """
+                    ),
+                    {"image_ids": ids},
+                )
+                .mappings()
+                .all()
+            )
+
+        result = {image_id: [] for image_id in ids}
+        now = _now_wib_naive()
+
+        for row in rows:
+            image_id = str(row.get("image_id") or "")
+            if image_id not in result:
+                continue
+
+            config = _json(row.get("config"), {})
+            active_until = config.get("active_until")
+            is_active_window = True
+            if active_until:
+                try:
+                    end_dt = active_until
+                    if not isinstance(end_dt, datetime):
+                        end_dt = datetime.fromisoformat(str(end_dt).replace("Z", "+00:00"))
+                    if getattr(end_dt, "tzinfo", None):
+                        end_dt = end_dt.astimezone(timezone(timedelta(hours=7))).replace(tzinfo=None)
+                    is_active_window = end_dt >= now
+                except Exception:
+                    is_active_window = True
+
+            result[image_id].append({
+                "kode_tka": str(row.get("kode_tka") or ""),
+                "jenjang": config.get("jenjang") or "-",
+                "mapel": config.get("mapel") or "-",
+                "active_from": config.get("active_from"),
+                "active_until": active_until,
+                "is_active_window": is_active_window,
+                "created_at": row.get("created_at"),
+                "updated_at": row.get("updated_at"),
+            })
+
+        return result
+    except Exception as exc:
+        print(f"[TKA IMAGE USAGE BULK] {exc}")
+        return {image_id: [] for image_id in ids}
+
+
+def delete_tka_images_safe_bulk(
+    items: list[dict],
+) -> tuple[list[str], list[dict]]:
+    """
+    Hapus banyak stimulus secara aman dengan satu pembacaan metadata dan
+    satu UPDATE database. Usage sudah diperiksa sebelumnya oleh UI.
+    Return: (deleted_ids, blocked_items)
+    """
+    normalized = []
+    for item in items or []:
+        image_id = str(item.get("image_id") or "").strip()
+        if image_id:
+            normalized.append({**item, "image_id": image_id})
+
+    if not normalized:
+        return [], []
+
+    conn = init_db_connection()
+    if not conn:
+        return [], [{"image_id": item["image_id"], "message": "Database tidak tersedia.", "usages": item.get("known_usages") or []} for item in normalized]
+
+    ids = [item["image_id"] for item in normalized]
+    placeholders = ", ".join(f":id_{i}" for i in range(len(ids)))
+    params = {f"id_{i}": image_id for i, image_id in enumerate(ids)}
+
+    try:
+        with conn.session as s:
+            rows = (
+                s.execute(
+                    text(
+                        f"""
+                        SELECT image_id, source_type, owner_key, is_active
+                        FROM tka_image_library
+                        WHERE image_id::text IN ({placeholders})
+                        """
+                    ),
+                    params,
+                )
+                .mappings()
+                .all()
+            )
+
+            metadata = {str(row["image_id"]): dict(row) for row in rows}
+            blocked = []
+            safe_items = []
+
+            for item in normalized:
+                image_id = item["image_id"]
+                image = metadata.get(image_id)
+                usages = list(item.get("known_usages") or [])
+
+                if not image or not image.get("is_active"):
+                    blocked.append({"image_id": image_id, "message": "Gambar tidak ditemukan atau sudah tidak aktif.", "usages": usages})
+                    continue
+
+                source_type = str(image.get("source_type") or "").upper()
+                owner_key = item.get("owner_key")
+                allow_system = bool(item.get("allow_system"))
+                image_owner = str(image.get("owner_key") or "").strip()
+
+                if source_type == "SYSTEM" and not allow_system:
+                    blocked.append({"image_id": image_id, "message": "Gambar Sistem UPN tidak dapat dihapus dari area Guru.", "usages": usages})
+                    continue
+
+                if source_type == "GURU" and owner_key and image_owner.lower() != str(owner_key).strip().lower():
+                    blocked.append({"image_id": image_id, "message": "Gambar Guru ini bukan milik akun/guru yang sedang aktif.", "usages": usages})
+                    continue
+
+                active_usages = [u for u in usages if u.get("is_active_window", True)]
+                if active_usages:
+                    blocked.append({"image_id": image_id, "message": "Masih digunakan oleh TKA yang masa aktifnya belum selesai.", "usages": active_usages})
+                    continue
+
+                safe_items.append(item)
+
+            if not safe_items:
+                return [], blocked
+
+            conditions = []
+            update_params = {}
+            for i, item in enumerate(safe_items):
+                image_id = item["image_id"]
+                p_id = f"safe_id_{i}"
+                update_params[p_id] = image_id
+                if bool(item.get("allow_system")):
+                    conditions.append(f"(image_id = :{p_id} AND source_type = 'SYSTEM')")
+                else:
+                    p_owner = f"safe_owner_{i}"
+                    update_params[p_owner] = item.get("owner_key") or ""
+                    conditions.append(
+                        f"(image_id = :{p_id} AND source_type = 'GURU' AND LOWER(owner_key) = LOWER(:{p_owner}))"
+                    )
+
+            update_sql = f"""
+                UPDATE tka_image_library
+                SET
+                    is_active = FALSE,
+                    updated_at = NOW() AT TIME ZONE 'Asia/Jakarta'
+                WHERE is_active = TRUE
+                  AND ({" OR ".join(conditions)})
+                RETURNING image_id
+            """
+            result = s.execute(text(update_sql), update_params)
+            returned = result.mappings().all()
+            s.commit()
+
+            deleted_ids = [str(row["image_id"]) for row in returned]
+            returned_set = set(deleted_ids)
+            for item in safe_items:
+                if item["image_id"] not in returned_set:
+                    blocked.append({
+                        "image_id": item["image_id"],
+                        "message": "Gambar berubah status sebelum proses selesai dan tidak dihapus.",
+                        "usages": item.get("known_usages") or [],
+                    })
+
+            return deleted_ids, blocked
+
+    except Exception as exc:
+        print(f"[TKA IMAGE DELETE BULK] {exc}")
+        return [], [
+            {
+                "image_id": item["image_id"],
+                "message": f"Penghapusan massal gagal: {exc}",
+                "usages": item.get("known_usages") or [],
+            }
+            for item in normalized
+        ]
+
+
 def can_delete_tka_image(
     image_id: str,
     owner_key: str | None = None,

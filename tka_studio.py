@@ -15,6 +15,8 @@ from tka_engine import (
     backfill_tka_image_topics,
     can_delete_tka_image,
     delete_tka_image_safe,
+    delete_tka_images_safe_bulk,
+    get_tka_images_usage_bulk,
     generate_tka_30,
     get_tka_image,
     get_tka_image_usage,
@@ -993,6 +995,131 @@ def render_tka_studio():
 
         start = (page - 1) * page_size
         page_images = all_images[start:start + page_size]
+
+        # ---------------------------------------------------------------
+        # HAPUS MASSAL: checkbox berada di dalam form supaya memilih banyak
+        # gambar tidak memicu rerun setiap kali checkbox diklik.
+        # ---------------------------------------------------------------
+        batch_state_key = "tka_batch_delete_pending"
+        batch_pending = st.session_state.get(batch_state_key)
+
+        st.markdown("##### ☑️ Pilih Banyak untuk Dihapus")
+        st.caption(
+            "Centang beberapa stimulus lalu klik 'Periksa & Siapkan Penghapusan'. "
+            "Perubahan checkbox tidak menjalankan proses berat sampai tombol form ditekan."
+        )
+
+        with st.form("tka_bulk_delete_form", clear_on_submit=False):
+            selected_batch_ids = []
+            selected_batch_items = {}
+
+            for record in page_images:
+                image_id = str(record.get("image_id") or "")
+                if not image_id:
+                    continue
+                source_type = str(record.get("source_type") or "GURU").upper()
+                owner_key = str(record.get("owner_key") or "")
+                can_select = (
+                    source_type == "SYSTEM"
+                    or (source_type == "GURU" and owner_key.lower() == current_teacher.lower())
+                )
+                if not can_select:
+                    continue
+
+                label = str(record.get("filename") or image_id)
+                if st.checkbox(
+                    label,
+                    key=f"tka_bulk_select_{image_id}",
+                ):
+                    selected_batch_ids.append(image_id)
+                    selected_batch_items[image_id] = {
+                        "image_id": image_id,
+                        "owner_key": None if source_type == "SYSTEM" else current_teacher,
+                        "allow_system": source_type == "SYSTEM",
+                    }
+
+            bulk_submit = st.form_submit_button(
+                "🔎 Periksa & Siapkan Penghapusan",
+                type="primary",
+                use_container_width=True,
+            )
+
+        if bulk_submit:
+            if not selected_batch_ids:
+                st.warning("Belum ada stimulus yang dipilih.")
+            else:
+                usage_map = get_tka_images_usage_bulk(selected_batch_ids)
+                pending_items = []
+                for image_id in selected_batch_ids:
+                    item = dict(selected_batch_items[image_id])
+                    item["known_usages"] = usage_map.get(image_id, [])
+                    pending_items.append(item)
+                st.session_state[batch_state_key] = pending_items
+                st.rerun(scope="fragment")
+
+        batch_pending = st.session_state.get(batch_state_key)
+        if batch_pending:
+            active_count = 0
+            safe_count = 0
+            for item in batch_pending:
+                usages = item.get("known_usages") or []
+                if any(u.get("is_active_window", True) for u in usages):
+                    active_count += 1
+                else:
+                    safe_count += 1
+
+            st.warning(
+                f"Konfirmasi: {len(batch_pending)} stimulus dipilih. "
+                f"{safe_count} aman diproses, {active_count} masih dipakai TKA aktif."
+            )
+
+            with st.expander("Lihat daftar yang akan diproses", expanded=False):
+                for item in batch_pending:
+                    image_id = item.get("image_id")
+                    record = next((r for r in page_images if str(r.get("image_id")) == str(image_id)), {})
+                    filename = record.get("filename") or image_id
+                    usages = item.get("known_usages") or []
+                    active = [u for u in usages if u.get("is_active_window", True)]
+                    status = "⛔ TKA masih aktif" if active else "✅ Siap dihapus"
+                    st.caption(f"{status} — {filename}")
+                    for usage in active:
+                        st.caption(
+                            f"   ↳ {usage.get('kode_tka', '-')} aktif sampai {usage.get('active_until') or '-'}"
+                        )
+
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button(
+                    "🗑️ Hapus Semua yang Aman",
+                    key="tka_bulk_confirm_delete",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=(safe_count == 0),
+                ):
+                    deleted_ids, blocked = delete_tka_images_safe_bulk(batch_pending)
+                    st.session_state.pop(batch_state_key, None)
+                    _cached_tka_library.clear()
+                    _cached_stimulus_preview.clear()
+                    if deleted_ids:
+                        st.success(f"{len(deleted_ids)} stimulus berhasil dikeluarkan dari Library aktif.")
+                    if blocked:
+                        st.warning(f"{len(blocked)} stimulus tidak dihapus karena masih terlindungi.")
+                        for item in blocked:
+                            st.caption(f"• {item.get('message', 'Tidak dapat dihapus.')}")
+                            for usage in item.get("usages") or []:
+                                st.caption(
+                                    f"  ↳ {usage.get('kode_tka', '-')} aktif sampai {usage.get('active_until') or '-'}"
+                                )
+                    st.rerun(scope="fragment")
+
+            with c2:
+                if st.button(
+                    "Batal Pilihan Massal",
+                    key="tka_bulk_cancel_delete",
+                    use_container_width=True,
+                ):
+                    st.session_state.pop(batch_state_key, None)
+                    st.rerun(scope="fragment")
 
         # Preview hanya SATU gambar jika memang diperlukan. Dengan default False,
         # klik hapus tidak memaksa Streamlit mengirim ulang puluhan gambar.
