@@ -186,22 +186,6 @@ def list_tka_images(source_type: str | None = None, owner_key: str | None = None
         return []
 
 
-def _coerce_image_bytes(image_data: Any) -> bytes | None:
-    """Normalize PostgreSQL BYTEA values for Streamlit/FastAPI/Gemini consumers."""
-    if image_data is None:
-        return None
-    if isinstance(image_data, memoryview):
-        return image_data.tobytes()
-    if isinstance(image_data, bytearray):
-        return bytes(image_data)
-    if isinstance(image_data, bytes):
-        return image_data
-    try:
-        return bytes(image_data)
-    except Exception:
-        return None
-
-
 def get_tka_image(image_id: str) -> dict | None:
     conn = init_db_connection()
     if not conn:
@@ -215,11 +199,12 @@ def get_tka_image(image_id: str) -> dict | None:
                 WHERE image_id = :id AND is_active = TRUE
                 LIMIT 1
             """), {"id": str(image_id)}).mappings().first()
-        if not row:
-            return None
-        record = dict(row)
-        record["image_data"] = _coerce_image_bytes(record.get("image_data"))
-        return record
+        result = dict(row) if row else None
+        if result and isinstance(result.get("image_data"), memoryview):
+            result["image_data"] = result["image_data"].tobytes()
+        elif result and isinstance(result.get("image_data"), bytearray):
+            result["image_data"] = bytes(result["image_data"])
+        return result
     except Exception as exc:
         print(f"[TKA IMAGE GET] {exc}")
         return None
@@ -254,103 +239,252 @@ def _image_part(data: bytes, mime_type: str):
         return None
 
 
-def _tka_prompt(*, jenjang: str, mapel: str, image_count: int, questions_per_image: int) -> str:
-    labels = tka_option_labels(jenjang)
-    return f"""
-Anda adalah Question Architect TKA RoboMANTAP untuk {jenjang}.
-Buat tepat {questions_per_image} soal Pilihan Ganda TKA untuk satu stimulus gambar.
-Mata pelajaran: {mapel}.
-Jumlah opsi WAJIB tepat {len(labels)} dengan label {', '.join(labels)}.
+TKA_QUESTION_TYPES = ("PG", "MCMA", "KATEGORI")
 
-KARAKTER TKA:
-- Soal berbasis penalaran, literasi/numerasi, analisis data, interpretasi visual, dan pemecahan masalah sesuai materi mapel.
-- Gunakan stimulus gambar sebagai sumber utama fakta. Jangan mengarang detail visual yang tidak tampak.
-- Satu stimulus dapat melahirkan beberapa soal yang saling independen tetapi tetap mengacu pada gambar.
-- Utamakan C4-C6 bila relevan; jangan memaksakan level jika tidak cocok dengan materi.
-- Jangan membuat soal matching/menjodohkan, isian, atau uraian.
-- MTs/SMP wajib A-D. MA/SMA wajib A-E.
-- Hanya satu jawaban benar.
-- correct_answer harus persis sama dengan opsi lengkap.
+
+def _normalize_question_type(value: Any) -> str:
+    raw = str(value or "PG").strip().upper().replace("-", "_").replace(" ", "_")
+    if raw == "MIXED":
+        return "MIXED"
+    if raw in {"MCMA", "PG_KOMPLEKS", "PILIHAN_GANDA_KOMPLEKS", "PILIHAN_GANDA_KOMPLEKS_MCMA"}:
+        return "MCMA"
+    if raw in {"KATEGORI", "CATEGORY", "PG_KOMPLEKS_KATEGORI", "BENAR_SALAH", "SETUJU_TIDAK_SETUJU"}:
+        return "KATEGORI"
+    return "PG"
+
+
+def _normalize_stimulus(item: dict) -> tuple[str | None, str | None, str | None]:
+    stimulus_text = str(item.get("stimulus_text") or item.get("stimulus") or "").strip()
+    stimulus_group = str(item.get("stimulus_group") or "").strip() or None
+    image_id = str(item.get("image_id") or "").strip() or None
+    return stimulus_text or None, stimulus_group, image_id
+
+
+def _tka_prompt(*, jenjang: str, mapel: str, question_type: str, count: int, image_count: int, image_ids: list[str] | None = None) -> str:
+    labels = tka_option_labels(jenjang)
+    qtype = _normalize_question_type(question_type)
+    if qtype == "MIXED":
+        type_rules = "\n".join([
+            "BENTUK: CAMPURAN TKA",
+            "- Gunakan ketiga bentuk: PG, MCMA, dan KATEGORI.",
+            "- Tidak ada rasio resmi yang boleh diasumsikan; distribusi boleh bervariasi secara wajar.",
+            "- Wajib ada minimal satu butir dari masing-masing bentuk dalam batch.",
+            f"- Untuk PG: satu jawaban benar. Untuk MCMA: minimal dua jawaban benar. Untuk KATEGORI: 3-5 pernyataan dengan respons masing-masing.",
+            f"- options wajib tepat {len(labels)} pilihan untuk PG/MCMA."
+        ])
+        schema = '"options": [],\n      "correct_answer": [],\n      "correct_answers": [],\n      "category_items": []'
+    elif qtype == "PG":
+        type_rules = f'''
+BENTUK: PILIHAN GANDA (PG)
+- Tepat satu jawaban benar.
+- options wajib tepat {len(labels)} pilihan dengan label {', '.join(labels)}.
+- correct_answer adalah SATU label, misalnya "B".
+'''
+        schema = f'''"options": ["{labels[0]}. ...", "{labels[1]}. ...", ...],
+      "correct_answer": "B",
+      "correct_answers": []'''
+    elif qtype == "MCMA":
+        type_rules = f'''
+BENTUK: PILIHAN GANDA KOMPLEKS - MCMA
+- Tepat {len(labels)} pilihan tersedia dengan label {', '.join(labels)}.
+- Dua atau lebih jawaban harus benar; jangan hanya satu.
+- correct_answers berisi 2 atau lebih LABEL unik, misalnya ["A", "C"].
+- correct_answer harus sama dengan correct_answers untuk kompatibilitas.
+'''
+        schema = f'''"options": ["{labels[0]}. ...", "{labels[1]}. ...", ...],
+      "correct_answer": ["A", "C"],
+      "correct_answers": ["A", "C"]'''
+    else:
+        type_rules = '''
+BENTUK: PILIHAN GANDA KOMPLEKS - KATEGORI
+- Buat 3-5 pernyataan yang semuanya berkaitan dengan satu stimulus/konsep.
+- Setiap pernyataan memiliki kategori/respons sendiri.
+- Kategori boleh Benar/Salah, Setuju/Tidak Setuju, atau kategori lain yang jelas ditentukan oleh soal.
+- Setiap pernyataan hanya memiliki satu correct_response.
+'''
+        schema = '''"options": [],
+      "correct_answer": ["Benar", "Salah", "Benar"],
+      "correct_answers": ["Benar", "Salah", "Benar"],
+      "category_items": [
+        {"statement": "...", "options": ["Benar", "Salah"], "correct_response": "Benar"}
+      ]'''
+    return f'''
+Anda adalah Question Architect TKA RoboMANTAP untuk jenjang {jenjang}, mata uji {mapel}.
+Buat tepat {count} butir bertipe {qtype}.
+
+ATURAN TKA YANG WAJIB:
+- TKA MTs: mata uji Bahasa Indonesia dan Matematika.
+- TKA MA: mata uji wajib Bahasa Indonesia, Matematika, Bahasa Inggris; mata uji pilihan hanya jika dipilih guru.
+- Bentuk soal yang didukung portal: PG, PG Kompleks-MCMA, dan PG Kompleks-Kategori.
+- Jangan membuat matching/menjodohkan, isian, atau uraian.
+- Stimulus TIDAK WAJIB berupa gambar. Soal boleh tunggal tanpa stimulus visual.
+- Stimulus dapat berupa teks, puisi, pidato, dialog, tabel, grafik, diagram, gambar, atau kombinasi yang relevan dengan mapel.
+- Jika gambar diberikan, gunakan hanya fakta yang benar-benar tampak. Jangan memaksa setiap butir memakai gambar.
+- Satu stimulus dapat dipakai bersama oleh beberapa butir melalui stimulus_group yang sama.
+- Soal matematika boleh berupa perhitungan biasa tanpa gambar.
+- Soal Bahasa Indonesia/Bahasa Inggris/Bahasa Arab boleh berupa teks polos tanpa gambar.
+- Utamakan penalaran, literasi/numerasi, analisis, interpretasi, dan pemecahan masalah sesuai materi; level kognitif ditulis C4-C6 bila memang sesuai, jangan dipaksakan.
 - Gunakan LaTeX $...$ hanya untuk rumus/pecahan/akar/variabel matematika.
 - Jangan menaruh teks biasa di dalam delimiter matematika.
-- Setiap soal harus memiliki topic, cognitive_level, solution_basis.
+- Setiap butir wajib memiliki topic, cognitive_level, solution_basis.
+
+{type_rules}
+
+Jika tidak ada gambar, image_id harus null.
+Jika memakai gambar, image_id WAJIB salah satu dari daftar IMAGE_ID yang diberikan.
+Jika memakai stimulus teks, stimulus_text harus memuat teks stimulus yang diperlukan oleh siswa dan stimulus_group harus konsisten untuk butir yang memakai stimulus yang sama.
+Jika memakai gambar yang tersedia, image_id harus berisi ID gambar yang relevan dan stimulus_text boleh kosong jika gambar sudah cukup.
+IMAGE_ID yang tersedia: {", ".join(str(x) for x in (image_ids or [])) or "(tidak ada)"}
 
 OUTPUT JSON MURNI:
 {{
   "questions": [
     {{
       "id": 1,
+      "question_type": "{"PG|MCMA|KATEGORI" if qtype == "MIXED" else qtype}",
       "question": "...",
-      "options": [{', '.join([f'"{x}. ..."' for x in labels])}],
-      "correct_answer": "{labels[0]}. ...",
+      {schema},
+      "category_items": [],
+      "stimulus_text": null,
+      "stimulus_group": null,
+      "image_id": null,
       "topic": "...",
       "cognitive_level": "C4",
       "solution_basis": "..."
     }}
   ]
 }}
-"""
+'''
 
 
-def _normalize_tka_questions(raw_questions: Any, jenjang: str, image_id: str | None) -> list[dict]:
+def _option_map(options: list[str]) -> dict[str, str]:
+    result = {}
+    for opt in options:
+        label, _ = _split_option_label(str(opt), 0)
+        if label:
+            result[label.upper()] = str(opt).strip()
+    return result
+
+
+def _normalize_tka_questions(raw_questions: Any, jenjang: str, default_image_ids: list[str] | None = None) -> list[dict]:
     labels = tka_option_labels(jenjang)
-    count = len(labels)
+    label_set = set(labels)
     if not isinstance(raw_questions, list):
         return []
     out = []
+    default_image_ids = [str(x) for x in (default_image_ids or []) if x]
     for idx, item in enumerate(raw_questions, 1):
         if not isinstance(item, dict):
             return []
         question = str(item.get("question", "")).strip()
-        raw_options = item.get("options", [])
-        answer = str(item.get("correct_answer", "")).strip()
-        if not question or not isinstance(raw_options, list):
+        if not question:
             return []
-        options, _ = normalize_quiz_options(raw_options, jenjang)
-        if len(options) != count:
+        qtype = _normalize_question_type(item.get("question_type") or item.get("type"))
+        stimulus_text, stimulus_group, image_id = _normalize_stimulus(item)
+        if image_id and default_image_ids and image_id not in default_image_ids:
             return []
-        label, _ = _split_option_label(answer, 0)
-        correct = next((o for o in options if o.startswith(f"{label}.")), None)
-        if correct is None and answer in options:
-            correct = answer
-        if correct is None:
-            return []
-        out.append({
+        topic = str(item.get("topic") or "TKA").strip()[:120]
+        cognitive = str(item.get("cognitive_level") or "C4").strip()[:10]
+        solution = str(item.get("solution_basis") or "").strip()
+        base = {
             "id": idx,
+            "question_type": qtype,
             "question": question,
-            "options": options,
-            "correct_answer": correct,
-            "topic": str(item.get("topic") or "TKA").strip()[:120],
-            "cognitive_level": str(item.get("cognitive_level") or "C4").strip()[:10],
-            "solution_basis": str(item.get("solution_basis") or "").strip(),
+            "topic": topic,
+            "cognitive_level": cognitive,
+            "solution_basis": solution,
+            "stimulus_text": stimulus_text,
+            "stimulus_group": stimulus_group,
             "image_id": image_id,
-        })
+        }
+        if qtype in {"PG", "MCMA"}:
+            raw_options = item.get("options", [])
+            if not isinstance(raw_options, list):
+                return []
+            options, _ = normalize_quiz_options(raw_options, jenjang)
+            if len(options) != len(labels):
+                return []
+            optmap = _option_map(options)
+            if set(optmap) != label_set:
+                return []
+            raw_answers = item.get("correct_answers")
+            if raw_answers is None:
+                raw_answers = item.get("correct_answer")
+            if isinstance(raw_answers, str):
+                answers = [x.strip().upper() for x in re.split(r"[,;|]", raw_answers) if x.strip()]
+            elif isinstance(raw_answers, list):
+                answers = []
+                for value in raw_answers:
+                    label, _ = _split_option_label(str(value), 0)
+                    candidate = label.upper() if label else str(value).strip().upper()
+                    if candidate in label_set:
+                        answers.append(candidate)
+            else:
+                answers = []
+            answers = list(dict.fromkeys(answers))
+            if qtype == "PG" and len(answers) != 1:
+                return []
+            if qtype == "MCMA" and len(answers) < 2:
+                return []
+            base["options"] = options
+            base["correct_answers"] = answers
+            base["correct_answer"] = answers[0] if qtype == "PG" else answers
+            base["category_items"] = []
+        else:
+            raw_items = item.get("category_items", [])
+            if not isinstance(raw_items, list) or not 3 <= len(raw_items) <= 5:
+                return []
+            category_items = []
+            answers = []
+            for cat in raw_items:
+                if not isinstance(cat, dict):
+                    return []
+                statement = str(cat.get("statement") or "").strip()
+                choices = cat.get("options")
+                correct_response = str(cat.get("correct_response") or cat.get("correct_answer") or "").strip()
+                if not statement or not isinstance(choices, list) or len(choices) < 2 or not correct_response:
+                    return []
+                choices = [str(x).strip() for x in choices if str(x).strip()]
+                if correct_response not in choices:
+                    return []
+                category_items.append({"statement": statement, "options": choices, "correct_response": correct_response})
+                answers.append(correct_response)
+            base["options"] = []
+            base["category_items"] = category_items
+            base["correct_answers"] = answers
+            base["correct_answer"] = answers
+        out.append(base)
     return out
 
 
-def generate_tka_questions_for_image(*, jenjang: str, mapel: str, mapel_type: str = "Wajib", image_id: str | None, image_data: bytes | None, mime_type: str | None, count: int = 6) -> list[dict]:
+def generate_tka_questions_batch(*, jenjang: str, mapel: str, question_type: str, count: int, image_records: list[dict] | None = None) -> list[dict]:
     clients = get_gemini_clients()
-    if not clients:
+    if not clients or count <= 0:
         return []
+    records = [r for r in (image_records or []) if r and r.get("image_id") and r.get("image_data")]
+    image_ids = [str(r["image_id"]) for r in records]
     contents: list[Any] = []
-    prompt = _tka_prompt(jenjang=normalize_tka_jenjang(jenjang), mapel=tka_mapel_name(mapel) + f" (Mapel {mapel_type})", image_count=1 if image_data else 0, questions_per_image=count)
-    if image_data and mime_type:
-        part = _image_part(image_data, mime_type)
+    for n, record in enumerate(records, 1):
+        data = record.get("image_data")
+        if isinstance(data, memoryview):
+            data = data.tobytes()
+        elif isinstance(data, bytearray):
+            data = bytes(data)
+        part = _image_part(data, record.get("mime_type") or "image/png") if data else None
         if part is not None:
             contents.append(part)
-            contents.append("Gambar di atas adalah stimulus TKA. Analisis hanya informasi yang benar-benar terlihat pada gambar.")
-    contents.append(prompt)
+            contents.append(f"IMAGE_ID={record['image_id']} | Stimulus gambar {n}: {record.get('filename','')}")
+    contents.append(_tka_prompt(
+        jenjang=normalize_tka_jenjang(jenjang), mapel=tka_mapel_name(mapel),
+        question_type=question_type, count=count, image_count=len(records), image_ids=image_ids,
+    ))
     for client in clients:
         for model in TKA_MODELS:
             try:
                 from google.genai import types
                 response = client.models.generate_content(
-                    model=model,
-                    contents=contents,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        temperature=0.3,
-                    ),
+                    model=model, contents=contents,
+                    config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.35),
                 )
                 raw = getattr(response, "text", "") or ""
                 try:
@@ -358,63 +492,89 @@ def generate_tka_questions_for_image(*, jenjang: str, mapel: str, mapel_type: st
                 except Exception:
                     m = re.search(r"\{.*\}", raw, flags=re.S)
                     data = json.loads(m.group(0), strict=False) if m else {}
-                normalized = _normalize_tka_questions(data.get("questions", []), jenjang, image_id)
+                normalized = _normalize_tka_questions(data.get("questions", []), jenjang, image_ids)
                 if len(normalized) == count:
                     return normalized
             except Exception as exc:
                 print(f"[TKA AI] {type(exc).__name__}: {exc}")
-                continue
     return []
 
 
-def generate_tka_30(*, jenjang: str, mapel: str, mapel_type: str = "Wajib", image_ids: list[str] | None = None) -> list[dict]:
-    """Generate exactly 30 image-grounded TKA questions: up to five stimuli × six questions."""
+def generate_tka_30(*, jenjang: str, mapel: str, mapel_type: str = "Wajib", image_ids: list[str] | None = None, auto_select_images: bool = True) -> list[dict]:
+    """Generate exactly 30 TKA questions with the three supported forms mixed; no official ratio is assumed."""
     jenjang = normalize_tka_jenjang(jenjang)
     mapel = tka_mapel_name(mapel)
-    selected = list(dict.fromkeys(image_ids or []))[:5]
-    if not selected:
+    selected = list(dict.fromkeys(str(x) for x in (image_ids or []) if x))[:5]
+    if not selected and auto_select_images:
         selected = [str(x["image_id"]) for x in list_tka_images(source_type="SYSTEM", jenjang=jenjang, mapel=mapel, limit=5)]
-    if not selected:
+    if not selected and auto_select_images:
         selected = [str(x["image_id"]) for x in list_tka_images(source_type="SYSTEM", jenjang=jenjang, limit=5)]
-    if not selected:
-        return []
-
     image_records = []
     for image_id in selected:
         record = get_tka_image(image_id)
         if record:
             image_records.append(record)
     image_records = image_records[:5]
-    all_questions: list[dict] = []
-    for record in image_records:
-        batch = generate_tka_questions_for_image(
-            jenjang=jenjang, mapel=mapel, mapel_type=mapel_type, image_id=str(record["image_id"]),
-            image_data=record.get("image_data"), mime_type=record.get("mime_type"), count=6,
-        )
-        if len(batch) != 6:
-            continue
-        all_questions.extend(batch)
-    if len(all_questions) < TKA_TOTAL_QUESTIONS:
+
+    batch = generate_tka_questions_batch(
+        jenjang=jenjang, mapel=mapel, question_type="MIXED", count=TKA_TOTAL_QUESTIONS,
+        image_records=image_records,
+    )
+    if len(batch) != TKA_TOTAL_QUESTIONS:
         return []
-    for idx, question in enumerate(all_questions[:TKA_TOTAL_QUESTIONS], 1):
+    for idx, question in enumerate(batch, 1):
         question["id"] = idx
-    return all_questions[:TKA_TOTAL_QUESTIONS]
+    return batch
 
 
 def validate_tka_30(questions: list[dict], jenjang: str) -> tuple[bool, str]:
     if not isinstance(questions, list) or len(questions) != TKA_TOTAL_QUESTIONS:
         return False, f"TKA wajib tepat {TKA_TOTAL_QUESTIONS} soal."
     labels = tka_option_labels(jenjang)
+    label_set = set(labels)
+    counts = {x: 0 for x in TKA_QUESTION_TYPES}
     for idx, q in enumerate(questions, 1):
         if not isinstance(q, dict) or not str(q.get("question", "")).strip():
             return False, f"Soal nomor {idx} tidak valid."
-        options = q.get("options")
-        if not isinstance(options, list) or len(options) != len(labels):
-            return False, f"Soal nomor {idx} harus memiliki tepat {len(labels)} opsi ({'/'.join(labels)})."
-        if not str(q.get("correct_answer", "")).strip() or q.get("correct_answer") not in options:
-            return False, f"Kunci soal nomor {idx} tidak valid."
-    return True, "OK"
-
+        qtype = _normalize_question_type(q.get("question_type"))
+        counts[qtype] += 1
+        if qtype in {"PG", "MCMA"}:
+            options = q.get("options")
+            if not isinstance(options, list) or len(options) != len(labels):
+                return False, f"Soal nomor {idx} harus memiliki tepat {len(labels)} opsi ({'/'.join(labels)})."
+            normalized_labels = {(_split_option_label(str(o), 0)[0] or "").upper() for o in options}
+            if normalized_labels != label_set:
+                return False, f"Opsi soal nomor {idx} harus berlabel {', '.join(labels)}."
+            answers = q.get("correct_answers")
+            if not isinstance(answers, list):
+                answers = [q.get("correct_answer")] if q.get("correct_answer") else []
+            answers = [str(x).strip().upper() for x in answers if str(x).strip()]
+            if qtype == "PG" and len(answers) != 1:
+                return False, f"PG nomor {idx} harus memiliki tepat satu jawaban benar."
+            if qtype == "MCMA" and len(set(answers)) < 2:
+                return False, f"MCMA nomor {idx} harus memiliki minimal dua jawaban benar."
+            if any(x not in label_set for x in answers):
+                return False, f"Kunci soal nomor {idx} tidak sesuai label opsi."
+        else:
+            items = q.get("category_items")
+            answers = q.get("correct_answers")
+            if not isinstance(items, list) or not 3 <= len(items) <= 5:
+                return False, f"Soal kategori nomor {idx} harus memiliki 3-5 pernyataan."
+            if not isinstance(answers, list) or len(answers) != len(items):
+                return False, f"Kunci kategori nomor {idx} tidak lengkap."
+            for pos, item in enumerate(items, 1):
+                if not isinstance(item, dict) or not str(item.get("statement", "")).strip():
+                    return False, f"Pernyataan kategori nomor {idx}.{pos} tidak valid."
+                choices = item.get("options")
+                correct = str(item.get("correct_response") or "").strip()
+                if not isinstance(choices, list) or len(choices) < 2 or correct not in choices:
+                    return False, f"Respons kategori nomor {idx}.{pos} tidak valid."
+        if not q.get("topic"):
+            return False, f"Topik soal nomor {idx} kosong."
+    missing = [qtype for qtype in TKA_QUESTION_TYPES if counts.get(qtype, 0) < 1]
+    if missing:
+        return False, f"Paket TKA harus memuat semua bentuk soal: {', '.join(missing)} belum ada."
+    return True, f"OK • PG {counts['PG']} • MCMA {counts['MCMA']} • Kategori {counts['KATEGORI']}"
 
 def publish_tka_to_db(kode_tka: str, config: dict, questions: list[dict]) -> bool:
     ok, reason = validate_tka_30(questions, config.get("jenjang", "MTs"))

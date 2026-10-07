@@ -59,6 +59,28 @@ from tka_studio import render_tka_studio
 
 TKA_PORTAL_URL = os.getenv("TKA_PORTAL_URL", "https://robomantap-tka.onrender.com")
 
+def _tka_review_answer_equal(question: dict, user_answer) -> bool:
+    qtype = str(question.get("question_type") or "PG").upper()
+    if qtype == "MCMA":
+        expected = question.get("correct_answers") or question.get("correct_answer") or []
+        actual = user_answer if isinstance(user_answer, list) else []
+        return {str(x).strip().upper() for x in actual} == {str(x).strip().upper() for x in expected}
+    if qtype == "KATEGORI":
+        expected = question.get("correct_answers") or question.get("correct_answer") or []
+        actual = user_answer if isinstance(user_answer, list) else []
+        return isinstance(expected, list) and isinstance(actual, list) and expected == actual
+    return str(user_answer or "").strip().upper() == str(question.get("correct_answer") or "").strip().upper()
+
+
+def _tka_review_answer_label(question: dict, answer) -> str:
+    qtype = str(question.get("question_type") or "PG").upper()
+    if qtype == "MCMA":
+        return ", ".join(str(x) for x in (answer or [])) if isinstance(answer, list) else str(answer or "Tidak Dijawab")
+    if qtype == "KATEGORI":
+        return " | ".join(str(x) for x in (answer or [])) if isinstance(answer, list) else str(answer or "Tidak Dijawab")
+    return str(answer or "Tidak Dijawab")
+
+
 # Interseptor Deep Link dari CBT Engine Render
 if "review_session" in st.query_params:
     review_id = st.query_params["review_session"]
@@ -1643,32 +1665,9 @@ if st.session_state.page == "landing":
             
     st.write("---")
     st.markdown("#### 🎓 TKA RoboMANTAP")
-    st.caption("Portal latihan TKA Mandiri dan latihan yang diterbitkan GuruMANTAP.")
+    st.caption("Portal latihan TKA 24/7 dan latihan yang diterbitkan GuruMANTAP.")
     st.markdown(
-        f"""
-        <a href="{TKA_PORTAL_URL}" target="_blank" style="text-decoration: none; color: #020617;">
-            <div style="
-                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                color: #020617 !important;
-                padding: 14px 24px;
-                border-radius: 12px;
-                text-align: center;
-                font-weight: 800;
-                font-size: 15px;
-                letter-spacing: 0.5px;
-                transition: all 0.3s ease;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 8px;
-                margin-top: 8px;
-                margin-bottom: 20px;
-                cursor: pointer;
-            ">
-                MASUK PORTAL TKA →
-            </div>
-        </a>
-        """,
+        f"""<a href="{TKA_PORTAL_URL}" target="_blank" style="text-decoration:none;"><div style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#020617;padding:14px 24px;border-radius:12px;text-align:center;font-weight:800;font-size:15px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;margin-bottom:20px;cursor:pointer;">🎓 MASUK PORTAL TKA →</div></a>""",
         unsafe_allow_html=True,
     )
 
@@ -1698,7 +1697,7 @@ if st.session_state.page == "landing":
                 margin-bottom: 20px;
                 cursor: pointer;
             ">
-                MASUK PORTAL KUIS →
+                🚀 MASUK PORTAL KUIS →
             </div>
         </a>
         """,
@@ -3068,8 +3067,8 @@ elif st.session_state.page == "guru_dashboard":
             <div class="footer-copy">Tujuannya bukan sekadar membuat file, tetapi menjaga sumber pembelajaran tetap konsisten antar-output.</div>
         </div>
         """, unsafe_allow_html=True)
-        
 # ==============================================================================
+
     with tab4:
         st.markdown("""
         <div class="premium-hero automation-hero">
@@ -3290,7 +3289,10 @@ elif st.session_state.page == "guru_dashboard":
             </div>
             """, unsafe_allow_html=True)
 
+
+# 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
 # ==============================================================================
+
     with tab5:
         render_tka_studio()
 
@@ -3778,10 +3780,13 @@ elif st.session_state.page == "result":
     detail = []
     for idx, q in enumerate(quiz_data):
         u_ans = user_answers.get(idx, None)
-        if u_ans is None:
+        if u_ans is None or u_ans == [] or u_ans == "":
             kosong += 1
             detail.append(None)
-        elif u_ans == q["correct_answer"]:
+        elif is_tka and _tka_review_answer_equal(q, u_ans):
+            benar += 1
+            detail.append(True)
+        elif (not is_tka) and u_ans == q["correct_answer"]:
             benar += 1
             detail.append(True)
         else:
@@ -3954,12 +3959,23 @@ elif st.session_state.page == "result":
     
     for idx, q in enumerate(quiz_data):
         u_ans = user_answers.get(idx, "Tidak Dijawab")
-        is_correct = u_ans == q["correct_answer"]
-        status_icon = "✅ BENAR" if is_correct else ("❌ SALAH" if u_ans != "Tidak Dijawab" else "⚪ KOSONG")
+        if is_tka:
+            is_correct = _tka_review_answer_equal(q, u_ans) if u_ans not in (None, "Tidak Dijawab", "", []) else False
+            answer_display = _tka_review_answer_label(q, u_ans)
+            correct_display = _tka_review_answer_label(q, q.get("correct_answers") or q.get("correct_answer"))
+        else:
+            is_correct = u_ans == q["correct_answer"]
+            answer_display = str(u_ans)
+            correct_display = str(q["correct_answer"])
+        status_icon = "✅ BENAR" if is_correct else ("❌ SALAH" if answer_display != "Tidak Dijawab" else "⚪ KOSONG")
         
-        with st.expander(f"Soal No. {idx + 1} [{status_icon}] - Jawaban Anda: {u_ans}"):
+        with st.expander(f"Soal No. {idx + 1} [{status_icon}] - Jawaban Anda: {answer_display}"):
             st.markdown(f"**Soal:**\n{q['question']}")
-            st.markdown(f"**Kunci Jawaban:** {q['correct_answer']}")
+            if is_tka and q.get("stimulus_text"):
+                st.markdown(f"**Stimulus:**\n{q['stimulus_text']}")
+            if is_tka and q.get("image_id"):
+                st.caption("Stimulus gambar tersedia pada paket TKA.")
+            st.markdown(f"**Kunci Jawaban:** {correct_display}")
             
             # Jika Kuis Custom memiliki Solution Basis dari Guru, tampilkan langsung
             if is_custom and q.get("solution_basis"):
@@ -3967,11 +3983,12 @@ elif st.session_state.page == "result":
 
             st.write("---")
             
+            solution_answer = correct_display
             solution_key = (
                 st.session_state.mapel,
                 idx,
                 q["question"],
-                q["correct_answer"],
+                json.dumps(q.get("correct_answers") if is_tka else q.get("correct_answer"), ensure_ascii=False, sort_keys=True, default=str),
             )
 
             if solution_key in st.session_state.ai_solution_cache:
@@ -3987,7 +4004,7 @@ elif st.session_state.page == "result":
                     streamed_solution = st.write_stream(
                         get_ai_solution_stream(
                             q["question"],
-                            q["correct_answer"],
+                            solution_answer,
                             st.session_state.mapel,
                         ),
                     )

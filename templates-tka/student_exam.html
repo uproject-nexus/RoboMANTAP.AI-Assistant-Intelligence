@@ -156,10 +156,13 @@
                 <div>
                     <div class="flex justify-between items-center border-b border-slate-800 pb-2.5 mb-3">
                         <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Memuat...</span>
-                        <span class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">Pilihan Ganda</span>
+                        <span id="question-type-label" class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">TKA</span>
                     </div>
 
-                    <div id="stimulus-image" class="hidden mb-4 rounded-xl overflow-hidden border border-slate-800 bg-slate-950"></div>
+                    <div id="stimulus-block" class="hidden mb-4 rounded-xl border border-slate-800 bg-slate-950 p-3.5">
+                        <div id="stimulus-text" class="hidden text-slate-200 text-sm leading-relaxed whitespace-pre-wrap text-justify mb-3"></div>
+                        <div id="stimulus-image" class="hidden rounded-xl overflow-hidden border border-slate-800 bg-slate-950"></div>
+                    </div>
                     <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-4 font-medium overflow-x-auto text-justify"></div>
 
                     <div id="options-container" class="space-y-2.5"></div>
@@ -601,16 +604,11 @@
             }
         }
 
-        function queueAnswerSave(index, opt) {
-            /*
-             * Jangan membuat klik pilihan menunggu network.
-             * Request diserialkan agar klik cepat A -> B -> C tidak tiba
-             * di server dalam urutan acak.
-             */
+        function queueAnswerSave(index, value) {
             const payload = {
                 session_id: sessionId,
                 q_index: index,
-                answer: opt
+                answer: value
             };
 
             answerSaveQueue = answerSaveQueue
@@ -619,7 +617,7 @@
                     const formData = new FormData();
                     formData.append("session_id", payload.session_id);
                     formData.append("q_index", payload.q_index);
-                    formData.append("answer", payload.answer);
+                    formData.append("answer", typeof payload.answer === "string" ? payload.answer : JSON.stringify(payload.answer));
 
                     return fetch("/api/save-answer", {
                         method: "POST",
@@ -627,6 +625,65 @@
                         keepalive: true
                     }).catch(() => {});
                 });
+        }
+
+        function selectedValuesForMCMA(index) {
+            const value = answers[index];
+            if (Array.isArray(value)) return value.map(v => String(v).toUpperCase());
+            return [];
+        }
+
+        function setQuestionTypeLabel(item) {
+            const label = document.getElementById("question-type-label");
+            const qtype = String(item.question_type || "PG").toUpperCase();
+            const names = {
+                PG: "Pilihan Ganda",
+                MCMA: "Pilihan Ganda Kompleks • MCMA",
+                KATEGORI: "Pilihan Ganda Kompleks • Kategori"
+            };
+            label.textContent = names[qtype] || "TKA";
+        }
+
+        function renderCategoryItems(item, index, optsDiv) {
+            const current = Array.isArray(answers[index]) ? answers[index] : [];
+            (item.category_items || []).forEach((cat, catIdx) => {
+                const row = document.createElement("div");
+                row.className = "border border-slate-800 bg-slate-950 rounded-xl p-3.5 space-y-2.5";
+
+                const statement = document.createElement("div");
+                statement.className = "text-slate-200 text-xs sm:text-sm leading-relaxed text-justify";
+                statement.innerHTML = `<span class="font-bold text-emerald-400 mr-1">${catIdx + 1}.</span>${cat.statement || ""}`;
+                row.appendChild(statement);
+
+                const select = document.createElement("select");
+                select.className = "w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none";
+                select.dataset.categoryIndex = String(catIdx);
+                const placeholder = document.createElement("option");
+                placeholder.value = "";
+                placeholder.textContent = "Pilih respons...";
+                placeholder.disabled = true;
+                placeholder.selected = !current[catIdx];
+                select.appendChild(placeholder);
+
+                (cat.options || []).forEach(choice => {
+                    const opt = document.createElement("option");
+                    opt.value = choice;
+                    opt.textContent = choice;
+                    opt.selected = String(current[catIdx] || "") === String(choice);
+                    select.appendChild(opt);
+                });
+
+                select.addEventListener("change", () => {
+                    const values = Array.isArray(answers[index]) ? [...answers[index]] : [];
+                    while (values.length < (item.category_items || []).length) values.push("");
+                    values[catIdx] = select.value;
+                    answers[index] = values;
+                    queueAnswerSave(index, values);
+                    renderGrid();
+                });
+                row.appendChild(select);
+                optsDiv.appendChild(row);
+            });
         }
 
         async function renderQuestion(index) {
@@ -638,23 +695,30 @@
 
             const item = quizData[index];
             const questionText = document.getElementById("question-text");
+            const stimulusBlock = document.getElementById("stimulus-block");
+            const stimulusText = document.getElementById("stimulus-text");
             const stimulusImage = document.getElementById("stimulus-image");
             const optsDiv = document.getElementById("options-container");
 
-            /*
-             * Kunci tampilan konten soal selama perpindahan.
-             * Ini mencegah flash LaTeX mentah -> KaTeX bagus.
-             * Tombol navigasi tetap terlihat sehingga layout tidak meloncat.
-             */
             questionText.classList.add("math-pending");
             optsDiv.classList.add("math-pending");
 
             document.getElementById("label-no-soal").textContent =
                 `Soal No. ${index + 1} dari ${quizData.length}`;
+            setQuestionTypeLabel(item);
 
-            questionText.innerHTML = item.question;
+            questionText.innerHTML = item.question || "";
+            stimulusText.innerHTML = "";
             stimulusImage.innerHTML = "";
+            stimulusText.classList.add("hidden");
             stimulusImage.classList.add("hidden");
+            stimulusBlock.classList.add("hidden");
+
+            if (item.stimulus_text) {
+                stimulusText.textContent = item.stimulus_text;
+                stimulusText.classList.remove("hidden");
+                stimulusBlock.classList.remove("hidden");
+            }
             if (item.image_id) {
                 const img = document.createElement("img");
                 img.src = `/api/image/${encodeURIComponent(item.image_id)}`;
@@ -663,54 +727,63 @@
                 img.loading = "lazy";
                 stimulusImage.appendChild(img);
                 stimulusImage.classList.remove("hidden");
+                stimulusBlock.classList.remove("hidden");
             }
+
             optsDiv.innerHTML = "";
+            const qtype = String(item.question_type || "PG").toUpperCase();
 
-            item.options.forEach((opt, optIdx) => {
-                const isSelected = String(answers[index]) === String(opt);
-                if (isSelected) selectedOptionIndex = optIdx;
+            if (qtype === "KATEGORI") {
+                renderCategoryItems(item, index, optsDiv);
+            } else {
+                const selected = qtype === "MCMA" ? selectedValuesForMCMA(index) : [String(answers[index] || "").toUpperCase()];
+                item.options.forEach((opt, optIdx) => {
+                    const label = String(opt).split(".")[0].trim().toUpperCase();
+                    const isSelected = selected.includes(label);
+                    if (isSelected && qtype === "PG") selectedOptionIndex = optIdx;
 
-                const btn = document.createElement("button");
-                btn.type = "button";
-                btn.id = `opt-btn-${optIdx}`;
-                btn.dataset.optionIndex = String(optIdx);
-                btn.className =
-                    "w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm " +
-                    "transition flex items-start space-x-3 " +
-                    "bg-slate-950 border-slate-800 text-slate-300 active:border-slate-700";
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.id = `opt-btn-${optIdx}`;
+                    btn.dataset.optionIndex = String(optIdx);
+                    btn.className =
+                        "w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm transition flex items-start space-x-3 bg-slate-950 border-slate-800 text-slate-300 active:border-slate-700";
 
-                btn.innerHTML = `
-                    <span data-option-badge
-                        class="w-6 h-6 rounded-full border border-slate-700 flex-shrink-0
-                               flex items-center justify-center text-[11px] font-bold mt-0.5">
-                        ${opt.charAt(0)}
-                    </span>
-                    <span class="leading-relaxed">${opt}</span>
-                `;
+                    btn.innerHTML = `
+                        <span data-option-badge class="w-6 h-6 rounded-full border border-slate-700 flex-shrink-0 flex items-center justify-center text-[11px] font-bold mt-0.5">${label}</span>
+                        <span class="leading-relaxed">${opt.substring(opt.indexOf(".") + 1).trim()}</span>
+                    `;
 
-                btn.addEventListener("click", function (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    selectAnswer(index, opt, optIdx);
+                    btn.addEventListener("click", function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (qtype === "MCMA") {
+                            const values = selectedValuesForMCMA(index);
+                            const pos = values.indexOf(label);
+                            if (pos >= 0) values.splice(pos, 1);
+                            else values.push(label);
+                            answers[index] = values;
+                            setOptionVisualState(btn, values.includes(label));
+                            queueAnswerSave(index, values);
+                            renderGrid();
+                        } else {
+                            selectAnswer(index, opt, optIdx, label);
+                        }
+                    });
+
+                    setOptionVisualState(btn, isSelected);
+                    optsDiv.appendChild(btn);
                 });
-
-                setOptionVisualState(btn, isSelected);
-                optsDiv.appendChild(btn);
-            });
+            }
 
             updateNavButtons();
             updateRaguButtonUI();
 
             document.getElementById("hint-curr-idx").value = index;
-            document.getElementById("hint-question").value = item.question;
+            document.getElementById("hint-question").value = item.question || "";
             document.getElementById("hint-attempt-input").value = "";
             document.getElementById("hint-result").innerHTML = "";
 
-            /*
-             * Render KaTeX sekali setelah DOM final.
-             * Token mencegah render soal lama membuka kembali konten
-             * setelah user sudah pindah ke soal berikutnya.
-             */
             await triggerKaTeX(document.getElementById("question-box"));
 
             if (token === questionRenderToken) {
@@ -722,31 +795,19 @@
             }
         }
 
-        function selectAnswer(index, opt, optIdx) {
+        function selectAnswer(index, opt, optIdx, label) {
             if (index !== currentIndex || !quizData[index]) return;
 
             const previousIndex = selectedOptionIndex;
-            answers[index] = opt;
+            answers[index] = label;
             selectedOptionIndex = optIdx;
 
-            /*
-             * Hanya ubah state visual tombol.
-             * Tidak ada innerHTML ulang, tidak ada renderQuestion(),
-             * dan tidak ada render KaTeX ulang.
-             */
             if (previousIndex !== null && previousIndex !== optIdx) {
-                setOptionVisualState(
-                    document.getElementById(`opt-btn-${previousIndex}`),
-                    false
-                );
+                setOptionVisualState(document.getElementById(`opt-btn-${previousIndex}`), false);
             }
-
-            setOptionVisualState(
-                document.getElementById(`opt-btn-${optIdx}`),
-                true
-            );
-
-            queueAnswerSave(index, opt);
+            setOptionVisualState(document.getElementById(`opt-btn-${optIdx}`), true);
+            queueAnswerSave(index, label);
+            renderGrid();
         }
 
         function toggleRagu() {
@@ -835,7 +896,14 @@
 
             quizData.forEach((_, idx) => {
                 const btn = document.createElement("button");
-                const isAnswered = answers[idx] !== undefined && answers[idx] !== null;
+                const q = quizData[idx] || {};
+                const rawAnswer = answers[idx];
+                let isAnswered = rawAnswer !== undefined && rawAnswer !== null && rawAnswer !== "";
+                if (String(q.question_type || "PG").toUpperCase() === "MCMA") {
+                    isAnswered = Array.isArray(rawAnswer) && rawAnswer.length > 0;
+                } else if (String(q.question_type || "PG").toUpperCase() === "KATEGORI") {
+                    isAnswered = Array.isArray(rawAnswer) && rawAnswer.length === (q.category_items || []).length && rawAnswer.every(v => String(v || "").trim() !== "");
+                }
                 const isRagu = raguState[idx] === true;
                 const isCurrent = idx === currentIndex;
 

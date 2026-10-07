@@ -32,6 +32,16 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 STUDENT_SESSIONS: dict[str, dict[str, Any]] = {}
 ai_hint_cache: dict[tuple, str] = {}
 
+TKA_MTS_MAPELS = {"Bahasa Indonesia", "Matematika"}
+TKA_MA_MAPELS = {
+    "Bahasa Indonesia", "Matematika", "Bahasa Inggris",
+    "Matematika Lanjutan", "Bahasa Indonesia Lanjutan", "Bahasa Inggris Lanjutan",
+    "Fisika", "Kimia", "Biologi", "Ekonomi", "Sosiologi", "Geografi", "Sejarah",
+    "Antropologi", "PPKn/Pendidikan Pancasila", "Bahasa Arab", "Bahasa Jerman",
+    "Bahasa Prancis", "Bahasa Jepang", "Bahasa Korea", "Bahasa Mandarin",
+    "Produk/Projek Kreatif dan Kewirausahaan",
+}
+
 try:
     ensure_tka_tables()
 except Exception as exc:
@@ -67,18 +77,55 @@ def normalized_anti_cheat(sess: dict) -> dict:
     }
 
 
+def _parse_answer_value(value: Any):
+    if value is None:
+        return None
+    if isinstance(value, (list, dict)):
+        return value
+    raw = str(value).strip()
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+        return parsed
+    except Exception:
+        return raw
+
+
+def _answer_is_correct(item: dict, user_value: Any) -> bool:
+    if user_value is None or user_value == "":
+        return False
+    qtype = str(item.get("question_type") or "PG").upper()
+    if qtype == "MCMA":
+        expected = item.get("correct_answers") or item.get("correct_answer") or []
+        if not isinstance(expected, list):
+            expected = [expected]
+        actual = user_value if isinstance(user_value, list) else _parse_answer_value(user_value)
+        if not isinstance(actual, list):
+            actual = [actual]
+        return {str(x).strip().upper() for x in actual} == {str(x).strip().upper() for x in expected}
+    if qtype == "KATEGORI":
+        expected = item.get("correct_answers") or item.get("correct_answer") or []
+        actual = user_value if isinstance(user_value, list) else _parse_answer_value(user_value)
+        if not isinstance(expected, list) or not isinstance(actual, list) or len(expected) != len(actual):
+            return False
+        return all(str(a).strip() == str(e).strip() for a, e in zip(actual, expected))
+    expected = str(item.get("correct_answer") or "").strip().upper()
+    actual = user_value if not isinstance(user_value, list) else (user_value[0] if user_value else "")
+    return str(actual).strip().upper() == expected
+
+
 def build_detail_answers(sess: dict) -> list[bool | None]:
     questions = sess.get("quiz", []) or []
     answers = sess.get("answers", {}) or {}
     detail = []
     for idx, item in enumerate(questions):
-        user = answers.get(idx) or answers.get(str(idx))
-        if user is None:
+        user = answers.get(idx) if idx in answers else answers.get(str(idx))
+        if user is None or user == "":
             detail.append(None)
         else:
-            detail.append(user == item.get("correct_answer"))
+            detail.append(_answer_is_correct(item, user))
     return detail
-
 
 def duration_label(seconds: int) -> str:
     seconds = max(0, int(seconds or 0))
@@ -123,7 +170,16 @@ async def mandiri_start(
     mapel: str = Form(...),
 ):
     jenjang = normalize_tka_jenjang(jenjang)
-    questions = generate_tka_30(jenjang=jenjang, mapel=mapel)
+    allowed_mapels = TKA_MTS_MAPELS if jenjang == "MTs" else TKA_MA_MAPELS
+    mapel = str(mapel or "").strip()
+    if mapel not in allowed_mapels:
+        return templates.TemplateResponse(request=request, name="student_login.html", context={
+            "error": f"❌ Mata uji {mapel or '-'} tidak tersedia untuk jenjang {jenjang}.",
+            "mode": "mandiri",
+        })
+    target_kelas = "9" if jenjang == "MTs" else "12"
+    kelas = target_kelas
+    questions = generate_tka_30(jenjang=jenjang, mapel=mapel, auto_select_images=True)
     if len(questions) != TKA_TOTAL_QUESTIONS:
         return templates.TemplateResponse(request=request, name="student_login.html", context={
             "error": "⚠️ RoboMANTAP belum berhasil menyiapkan tepat 30 soal TKA. Pastikan Library Gambar TKA sudah memiliki stimulus dan coba lagi.",
@@ -242,9 +298,29 @@ async def save_answer(session_id: str = Form(...), q_index: int = Form(...), ans
     quiz = sess.get("quiz", [])
     if q_index < 0 or q_index >= len(quiz):
         return Response(status_code=400)
-    clean = str(answer).strip()
-    sess.setdefault("answers", {})[q_index] = clean
-    sess["answers"][str(q_index)] = clean
+    clean = _parse_answer_value(answer)
+    if clean is None:
+        return Response(status_code=400)
+    item = quiz[q_index] or {}
+    qtype = str(item.get("question_type") or "PG").upper()
+    if qtype == "MCMA":
+        if not isinstance(clean, list) or any(str(x).strip().upper() not in {str(o).split(".", 1)[0].strip().upper() for o in item.get("options", [])} for x in clean):
+            return Response(status_code=400)
+        clean = list(dict.fromkeys(str(x).strip().upper() for x in clean))
+    elif qtype == "KATEGORI":
+        categories = item.get("category_items") or []
+        if not isinstance(clean, list) or len(clean) != len(categories):
+            return Response(status_code=400)
+        for value, category in zip(clean, categories):
+            if str(value) not in [str(x) for x in (category.get("options") or [])]:
+                return Response(status_code=400)
+        clean = [str(x) for x in clean]
+    else:
+        clean = str(clean).strip().upper()
+        allowed = {str(o).split(".", 1)[0].strip().upper() for o in item.get("options", [])}
+        if clean not in allowed:
+            return Response(status_code=400)
+    sess.setdefault("answers", {})[str(q_index)] = clean
     sess["current_index"] = q_index
     update_tka_progress(
         session_id=session_id, nama=sess.get("nama", "Siswa"), jenjang=config.get("jenjang", "MTs"),
@@ -305,12 +381,11 @@ async def submit_exam(
     benar = salah = kosong = 0
     detail = []
     for idx, item in enumerate(quiz):
-        user = answers.get(idx) or answers.get(str(idx))
-        correct = item.get("correct_answer")
-        if not user:
+        user = answers.get(idx) if idx in answers else answers.get(str(idx))
+        if user is None or user == "" or user == []:
             kosong += 1
             detail.append(None)
-        elif user == correct:
+        elif _answer_is_correct(item, user):
             benar += 1
             detail.append(True)
         else:
