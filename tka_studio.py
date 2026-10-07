@@ -38,6 +38,13 @@ def render_tka_studio():
     </div>
     """, unsafe_allow_html=True)
 
+    st.markdown("""
+    <div class="source-warning">
+        <div class="source-warning-title">⛔ DALAM PENGEMBANGAN</div>
+        <b>Fitur TKA STUDIO</b> saat ini masih dalam tahap pengembangan.
+    </div>
+    """, unsafe_allow_html=True)
+
     teacher_name = st.text_input("Nama / Identitas Guru", value=st.session_state.get("tka_teacher_name", "GuruMANTAP"), key="tka_teacher_name")
     jenjang = st.selectbox("Jenjang", ["MTs", "MA"], key="tka_studio_jenjang")
     kelas_options = ["7", "8", "9"] if jenjang == "MTs" else ["10", "11", "12"]
