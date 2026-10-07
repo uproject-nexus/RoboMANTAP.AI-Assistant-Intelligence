@@ -23,10 +23,10 @@ from ai_engine import (
 TKA_TOTAL_QUESTIONS = 30
 # Generator Studio dibuat ringan: satu batch hanya 5 soal.
 # Ini TIDAK mengubah requirement portal siswa yang tetap 30 soal.
-TKA_GENERATION_QUESTIONS = 5
+TKA_GENERATION_QUESTIONS = 15
 TKA_GENERATION_MAX_ATTEMPTS = 2
 TKA_GENERATION_MAX_IMAGES = 3
-TKA_DEFAULT_DURATION_SECONDS = 90 * 60
+TKA_DEFAULT_DURATION_SECONDS = 75 * 60
 TKA_DEFAULT_ACTIVE_HOURS = 24
 TKA_IMAGE_MAX_BYTES = 8 * 1024 * 1024
 TKA_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
@@ -1647,7 +1647,7 @@ def generate_tka_questions_batch(
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     temperature=0.25,
-                    max_output_tokens=5000,
+                    max_output_tokens=11000,
                 ),
             )
 
@@ -1687,7 +1687,7 @@ def generate_tka_studio(
     auto_select_images: bool = False,
     count: int = TKA_GENERATION_QUESTIONS,
 ) -> list[dict]:
-    """Fast Studio generator. Default is exactly 5 questions.
+    """Fast Studio generator. Default is exactly 15 questions.
 
     This is deliberately separate from generate_tka_30(), which is used by
     the student portal and remains locked at 30 questions.
