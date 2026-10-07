@@ -21,6 +21,11 @@ from ai_engine import (
 )
 
 TKA_TOTAL_QUESTIONS = 30
+# Generator Studio dibuat ringan: satu batch hanya 5 soal.
+# Ini TIDAK mengubah requirement portal siswa yang tetap 30 soal.
+TKA_GENERATION_QUESTIONS = 5
+TKA_GENERATION_MAX_ATTEMPTS = 2
+TKA_GENERATION_MAX_IMAGES = 3
 TKA_DEFAULT_DURATION_SECONDS = 90 * 60
 TKA_DEFAULT_ACTIVE_HOURS = 24
 TKA_IMAGE_MAX_BYTES = 8 * 1024 * 1024
@@ -1045,8 +1050,34 @@ def delete_tka_image_safe(
 
 
 def _image_part(data: bytes, mime_type: str):
+    """Build a compact image part for AI generation.
+
+    Stimulus asli dapat berukuran beberapa MB. Untuk generation kita tidak
+    perlu mengirim resolusi penuh; thumbnail AI menjaga detail cukup untuk
+    diagram/teks sambil mengurangi upload latency dan token/input cost.
+    """
     try:
         from google.genai import types
+
+        try:
+            from PIL import Image
+            import io
+
+            src = Image.open(io.BytesIO(data))
+            src.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+
+            buf = io.BytesIO()
+            # JPEG jauh lebih kecil untuk stimulus foto/diagram.
+            # Untuk PNG transparan, gunakan RGB dengan latar putih agar aman.
+            if src.mode not in ("RGB", "L"):
+                src = src.convert("RGB")
+            elif src.mode == "L":
+                src = src.convert("RGB")
+            src.save(buf, format="JPEG", quality=82, optimize=True)
+            data = buf.getvalue()
+            mime_type = "image/jpeg"
+        except Exception:
+            pass
 
         return types.Part.from_bytes(
             data=data,
@@ -1550,73 +1581,46 @@ def generate_tka_questions_batch(
     count: int,
     image_records: list[dict] | None = None,
 ) -> list[dict]:
+    """Generate one bounded batch. Never fan out over every API key/model.
 
+    The old implementation tried every configured client against every model.
+    With many API keys, a timeout could therefore multiply into tens of minutes.
+    Studio generation now makes at most TKA_GENERATION_MAX_ATTEMPTS calls.
+    """
     clients = get_gemini_clients()
-
     if not clients or count <= 0:
         return []
 
     records = [
-        r
-        for r in (image_records or [])
-        if r
-        and r.get("image_id")
-        and r.get("image_data")
-    ]
+        r for r in (image_records or [])
+        if r and r.get("image_id") and r.get("image_data")
+    ][:TKA_GENERATION_MAX_IMAGES]
 
-    image_ids = [
-        str(r["image_id"])
-        for r in records
-    ]
-
+    image_ids = [str(r["image_id"]) for r in records]
     contents: list[Any] = []
 
-    for n, record in enumerate(
-        records,
-        1,
-    ):
-
-        data = record.get(
-            "image_data"
-        )
-
-        if isinstance(
-            data,
-            memoryview,
-        ):
+    for n, record in enumerate(records, 1):
+        data = record.get("image_data")
+        if isinstance(data, memoryview):
             data = data.tobytes()
-
-        elif isinstance(
-            data,
-            bytearray,
-        ):
+        elif isinstance(data, bytearray):
             data = bytes(data)
 
-        part = (
-            _image_part(
-                data,
-                record.get(
-                    "mime_type"
-                )
-                or "image/png",
-            )
-            if data
-            else None
-        )
+        part = _image_part(
+            data,
+            record.get("mime_type") or "image/png",
+        ) if data else None
 
         if part is not None:
             contents.append(part)
             contents.append(
                 f"IMAGE_ID={record['image_id']} | "
-                f"Stimulus gambar {n}: "
-                f"{record.get('filename', '')}"
+                f"Stimulus gambar {n}: {record.get('filename', '')}"
             )
 
     contents.append(
         _tka_prompt(
-            jenjang=normalize_tka_jenjang(
-                jenjang
-            ),
+            jenjang=normalize_tka_jenjang(jenjang),
             mapel=tka_mapel_name(mapel),
             question_type=question_type,
             count=count,
@@ -1625,68 +1629,100 @@ def generate_tka_questions_batch(
         )
     )
 
-    for client in clients:
-        for model in TKA_MODELS:
+    # Hanya dua percobaan maksimum: key/model pertama, lalu key kedua jika ada.
+    # Ini mencegah spinner menggantung lama ketika banyak API key tersedia.
+    attempts = []
+    for client in clients[:2]:
+        attempts.append((client, TKA_MODELS[0]))
+        if len(attempts) >= TKA_GENERATION_MAX_ATTEMPTS:
+            break
 
+    for client, model in attempts:
+        try:
+            from google.genai import types
+
+            response = client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.25,
+                    max_output_tokens=5000,
+                ),
+            )
+
+            raw = getattr(response, "text", "") or ""
             try:
-                from google.genai import types
+                data = json.loads(clean_json_text(raw), strict=False)
+            except Exception:
+                m = re.search(r"\{.*\}", raw, flags=re.S)
+                data = json.loads(m.group(0), strict=False) if m else {}
 
-                response = client.models.generate_content(
-                    model=model,
-                    contents=contents,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        temperature=0.35,
-                    ),
-                )
+            normalized = _normalize_tka_questions(
+                data.get("questions", []),
+                jenjang,
+                image_ids,
+            )
 
-                raw = getattr(
-                    response,
-                    "text",
-                    "",
-                ) or ""
+            if len(normalized) == count:
+                return normalized
 
-                try:
-                    data = json.loads(
-                        clean_json_text(raw),
-                        strict=False,
-                    )
+            print(
+                f"[TKA AI] output tidak lengkap: "
+                f"{len(normalized)}/{count} soal."
+            )
 
-                except Exception:
-                    m = re.search(
-                        r"\{.*\}",
-                        raw,
-                        flags=re.S,
-                    )
-
-                    data = (
-                        json.loads(
-                            m.group(0),
-                            strict=False,
-                        )
-                        if m
-                        else {}
-                    )
-
-                normalized = _normalize_tka_questions(
-                    data.get(
-                        "questions",
-                        [],
-                    ),
-                    jenjang,
-                    image_ids,
-                )
-
-                if len(normalized) == count:
-                    return normalized
-
-            except Exception as exc:
-                print(
-                    f"[TKA AI] "
-                    f"{type(exc).__name__}: {exc}"
-                )
+        except Exception as exc:
+            print(f"[TKA AI] {type(exc).__name__}: {exc}")
 
     return []
+
+
+def generate_tka_studio(
+    *,
+    jenjang: str,
+    mapel: str,
+    mapel_type: str = "Wajib",
+    image_ids: list[str] | None = None,
+    auto_select_images: bool = False,
+    count: int = TKA_GENERATION_QUESTIONS,
+) -> list[dict]:
+    """Fast Studio generator. Default is exactly 5 questions.
+
+    This is deliberately separate from generate_tka_30(), which is used by
+    the student portal and remains locked at 30 questions.
+    """
+    jenjang = normalize_tka_jenjang(jenjang)
+    mapel = tka_mapel_name(mapel)
+    count = max(1, min(int(count or TKA_GENERATION_QUESTIONS), TKA_GENERATION_QUESTIONS))
+
+    selected = list(dict.fromkeys(str(x) for x in (image_ids or []) if x))[:TKA_GENERATION_MAX_IMAGES]
+
+    if not selected and auto_select_images:
+        selected = [
+            str(x["image_id"])
+            for x in list_tka_images(
+                source_type="SYSTEM", jenjang=jenjang, mapel=mapel, limit=TKA_GENERATION_MAX_IMAGES
+            )
+        ]
+
+    image_records = []
+    for image_id in selected:
+        record = get_tka_image(image_id)
+        if record:
+            image_records.append(record)
+
+    batch = generate_tka_questions_batch(
+        jenjang=jenjang,
+        mapel=mapel,
+        question_type="MIXED",
+        count=count,
+        image_records=image_records,
+    )
+
+    for idx, question in enumerate(batch, 1):
+        question["id"] = idx
+    return batch
 
 
 def generate_tka_30(
@@ -1769,19 +1805,20 @@ def generate_tka_30(
     return batch
 
 
-def validate_tka_30(
+def validate_tka_questions(
     questions: list[dict],
     jenjang: str,
+    expected_count: int = TKA_TOTAL_QUESTIONS,
 ) -> tuple[bool, str]:
 
     if (
         not isinstance(questions, list)
         or len(questions)
-        != TKA_TOTAL_QUESTIONS
+        != expected_count
     ):
         return (
             False,
-            f"TKA wajib tepat {TKA_TOTAL_QUESTIONS} soal.",
+            f"Paket harus tepat {expected_count} soal.",
         )
 
     labels = tka_option_labels(
@@ -2016,6 +2053,14 @@ def validate_tka_30(
         f"MCMA {counts['MCMA']} • "
         f"Kategori {counts['KATEGORI']}",
     )
+
+
+def validate_tka_30(
+    questions: list[dict],
+    jenjang: str,
+) -> tuple[bool, str]:
+    """Backward-compatible strict validator for student/published 30-question TKA."""
+    return validate_tka_questions(questions, jenjang, TKA_TOTAL_QUESTIONS)
 
 
 def publish_tka_to_db(

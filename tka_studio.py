@@ -12,12 +12,13 @@ from tka_engine import (
     TKA_DEFAULT_ACTIVE_HOURS,
     TKA_DEFAULT_DURATION_SECONDS,
     TKA_TOTAL_QUESTIONS,
+    TKA_GENERATION_QUESTIONS,
     backfill_tka_image_topics,
     can_delete_tka_image,
     delete_tka_image_safe,
     delete_tka_images_safe_bulk,
     get_tka_images_usage_bulk,
-    generate_tka_30,
+    generate_tka_studio,
     get_tka_image,
     get_tka_image_usage,
     infer_tka_topic,
@@ -25,6 +26,7 @@ from tka_engine import (
     publish_tka_to_db,
     save_tka_image,
     tka_option_labels,
+    validate_tka_questions,
     validate_tka_30,
 )
 
@@ -536,8 +538,7 @@ def render_tka_studio():
                                 )
 
     st.info(
-        f"🎯 Paket latihan RoboMANTAP dibuat "
-        f"**tepat {TKA_TOTAL_QUESTIONS} soal**. "
+        f"🎯 Generator Studio membuat **tepat {TKA_GENERATION_QUESTIONS} soal per batch**. "
         f"{jenjang} menggunakan opsi "
         f"{', '.join(tka_option_labels(jenjang))} "
         "untuk PG/MCMA. "
@@ -555,27 +556,27 @@ def render_tka_studio():
     )
 
     if st.button(
-        "✨ GENERATE TKA 30 SOAL",
+        f"✨ GENERATE {TKA_GENERATION_QUESTIONS} SOAL TKA",
         type="primary",
         use_container_width=True,
         key="generate_tka_30",
     ):
 
         with st.spinner(
-            "RoboMANTAP sedang menyusun tepat "
-            "30 soal TKA "
+            f"RoboMANTAP sedang menyusun tepat {TKA_GENERATION_QUESTIONS} soal TKA "
             "(PG • MCMA • Kategori)..."
         ):
 
-            generated = generate_tka_30(
+            generated = generate_tka_studio(
                 jenjang=jenjang,
                 mapel=mapel,
                 mapel_type=mapel_type,
-                image_ids=selected_ids[:5],
+                image_ids=selected_ids[:3],
                 auto_select_images=False,
+                count=TKA_GENERATION_QUESTIONS,
             )
 
-        if len(generated) == TKA_TOTAL_QUESTIONS:
+        if len(generated) == TKA_GENERATION_QUESTIONS:
 
             st.session_state.tka_draft = (
                 generated
@@ -589,6 +590,7 @@ def render_tka_studio():
                 "timer_seconds": (
                     TKA_DEFAULT_DURATION_SECONDS
                 ),
+                "generation_count": TKA_GENERATION_QUESTIONS,
                 "active_from": None,
                 "active_until": None,
                 "active_hours": (
@@ -602,15 +604,14 @@ def render_tka_studio():
             )
 
             st.success(
-                "✅ 30 soal berhasil dibuat "
+                f"✅ {TKA_GENERATION_QUESTIONS} soal berhasil dibuat "
                 "dan siap direview."
             )
 
         else:
 
             st.error(
-                "❌ AI belum menghasilkan tepat "
-                "30 soal. Paket tidak disimpan agar "
+                f"❌ AI belum menghasilkan tepat {TKA_GENERATION_QUESTIONS} soal. Paket tidak disimpan agar "
                 "tidak ada TKA parsial."
             )
 
@@ -626,12 +627,13 @@ def render_tka_studio():
 
     if questions:
 
-        ok, reason = validate_tka_30(
+        ok, reason = validate_tka_questions(
             questions,
             config.get(
                 "jenjang",
                 jenjang,
             ),
+            expected_count=len(questions),
         )
 
         if not ok:
