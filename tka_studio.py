@@ -92,8 +92,8 @@ def render_tka_studio():
     <div class="premium-hero automation-hero">
         <div class="premium-kicker">UPN • TKA INTELLIGENCE</div>
         <div class="premium-title">🎓 RoboMANTAP <span>TKA STUDIO</span></div>
-        <div class="premium-subtitle">Library gambar → paket latihan TKA → review → token → siswa</div>
-        <div class="premium-pills"><span>30 SOAL PORTAL</span><span>STIMULUS IMAGE</span><span>AI GROUNDED</span><span>24 JAM</span></div>
+        <div class="premium-subtitle">Library stimulus → paket latihan TKA → review → token → siswa</div>
+        <div class="premium-pills"><span>30 SOAL PORTAL</span><span>PG • MCMA • KATEGORI</span><span>AI GROUNDED</span><span>24 JAM</span></div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -223,37 +223,36 @@ def render_tka_studio():
 
     st.info(
         f"🎯 Paket latihan RoboMANTAP dibuat **tepat {TKA_TOTAL_QUESTIONS} soal**. "
-        f"{jenjang} menggunakan opsi {', '.join(tka_option_labels(jenjang))}. "
-        "Durasi portal default 90 menit."
+        f"{jenjang} menggunakan opsi {', '.join(tka_option_labels(jenjang))} untuk PG/MCMA. "
+        "Bentuk KATEGORI menggunakan respons per pernyataan. Stimulus gambar opsional. Durasi portal default 90 menit."
     )
 
+    st.caption("💡 Gambar/stimulus visual bersifat **opsional**. Soal dapat berupa hitungan biasa, teks, puisi, pidato, dialog, tabel, grafik, atau stimulus gambar sesuai kebutuhan mata uji.")
     if st.button("✨ GENERATE TKA 30 SOAL", type="primary", use_container_width=True, key="generate_tka_30"):
-        if not selected_ids:
-            st.warning("Pilih atau upload stimulus gambar terlebih dahulu.")
+        with st.spinner("RoboMANTAP sedang menyusun tepat 30 soal TKA (PG • MCMA • Kategori)..."):
+            generated = generate_tka_30(
+                jenjang=jenjang,
+                mapel=mapel,
+                mapel_type=mapel_type,
+                image_ids=selected_ids[:5],
+                auto_select_images=False,
+            )
+        if len(generated) == TKA_TOTAL_QUESTIONS:
+            st.session_state.tka_draft = generated
+            st.session_state.tka_draft_config = {
+                "jenjang": jenjang,
+                "mapel": mapel,
+                "mapel_type": mapel_type,
+                "mode": "GURU",
+                "timer_seconds": TKA_DEFAULT_DURATION_SECONDS,
+                "active_from": None,
+                "active_until": None,
+                "active_hours": TKA_DEFAULT_ACTIVE_HOURS,
+            }
+            st.session_state.tka_default_code = f"TKA-{uuid.uuid4().hex[:6].upper()}"
+            st.success("✅ 30 soal berhasil dibuat dan siap direview.")
         else:
-            with st.spinner("RoboMANTAP sedang membaca stimulus dan menyusun tepat 30 soal TKA..."):
-                generated = generate_tka_30(
-                    jenjang=jenjang,
-                    mapel=mapel,
-                    mapel_type=mapel_type,
-                    image_ids=selected_ids[:5],
-                )
-            if len(generated) == TKA_TOTAL_QUESTIONS:
-                st.session_state.tka_draft = generated
-                st.session_state.tka_draft_config = {
-                    "jenjang": jenjang,
-                    "mapel": mapel,
-                    "mapel_type": mapel_type,
-                    "mode": "GURU",
-                    "timer_seconds": TKA_DEFAULT_DURATION_SECONDS,
-                    "active_from": None,
-                    "active_until": None,
-                    "active_hours": TKA_DEFAULT_ACTIVE_HOURS,
-                }
-                st.session_state.tka_default_code = f"TKA-{uuid.uuid4().hex[:6].upper()}"
-                st.success("✅ 30 soal berhasil dibuat dan siap direview.")
-            else:
-                st.error("❌ AI belum menghasilkan tepat 30 soal. Paket tidak disimpan agar tidak ada TKA parsial.")
+            st.error("❌ AI belum menghasilkan tepat 30 soal. Paket tidak disimpan agar tidak ada TKA parsial.")
 
     questions = st.session_state.get("tka_draft", [])
     config = st.session_state.get("tka_draft_config", {})
@@ -273,6 +272,15 @@ def render_tka_studio():
                     f"{idx:02d}. {q.get('topic','TKA')} • {q.get('cognitive_level','C4')}",
                     expanded=(idx == 1),
                 ):
+                    qtype = str(q.get("question_type") or "PG").upper()
+                    type_label = {
+                        "PG": "Pilihan Ganda",
+                        "MCMA": "Pilihan Ganda Kompleks • MCMA",
+                        "KATEGORI": "Pilihan Ganda Kompleks • Kategori",
+                    }.get(qtype, qtype)
+                    st.markdown(f"**Bentuk:** {type_label}")
+                    if q.get("stimulus_text"):
+                        st.markdown(f"**Stimulus:**\n\n{q.get('stimulus_text')}")
                     st.markdown(q.get("question", ""))
                     image_id = q.get("image_id")
                     if image_id:
@@ -281,9 +289,15 @@ def render_tka_studio():
                             image = _image_for_streamlit(record.get("image_data"))
                             if image is not None:
                                 st.image(image, caption=f"Stimulus • {record['filename']}", use_container_width=True)
-                    for option in q.get("options", []):
-                        st.markdown(f"- {option}")
-                    st.success(f"Kunci: {q.get('correct_answer','-')}")
+                    if qtype in {"PG", "MCMA"}:
+                        for option in q.get("options", []):
+                            st.markdown(f"- {option}")
+                        st.success(f"Kunci: {q.get('correct_answer','-')}")
+                    else:
+                        for pos, category in enumerate(q.get("category_items", []), 1):
+                            st.markdown(f"**{pos}.** {category.get('statement','')}")
+                            st.caption("Respons: " + " / ".join(str(x) for x in (category.get("options") or [])))
+                        st.success("Kunci kategori: " + " | ".join(str(x) for x in (q.get("correct_answers") or [])))
                     st.caption(f"Level: {q.get('cognitive_level','-')} • Topik: {q.get('topic','-')}")
 
             st.markdown("### 📄 Download TKA")
@@ -323,7 +337,7 @@ def render_tka_studio():
 
     st.markdown("---")
     st.markdown("### 🗂️ Library Gambar TKA")
-    st.caption("Gambar Guru tersimpan dan dapat dipakai ulang oleh pemiliknya; gambar Sistem menjadi aset bersama.")
+    st.caption("Gambar Guru tersimpan dan dapat dipakai ulang oleh pemiliknya; gambar Sistem menjadi aset bersama. Filter generator di atas selalu membatasi stimulus berdasarkan Jenjang + Mata Uji.")
     all_images = list_tka_images(limit=200)
     if all_images:
         st.dataframe(
