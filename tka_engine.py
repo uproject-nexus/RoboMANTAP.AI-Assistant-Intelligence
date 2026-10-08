@@ -25,7 +25,7 @@ TKA_TOTAL_QUESTIONS = 30
 # Generator Studio dibuat ringan: satu batch hanya 5 soal.
 # Ini TIDAK mengubah requirement portal siswa yang tetap 30 soal.
 TKA_GENERATION_QUESTIONS = 15
-TKA_GENERATION_MAX_ATTEMPTS = 2
+TKA_GENERATION_MAX_ATTEMPTS = 3
 TKA_GENERATION_MAX_IMAGES = 3
 # Studio selalu menghasilkan tepat 15 soal, tetapi dikirim ke AI dalam
 # tiga request kecil agar tidak terkena 504 DEADLINE_EXCEEDED.
@@ -1638,11 +1638,20 @@ def generate_tka_questions_batch(
         )
     )
 
-    # Jangan mencoba semua API key. Dua percobaan maksimum cukup untuk
-    # menghindari spinner panjang ketika layanan Gemini sedang padat.
+    # Fallback sengaja berganti model, bukan mengulang model pertama terus.
+    # Urutan: model utama -> model fallback -> key kedua/model utama.
+    # Ini penting untuk kondisi 503 high demand pada model utama.
     attempts = []
-    for client in clients[:2]:
-        attempts.append((client, TKA_MODELS[0]))
+    candidate_pairs = []
+    if clients:
+        candidate_pairs.append((clients[0], TKA_MODELS[0]))
+        if len(TKA_MODELS) > 1:
+            candidate_pairs.append((clients[0], TKA_MODELS[1]))
+        if len(clients) > 1:
+            candidate_pairs.append((clients[1], TKA_MODELS[0]))
+
+    for pair in candidate_pairs:
+        attempts.append(pair)
         if len(attempts) >= TKA_GENERATION_MAX_ATTEMPTS:
             break
 
@@ -1775,6 +1784,9 @@ def generate_tka_studio(
     # Semua batch wajib berhasil. Kalau satu saja gagal, return [] agar tidak
     # ada penyimpanan/publish parsial yang tampak seperti kuis lengkap.
     for question_type in TKA_STUDIO_BATCH_TYPES:
+        # Jalur utama: 5 soal sekaligus. Jika 5 masih terkena 503/504 atau
+        # output invalid, pecah hanya batch internal tersebut menjadi 3 + 2.
+        # Hasil Studio tetap wajib 15 soal; 3/2 bukan jumlah yang ditampilkan.
         batch = generate_tka_questions_batch(
             jenjang=jenjang,
             mapel=mapel,
@@ -1785,11 +1797,39 @@ def generate_tka_studio(
 
         if len(batch) != TKA_STUDIO_BATCH_SIZE:
             print(
-                f"[TKA STUDIO] GAGAL: batch {question_type} hanya "
-                f"{len(batch)}/{TKA_STUDIO_BATCH_SIZE}. "
-                "Tidak mengembalikan hasil parsial."
+                f"[TKA STUDIO] batch {question_type} 5 soal gagal; "
+                "fallback internal 3 + 2 soal."
             )
-            return []
+            batch_3 = generate_tka_questions_batch(
+                jenjang=jenjang,
+                mapel=mapel,
+                question_type=question_type,
+                count=3,
+                image_records=image_records,
+            )
+            if len(batch_3) == 3:
+                batch_2 = generate_tka_questions_batch(
+                    jenjang=jenjang,
+                    mapel=mapel,
+                    question_type=question_type,
+                    count=2,
+                    image_records=image_records,
+                )
+            else:
+                batch_2 = []
+
+            if len(batch_3) == 3 and len(batch_2) == 2:
+                batch = batch_3 + batch_2
+                print(
+                    f"[TKA STUDIO] fallback {question_type} berhasil: 3 + 2 = 5 soal."
+                )
+            else:
+                print(
+                    f"[TKA STUDIO] GAGAL: batch {question_type} hanya "
+                    f"{len(batch_3) + len(batch_2)}/5 setelah fallback. "
+                    "Tidak mengembalikan hasil parsial."
+                )
+                return []
 
         all_questions.extend(batch)
         print(
