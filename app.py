@@ -1676,24 +1676,24 @@ if st.session_state.page == "landing":
     # --- UI KARTU PAKSAAN HALUS ---
     st.markdown("""
     <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border: 2px solid #3b82f6; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 25px; box-shadow: 0 8px 32px rgba(59, 130, 246, 0.2);">
-        <h3 style="color: #60a5fa; margin-top: 0;">🚀 HUBUNGI WA RoboMANTAP SEKARANG!</h3>
-        <p style="color: #cbd5e1; font-size: 14px;">Dapatkan kemudahan belajar yang lebih efektif, efisien, dan lengkap. Kapan saja, di mana saja!</p>
+        <h3 style="color: #60a5fa; font-size: 14px; margin-top: 0;">🚀 HUBUNGI WA RoboMANTAP SEKARANG!</h3>
+        <p style="color: #cbd5e1; font-size: 12px;">Dapatkan kemudahan belajar yang lebih efektif, efisien, dan lengkap. Kapan saja, di mana saja!</p>
     </div>
     """, unsafe_allow_html=True)
     
     NO_WA_BOT = "6283141694735" # Nomor WA bot Anda
     
-    tab_siswa, tab_guru = st.tabs(["🎓 Saya Siswa", "👩‍🏫 Saya Guru / Ustadzah"])
+    tab_siswa, tab_guru = st.tabs(["👤 Saya Siswa", "🧕🏼 Saya Guru"])
     
     with tab_siswa:
         with st.form("form_wa_siswa"):
-            s_nama = st.text_input("Nama Lengkap")
+            s_nama = st.text_input("Nama Lengkap", placeholder="Masukkan Nama Lengkap Kamu")
             s_jenjang = st.selectbox("Jenjang", ["MTs", "MA"])
             c1, c2 = st.columns(2)
             with c1:
-                s_kelas = st.text_input("Kelas (Contoh: 9A / 12 IPA 1)")
+                s_kelas = st.text_input("Kelas", placeholder="Contoh: 9A / 12")
             with c2:
-                s_absen = st.text_input("Nomor Absen")
+                s_absen = st.text_input("Nomor Absen", placeholder="Contoh: 03")
                 
             btn_siswa = st.form_submit_button("KIRIM PESAN SEKARANG! 💬", type="primary", use_container_width=True)
             
@@ -1702,14 +1702,14 @@ if st.session_state.page == "landing":
                     st.error("Lengkapi semua data terlebih dahulu!")
                 else:
                     pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama} - {s_jenjang} - {s_kelas} - {s_absen}"
-                    link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
+                    link = f"https://wa.me/{6283141694735}?text={urllib.parse.quote(pesan)}"
                     st.markdown(f'<meta http-equiv="refresh" content="0;url={link}">', unsafe_allow_html=True)
                     st.success("Membuka WhatsApp...")
     
     with tab_guru:
         with st.form("form_wa_guru"):
-            g_nama = st.text_input("Nama Lengkap Ustadzah")
-            g_kode = st.text_input("Kode Akses Guru", type="password", help="Tanyakan kepada admin UPN untuk kode ini.")
+            g_nama = st.text_input("Nama Lengkap Ustadzah", placeholder="Masukkan Nama Lengkap Anda")
+            g_kode = st.text_input("Kode PIN Akses GuruMANTAP", type="password", help="Tanyakan kepada admin UPN untuk kode ini.", placeholder="Masukkan PIN GuruMANTAP")
             
             btn_guru = st.form_submit_button("KIRIM PESAN SEKARANG! 💬", type="primary", use_container_width=True)
             
@@ -1717,12 +1717,13 @@ if st.session_state.page == "landing":
                 if not g_nama or not g_kode:
                     st.error("Nama dan Kode Akses wajib diisi!")
                 elif g_kode != "MANTAP2026": # Ganti dengan kode rahasia yang Anda inginkan
-                    st.error("Kode Akses Guru salah. Siswa dilarang masuk area ini.")
+                    st.error("⚠️ Kode PIN Akses Guru salah. Siswa dilarang masuk area ini.")
                 else:
                     pesan = f"Halo RoboMANTAP! Saya [GURU] : {g_nama} - VALIDATED"
-                    link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
+                    link = f"https://wa.me/{6283141694735}?text={urllib.parse.quote(pesan)}"
                     st.markdown(f'<meta http-equiv="refresh" content="0;url={link}">', unsafe_allow_html=True)
                     st.success("Membuka WhatsApp...")
+                    
     st.write("---")
     st.markdown("#### 🎓 TKA RoboMANTAP")
     st.caption("Portal latihan TKA Mandiri dan latihan yang diterbitkan GuruMANTAP.")
