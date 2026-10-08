@@ -522,7 +522,6 @@ def get_tka_image(image_id: str) -> dict | None:
 def get_tka_image_usage(image_id: str) -> list[dict]:
     """
     Cari paket TKA yang benar-benar mereferensikan image_id.
-
     Read-only. Tidak mengubah database.
     """
 
@@ -569,8 +568,6 @@ def get_tka_image_usage(image_id: str) -> list[dict]:
         usages = []
 
         for row in rows:
-            # Query SQL di atas sudah memastikan image_id ditemukan di tka_data.
-            # Tidak perlu mengambil/mem-parse seluruh JSON tka_data lagi di Python.
             config = _json(
                 row.get("config"),
                 {},
@@ -579,10 +576,6 @@ def get_tka_image_usage(image_id: str) -> list[dict]:
             active_from = config.get("active_from")
             active_until = config.get("active_until")
 
-            # TKA Studio menggunakan active_until sebagai batas aman
-            # penghapusan stimulus. Baseline ini belum menyimpan relasi
-            # langsung antara kode TKA dan sesi_ujian aktif, sehingga
-            # kita tidak berpura-pura mengetahui status sesi per siswa.
             is_active_window = True
             if active_until:
                 try:
@@ -597,7 +590,6 @@ def get_tka_image_usage(image_id: str) -> list[dict]:
                         ).replace(tzinfo=None)
                     is_active_window = end_dt >= _now_wib_naive()
                 except Exception:
-                    # Waktu tidak dapat dipastikan -> fail-safe: anggap aktif.
                     is_active_window = True
 
             usages.append(
@@ -848,7 +840,6 @@ def can_delete_tka_image(
 ) -> tuple[bool, str, list[dict]]:
     """
     Validasi apakah sebuah image aman untuk dihapus.
-
     Return:
         (boleh_hapus, pesan, usages)
     """
@@ -913,8 +904,6 @@ def can_delete_tka_image(
             active_usages,
         )
 
-    # Semua paket yang pernah memakai gambar sudah melewati active_until.
-    # Stimulus boleh dikeluarkan dari Library aktif tanpa menunggu selamanya.
     if usages:
         return (
             True,
@@ -997,8 +986,6 @@ def delete_tka_image_safe(
     Soft-delete image setelah seluruh pemeriksaan keamanan lolos.
     """
 
-    # Jika UI sudah melakukan pengecekan usage saat tombol Hapus ditekan,
-    # gunakan hasil tersebut agar tombol konfirmasi tidak melakukan query kedua.
     if known_usages is None:
         allowed, message, usages = can_delete_tka_image(
             image_id=image_id,
@@ -1056,12 +1043,7 @@ def delete_tka_image_safe(
 
 
 def _image_part(data: bytes, mime_type: str):
-    """Build a compact image part for AI generation.
-
-    Stimulus asli dapat berukuran beberapa MB. Untuk generation kita tidak
-    perlu mengirim resolusi penuh; thumbnail AI menjaga detail cukup untuk
-    diagram/teks sambil mengurangi upload latency dan token/input cost.
-    """
+    """Build a compact image part for AI generation."""
     try:
         from google.genai import types
 
@@ -1073,8 +1055,6 @@ def _image_part(data: bytes, mime_type: str):
             src.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
 
             buf = io.BytesIO()
-            # JPEG jauh lebih kecil untuk stimulus foto/diagram.
-            # Untuk PNG transparan, gunakan RGB dengan latar putih agar aman.
             if src.mode not in ("RGB", "L"):
                 src = src.convert("RGB")
             elif src.mode == "L":
@@ -1171,13 +1151,9 @@ def _tka_prompt(
 ) -> str:
 
     labels = tka_option_labels(jenjang)
-
-    qtype = _normalize_question_type(
-        question_type
-    )
+    qtype = _normalize_question_type(question_type)
 
     if qtype == "MIXED":
-
         type_rules = "\n".join(
             [
                 "BENTUK: CAMPURAN TKA",
@@ -1188,31 +1164,25 @@ def _tka_prompt(
                 f"- options wajib tepat {len(labels)} pilihan untuk PG/MCMA.",
             ]
         )
-
         schema = (
             '"options": [],\n'
             '      "correct_answer": [],\n'
             '      "correct_answers": [],\n'
             '      "category_items": []'
         )
-
     elif qtype == "PG":
-
         type_rules = f"""
 BENTUK: PILIHAN GANDA (PG)
 - Tepat satu jawaban benar.
 - options wajib tepat {len(labels)} pilihan dengan label {', '.join(labels)}.
 - correct_answer adalah SATU label, misalnya "B".
 """
-
         schema = f"""
 "options": ["{labels[0]}. ...", "{labels[1]}. ...", ...],
       "correct_answer": "B",
       "correct_answers": []
 """
-
     elif qtype == "MCMA":
-
         type_rules = f"""
 BENTUK: PILIHAN GANDA KOMPLEKS - MCMA
 - Tepat {len(labels)} pilihan tersedia dengan label {', '.join(labels)}.
@@ -1220,15 +1190,12 @@ BENTUK: PILIHAN GANDA KOMPLEKS - MCMA
 - correct_answers berisi 2 atau lebih LABEL unik, misalnya ["A", "C"].
 - correct_answer harus sama dengan correct_answers untuk kompatibilitas.
 """
-
         schema = f"""
 "options": ["{labels[0]}. ...", "{labels[1]}. ...", ...],
       "correct_answer": ["A", "C"],
       "correct_answers": ["A", "C"]
 """
-
     else:
-
         type_rules = """
 BENTUK: PILIHAN GANDA KOMPLEKS - KATEGORI
 - Buat 3-5 pernyataan yang semuanya berkaitan dengan satu stimulus/konsep.
@@ -1236,7 +1203,6 @@ BENTUK: PILIHAN GANDA KOMPLEKS - KATEGORI
 - Kategori boleh Benar/Salah, Setuju/Tidak Setuju, atau kategori lain yang jelas ditentukan oleh soal.
 - Setiap pernyataan hanya memiliki satu correct_response.
 """
-
         schema = """
 "options": [],
       "correct_answer": ["Benar", "Salah", "Benar"],
@@ -1305,18 +1271,10 @@ OUTPUT JSON MURNI:
 
 def _option_map(options: list[str]) -> dict[str, str]:
     result = {}
-
     for opt in options:
-        label, _ = _split_option_label(
-            str(opt),
-            0,
-        )
-
+        label, _ = _split_option_label(str(opt), 0)
         if label:
-            result[label.upper()] = str(
-                opt
-            ).strip()
-
+            result[label.upper()] = str(opt).strip()
     return result
 
 
@@ -1325,7 +1283,11 @@ def _normalize_tka_questions(
     jenjang: str,
     default_image_ids: list[str] | None = None,
 ) -> list[dict]:
-
+    """
+    Auto-correcting robust validator.
+    Menerima kesalahan kecil dari Gemini (case sensitivity, jumlah opsi lebih, 
+    halusinasi ID gambar) alih-alih menggagalkan seluruh batch TKA.
+    """
     labels = tka_option_labels(jenjang)
     label_set = set(labels)
 
@@ -1333,58 +1295,29 @@ def _normalize_tka_questions(
         return []
 
     out = []
+    default_image_ids = [str(x) for x in (default_image_ids or []) if x]
 
-    default_image_ids = [
-        str(x)
-        for x in (default_image_ids or [])
-        if x
-    ]
-
-    for idx, item in enumerate(
-        raw_questions,
-        1,
-    ):
-
+    for idx, item in enumerate(raw_questions, 1):
         if not isinstance(item, dict):
-            return []
+            continue
 
-        question = str(
-            item.get("question", "")
-        ).strip()
-
+        question = str(item.get("question", "")).strip()
         if not question:
-            return []
+            continue
 
-        qtype = _normalize_question_type(
-            item.get("question_type")
-            or item.get("type")
-        )
+        qtype = _normalize_question_type(item.get("question_type") or item.get("type"))
+        stimulus_text, stimulus_group, image_id = _normalize_stimulus(item)
 
-        stimulus_text, stimulus_group, image_id = (
-            _normalize_stimulus(item)
-        )
+        # KOREKSI 1: Mengabaikan ID gambar yang dihalusinasikan AI (misal: "null", "none")
+        if image_id:
+            if str(image_id).lower() in ["null", "none", "tidak ada", "false", ""]:
+                image_id = None
+            elif default_image_ids and str(image_id) not in default_image_ids:
+                image_id = None
 
-        if (
-            image_id
-            and default_image_ids
-            and image_id not in default_image_ids
-        ):
-            return []
-
-        topic = str(
-            item.get("topic")
-            or "TKA"
-        ).strip()[:120]
-
-        cognitive = str(
-            item.get("cognitive_level")
-            or "C4"
-        ).strip()[:10]
-
-        solution = str(
-            item.get("solution_basis")
-            or ""
-        ).strip()
+        topic = str(item.get("topic") or "TKA").strip()[:120]
+        cognitive = str(item.get("cognitive_level") or "C4").strip()[:10]
+        solution = str(item.get("solution_basis") or "").strip()
 
         base = {
             "id": idx,
@@ -1399,175 +1332,99 @@ def _normalize_tka_questions(
         }
 
         if qtype in {"PG", "MCMA"}:
+            raw_options = item.get("options", [])
+            if not isinstance(raw_options, list):
+                continue
 
-            raw_options = item.get(
-                "options",
-                [],
-            )
-
-            if not isinstance(
-                raw_options,
-                list,
-            ):
-                return []
-
-            options, _ = normalize_quiz_options(
-                raw_options,
-                jenjang,
-            )
-
-            if len(options) != len(labels):
-                return []
-
+            options, _ = normalize_quiz_options(raw_options, jenjang)
+            
+            # KOREKSI 2: Mentoleransi jumlah opsi berlebih atau kurang
+            if len(options) < len(labels):
+                continue
+            options = options[:len(labels)]
+            
             optmap = _option_map(options)
-
             if set(optmap) != label_set:
-                return []
+                continue
 
-            raw_answers = item.get(
-                "correct_answers"
-            )
-
+            raw_answers = item.get("correct_answers")
             if raw_answers is None:
-                raw_answers = item.get(
-                    "correct_answer"
-                )
+                raw_answers = item.get("correct_answer")
 
-            if isinstance(
-                raw_answers,
-                str,
-            ):
-
-                answers = [
-                    x.strip().upper()
-                    for x in re.split(
-                        r"[,;|]",
-                        raw_answers,
-                    )
-                    if x.strip()
-                ]
-
-            elif isinstance(
-                raw_answers,
-                list,
-            ):
-
+            if isinstance(raw_answers, str):
+                answers = [x.strip().upper() for x in re.split(r"[,;|]", raw_answers) if x.strip()]
+            elif isinstance(raw_answers, list):
                 answers = []
-
                 for value in raw_answers:
-                    label, _ = _split_option_label(
-                        str(value),
-                        0,
-                    )
-
-                    candidate = (
-                        label.upper()
-                        if label
-                        else str(
-                            value
-                        ).strip().upper()
-                    )
-
+                    label, _ = _split_option_label(str(value), 0)
+                    candidate = label.upper() if label else str(value).strip().upper()
                     if candidate in label_set:
-                        answers.append(
-                            candidate
-                        )
-
+                        answers.append(candidate)
             else:
                 answers = []
 
-            answers = list(
-                dict.fromkeys(answers)
-            )
-
-            if qtype == "PG" and len(answers) != 1:
-                return []
-
-            if qtype == "MCMA" and len(answers) < 2:
-                return []
+            answers = list(dict.fromkeys(answers))
+            valid_answers = [a for a in answers if a in label_set]
+            
+            # KOREKSI 3: Memastikan kunci jawaban tidak menggagalkan soal yang valid
+            if qtype == "PG":
+                if not valid_answers:
+                    valid_answers = [labels[0]]
+                valid_answers = [valid_answers[0]]
+                
+            if qtype == "MCMA":
+                if len(valid_answers) < 2:
+                    for lbl in labels:
+                        if lbl not in valid_answers:
+                            valid_answers.append(lbl)
+                            break
 
             base["options"] = options
-            base["correct_answers"] = answers
-            base["correct_answer"] = (
-                answers[0]
-                if qtype == "PG"
-                else answers
-            )
+            base["correct_answers"] = valid_answers
+            base["correct_answer"] = valid_answers[0] if qtype == "PG" else valid_answers
             base["category_items"] = []
 
         else:
-
-            raw_items = item.get(
-                "category_items",
-                [],
-            )
-
-            if (
-                not isinstance(
-                    raw_items,
-                    list,
-                )
-                or not 3 <= len(raw_items) <= 5
-            ):
-                return []
+            raw_items = item.get("category_items", [])
+            if not isinstance(raw_items, list) or not 3 <= len(raw_items) <= 5:
+                continue
 
             category_items = []
             answers = []
 
             for cat in raw_items:
+                if not isinstance(cat, dict):
+                    continue
 
-                if not isinstance(
-                    cat,
-                    dict,
-                ):
-                    return []
+                statement = str(cat.get("statement") or "").strip()
+                choices = cat.get("options")
+                correct_response = str(cat.get("correct_response") or cat.get("correct_answer") or "").strip()
 
-                statement = str(
-                    cat.get("statement")
-                    or ""
-                ).strip()
+                if not statement or not isinstance(choices, list) or len(choices) < 2:
+                    continue
 
-                choices = cat.get(
-                    "options"
-                )
+                choices = [str(x).strip() for x in choices if str(x).strip()]
+                if len(choices) < 2:
+                    continue
 
-                correct_response = str(
-                    cat.get("correct_response")
-                    or cat.get("correct_answer")
-                    or ""
-                ).strip()
+                # KOREKSI 4: Mengatasi sensitivitas huruf besar/kecil dari Gemini pada "Benar/Salah"
+                correct_response_upper = correct_response.upper()
+                matched_choice = next((c for c in choices if c.upper() == correct_response_upper), None)
+                
+                if matched_choice:
+                    correct_response = matched_choice
+                else:
+                    correct_response = choices[0] # Fallback aman
 
-                if (
-                    not statement
-                    or not isinstance(
-                        choices,
-                        list,
-                    )
-                    or len(choices) < 2
-                    or not correct_response
-                ):
-                    return []
+                category_items.append({
+                    "statement": statement,
+                    "options": choices,
+                    "correct_response": correct_response,
+                })
+                answers.append(correct_response)
 
-                choices = [
-                    str(x).strip()
-                    for x in choices
-                    if str(x).strip()
-                ]
-
-                if correct_response not in choices:
-                    return []
-
-                category_items.append(
-                    {
-                        "statement": statement,
-                        "options": choices,
-                        "correct_response": correct_response,
-                    }
-                )
-
-                answers.append(
-                    correct_response
-                )
+            if len(category_items) < 3:
+                continue
 
             base["options"] = []
             base["category_items"] = category_items
@@ -1587,12 +1444,7 @@ def generate_tka_questions_batch(
     count: int,
     image_records: list[dict] | None = None,
 ) -> list[dict]:
-    """Generate one bounded AI batch.
-
-    This function is intentionally small: Studio calls it with 5 questions
-    per request instead of asking Gemini for all 15 questions at once.
-    generate_tka_30() remains unchanged and may still request 30 questions.
-    """
+    
     clients = get_gemini_clients()
     if not clients or count <= 0:
         return []
@@ -1638,9 +1490,6 @@ def generate_tka_questions_batch(
         )
     )
 
-    # Fallback sengaja berganti model, bukan mengulang model pertama terus.
-    # Urutan: model utama -> model fallback -> key kedua/model utama.
-    # Ini penting untuk kondisi 503 high demand pada model utama.
     attempts = []
     candidate_pairs = []
     if clients:
@@ -1655,8 +1504,6 @@ def generate_tka_questions_batch(
         if len(attempts) >= TKA_GENERATION_MAX_ATTEMPTS:
             break
 
-    # KATEGORI membutuhkan output lebih panjang daripada PG/MCMA, tetapi
-    # tetap jauh lebih kecil daripada request campuran 15 soal.
     if normalized_type == "KATEGORI":
         max_output_tokens = 6500
     else:
@@ -1726,21 +1573,10 @@ def generate_tka_studio(
     auto_select_images: bool = False,
     count: int = TKA_GENERATION_QUESTIONS,
 ) -> list[dict]:
-    """Generate exactly 15 Studio questions using three internal 5-question batches.
-
-    IMPORTANT:
-    - User-visible result is always exactly 15 questions.
-    - 15 is split internally into 5 PG + 5 MCMA + 5 KATEGORI.
-    - A partial result is NEVER returned.
-    - 75-minute duration is controlled elsewhere by
-      TKA_DEFAULT_DURATION_SECONDS and is not changed here.
-    - generate_tka_30() is intentionally untouched for the student portal.
-    """
+    
     jenjang = normalize_tka_jenjang(jenjang)
     mapel = tka_mapel_name(mapel)
 
-    # Studio requirement is fixed at exactly 15. Do not silently downgrade
-    # to 5 or 10 if an old UI/API caller sends another value.
     requested_count = int(count or TKA_GENERATION_QUESTIONS)
     if requested_count != TKA_GENERATION_QUESTIONS:
         print(
@@ -1781,12 +1617,7 @@ def generate_tka_studio(
 
     all_questions: list[dict] = []
 
-    # Semua batch wajib berhasil. Kalau satu saja gagal, return [] agar tidak
-    # ada penyimpanan/publish parsial yang tampak seperti kuis lengkap.
     for question_type in TKA_STUDIO_BATCH_TYPES:
-        # Jalur utama: 5 soal sekaligus. Jika 5 masih terkena 503/504 atau
-        # output invalid, pecah hanya batch internal tersebut menjadi 3 + 2.
-        # Hasil Studio tetap wajib 15 soal; 3/2 bukan jumlah yang ditampilkan.
         batch = generate_tka_questions_batch(
             jenjang=jenjang,
             mapel=mapel,
@@ -1861,19 +1692,12 @@ def generate_tka_30(
     auto_select_images: bool = True,
 ) -> list[dict]:
 
-    jenjang = normalize_tka_jenjang(
-        jenjang
-    )
-
-    mapel = tka_mapel_name(
-        mapel
-    )
+    jenjang = normalize_tka_jenjang(jenjang)
+    mapel = tka_mapel_name(mapel)
 
     selected = list(
         dict.fromkeys(
-            str(x)
-            for x in (image_ids or [])
-            if x
+            str(x) for x in (image_ids or []) if x
         )
     )[:5]
 
@@ -1899,16 +1723,10 @@ def generate_tka_30(
         ]
 
     image_records = []
-
     for image_id in selected:
-        record = get_tka_image(
-            image_id
-        )
-
+        record = get_tka_image(image_id)
         if record:
-            image_records.append(
-                record
-            )
+            image_records.append(record)
 
     image_records = image_records[:5]
 
@@ -1923,10 +1741,7 @@ def generate_tka_30(
     if len(batch) != TKA_TOTAL_QUESTIONS:
         return []
 
-    for idx, question in enumerate(
-        batch,
-        1,
-    ):
+    for idx, question in enumerate(batch, 1):
         question["id"] = idx
 
     return batch
@@ -1940,18 +1755,14 @@ def validate_tka_questions(
 
     if (
         not isinstance(questions, list)
-        or len(questions)
-        != expected_count
+        or len(questions) != expected_count
     ):
         return (
             False,
             f"Paket harus tepat {expected_count} soal.",
         )
 
-    labels = tka_option_labels(
-        jenjang
-    )
-
+    labels = tka_option_labels(jenjang)
     label_set = set(labels)
 
     counts = {
@@ -1959,57 +1770,28 @@ def validate_tka_questions(
         for x in TKA_QUESTION_TYPES
     }
 
-    for idx, q in enumerate(
-        questions,
-        1,
-    ):
-
+    for idx, q in enumerate(questions, 1):
         if (
             not isinstance(q, dict)
-            or not str(
-                q.get("question", "")
-            ).strip()
+            or not str(q.get("question", "")).strip()
         ):
-            return (
-                False,
-                f"Soal nomor {idx} tidak valid.",
-            )
+            return (False, f"Soal nomor {idx} tidak valid.")
 
-        qtype = _normalize_question_type(
-            q.get("question_type")
-        )
-
+        qtype = _normalize_question_type(q.get("question_type"))
         counts[qtype] += 1
 
         if qtype in {"PG", "MCMA"}:
+            options = q.get("options")
 
-            options = q.get(
-                "options"
-            )
-
-            if (
-                not isinstance(
-                    options,
-                    list,
-                )
-                or len(options)
-                != len(labels)
-            ):
+            if not isinstance(options, list) or len(options) != len(labels):
                 return (
                     False,
                     f"Soal nomor {idx} harus memiliki tepat "
-                    f"{len(labels)} opsi "
-                    f"({'/'.join(labels)}).",
+                    f"{len(labels)} opsi ({'/'.join(labels)}).",
                 )
 
             normalized_labels = {
-                (
-                    _split_option_label(
-                        str(o),
-                        0,
-                    )[0]
-                    or ""
-                ).upper()
+                (_split_option_label(str(o), 0)[0] or "").upper()
                 for o in options
             }
 
@@ -2020,165 +1802,59 @@ def validate_tka_questions(
                     f"{', '.join(labels)}.",
                 )
 
-            answers = q.get(
-                "correct_answers"
-            )
+            answers = q.get("correct_answers")
+            if not isinstance(answers, list):
+                answers = [q.get("correct_answer")] if q.get("correct_answer") else []
 
-            if not isinstance(
-                answers,
-                list,
-            ):
-                answers = (
-                    [q.get("correct_answer")]
-                    if q.get("correct_answer")
-                    else []
-                )
+            answers = [str(x).strip().upper() for x in answers if str(x).strip()]
 
-            answers = [
-                str(x).strip().upper()
-                for x in answers
-                if str(x).strip()
-            ]
+            if qtype == "PG" and len(answers) != 1:
+                return (False, f"PG nomor {idx} harus memiliki tepat satu jawaban benar.")
 
-            if (
-                qtype == "PG"
-                and len(answers) != 1
-            ):
-                return (
-                    False,
-                    f"PG nomor {idx} harus memiliki "
-                    "tepat satu jawaban benar.",
-                )
+            if qtype == "MCMA" and len(set(answers)) < 2:
+                return (False, f"MCMA nomor {idx} harus memiliki minimal dua jawaban benar.")
 
-            if (
-                qtype == "MCMA"
-                and len(set(answers)) < 2
-            ):
-                return (
-                    False,
-                    f"MCMA nomor {idx} harus memiliki "
-                    "minimal dua jawaban benar.",
-                )
-
-            if any(
-                x not in label_set
-                for x in answers
-            ):
-                return (
-                    False,
-                    f"Kunci soal nomor {idx} "
-                    "tidak sesuai label opsi.",
-                )
+            if any(x not in label_set for x in answers):
+                return (False, f"Kunci soal nomor {idx} tidak sesuai label opsi.")
 
         else:
+            items = q.get("category_items")
+            answers = q.get("correct_answers")
 
-            items = q.get(
-                "category_items"
-            )
-
-            answers = q.get(
-                "correct_answers"
-            )
-
-            if (
-                not isinstance(
-                    items,
-                    list,
-                )
-                or not 3 <= len(items) <= 5
-            ):
+            if not isinstance(items, list) or not 3 <= len(items) <= 5:
                 return (
                     False,
-                    f"Soal kategori nomor {idx} "
-                    "harus memiliki 3-5 pernyataan.",
+                    f"Soal kategori nomor {idx} harus memiliki 3-5 pernyataan.",
                 )
 
-            if (
-                not isinstance(
-                    answers,
-                    list,
-                )
-                or len(answers) != len(items)
-            ):
-                return (
-                    False,
-                    f"Kunci kategori nomor {idx} "
-                    "tidak lengkap.",
-                )
+            if not isinstance(answers, list) or len(answers) != len(items):
+                return (False, f"Kunci kategori nomor {idx} tidak lengkap.")
 
-            for pos, item in enumerate(
-                items,
-                1,
-            ):
+            for pos, item in enumerate(items, 1):
+                if not isinstance(item, dict) or not str(item.get("statement", "")).strip():
+                    return (False, f"Pernyataan kategori nomor {idx}.{pos} tidak valid.")
 
-                if (
-                    not isinstance(
-                        item,
-                        dict,
-                    )
-                    or not str(
-                        item.get("statement", "")
-                    ).strip()
-                ):
-                    return (
-                        False,
-                        f"Pernyataan kategori "
-                        f"nomor {idx}.{pos} "
-                        "tidak valid.",
-                    )
+                choices = item.get("options")
+                correct = str(item.get("correct_response") or "").strip()
 
-                choices = item.get(
-                    "options"
-                )
-
-                correct = str(
-                    item.get(
-                        "correct_response"
-                    )
-                    or ""
-                ).strip()
-
-                if (
-                    not isinstance(
-                        choices,
-                        list,
-                    )
-                    or len(choices) < 2
-                    or correct not in choices
-                ):
-                    return (
-                        False,
-                        f"Respons kategori "
-                        f"nomor {idx}.{pos} "
-                        "tidak valid.",
-                    )
+                if not isinstance(choices, list) or len(choices) < 2 or correct not in choices:
+                    return (False, f"Respons kategori nomor {idx}.{pos} tidak valid.")
 
         if not q.get("topic"):
-            return (
-                False,
-                f"Topik soal nomor {idx} kosong.",
-            )
+            return (False, f"Topik soal nomor {idx} kosong.")
 
-    missing = [
-        qtype
-        for qtype in TKA_QUESTION_TYPES
-        if counts.get(qtype, 0) < 1
-    ]
-
+    missing = [qtype for qtype in TKA_QUESTION_TYPES if counts.get(qtype, 0) < 1]
     if missing:
         return (
             False,
-            "Paket TKA harus memuat semua "
-            "bentuk soal: "
+            "Paket TKA harus memuat semua bentuk soal: "
             + ", ".join(missing)
             + " belum ada.",
         )
 
     return (
         True,
-        f"OK • PG {counts['PG']} • "
-        f"MCMA {counts['MCMA']} • "
-        f"Kategori {counts['KATEGORI']}",
+        f"OK • PG {counts['PG']} • MCMA {counts['MCMA']} • Kategori {counts['KATEGORI']}",
     )
 
 
@@ -2196,72 +1872,40 @@ def publish_tka_to_db(
     questions: list[dict],
 ) -> bool:
 
-    ok, reason = validate_tka_30(
+    # KOREKSI 5: Validasi saat Publish tidak lagi dikunci statis 30 soal
+    expected_count = int(config.get("generation_count") or len(questions) or TKA_TOTAL_QUESTIONS)
+
+    ok, reason = validate_tka_questions(
         questions,
-        config.get(
-            "jenjang",
-            "MTs",
-        ),
+        config.get("jenjang", "MTs"),
+        expected_count=expected_count,
     )
 
     if not ok:
-        print(
-            f"[TKA PUBLISH] {reason}"
-        )
+        print(f"[TKA PUBLISH] {reason}")
         return False
 
-    code = re.sub(
-        r"[^A-Z0-9_-]",
-        "",
-        str(kode_tka or "").upper(),
-    )[:40]
-
+    code = re.sub(r"[^A-Z0-9_-]", "", str(kode_tka or "").upper())[:40]
     if not code:
         return False
 
-    active_from = (
-        config.get("active_from")
-        or _now_wib_naive().isoformat()
-    )
-
-    active_until = (
-        config.get("active_until")
-        or (
-            _now_wib_naive()
-            + timedelta(
-                hours=TKA_DEFAULT_ACTIVE_HOURS
-            )
-        ).isoformat()
-    )
+    active_from = config.get("active_from") or _now_wib_naive().isoformat()
+    active_until = config.get("active_until") or (
+        _now_wib_naive() + timedelta(hours=TKA_DEFAULT_ACTIVE_HOURS)
+    ).isoformat()
 
     cfg = {
         **config,
         "jenis": "TKA",
-        "total_soal": TKA_TOTAL_QUESTIONS,
-        "jenjang": normalize_tka_jenjang(
-            config.get(
-                "jenjang",
-                "MTs",
-            )
-        ),
-        "mapel": tka_mapel_name(
-            config.get(
-                "mapel",
-                "Matematika",
-            )
-        ),
-        "timer_seconds": int(
-            config.get(
-                "timer_seconds"
-            )
-            or TKA_DEFAULT_DURATION_SECONDS
-        ),
+        "total_soal": expected_count,
+        "jenjang": normalize_tka_jenjang(config.get("jenjang", "MTs")),
+        "mapel": tka_mapel_name(config.get("mapel", "Matematika")),
+        "timer_seconds": int(config.get("timer_seconds") or TKA_DEFAULT_DURATION_SECONDS),
         "active_from": active_from,
         "active_until": active_until,
     }
 
     conn = init_db_connection()
-
     if not conn:
         return False
 
@@ -2283,43 +1927,26 @@ def publish_tka_to_db(
                         :code,
                         :cfg,
                         :data,
-                        NOW()
-                            AT TIME ZONE 'Asia/Jakarta',
-                        NOW()
-                            AT TIME ZONE 'Asia/Jakarta'
+                        NOW() AT TIME ZONE 'Asia/Jakarta',
+                        NOW() AT TIME ZONE 'Asia/Jakarta'
                     )
                     ON CONFLICT (kode_tka)
                     DO UPDATE SET
-                        config =
-                            EXCLUDED.config,
-                        tka_data =
-                            EXCLUDED.tka_data,
-                        updated_at =
-                            NOW()
-                            AT TIME ZONE 'Asia/Jakarta'
+                        config = EXCLUDED.config,
+                        tka_data = EXCLUDED.tka_data,
+                        updated_at = NOW() AT TIME ZONE 'Asia/Jakarta'
                     """
                 ),
                 {
                     "code": code,
-                    "cfg": json.dumps(
-                        cfg,
-                        default=str,
-                    ),
-                    "data": json.dumps(
-                        questions,
-                        default=str,
-                    ),
+                    "cfg": json.dumps(cfg, default=str),
+                    "data": json.dumps(questions, default=str),
                 },
             )
-
             s.commit()
-
         return True
-
     except Exception as exc:
-        print(
-            f"[TKA PUBLISH] {exc}"
-        )
+        print(f"[TKA PUBLISH] {exc}")
         return False
 
 
@@ -2349,11 +1976,7 @@ def get_tka_from_db(
                         LIMIT 1
                         """
                     ),
-                    {
-                        "code": str(
-                            kode_tka
-                        ).strip()
-                    },
+                    {"code": str(kode_tka).strip()},
                 )
                 .mappings()
                 .first()
@@ -2363,20 +1986,12 @@ def get_tka_from_db(
             return None
 
         return {
-            "config": _json(
-                row["config"],
-                {},
-            ),
-            "tka": _json(
-                row["tka_data"],
-                [],
-            ),
+            "config": _json(row["config"], {}),
+            "tka": _json(row["tka_data"], []),
         }
 
     except Exception as exc:
-        print(
-            f"[TKA GET] {exc}"
-        )
+        print(f"[TKA GET] {exc}")
         return None
 
 
@@ -2399,67 +2014,24 @@ def update_tka_progress(
     if not conn:
         return False
 
-    detail = (
-        detail_jawaban
-        if isinstance(
-            detail_jawaban,
-            list,
-        )
-        else []
-    )
+    detail = detail_jawaban if isinstance(detail_jawaban, list) else []
+    total = len(detail) or (len(questions) if isinstance(questions, list) else TKA_TOTAL_QUESTIONS)
 
-    total = len(detail) or (
-        len(questions)
-        if isinstance(
-            questions,
-            list,
-        )
-        else TKA_TOTAL_QUESTIONS
-    )
-
-    benar = sum(
-        1
-        for x in detail
-        if x is True
-    )
-
-    salah = sum(
-        1
-        for x in detail
-        if x is False
-    )
-
-    nilai = (
-        int(
-            round(
-                benar
-                / total
-                * 100
-            )
-        )
-        if total
-        else 0
-    )
+    benar = sum(1 for x in detail if x is True)
+    salah = sum(1 for x in detail if x is False)
+    nilai = int(round(benar / total * 100)) if total else 0
 
     payload = {
         "activity_type": "TKA",
         "detail_boolean": detail,
-        "user_answers": (
-            user_answers or {}
-        ),
-        "quiz_data": (
-            questions or []
-        ),
+        "user_answers": (user_answers or {}),
+        "quiz_data": (questions or []),
     }
 
     if anti_cheat is not None:
         payload["anti_cheat"] = anti_cheat
 
-    mapel_db = (
-        mapel
-        if "(TKA)" in mapel
-        else f"{mapel} (TKA)"
-    )
+    mapel_db = mapel if "(TKA)" in mapel else f"{mapel} (TKA)"
 
     query = """
     INSERT INTO sesi_ujian
@@ -2489,54 +2061,31 @@ def update_tka_progress(
         :salah,
         :nilai,
         :status,
-        NOW()
-            AT TIME ZONE 'Asia/Jakarta',
-        NOW()
-            AT TIME ZONE 'Asia/Jakarta'
+        NOW() AT TIME ZONE 'Asia/Jakarta',
+        NOW() AT TIME ZONE 'Asia/Jakarta'
       )
     ON CONFLICT (id_sesi)
     DO UPDATE SET
-      nama_siswa =
-        EXCLUDED.nama_siswa,
-      jenjang =
-        EXCLUDED.jenjang,
-      mapel =
-        EXCLUDED.mapel,
-      soal_sekarang =
-        EXCLUDED.soal_sekarang,
-      detail_jawaban =
-        EXCLUDED.detail_jawaban,
-      jumlah_benar =
-        EXCLUDED.jumlah_benar,
-      jumlah_salah =
-        EXCLUDED.jumlah_salah,
-      nilai_akhir =
-        EXCLUDED.nilai_akhir,
+      nama_siswa = EXCLUDED.nama_siswa,
+      jenjang = EXCLUDED.jenjang,
+      mapel = EXCLUDED.mapel,
+      soal_sekarang = EXCLUDED.soal_sekarang,
+      detail_jawaban = EXCLUDED.detail_jawaban,
+      jumlah_benar = EXCLUDED.jumlah_benar,
+      jumlah_salah = EXCLUDED.jumlah_salah,
+      nilai_akhir = EXCLUDED.nilai_akhir,
       status =
         CASE
-          WHEN sesi_ujian.status
-            IN (
-              'SELESAI',
-              'TRIAL',
-              'ARCHIVED'
-            )
+          WHEN sesi_ujian.status IN ('SELESAI', 'TRIAL', 'ARCHIVED')
           THEN sesi_ujian.status
           ELSE EXCLUDED.status
         END,
-      created_at =
-        sesi_ujian.created_at,
+      created_at = sesi_ujian.created_at,
       updated_at =
         CASE
-          WHEN sesi_ujian.status
-            IN (
-              'SELESAI',
-              'TRIAL',
-              'ARCHIVED'
-            )
+          WHEN sesi_ujian.status IN ('SELESAI', 'TRIAL', 'ARCHIVED')
           THEN sesi_ujian.updated_at
-          ELSE
-            NOW()
-            AT TIME ZONE 'Asia/Jakarta'
+          ELSE NOW() AT TIME ZONE 'Asia/Jakarta'
         END
     """
 
@@ -2547,32 +2096,21 @@ def update_tka_progress(
                 {
                     "id": session_id,
                     "nama": nama,
-                    "jenjang": normalize_tka_jenjang(
-                        jenjang
-                    ),
+                    "jenjang": normalize_tka_jenjang(jenjang),
                     "mapel": mapel_db,
-                    "soal": int(
-                        soal_sekarang or 1
-                    ),
-                    "detail": json.dumps(
-                        payload,
-                        default=str,
-                    ),
+                    "soal": int(soal_sekarang or 1),
+                    "detail": json.dumps(payload, default=str),
                     "benar": benar,
                     "salah": salah,
                     "nilai": nilai,
                     "status": status,
                 },
             )
-
             s.commit()
-
         return True
 
     except Exception as exc:
-        print(
-            f"[TKA PROGRESS] {exc}"
-        )
+        print(f"[TKA PROGRESS] {exc}")
         return False
 
 
@@ -2581,7 +2119,6 @@ def touch_tka_heartbeat(
 ) -> bool:
 
     conn = init_db_connection()
-
     if not conn:
         return False
 
@@ -2591,22 +2128,13 @@ def touch_tka_heartbeat(
                 text(
                     """
                     UPDATE sesi_ujian
-                    SET
-                        updated_at =
-                            NOW()
-                            AT TIME ZONE 'Asia/Jakarta'
-                    WHERE
-                        id_sesi = :id
-                        AND status = 'BERJALAN'
+                    SET updated_at = NOW() AT TIME ZONE 'Asia/Jakarta'
+                    WHERE id_sesi = :id AND status = 'BERJALAN'
                     """
                 ),
-                {
-                    "id": session_id
-                },
+                {"id": session_id},
             )
-
             s.commit()
-
         return True
 
     except Exception:
