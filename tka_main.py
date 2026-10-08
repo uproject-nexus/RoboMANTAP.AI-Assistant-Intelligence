@@ -47,10 +47,8 @@ try:
 except Exception as exc:
     print(f"[TKA INIT WARN] {exc}")
 
-
 def now_wib() -> datetime:
     return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=7))).replace(tzinfo=None)
-
 
 def parse_wib_datetime(value: Any) -> datetime | None:
     if not value:
@@ -64,7 +62,6 @@ def parse_wib_datetime(value: Any) -> datetime | None:
     except Exception:
         return None
 
-
 def normalized_anti_cheat(sess: dict) -> dict:
     current = sess.get("anti_cheat") if isinstance(sess, dict) else None
     if not isinstance(current, dict):
@@ -75,7 +72,6 @@ def normalized_anti_cheat(sess: dict) -> dict:
         "violation_count": max(0, int(current.get("violation_count", 0) or 0)),
         "max_violations": 3,
     }
-
 
 def _parse_answer_value(value: Any):
     if value is None:
@@ -90,7 +86,6 @@ def _parse_answer_value(value: Any):
         return parsed
     except Exception:
         return raw
-
 
 def _answer_is_correct(item: dict, user_value: Any) -> bool:
     if user_value is None or user_value == "":
@@ -114,7 +109,6 @@ def _answer_is_correct(item: dict, user_value: Any) -> bool:
     actual = user_value if not isinstance(user_value, list) else (user_value[0] if user_value else "")
     return str(actual).strip().upper() == expected
 
-
 def build_detail_answers(sess: dict) -> list[bool | None]:
     questions = sess.get("quiz", []) or []
     answers = sess.get("answers", {}) or {}
@@ -135,7 +129,6 @@ def duration_label(seconds: int) -> str:
         return f"{h} jam {m} menit" + (f" {s} detik" if s else "")
     return f"{m} menit" + (f" {s} detik" if s else "") if m else f"{s} detik"
 
-
 def validate_active_window(config: dict) -> str | None:
     now = now_wib()
     start = parse_wib_datetime(config.get("active_from"))
@@ -146,7 +139,6 @@ def validate_active_window(config: dict) -> str | None:
         return f"❌ Kode TKA sudah kedaluwarsa pada {end.strftime('%d-%m-%Y %H:%M')} WIB."
     return None
 
-
 @app.get("/", response_class=HTMLResponse)
 async def landing(request: Request):
     mode = request.query_params.get("mode", "choice")
@@ -154,11 +146,9 @@ async def landing(request: Request):
         mode = "choice"
     return templates.TemplateResponse(request=request, name="student_login.html", context={"error": None, "mode": mode})
 
-
 @app.get("/mandiri", response_class=HTMLResponse)
 async def mandiri_page(request: Request):
     return templates.TemplateResponse(request=request, name="student_login.html", context={"error": None, "mode": "mandiri"})
-
 
 @app.post("/mandiri/start", response_class=HTMLResponse)
 async def mandiri_start(
@@ -179,10 +169,12 @@ async def mandiri_start(
         })
     target_kelas = "9" if jenjang == "MTs" else "12"
     kelas = target_kelas
+    
+    # Mode mandiri tetap default menggunakan 30 soal simulasi
     questions = generate_tka_30(jenjang=jenjang, mapel=mapel, auto_select_images=True)
     if len(questions) != TKA_TOTAL_QUESTIONS:
         return templates.TemplateResponse(request=request, name="student_login.html", context={
-            "error": "⚠️ RoboMANTAP belum berhasil menyiapkan tepat 30 soal TKA. Pastikan Library Gambar TKA sudah memiliki stimulus dan coba lagi.",
+            "error": "⚠️ RoboMANTAP belum berhasil menyiapkan paket simulasi TKA. Pastikan Library Gambar TKA sudah memiliki stimulus dan coba lagi.",
             "mode": "mandiri",
         })
     session_id = str(uuid.uuid4())[:8]
@@ -209,7 +201,6 @@ async def mandiri_start(
     )
     return await render_exam(request, session_id)
 
-
 @app.post("/verify-token", response_class=HTMLResponse)
 async def verify_token(
     request: Request,
@@ -228,11 +219,15 @@ async def verify_token(
     error = validate_active_window(config)
     if error:
         return templates.TemplateResponse(request=request, name="student_login.html", context={"error": error, "mode": "guru"})
+    
     questions = package.get("tka") or []
-    if len(questions) != TKA_TOTAL_QUESTIONS:
+    total_soal_dinamis = config.get("total_soal", len(questions))
+    
+    if len(questions) == 0:
         return templates.TemplateResponse(request=request, name="student_login.html", context={
-            "error": f"❌ Paket TKA tidak valid. Sistem mensyaratkan tepat {TKA_TOTAL_QUESTIONS} soal.", "mode": "guru"
+            "error": "❌ Paket TKA ini kosong atau tidak valid.", "mode": "guru"
         })
+        
     session_id = str(uuid.uuid4())[:8]
     anti = {"detected": False, "reason": "", "violation_count": 0, "max_violations": 3}
     STUDENT_SESSIONS[session_id] = {
@@ -240,13 +235,13 @@ async def verify_token(
         "config": config, "quiz": questions, "answers": {}, "current_index": 0,
         "start_time": datetime.now(timezone.utc), "anti_cheat": anti, "finished": False,
     }
+    
     update_tka_progress(
         session_id=session_id, nama=nama.strip(), jenjang=config.get("jenjang", "MTs"),
         mapel=config.get("mapel", "Matematika"), soal_sekarang=1,
-        detail_jawaban=[None] * TKA_TOTAL_QUESTIONS, questions=questions, anti_cheat=anti,
+        detail_jawaban=[None] * total_soal_dinamis, questions=questions, anti_cheat=anti,
     )
     return await render_exam(request, session_id)
-
 
 async def render_exam(request: Request, session_id: str):
     sess = STUDENT_SESSIONS.get(session_id)
@@ -254,28 +249,31 @@ async def render_exam(request: Request, session_id: str):
         return RedirectResponse(url="/", status_code=303)
     if sess.get("finished") or normalized_anti_cheat(sess)["detected"]:
         return RedirectResponse(url=f"{STREAMLIT_URL.rstrip('/')}/?review_session={session_id}", status_code=303)
+        
     config = sess.get("config", {})
+    questions = sess.get("quiz", [])
+    total_soal = config.get("total_soal", len(questions))
     duration = int(config.get("timer_seconds") or TKA_DEFAULT_DURATION_SECONDS)
+    
     start = sess.get("start_time")
     if start.tzinfo is None:
         start = start.replace(tzinfo=timezone.utc)
     remaining = max(0, int(duration - (datetime.now(timezone.utc) - start).total_seconds()))
+    
     return templates.TemplateResponse(request=request, name="student_exam.html", context={
         "session_id": session_id, "sess": sess, "mapel": config.get("mapel", "TKA"),
         "materi": "Latihan TKA", "nama": sess.get("nama", "Siswa"), "kelas": sess.get("kelas", "-"),
-        "absen": sess.get("absen", "-"), "jumlah_soal": TKA_TOTAL_QUESTIONS,
+        "absen": sess.get("absen", "-"), "jumlah_soal": total_soal,
         "duration_seconds": duration, "durasi_label": duration_label(duration),
-        "quiz_json": json.dumps(sess.get("quiz", []), ensure_ascii=False),
+        "quiz_json": json.dumps(questions, ensure_ascii=False),
         "answers_json": json.dumps(sess.get("answers", {}), ensure_ascii=False),
         "remaining_seconds": remaining, "anti_cheat_json": json.dumps(normalized_anti_cheat(sess)),
         "mode_label": "Latihan Mandiri" if config.get("mode") == "MANDIRI" else "By GuruMANTAP",
     })
 
-
 @app.get("/exam/{session_id}", response_class=HTMLResponse)
 async def exam_get(request: Request, session_id: str):
     return await render_exam(request, session_id)
-
 
 @app.get("/api/image/{image_id}")
 async def image_api(image_id: str):
@@ -283,7 +281,6 @@ async def image_api(image_id: str):
     if not record:
         return Response(status_code=404)
     return Response(content=record["image_data"], media_type=record["mime_type"], headers={"Cache-Control": "public, max-age=86400"})
-
 
 @app.post("/api/save-answer")
 async def save_answer(session_id: str = Form(...), q_index: int = Form(...), answer: str = Form(...)):
@@ -330,7 +327,6 @@ async def save_answer(session_id: str = Form(...), q_index: int = Form(...), ans
     )
     return Response(status_code=204)
 
-
 @app.post("/api/session-heartbeat")
 async def heartbeat(session_id: str = Form(...)):
     if session_id not in STUDENT_SESSIONS:
@@ -338,7 +334,6 @@ async def heartbeat(session_id: str = Form(...)):
     if not STUDENT_SESSIONS[session_id].get("finished"):
         touch_tka_heartbeat(session_id)
     return Response(status_code=204)
-
 
 @app.post("/api/anti-cheat")
 async def anti_cheat(session_id: str = Form(...), violation_count: int = Form(0), reason: str = Form("Pindah tab")):
@@ -364,7 +359,6 @@ async def anti_cheat(session_id: str = Form(...), violation_count: int = Form(0)
         return Response(content="STOP")
     return Response(content="WARN")
 
-
 @app.post("/submit-exam", response_class=HTMLResponse)
 async def submit_exam(
     request: Request,
@@ -378,6 +372,8 @@ async def submit_exam(
         return RedirectResponse(url="/", status_code=303)
     quiz = sess.get("quiz", []) or []
     answers = sess.get("answers", {}) or {}
+    total_soal = sess.get("config", {}).get("total_soal", len(quiz))
+    
     benar = salah = kosong = 0
     detail = []
     for idx, item in enumerate(quiz):
@@ -391,26 +387,30 @@ async def submit_exam(
         else:
             salah += 1
             detail.append(False)
+            
     meta = normalized_anti_cheat(sess)
     if str(anti_cheat_detected).lower() in {"1", "true", "yes", "on"} or int(anti_cheat_count or 0) > 0:
         meta["violation_count"] = min(3, max(meta["violation_count"], int(anti_cheat_count or 0)))
         meta["reason"] = str(anti_cheat_reason or meta["reason"] or "Pindah tab")[:100]
         meta["detected"] = meta["violation_count"] >= 3 or str(anti_cheat_detected).lower() in {"1", "true", "yes", "on"}
     sess["anti_cheat"] = meta
+    
     update_tka_progress(
         session_id=session_id, nama=sess.get("nama", "Siswa"), jenjang=sess.get("config", {}).get("jenjang", "MTs"),
-        mapel=sess.get("config", {}).get("mapel", "Matematika"), soal_sekarang=TKA_TOTAL_QUESTIONS,
+        mapel=sess.get("config", {}).get("mapel", "Matematika"), soal_sekarang=total_soal,
         detail_jawaban=detail, status="SELESAI", questions=quiz, user_answers=answers, anti_cheat=meta,
     )
     sess["finished"] = True
-    score = int(round(benar / TKA_TOTAL_QUESTIONS * 100))
+    
+    # Kalkulasi nilai dinamis menyesuaikan total soal aktual
+    score = int(round(benar / total_soal * 100)) if total_soal > 0 else 0
     review_url = f"{STREAMLIT_URL.rstrip('/')}/?review_session={session_id}"
+    
     return templates.TemplateResponse(request=request, name="student_result.html", context={
         "nama": (sess.get("nama") or "Siswa").split()[0], "skor": score, "benar": benar,
-        "salah": salah, "kosong": kosong, "total": TKA_TOTAL_QUESTIONS,
+        "salah": salah, "kosong": kosong, "total": total_soal,
         "streamlit_url": review_url, "mode_label": "Latihan Mandiri" if sess.get("config", {}).get("mode") == "MANDIRI" else "By GuruMANTAP",
     })
-
 
 @app.post("/api/hint", response_class=HTMLResponse)
 async def hint(curr_idx: int = Form(...), mapel: str = Form(""), question: str = Form(""), attempt_input: str = Form("")):
