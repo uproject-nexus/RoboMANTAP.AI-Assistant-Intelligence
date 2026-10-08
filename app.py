@@ -1681,10 +1681,8 @@ if st.session_state.page == "landing":
     </div>
     """, unsafe_allow_html=True)
     
-    NO_WA_BOT = "6283141694735" # Nomor WA bot Anda
-    
-    tab_siswa, tab_guru = st.tabs(["👤 Saya Siswa", "🧕🏼 Saya Guru"])
-    
+    NO_WA_BOT = "6283141694735"
+    tab_siswa, tab_guru = st.tabs(["👤 Saya Siswa", "🧕🏼 Saya Guru"])    
     with tab_siswa:
         with st.form("form_wa_siswa"):
             s_nama = st.text_input("Nama Lengkap", placeholder="Masukkan Nama Lengkap Kamu")
@@ -1702,7 +1700,7 @@ if st.session_state.page == "landing":
                     st.error("Lengkapi semua data terlebih dahulu!")
                 else:
                     pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama} - {s_jenjang} - {s_kelas} - {s_absen}"
-                    link = f"https://wa.me/{6283141694735}?text={urllib.parse.quote(pesan)}"
+                    link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
                     st.markdown(f'<meta http-equiv="refresh" content="0;url={link}">', unsafe_allow_html=True)
                     st.success("Membuka WhatsApp...")
     
@@ -1720,7 +1718,7 @@ if st.session_state.page == "landing":
                     st.error("⚠️ Kode PIN Akses Guru salah. Siswa dilarang masuk area ini.")
                 else:
                     pesan = f"Halo RoboMANTAP! Saya [GURU] : {g_nama} - VALIDATED"
-                    link = f"https://wa.me/{6283141694735}?text={urllib.parse.quote(pesan)}"
+                    link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
                     st.markdown(f'<meta http-equiv="refresh" content="0;url={link}">', unsafe_allow_html=True)
                     st.success("Membuka WhatsApp...")
                     
