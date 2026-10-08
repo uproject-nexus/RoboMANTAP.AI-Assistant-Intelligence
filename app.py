@@ -1709,7 +1709,7 @@ if st.session_state.page == "landing":
     with tab_guru:
         with st.form("form_wa_guru"):
             g_nama = st.text_input("Nama Lengkap Ustadzah", placeholder="Masukkan Nama Lengkap Anda")
-            g_kode = st.text_input("Kode PIN Akses GuruMANTAP", type="password", help="Tanyakan kepada admin UPN untuk kode ini.", placeholder="Masukkan PIN GuruMANTAP")
+            g_kode = st.text_input("PIN Akses Guru", type="password", help="Tanyakan kepada admin UPN untuk kode ini.", placeholder="Masukkan PIN GuruMANTAP")
             
             btn_guru = st.form_submit_button("KIRIM PESAN SEKARANG! 💬", type="primary", use_container_width=True)
             
