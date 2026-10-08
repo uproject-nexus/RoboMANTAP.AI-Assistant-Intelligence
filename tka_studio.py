@@ -538,65 +538,67 @@ def render_tka_studio():
                                 )
 
     st.info(
-        f"🎯 Generator Studio membuat **tepat {TKA_GENERATION_QUESTIONS} soal per batch**. "
-        f"{jenjang} menggunakan opsi "
-        f"{', '.join(tka_option_labels(jenjang))} "
-        "untuk PG/MCMA. "
-        "Bentuk KATEGORI menggunakan respons "
-        "per pernyataan. Stimulus gambar opsional. "
-        "Durasi portal default 90 menit."
+        f"🎯 Generator Studio kini beradaptasi penuh dengan kebutuhan Anda. "
+        f"{jenjang} menggunakan opsi {', '.join(tka_option_labels(jenjang))} untuk PG/MCMA. "
+        "Bentuk KATEGORI menggunakan respons per pernyataan."
     )
 
-    st.caption(
-        "💡 Gambar/stimulus visual bersifat "
-        "**opsional**. Soal dapat berupa hitungan "
-        "biasa, teks, puisi, pidato, dialog, tabel, "
-        "grafik, atau stimulus gambar sesuai "
-        "kebutuhan mata uji."
-    )
+    # --- TAMBAHAN KONTROL DINAMIS UNTUK GURU MANTAP ---
+    col_opt1, col_opt2 = st.columns(2)
+    with col_opt1:
+        jumlah_soal_pilihan = st.pills(
+            "Pilih Jumlah Soal:",
+            [15, 20, 25],
+            default=15,
+            key="tka_studio_jumlah_soal",
+        )
+    with col_opt2:
+        masa_aktif_pilihan = st.selectbox(
+            "Pilih Masa Aktif Kuis:",
+            ["12 Jam", "24 Jam", "3 Hari"],
+            index=1,
+            key="tka_studio_masa_aktif"
+        )
+        # Mapping durasi string ke hitungan Jam
+        durasi_jam_map = {"12 Jam": 12, "24 Jam": 24, "3 Hari": 72}
+        jam_aktif = durasi_jam_map.get(masa_aktif_pilihan, 24)
+
+    # Jika guru iseng menghapus pilihan pill, kita kembalikan ke default 15
+    if not jumlah_soal_pilihan:
+        jumlah_soal_pilihan = 15
 
     if st.button(
-        f"✨ GENERATE {TKA_GENERATION_QUESTIONS} SOAL TKA",
+        f"✨ GENERATE {jumlah_soal_pilihan} SOAL TKA",
         type="primary",
         use_container_width=True,
-        key="generate_tka_30",
+        key="generate_tka_dinamis",
     ):
 
-        with st.spinner(
-            f"RoboMANTAP sedang menyusun tepat {TKA_GENERATION_QUESTIONS} soal TKA "
-            "(PG • MCMA • Kategori)..."
-        ):
-
+        with st.spinner(f"RoboMANTAP sedang menyusun tepat {jumlah_soal_pilihan} soal TKA (PG • MCMA • Kategori)..."):
             generated = generate_tka_studio(
                 jenjang=jenjang,
                 mapel=mapel,
                 mapel_type=mapel_type,
-                image_ids=selected_ids[:3],
+                image_ids=selected_ids[:5],
                 auto_select_images=False,
-                count=TKA_GENERATION_QUESTIONS,
+                count=jumlah_soal_pilihan, # Lempar variabel ini ke Engine
             )
 
-        if len(generated) == TKA_GENERATION_QUESTIONS:
-
-            st.session_state.tka_draft = (
-                generated
-            )
-
+        if len(generated) == jumlah_soal_pilihan:
+            st.session_state.tka_draft = generated
             st.session_state.tka_draft_config = {
                 "jenjang": jenjang,
                 "mapel": mapel,
                 "mapel_type": mapel_type,
                 "mode": "GURU",
-                "timer_seconds": (
-                    TKA_DEFAULT_DURATION_SECONDS
-                ),
-                "generation_count": TKA_GENERATION_QUESTIONS,
+                "timer_seconds": TKA_DEFAULT_DURATION_SECONDS,
+                "generation_count": jumlah_soal_pilihan,
                 "active_from": None,
                 "active_until": None,
-                "active_hours": (
-                    TKA_DEFAULT_ACTIVE_HOURS
-                ),
+                "active_hours": jam_aktif, # Lempar durasi pilihan guru 
             }
+            # Lanjut ke baris default UUID Anda seperti biasa...
+
 
             st.session_state.tka_default_code = (
                 f"TKA-"
@@ -867,47 +869,23 @@ def render_tka_studio():
             )
 
             st.caption(
-                f"Aktif otomatis 24 jam: "
-                f"{config.get('active_from','-')} WIB "
-                f"→ "
-                f"{config.get('active_until','-')} WIB"
+                f"Masa aktif ({config.get('active_hours', 24)} Jam) akan otomatis "
+                "dimulai saat Anda menekan tombol Terbitkan TKA."
             )
 
-            if st.button(
-                "🚀 TERBITKAN TKA",
-                type="primary",
-                use_container_width=True,
-                key="publish_tka",
-            ):
-
-                clean = _safe_code(
-                    code
-                )
-
+            if st.button("🚀 TERBITKAN TKA", type="primary", use_container_width=True, key="publish_tka"):
+                clean = _safe_code(code)
                 if not clean:
-
-                    st.warning(
-                        "Kode TKA tidak boleh kosong."
-                    )
-
+                    st.warning("Kode TKA tidak boleh kosong.")
                 else:
-
                     config["kode_tka"] = clean
-
                     publish_start = _now_wib()
-
-                    config[
-                        "active_from"
-                    ] = publish_start.isoformat()
-
-                    config[
-                        "active_until"
-                    ] = (
-                        publish_start
-                        + timedelta(
-                            hours=TKA_DEFAULT_ACTIVE_HOURS
-                        )
+                    config["active_from"] = publish_start.isoformat()
+                    # Menambahkan jam secara dinamis berdasarkan pilihan guru
+                    config["active_until"] = (
+                        publish_start + timedelta(hours=config.get("active_hours", 24))
                     ).isoformat()
+
 
                     if publish_tka_to_db(
                         clean,
