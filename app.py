@@ -1676,13 +1676,14 @@ if st.session_state.page == "landing":
     # --- UI KARTU PAKSAAN HALUS ---
     st.markdown("""
     <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border: 2px solid #3b82f6; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 25px; box-shadow: 0 8px 32px rgba(59, 130, 246, 0.2);">
-        <h3 style="color: #60a5fa; font-size: 14px; margin-top: 0;">🚀 HUBUNGI WA RoboMANTAP SEKARANG!</h3>
-        <p style="color: #cbd5e1; font-size: 12px;">Dapatkan kemudahan belajar yang lebih efektif, efisien, dan lengkap. Kapan saja, di mana saja!</p>
+        <h3 style="color: #60a5fa; font-size: 15px; margin-top: 0;">🚀 HUBUNGI WA RoboMANTAP SEKARANG!</h3>
+        <p style="color: #cbd5e1; font-size: 10px;">Dapatkan kemudahan belajar yang lebih efektif, efisien, dan lengkap. Kapan saja, di mana saja!</p>
     </div>
     """, unsafe_allow_html=True)
     
     NO_WA_BOT = "6283141694735"
     tab_siswa, tab_guru = st.tabs(["👤 Saya Siswa", "🧕🏼 Saya Guru"])    
+    
     with tab_siswa:
         with st.form("form_wa_siswa"):
             s_nama = st.text_input("Nama Lengkap", placeholder="Masukkan Nama Lengkap Kamu")
@@ -1693,34 +1694,51 @@ if st.session_state.page == "landing":
             with c2:
                 s_absen = st.text_input("Nomor Absen", placeholder="Contoh: 03")
                 
-            btn_siswa = st.form_submit_button("KIRIM PESAN SEKARANG! 💬", type="primary", use_container_width=True)
+            btn_siswa = st.form_submit_button("SINKRONISASI DATA 💬", type="primary", use_container_width=True)
             
-            if btn_siswa:
-                if not s_nama or not s_kelas or not s_absen:
-                    st.error("Lengkapi semua data terlebih dahulu!")
-                else:
-                    pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama} - {s_jenjang} - {s_kelas} - {s_absen}"
-                    link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
-                    st.markdown(f'<meta http-equiv="refresh" content="0;url={link}">', unsafe_allow_html=True)
-                    st.success("Membuka WhatsApp...")
+        # Pengecekan diletakkan di LUAR st.form agar bisa memunculkan tombol HTML baru
+        if btn_siswa:
+            if not s_nama or not s_kelas or not s_absen:
+                st.error("Lengkapi semua data terlebih dahulu!")
+            else:
+                pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama} - {s_jenjang} - {s_kelas} - {s_absen}"
+                link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
+                
+                st.success("✅ Data Siap! Klik tombol di bawah untuk masuk ke obrolan WhatsApp.")
+                # Menggunakan HTML Anchor Tag target="_blank" seperti di student_intelligence
+                st.markdown(f"""
+                <a href="{link}" target="_blank" style="text-decoration: none;">
+                    <div style="background-color: #25D366; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 10px;">
+                        Buka WhatsApp RoboMANTAP 🚀
+                    </div>
+                </a>
+                """, unsafe_allow_html=True)
     
     with tab_guru:
         with st.form("form_wa_guru"):
             g_nama = st.text_input("Nama Lengkap Ustadzah", placeholder="Masukkan Nama Lengkap Anda")
             g_kode = st.text_input("PIN Akses Guru", type="password", help="Tanyakan kepada admin UPN untuk kode ini.", placeholder="Masukkan PIN GuruMANTAP")
             
-            btn_guru = st.form_submit_button("KIRIM PESAN SEKARANG! 💬", type="primary", use_container_width=True)
+            btn_guru = st.form_submit_button("SINKRONISASI DATA 💬", type="primary", use_container_width=True)
             
-            if btn_guru:
-                if not g_nama or not g_kode:
-                    st.error("Nama dan Kode Akses wajib diisi!")
-                elif g_kode != "MANTAP2026": # Ganti dengan kode rahasia yang Anda inginkan
-                    st.error("⚠️ Kode PIN Akses Guru salah. Siswa dilarang masuk area ini.")
-                else:
-                    pesan = f"Halo RoboMANTAP! Saya [GURU] : {g_nama} - VALIDATED"
-                    link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
-                    st.markdown(f'<meta http-equiv="refresh" content="0;url={link}">', unsafe_allow_html=True)
-                    st.success("Membuka WhatsApp...")
+        if btn_guru:
+            if not g_nama or not g_kode:
+                st.error("Nama dan Kode Akses wajib diisi!")
+            elif g_kode != "MANTAP2026": 
+                st.error("⚠️ Kode PIN Akses Guru salah. Siswa dilarang masuk area ini.")
+            else:
+                pesan = f"Halo RoboMANTAP! Saya [GURU] : {g_nama} - VALIDATED"
+                link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
+                
+                st.success("✅ Akses diverifikasi! Klik tombol di bawah untuk masuk ke obrolan WhatsApp.")
+                st.markdown(f"""
+                <a href="{link}" target="_blank" style="text-decoration: none;">
+                    <div style="background-color: #25D366; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 10px;">
+                        Buka WhatsApp RoboMANTAP 🚀
+                    </div>
+                </a>
+                """, unsafe_allow_html=True)
+
                     
     st.write("---")
     st.markdown("#### 🎓 TKA RoboMANTAP")
