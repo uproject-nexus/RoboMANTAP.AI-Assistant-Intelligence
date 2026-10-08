@@ -15,8 +15,8 @@ from ai_engine import append_text_with_fractions, clean_math_string
 from tka_engine import get_tka_image
 
 
-IMAGE_WIDTH_IN = 7 / 2.54
-IMAGE_HEIGHT_IN = 13 / 2.54
+IMAGE_WIDTH_IN = 10 / 2.54
+IMAGE_HEIGHT_IN = 10 / 2.54
 
 
 def _add_stimulus_image(doc: Document, image_data) -> None:
