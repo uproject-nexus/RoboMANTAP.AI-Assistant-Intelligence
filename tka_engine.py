@@ -4,6 +4,7 @@ import json
 import os
 import random
 import re
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -26,6 +27,11 @@ TKA_TOTAL_QUESTIONS = 30
 TKA_GENERATION_QUESTIONS = 15
 TKA_GENERATION_MAX_ATTEMPTS = 2
 TKA_GENERATION_MAX_IMAGES = 3
+# Studio selalu menghasilkan tepat 15 soal, tetapi dikirim ke AI dalam
+# tiga request kecil agar tidak terkena 504 DEADLINE_EXCEEDED.
+TKA_STUDIO_BATCH_SIZE = 5
+TKA_STUDIO_BATCH_TYPES = ("PG", "MCMA", "KATEGORI")
+TKA_STUDIO_RETRY_BACKOFF_SECONDS = 1.5
 TKA_DEFAULT_DURATION_SECONDS = 75 * 60
 TKA_DEFAULT_ACTIVE_HOURS = 24
 TKA_IMAGE_MAX_BYTES = 8 * 1024 * 1024
@@ -1581,11 +1587,11 @@ def generate_tka_questions_batch(
     count: int,
     image_records: list[dict] | None = None,
 ) -> list[dict]:
-    """Generate one bounded batch. Never fan out over every API key/model.
+    """Generate one bounded AI batch.
 
-    The old implementation tried every configured client against every model.
-    With many API keys, a timeout could therefore multiply into tens of minutes.
-    Studio generation now makes at most TKA_GENERATION_MAX_ATTEMPTS calls.
+    This function is intentionally small: Studio calls it with 5 questions
+    per request instead of asking Gemini for all 15 questions at once.
+    generate_tka_30() remains unchanged and may still request 30 questions.
     """
     clients = get_gemini_clients()
     if not clients or count <= 0:
@@ -1618,26 +1624,36 @@ def generate_tka_questions_batch(
                 f"Stimulus gambar {n}: {record.get('filename', '')}"
             )
 
+    normalized_jenjang = normalize_tka_jenjang(jenjang)
+    normalized_type = _normalize_question_type(question_type)
+
     contents.append(
         _tka_prompt(
-            jenjang=normalize_tka_jenjang(jenjang),
+            jenjang=normalized_jenjang,
             mapel=tka_mapel_name(mapel),
-            question_type=question_type,
+            question_type=normalized_type,
             count=count,
             image_count=len(records),
             image_ids=image_ids,
         )
     )
 
-    # Hanya dua percobaan maksimum: key/model pertama, lalu key kedua jika ada.
-    # Ini mencegah spinner menggantung lama ketika banyak API key tersedia.
+    # Jangan mencoba semua API key. Dua percobaan maksimum cukup untuk
+    # menghindari spinner panjang ketika layanan Gemini sedang padat.
     attempts = []
     for client in clients[:2]:
         attempts.append((client, TKA_MODELS[0]))
         if len(attempts) >= TKA_GENERATION_MAX_ATTEMPTS:
             break
 
-    for client, model in attempts:
+    # KATEGORI membutuhkan output lebih panjang daripada PG/MCMA, tetapi
+    # tetap jauh lebih kecil daripada request campuran 15 soal.
+    if normalized_type == "KATEGORI":
+        max_output_tokens = 6500
+    else:
+        max_output_tokens = 5000
+
+    for attempt_no, (client, model) in enumerate(attempts, 1):
         try:
             from google.genai import types
 
@@ -1647,7 +1663,7 @@ def generate_tka_questions_batch(
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     temperature=0.25,
-                    max_output_tokens=11000,
+                    max_output_tokens=max_output_tokens,
                 ),
             )
 
@@ -1658,22 +1674,36 @@ def generate_tka_questions_batch(
                 m = re.search(r"\{.*\}", raw, flags=re.S)
                 data = json.loads(m.group(0), strict=False) if m else {}
 
+            if not isinstance(data, dict):
+                data = {}
+
             normalized = _normalize_tka_questions(
                 data.get("questions", []),
-                jenjang,
+                normalized_jenjang,
                 image_ids,
             )
 
             if len(normalized) == count:
+                print(
+                    f"[TKA AI] batch {normalized_type} berhasil: "
+                    f"{len(normalized)}/{count} soal (attempt {attempt_no})."
+                )
                 return normalized
 
             print(
-                f"[TKA AI] output tidak lengkap: "
-                f"{len(normalized)}/{count} soal."
+                f"[TKA AI] batch {normalized_type} output tidak lengkap/invalid: "
+                f"{len(normalized)}/{count} soal (attempt {attempt_no})."
             )
 
         except Exception as exc:
-            print(f"[TKA AI] {type(exc).__name__}: {exc}")
+            print(
+                f"[TKA AI] batch {normalized_type} gagal "
+                f"(attempt {attempt_no}/{len(attempts)}): "
+                f"{type(exc).__name__}: {exc}"
+            )
+
+        if attempt_no < len(attempts):
+            time.sleep(TKA_STUDIO_RETRY_BACKOFF_SECONDS)
 
     return []
 
@@ -1687,22 +1717,43 @@ def generate_tka_studio(
     auto_select_images: bool = False,
     count: int = TKA_GENERATION_QUESTIONS,
 ) -> list[dict]:
-    """Fast Studio generator. Default is exactly 15 questions.
+    """Generate exactly 15 Studio questions using three internal 5-question batches.
 
-    This is deliberately separate from generate_tka_30(), which is used by
-    the student portal and remains locked at 30 questions.
+    IMPORTANT:
+    - User-visible result is always exactly 15 questions.
+    - 15 is split internally into 5 PG + 5 MCMA + 5 KATEGORI.
+    - A partial result is NEVER returned.
+    - 75-minute duration is controlled elsewhere by
+      TKA_DEFAULT_DURATION_SECONDS and is not changed here.
+    - generate_tka_30() is intentionally untouched for the student portal.
     """
     jenjang = normalize_tka_jenjang(jenjang)
     mapel = tka_mapel_name(mapel)
-    count = max(1, min(int(count or TKA_GENERATION_QUESTIONS), TKA_GENERATION_QUESTIONS))
 
-    selected = list(dict.fromkeys(str(x) for x in (image_ids or []) if x))[:TKA_GENERATION_MAX_IMAGES]
+    # Studio requirement is fixed at exactly 15. Do not silently downgrade
+    # to 5 or 10 if an old UI/API caller sends another value.
+    requested_count = int(count or TKA_GENERATION_QUESTIONS)
+    if requested_count != TKA_GENERATION_QUESTIONS:
+        print(
+            f"[TKA STUDIO] count={requested_count} diabaikan; "
+            f"Studio dikunci tepat {TKA_GENERATION_QUESTIONS} soal."
+        )
+    count = TKA_GENERATION_QUESTIONS
+
+    selected = list(
+        dict.fromkeys(
+            str(x) for x in (image_ids or []) if x
+        )
+    )[:TKA_GENERATION_MAX_IMAGES]
 
     if not selected and auto_select_images:
         selected = [
             str(x["image_id"])
             for x in list_tka_images(
-                source_type="SYSTEM", jenjang=jenjang, mapel=mapel, limit=TKA_GENERATION_MAX_IMAGES
+                source_type="SYSTEM",
+                jenjang=jenjang,
+                mapel=mapel,
+                limit=TKA_GENERATION_MAX_IMAGES,
             )
         ]
 
@@ -1712,17 +1763,53 @@ def generate_tka_studio(
         if record:
             image_records.append(record)
 
-    batch = generate_tka_questions_batch(
-        jenjang=jenjang,
-        mapel=mapel,
-        question_type="MIXED",
-        count=count,
-        image_records=image_records,
+    print(
+        f"[TKA STUDIO] mulai generate tepat {count} soal: "
+        f"3 batch x {TKA_STUDIO_BATCH_SIZE} "
+        f"({', '.join(TKA_STUDIO_BATCH_TYPES)}), "
+        f"gambar={len(image_records)}."
     )
 
-    for idx, question in enumerate(batch, 1):
+    all_questions: list[dict] = []
+
+    # Semua batch wajib berhasil. Kalau satu saja gagal, return [] agar tidak
+    # ada penyimpanan/publish parsial yang tampak seperti kuis lengkap.
+    for question_type in TKA_STUDIO_BATCH_TYPES:
+        batch = generate_tka_questions_batch(
+            jenjang=jenjang,
+            mapel=mapel,
+            question_type=question_type,
+            count=TKA_STUDIO_BATCH_SIZE,
+            image_records=image_records,
+        )
+
+        if len(batch) != TKA_STUDIO_BATCH_SIZE:
+            print(
+                f"[TKA STUDIO] GAGAL: batch {question_type} hanya "
+                f"{len(batch)}/{TKA_STUDIO_BATCH_SIZE}. "
+                "Tidak mengembalikan hasil parsial."
+            )
+            return []
+
+        all_questions.extend(batch)
+        print(
+            f"[TKA STUDIO] batch {question_type} selesai: "
+            f"{len(batch)}/{TKA_STUDIO_BATCH_SIZE}; "
+            f"total sementara {len(all_questions)}/{count}."
+        )
+
+    if len(all_questions) != count:
+        print(
+            f"[TKA STUDIO] GAGAL validasi jumlah akhir: "
+            f"{len(all_questions)}/{count}."
+        )
+        return []
+
+    for idx, question in enumerate(all_questions, 1):
         question["id"] = idx
-    return batch
+
+    print(f"[TKA STUDIO] BERHASIL: {len(all_questions)}/{count} soal.")
+    return all_questions
 
 
 def generate_tka_30(
