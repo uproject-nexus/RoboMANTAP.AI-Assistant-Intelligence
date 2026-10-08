@@ -21,7 +21,7 @@ from ai_engine import (
     _split_option_label,
 )
 
-TKA_TOTAL_QUESTIONS = 30
+TKA_TOTAL_QUESTIONS = 15
 # Generator Studio dibuat ringan: satu batch hanya 5 soal.
 # Ini TIDAK mengubah requirement portal siswa yang tetap 30 soal.
 TKA_GENERATION_QUESTIONS = 15
