@@ -1676,8 +1676,8 @@ if st.session_state.page == "landing":
     # --- UI KARTU PAKSAAN HALUS ---
     st.markdown("""
     <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border: 1px solid #3b82f6; border-radius: 8px; padding: 8px 14px; text-align: center; margin-bottom: 25px; box-shadow: 0 8px 32px rgba(59, 130, 246, 0.2);">
-        <h3 style="color: #60a5fa; font-size: 14px; margin-bottom: 2px;">🚀 HUBUNGI WA RoboMANTAP SEKARANG!</h3>
-        <p style="color: #cbd5e1; font-size: 11px; line-height: 1.3;">Ruang Belajar yang lebih efektif, efisien, dan lengkap. Kapan saja, di mana saja!</p>
+        <h3 style="color: #60a5fa; font-size: 18px; margin-bottom: 2px;">🚀 HUBUNGI WA RoboMANTAP SEKARANG!</h3>
+        <p style="color: #cbd5e1; font-size: 9px; line-height: 1.3;">Ruang Belajar yang lebih efektif, efisien, dan lengkap. Kapan saja, di mana saja!</p>
     </div>
     """, unsafe_allow_html=True)
     
