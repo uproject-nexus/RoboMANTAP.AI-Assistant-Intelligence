@@ -1696,7 +1696,7 @@ if st.session_state.page == "landing":
     """, unsafe_allow_html=True)
     
     NO_WA_BOT = "6283141694735"
-    tab_siswa, tab_guru = st.tabs(["👤 Saya Siswa", "🧕🏼 Saya Guru"])    
+    tab_siswa, tab_guru = st.tabs(["👤 Siswa", "🧕🏼 Guru"])    
     
     with tab_siswa:
         with st.form("form_wa_siswa"):
