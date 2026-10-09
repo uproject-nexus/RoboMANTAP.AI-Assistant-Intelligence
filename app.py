@@ -1674,6 +1674,7 @@ if st.session_state.page == "landing":
             st.rerun()
     
     # --- UI KARTU PAKSAAN HALUS ---
+    st.write("---")
     st.markdown("""
     <div style="
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
@@ -1755,7 +1756,7 @@ if st.session_state.page == "landing":
                     
     st.write("---")
     st.markdown("#### 🎓 TKA RoboMANTAP")
-    st.caption("Portal latihan TKA Mandiri dan latihan yang diterbitkan GuruMANTAP.")
+    st.caption("Latihan TKA Mandiri atau yang diterbitkan GuruMANTAP.")
     st.markdown(
         f"""
         <a href="{TKA_PORTAL_URL}" target="_blank" style="text-decoration: none; color: #020617;">
