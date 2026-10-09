@@ -1680,8 +1680,8 @@ if st.session_state.page == "landing":
         <p style="color: #cbd5e1; font-size: 10px; line-height: 1.3;">Ruang Belajar yang lebih efektif, efisien, dan lengkap. Kapan saja, di mana saja!</p>
     </div>
     <div style="
-        background-color: #0b1329;
-        border: 1px solid #1e3a8a;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        border: 1px solid #3b82f6;
         border-radius: 8px;
         padding: 8px 14px;
         text-align: center;
