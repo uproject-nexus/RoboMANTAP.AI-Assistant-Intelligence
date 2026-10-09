@@ -1787,7 +1787,7 @@ if st.session_state.page == "landing":
 
     st.write("---")
     st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
-    st.caption("Ikuti kuis interaktif yang disiapkan langsung oleh GuruMANTAP!")
+    st.caption("Yuk, ikuti kuis interaktif yang disiapkan GuruMANTAP!")
     
     # Tombol Futuristik Neon Emerald yang Mengarah ke Render
     st.markdown(
