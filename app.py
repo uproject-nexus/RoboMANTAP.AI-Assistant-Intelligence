@@ -1756,7 +1756,7 @@ if st.session_state.page == "landing":
                     
     st.write("---")
     st.markdown("#### 🎓 TKA RoboMANTAP")
-    st.caption("Latihan TKA Mandiri atau yang diterbitkan GuruMANTAP.")
+    st.caption("Yuk mulai latihan, agar lebih siap menghadapi TKA 2026!")
     st.markdown(
         f"""
         <a href="{TKA_PORTAL_URL}" target="_blank" style="text-decoration: none; color: #020617;">
@@ -1787,7 +1787,7 @@ if st.session_state.page == "landing":
 
     st.write("---")
     st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
-    st.caption("Klik tombol dibawah ini untuk menuju Portal Kuis!")
+    st.caption("Ikuti kuis interaktif yang disiapkan langsung oleh GuruMANTAP!")
     
     # Tombol Futuristik Neon Emerald yang Mengarah ke Render
     st.markdown(
