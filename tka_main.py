@@ -174,7 +174,7 @@ async def mandiri_start(
     questions = generate_tka_30(jenjang=jenjang, mapel=mapel, auto_select_images=True)
     if len(questions) != TKA_TOTAL_QUESTIONS:
         return templates.TemplateResponse(request=request, name="student_login.html", context={
-            "error": "⚠️ RoboMANTAP belum berhasil menyiapkan paket simulasi TKA. Coba lagi beberapa saat. Mata uji pilihan berbasis teks tidak memerlukan Library Gambar; mata uji tertentu hanya memakai gambar yang sesuai jika tersedia.",
+            "error": "⚠️ RoboMANTAP belum berhasil menyiapkan paket simulasi TKA. Pastikan Library Gambar TKA sudah memiliki stimulus dan coba lagi.",
             "mode": "mandiri",
         })
     session_id = str(uuid.uuid4())[:8]
