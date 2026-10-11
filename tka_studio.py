@@ -26,6 +26,7 @@ from tka_engine import (
     publish_tka_to_db,
     save_tka_image,
     tka_option_labels,
+    tka_stimulus_policy,
     validate_tka_questions,
     validate_tka_30,
 )
@@ -216,7 +217,7 @@ def render_tka_studio():
                 review → token → siswa
             </div>
             <div class="premium-pills">
-                <span>30 SOAL PORTAL</span>
+                <span>15 / 20 / 25 SOAL</span>
                 <span>PG • MCMA • KATEGORI</span>
                 <span>AI GROUNDED</span>
                 <span>24 JAM</span>
@@ -254,288 +255,303 @@ def render_tka_studio():
     mapel, mapel_type = _mapel_controls(
         jenjang
     )
-
-    st.markdown(
-        "### 🖼️ Sumber Gambar / Stimulus TKA"
-    )
-
-    source_mode = st.radio(
-        "Sumber stimulus",
-        [
-            "Pilih dari Library TKA",
-            "Upload Gambar Baru",
-        ],
-        horizontal=True,
-        key="tka_source_mode",
-    )
+    stimulus_policy = tka_stimulus_policy(jenjang, mapel, mapel_type)
 
     selected_ids: list[str] = []
-
-    if source_mode == "Upload Gambar Baru":
-
-        owner_type = st.radio(
-            "Simpan sebagai",
-            [
-                "Gambar Guru",
-                "Gambar Sistem UPN",
-            ],
-            horizontal=True,
-            key="tka_owner_type",
+    if stimulus_policy["mode"] == "TEXT_ONLY":
+        st.markdown("### 📝 Stimulus Teks TKA")
+        st.info(
+            f"**{mapel} — mode teks penuh.** Generator tidak akan memakai gambar. "
+            "AI akan membuat narasi/kasus/teks berjudul yang relevan dan dapat dipakai "
+            "bersama oleh beberapa soal bila sesuai."
         )
-
-        uploads = st.file_uploader(
-            f"Upload 1–5 gambar stimulus untuk "
-            f"{mapel} • {jenjang}",
-            type=[
-                "jpg",
-                "jpeg",
-                "png",
-                "webp",
-            ],
-            accept_multiple_files=True,
-            key="tka_image_uploads",
-            help=(
-                "Metadata jenjang dan mapel "
-                "mengikuti filter aktif."
-            ),
+    else:
+        st.markdown(
+            "### 🖼️ Sumber Gambar / Stimulus TKA"
         )
+        if stimulus_policy["mode"] == "MAPPED_IMAGES":
+            st.info(
+                f"Stimulus untuk **{mapel}** diambil dari Library mata uji "
+                f"**{stimulus_policy['source_mapel']} • {stimulus_policy['source_jenjang']}**. "
+                "Maksimal dua gambar unik; jika tidak tersedia, AI tetap membuat soal berbasis teks."
+            )
 
-        if uploads:
+        if stimulus_policy["mode"] == "MAPPED_IMAGES":
+            source_mode = "Pilih dari Library TKA"
+        else:
+            source_mode = st.radio(
+                "Sumber stimulus",
+                ["Pilih dari Library TKA", "Upload Gambar Baru"],
+                horizontal=True,
+                key="tka_source_mode",
+            )
 
-            if len(uploads) > 5:
-                st.warning(
-                    "Maksimal 5 stimulus digunakan "
-                    "untuk satu paket. Hanya 5 pertama "
-                    "yang dipakai."
-                )
+        if source_mode == "Upload Gambar Baru":
 
-            if st.button(
-                "💾 Simpan ke Library TKA",
-                type="secondary",
-                use_container_width=True,
-                key="save_tka_images",
-            ):
+            owner_type = st.radio(
+                "Simpan sebagai",
+                [
+                    "Gambar Guru",
+                    "Gambar Sistem UPN",
+                ],
+                horizontal=True,
+                key="tka_owner_type",
+            )
 
-                source = (
-                    "SYSTEM"
-                    if owner_type
-                    == "Gambar Sistem UPN"
-                    else "GURU"
-                )
+            uploads = st.file_uploader(
+                f"Upload 1–5 gambar stimulus untuk "
+                f"{mapel} • {jenjang}",
+                type=[
+                    "jpg",
+                    "jpeg",
+                    "png",
+                    "webp",
+                ],
+                accept_multiple_files=True,
+                key="tka_image_uploads",
+                help=(
+                    "Metadata jenjang dan mapel "
+                    "mengikuti filter aktif."
+                ),
+            )
 
-                owner = (
-                    "UPN-SYSTEM"
-                    if source == "SYSTEM"
-                    else (
-                        teacher_name.strip()
-                        or "GuruMANTAP"
-                    )
-                )
+            if uploads:
 
-                saved = []
-
-                for item in uploads[:5]:
-
-                    topic = infer_tka_topic(
-                        item.name,
-                        jenjang,
-                        mapel,
-                    )
-
-                    image_id = save_tka_image(
-                        data=item.getvalue(),
-                        filename=item.name,
-                        mime_type=(
-                            item.type
-                            or "image/png"
-                        ),
-                        source_type=source,
-                        owner_key=owner,
-                        jenjang=jenjang,
-                        mapel=mapel,
-                        topic=topic,
+                if len(uploads) > 5:
+                    st.warning(
+                        "Maksimal 5 stimulus digunakan "
+                        "untuk satu paket. Hanya 5 pertama "
+                        "yang dipakai."
                     )
 
-                    if image_id:
-                        saved.append(
-                            image_id
+                if st.button(
+                    "💾 Simpan ke Library TKA",
+                    type="secondary",
+                    use_container_width=True,
+                    key="save_tka_images",
+                ):
+
+                    source = (
+                        "SYSTEM"
+                        if owner_type
+                        == "Gambar Sistem UPN"
+                        else "GURU"
+                    )
+
+                    owner = (
+                        "UPN-SYSTEM"
+                        if source == "SYSTEM"
+                        else (
+                            teacher_name.strip()
+                            or "GuruMANTAP"
+                        )
+                    )
+
+                    saved = []
+
+                    for item in uploads[:5]:
+
+                        topic = infer_tka_topic(
+                            item.name,
+                            jenjang,
+                            mapel,
                         )
 
-                st.session_state[
-                    "tka_selected_image_ids"
-                ] = saved
+                        image_id = save_tka_image(
+                            data=item.getvalue(),
+                            filename=item.name,
+                            mime_type=(
+                                item.type
+                                or "image/png"
+                            ),
+                            source_type=source,
+                            owner_key=owner,
+                            jenjang=jenjang,
+                            mapel=mapel,
+                            topic=topic,
+                        )
 
-                st.success(
-                    f"✅ {len(saved)} gambar tersimpan "
-                    f"untuk {mapel} • {jenjang}."
-                )
+                        if image_id:
+                            saved.append(
+                                image_id
+                            )
 
-                st.rerun(
-                    scope="fragment"
-                )
+                    st.session_state[
+                        "tka_selected_image_ids"
+                    ] = saved
 
-        selected_ids = (
-            st.session_state.get(
-                "tka_selected_image_ids",
-                [],
-            )[:5]
-        )
+                    st.success(
+                        f"✅ {len(saved)} gambar tersimpan "
+                        f"untuk {mapel} • {jenjang}."
+                    )
 
-        if selected_ids:
-            st.caption(
-                f"Stimulus aktif: "
-                f"{len(selected_ids)} gambar"
-            )
+                    st.rerun(
+                        scope="fragment"
+                    )
 
-    else:
-
-        source_filter = st.selectbox(
-            "Filter sumber library",
-            [
-                "Semua: Sistem + Gambar Saya",
-                "Gambar Sistem",
-                "Gambar Saya",
-            ],
-            key="tka_library_source_filter",
-        )
-
-        search_term = st.text_input(
-            "🔎 Cari stimulus",
-            placeholder=(
-                "Contoh: lingkaran, peluang, "
-                "teks eksposisi, sistem pernapasan..."
-            ),
-            key="tka_library_search",
-            help=(
-                "Pencarian hanya dilakukan pada gambar "
-                "yang sudah lolos filter jenjang dan "
-                "mata uji."
-            ),
-        )
-
-        owner = (
-            teacher_name.strip()
-            or "GuruMANTAP"
-        )
-
-        source_type = None
-        owner_key = owner
-
-        if source_filter == "Gambar Sistem":
-            source_type = "SYSTEM"
-            owner_key = None
-
-        elif source_filter == "Gambar Saya":
-            source_type = "GURU"
-
-        library = list_tka_images(
-            source_type=source_type,
-            owner_key=owner_key,
-            jenjang=jenjang,
-            mapel=mapel,
-            search=search_term,
-            limit=200,
-        )
-
-        if not library:
-            st.info(
-                f"Belum ada stimulus yang cocok "
-                f"untuk **{mapel} • {jenjang}** "
-                "dengan filter saat ini."
-            )
-
-        else:
-
-            labels = {
-                str(x["image_id"]):
-                    f"{x['filename']} • "
-                    f"{x.get('source_type','GURU')} • "
-                    f"{x.get('topic') or infer_tka_topic(x['filename'], jenjang, mapel)}"
-                for x in library
-            }
-
-            options = [
-                str(x["image_id"])
-                for x in library
-            ]
-
-            valid_previous = [
-                str(x)
-                for x in st.session_state.get(
-                    "tka_library_selection",
+            selected_ids = (
+                st.session_state.get(
+                    "tka_selected_image_ids",
                     [],
-                )
-                if str(x) in options
-            ]
-
-            st.session_state[
-                "tka_library_selection"
-            ] = valid_previous
-
-            selected_ids = st.multiselect(
-                f"Pilih maksimal 5 stimulus • "
-                f"{mapel} • {jenjang}",
-                options,
-                max_selections=5,
-                format_func=lambda x:
-                    labels.get(x, x),
-                key="tka_library_selection",
+                )[:5]
             )
 
             if selected_ids:
-
                 st.caption(
-                    f"Stimulus dipilih: "
-                    f"{len(selected_ids)}/5"
+                    f"Stimulus aktif: "
+                    f"{len(selected_ids)} gambar"
                 )
 
-                cols = st.columns(
-                    min(
-                        5,
-                        len(selected_ids),
-                    )
+        else:
+
+            source_filter = st.selectbox(
+                "Filter sumber library",
+                [
+                    "Semua: Sistem + Gambar Saya",
+                    "Gambar Sistem",
+                    "Gambar Saya",
+                ],
+                key="tka_library_source_filter",
+            )
+
+            search_term = st.text_input(
+                "🔎 Cari stimulus",
+                placeholder=(
+                    "Contoh: lingkaran, peluang, "
+                    "teks eksposisi, sistem pernapasan..."
+                ),
+                key="tka_library_search",
+                help=(
+                    "Pencarian hanya dilakukan pada gambar "
+                    "yang sudah lolos filter jenjang dan "
+                    "mata uji."
+                ),
+            )
+
+            owner = (
+                teacher_name.strip()
+                or "GuruMANTAP"
+            )
+
+            source_type = None
+            owner_key = owner
+
+            if source_filter == "Gambar Sistem":
+                source_type = "SYSTEM"
+                owner_key = None
+
+            elif source_filter == "Gambar Saya":
+                source_type = "GURU"
+
+            library_jenjang = stimulus_policy.get("source_jenjang") or jenjang
+            library_mapel = stimulus_policy.get("source_mapel") or mapel
+            library = list_tka_images(
+                source_type=source_type,
+                owner_key=owner_key,
+                jenjang=library_jenjang,
+                mapel=library_mapel,
+                search=search_term,
+                limit=200,
+            )
+
+            if not library:
+                st.info(
+                    f"Belum ada stimulus yang cocok untuk **{library_mapel} • {library_jenjang}** "
+                    "dengan filter saat ini. Generator akan tetap membuat soal berbasis teks."
                 )
 
-                selected_lookup = {
-                    str(x["image_id"]): x
+            else:
+
+                labels = {
+                    str(x["image_id"]):
+                        f"{x['filename']} • "
+                        f"{x.get('source_type','GURU')} • "
+                        f"{x.get('topic') or infer_tka_topic(x['filename'], jenjang, mapel)}"
                     for x in library
                 }
 
-                for col, image_id in zip(
-                    cols,
-                    selected_ids,
-                ):
+                options = [
+                    str(x["image_id"])
+                    for x in library
+                ]
 
-                    record = get_tka_image(
-                        image_id
+                valid_previous = [
+                    str(x)
+                    for x in st.session_state.get(
+                        "tka_library_selection",
+                        [],
+                    )
+                    if str(x) in options
+                ]
+
+                st.session_state[
+                    "tka_library_selection"
+                ] = valid_previous
+
+                selected_ids = st.multiselect(
+                    f"Pilih maksimal 5 stimulus • "
+                    f"{mapel} • {jenjang}",
+                    options,
+                    max_selections=5,
+                    format_func=lambda x:
+                        labels.get(x, x),
+                    key="tka_library_selection",
+                )
+
+                if selected_ids:
+
+                    st.caption(
+                        f"Stimulus dipilih: "
+                        f"{len(selected_ids)}/5"
                     )
 
-                    if record:
+                    cols = st.columns(
+                        min(
+                            5,
+                            len(selected_ids),
+                        )
+                    )
 
-                        with col:
+                    selected_lookup = {
+                        str(x["image_id"]): x
+                        for x in library
+                    }
 
-                            image = (
-                                _image_for_streamlit(
-                                    record.get(
-                                        "image_data"
+                    for col, image_id in zip(
+                        cols,
+                        selected_ids,
+                    ):
+
+                        record = get_tka_image(
+                            image_id
+                        )
+
+                        if record:
+
+                            with col:
+
+                                image = (
+                                    _image_for_streamlit(
+                                        record.get(
+                                            "image_data"
+                                        )
                                     )
                                 )
-                            )
 
-                            if image is not None:
-                                st.image(
-                                    image,
-                                    caption=(
-                                        selected_lookup.get(
-                                            image_id,
-                                            record,
-                                        ).get(
-                                            "filename",
-                                            "Stimulus",
-                                        )
-                                    ),
-                                    use_container_width=True,
-                                )
+                                if image is not None:
+                                    st.image(
+                                        image,
+                                        caption=(
+                                            selected_lookup.get(
+                                                image_id,
+                                                record,
+                                            ).get(
+                                                "filename",
+                                                "Stimulus",
+                                            )
+                                        ),
+                                        use_container_width=True,
+                                    )
 
     st.info(
         f"🎯 Generator Studio kini beradaptasi penuh dengan kebutuhan Anda. "
@@ -580,8 +596,9 @@ def render_tka_studio():
                 mapel=mapel,
                 mapel_type=mapel_type,
                 image_ids=selected_ids[:5],
-                auto_select_images=False,
-                count=jumlah_soal_pilihan, # Lempar variabel ini ke Engine
+                auto_select_images=True,
+                count=jumlah_soal_pilihan,
+                owner_key=teacher_name.strip() or "GuruMANTAP",
             )
 
         if len(generated) == jumlah_soal_pilihan:
@@ -606,14 +623,14 @@ def render_tka_studio():
             )
 
             st.success(
-                f"✅ {TKA_GENERATION_QUESTIONS} soal berhasil dibuat "
+                f"✅ {jumlah_soal_pilihan} soal berhasil dibuat "
                 "dan siap direview."
             )
 
         else:
 
             st.error(
-                f"❌ AI belum menghasilkan tepat {TKA_GENERATION_QUESTIONS} soal. Paket tidak disimpan agar "
+                f"❌ AI belum menghasilkan tepat {jumlah_soal_pilihan} soal. Paket tidak disimpan agar "
                 "tidak ada TKA parsial."
             )
 

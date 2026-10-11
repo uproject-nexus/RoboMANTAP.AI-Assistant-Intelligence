@@ -21,15 +21,16 @@ from ai_engine import (
     _split_option_label,
 )
 
-# Latihan Mandiri TKA menggunakan tepat 15 soal. Studio Guru tetap dapat
-# memilih paket 15/20/25 sesuai kontrol UI.
 TKA_TOTAL_QUESTIONS = 15
+# Generator dan Latihan Mandiri menggunakan 15 soal; request AI dibagi ke batch kecil.
+# Nama generate_tka_30 dipertahankan untuk kompatibilitas pemanggil lama.
 TKA_GENERATION_QUESTIONS = 15
 TKA_GENERATION_MAX_ATTEMPTS = 3
 TKA_GENERATION_MAX_IMAGES = 3
+# Studio selalu menghasilkan tepat 15 soal, tetapi dikirim ke AI dalam
+# tiga request kecil agar tidak terkena 504 DEADLINE_EXCEEDED.
 TKA_STUDIO_BATCH_SIZE = 5
 TKA_STUDIO_BATCH_TYPES = ("PG", "MCMA", "KATEGORI")
-TKA_STUDIO_ALLOWED_COUNTS = (15, 20, 25)
 TKA_STUDIO_RETRY_BACKOFF_SECONDS = 1.5
 TKA_DEFAULT_DURATION_SECONDS = 75 * 60
 TKA_DEFAULT_ACTIVE_HOURS = 24
@@ -69,6 +70,71 @@ def tka_option_labels(jenjang: str) -> tuple[str, ...]:
 def tka_mapel_name(value: str) -> str:
     value = re.sub(r"\s+", " ", str(value or "").strip())
     return value[:80] or "Matematika"
+
+
+# Mata uji pilihan MA dan kebijakan stimulusnya. Kebijakan ini mengatur
+# sumber gambar; gambar tetap opsional jika tidak ada asset yang cocok.
+TKA_MA_PILIHAN_MAPELS = (
+    "Matematika Lanjutan",
+    "Bahasa Indonesia Lanjutan",
+    "Bahasa Inggris Lanjutan",
+    "Fisika", "Kimia", "Biologi", "Ekonomi", "Sosiologi",
+    "Geografi", "Sejarah", "Antropologi",
+    "PPKn / Pendidikan Pancasila", "PPKn/Pendidikan Pancasila",
+    "Bahasa Arab", "Bahasa Jerman", "Bahasa Prancis",
+    "Bahasa Jepang", "Bahasa Korea", "Bahasa Mandarin",
+    "Produk / Projek Kreatif dan Kewirausahaan",
+    "Produk/Projek Kreatif dan Kewirausahaan",
+)
+
+TKA_MA_ELECTIVE_IMAGE_SOURCES = {
+    "matematikalanjutan": {"source_jenjang": "MA", "source_mapel": "Matematika"},
+    "bahasaindonesialanjutan": {"source_jenjang": "MA", "source_mapel": "Bahasa Indonesia"},
+    "bahasainggrislanjutan": {"source_jenjang": "MA", "source_mapel": "Bahasa Inggris"},
+    "bahasaarab": {"source_jenjang": "MTs", "source_mapel": "Bahasa Arab"},
+}
+
+TKA_MA_ELECTIVE_TEXT_ONLY = {
+    "fisika", "kimia", "biologi", "ekonomi", "sosiologi", "geografi",
+    "sejarah", "antropologi", "ppknpendidikanpancasila", "bahasajerman",
+    "bahasaprancis", "bahasajepang", "bahasakorea", "bahasamandarin",
+    "produkprojekkreatifdankewirausahaan",
+}
+
+def _mapel_key(value: str) -> str:
+    """Normalisasi nama mapel agar variasi spasi/tanda baca tetap dikenali."""
+    return re.sub(r"[^a-z0-9]", "", str(value or "").lower())
+
+def tka_stimulus_policy(
+    jenjang: str, mapel: str, mapel_type: str = "Wajib"
+) -> dict[str, Any]:
+    """Konfigurasi stimulus untuk jalur Studio maupun Latihan Mandiri."""
+    level = normalize_tka_jenjang(jenjang)
+    key = _mapel_key(mapel)
+    if level == "MA" and key in TKA_MA_ELECTIVE_IMAGE_SOURCES:
+        source = TKA_MA_ELECTIVE_IMAGE_SOURCES[key]
+        return {
+            "mode": "MAPPED_IMAGES",
+            "source_jenjang": source["source_jenjang"],
+            "source_mapel": source["source_mapel"],
+            "max_images": 2,
+            "is_elective": True,
+        }
+    if level == "MA" and key in TKA_MA_ELECTIVE_TEXT_ONLY:
+        return {
+            "mode": "TEXT_ONLY",
+            "source_jenjang": None,
+            "source_mapel": None,
+            "max_images": 0,
+            "is_elective": True,
+        }
+    return {
+        "mode": "NORMAL",
+        "source_jenjang": level,
+        "source_mapel": tka_mapel_name(mapel),
+        "max_images": TKA_GENERATION_MAX_IMAGES,
+        "is_elective": False,
+    }
 
 
 def infer_tka_topic(
@@ -1148,21 +1214,17 @@ def _tka_prompt(
     image_count: int,
     image_ids: list[str] | None = None,
 ) -> str:
-
     labels = tka_option_labels(jenjang)
     qtype = _normalize_question_type(question_type)
+    policy = tka_stimulus_policy(jenjang, mapel, "Pilihan")
+    mapel_key = _mapel_key(mapel)
 
     if qtype == "MIXED":
-        type_rules = "\n".join(
-            [
-                "BENTUK: CAMPURAN TKA",
-                "- Gunakan ketiga bentuk: PG, MCMA, dan KATEGORI.",
-                "- Tidak ada rasio resmi yang boleh diasumsikan; distribusi boleh bervariasi secara wajar.",
-                "- Wajib ada minimal satu butir dari masing-masing bentuk dalam batch.",
-                f"- Untuk PG: satu jawaban benar. Untuk MCMA: minimal dua jawaban benar. Untuk KATEGORI: 3-5 pernyataan dengan respons masing-masing.",
-                f"- options wajib tepat {len(labels)} pilihan untuk PG/MCMA.",
-            ]
-        )
+        type_rules = """BENTUK: CAMPURAN TKA
+- Gunakan PG, MCMA, dan KATEGORI dalam satu paket.
+- Jangan mengasumsikan rasio resmi yang tidak disebutkan dalam sumber acuan.
+- Pastikan setiap bentuk muncul sekurang-kurangnya sekali dalam paket.
+- PG memiliki tepat satu jawaban benar; MCMA memiliki minimal dua jawaban benar; KATEGORI memberi satu respons benar untuk tiap pernyataan."""
         schema = (
             '"options": [],\n'
             '      "correct_answer": [],\n'
@@ -1170,94 +1232,142 @@ def _tka_prompt(
             '      "category_items": []'
         )
     elif qtype == "PG":
-        type_rules = f"""
-BENTUK: PILIHAN GANDA (PG)
+        type_rules = f"""BENTUK: PILIHAN GANDA (PG)
 - Tepat satu jawaban benar.
 - options wajib tepat {len(labels)} pilihan dengan label {', '.join(labels)}.
-- correct_answer adalah SATU label, misalnya "B".
-"""
-        schema = f"""
-"options": ["{labels[0]}. ...", "{labels[1]}. ...", ...],
+- correct_answer wajib berupa satu label opsi yang memang benar, misalnya \"B\".
+- Jangan mengosongkan kunci dan jangan menebak kunci setelah opsi selesai dibuat."""
+        schema = f""""options": ["{labels[0]}. ...", "{labels[1]}. ...", ...],
       "correct_answer": "B",
-      "correct_answers": []
-"""
+      "correct_answers": []"""
     elif qtype == "MCMA":
-        type_rules = f"""
-BENTUK: PILIHAN GANDA KOMPLEKS - MCMA
-- Tepat {len(labels)} pilihan tersedia dengan label {', '.join(labels)}.
-- Dua atau lebih jawaban harus benar; jangan hanya satu.
-- correct_answers berisi 2 atau lebih LABEL unik, misalnya ["A", "C"].
-- correct_answer harus sama dengan correct_answers untuk kompatibilitas.
-"""
-        schema = f"""
-"options": ["{labels[0]}. ...", "{labels[1]}. ...", ...],
+        type_rules = f"""BENTUK: PILIHAN GANDA KOMPLEKS - MCMA
+- Tepat {len(labels)} pilihan dengan label {', '.join(labels)}.
+- Dua atau lebih jawaban harus benar berdasarkan materi; jangan membuat kunci tambahan hanya untuk memenuhi jumlah.
+- correct_answers berisi minimal dua label unik dan seluruhnya harus benar.
+- correct_answer harus konsisten dengan correct_answers."""
+        schema = f""""options": ["{labels[0]}. ...", "{labels[1]}. ...", ...],
       "correct_answer": ["A", "C"],
-      "correct_answers": ["A", "C"]
-"""
+      "correct_answers": ["A", "C"]"""
     else:
-        type_rules = """
-BENTUK: PILIHAN GANDA KOMPLEKS - KATEGORI
-- Buat 3-5 pernyataan yang semuanya berkaitan dengan satu stimulus/konsep.
-- Setiap pernyataan memiliki kategori/respons sendiri.
-- Kategori boleh Benar/Salah, Setuju/Tidak Setuju, atau kategori lain yang jelas ditentukan oleh soal.
-- Setiap pernyataan hanya memiliki satu correct_response.
-"""
-        schema = """
-"options": [],
+        type_rules = """BENTUK: PILIHAN GANDA KOMPLEKS - KATEGORI
+- Buat 3-5 pernyataan yang benar-benar dapat dinilai berdasarkan materi/stimulus.
+- Setiap pernyataan memiliki kategori/respons sendiri, misalnya Benar/Salah atau Setuju/Tidak Setuju.
+- Setiap correct_response harus sama persis dengan salah satu opsi pada pernyataan tersebut; jangan memakai fallback."""
+        schema = """"options": [],
       "correct_answer": ["Benar", "Salah", "Benar"],
       "correct_answers": ["Benar", "Salah", "Benar"],
       "category_items": [
-        {
-          "statement": "...",
-          "options": ["Benar", "Salah"],
-          "correct_response": "Benar"
-        }
-      ]
-"""
+        {"statement": "...", "options": ["Benar", "Salah"], "correct_response": "Benar"}
+      ]"""
 
-    return f'''
-Anda adalah Question Architect TKA RoboMANTAP untuk jenjang {jenjang}, mata uji {mapel}.
+    # Profile materi dan bahasa berdasarkan mata uji pilihan MA.
+    subject_rules = "Gunakan Bahasa Indonesia akademik yang jelas dan sesuai tingkat MA, kecuali mata uji bahasa yang menetapkan bahasa target."
+    if mapel_key == "matematikalanjutan":
+        subject_rules = """KHUSUS MATEMATIKA LANJUTAN MA:
+- Utamakan penalaran matematis multi-langkah, pemodelan, generalisasi, interpretasi representasi, dan justifikasi strategi; jangan sekadar hitung rutin.
+- Variasikan konteks dan konsep matematika lanjutan yang relevan dengan kisi-kisi/kompetensi TKA MA, tanpa mengarang klaim bahwa suatu submateri pasti diwajibkan.
+- Teks soal dan narasi matematis harus cukup lengkap untuk dikerjakan tanpa gambar.
+- Gambar dari mata uji wajib Matematika MA hanya boleh digunakan bila memang membantu membaca grafik/diagram/representasi; maksimal dua gambar unik dalam satu paket. Soal lain tetap berbasis teks dan penalaran.
+- Periksa ulang semua perhitungan, domain, satuan, asumsi, dan kunci jawaban sebelum keluaran."""
+    elif mapel_key == "bahasaindonesialanjutan":
+        subject_rules = """KHUSUS BAHASA INDONESIA LANJUTAN MA:
+- Gunakan teks autentik-buatan yang wajar: editorial, esai, laporan, kritik, argumentasi, atau teks sastra yang jelas judul dan konteksnya.
+- Uji inferensi tersirat, evaluasi argumen/bukti, sudut pandang, tujuan retoris, hubungan antargagasan, makna kontekstual, dan revisi pilihan bahasa; hindari pertanyaan literal yang jawabannya tersurat sederhana.
+- Maksimal dua gambar unik, hanya dari sumber stimulus mata uji wajib Bahasa Indonesia MA dan hanya bila benar-benar mendukung soal. Utamakan bacaan dan penalaran berbasis teks.
+- Tulis teks sendiri; jangan mengaku mengutip berita atau karya nyata tertentu jika tidak diberikan sumbernya."""
+    elif mapel_key == "bahasainggrislanjutan":
+        subject_rules = """KHUSUS ADVANCED ENGLISH MA:
+- Write the reading passages, questions, options, category statements, and answer rationale in natural English.
+- Use titled, coherent texts such as an editorial, report, short story, review, speech, or argumentative passage.
+- Test inference, author's purpose, tone, evidence quality, argument structure, cohesion, contextual vocabulary, and evaluation across multiple parts of a text; avoid questions answerable by a single obvious keyword.
+- At most two unique images may be reused from the compulsory MA English stimulus library, and only when visual interpretation is genuinely required. Prefer text-based questions.
+- Do not claim a generated passage is a real published article."""
+    elif mapel_key == "bahasaarab":
+        subject_rules = """KHUSUS BAHASA ARAB MA:
+- Gunakan bahasa Arab baku dalam aksara Arab untuk teks, pertanyaan, opsi, pernyataan kategori, dan kunci penjelas; jangan mengganti teks Arab dengan transliterasi Latin.
+- Buat teks berjudul yang wajar, seperti خبر قصير، حوار، رسالة، مقال قصير، أو قصة قصيرة, lalu uji الفهم والاستنتاج والفكرة الرئيسة ومعنى المفردات في السياق والعلاقات بين الجمل ومقصد الكاتب.
+- Maksimal dua gambar unik dari library stimulus Bahasa Arab berjenjang MTs boleh digunakan jika benar-benar relevan; jika tidak tersedia, hasilkan paket teks Arab tanpa gambar.
+- Pastikan tata bahasa, ejaan, pilihan kata, dan kunci jawaban Arab konsisten."""
+    elif mapel_key in {"fisika", "kimia", "biologi", "ekonomi", "sosiologi", "geografi", "sejarah", "antropologi", "ppknpendidikanpancasila", "produkprojekkreatifdankewirausahaan"}:
+        subject_rules = f"""KHUSUS MATA UJI {mapel.upper()} MA — MODE TEKS PENUH:
+- DILARANG menggunakan gambar, image_id, diagram gambar, atau meminta siswa melihat aset visual. image_id harus null pada semua butir.
+- Gunakan stimulus berbasis teks bila membantu: beri judul yang jelas dan buat narasi/kasus/data tertulis yang masuk akal, seperti cerita singkat, laporan/berita simulasi, kutipan wawancara, skenario eksperimen, deskripsi fenomena, tabel tekstual, atau kasus sosial/ekonomi sesuai disiplin {mapel}.
+- Stimulus teks boleh dipakai bersama oleh beberapa soal: isi stimulus_text dengan teks lengkap yang diperlukan dan gunakan stimulus_group yang sama untuk grup tersebut. Jangan menyalin teks yang sama dengan variasi kecil ke tiap butir.
+- Sebagian soal boleh berdiri sendiri tanpa stimulus bersama jika itu lebih tepat. Semua soal tetap harus dapat dijawab dari informasi tekstual dan pengetahuan disiplin yang relevan.
+- Utamakan penerapan konsep, analisis sebab-akibat, evaluasi bukti/data, penalaran multi-langkah, pemilihan kesimpulan terbaik, dan penerapan pada situasi baru; hindari hafalan definisi sebagai mayoritas soal.
+- Untuk data numerik, rumus, kronologi, atau istilah teknis, pastikan konsisten dan masuk akal. Jangan menciptakan kutipan atau peristiwa nyata seolah-olah fakta sejarah/berita sungguhan."""
+    elif mapel_key == "bahasajerman":
+        subject_rules = "Write all student-facing content in natural standard German. Use a titled short text/dialogue/report; assess inference, purpose, context vocabulary, argument, and implied meaning. No images; use text only. Keep grammar, spelling, and answer keys consistent."
+    elif mapel_key == "bahasaprancis":
+        subject_rules = "Rédigez tout le contenu destiné à l’élève en français naturel et correct. Utilisez un texte ou dialogue titré; évaluez l’inférence, l’intention, le vocabulaire en contexte et l’interprétation. Aucun image; texte uniquement. Vérifiez la grammaire et les réponses."
+    elif mapel_key == "bahasajepang":
+        subject_rules = "日本語の自然な文章で、本文・設問・選択肢・カテゴリー文を作成してください。必要に応じて漢字・ひらがな・カタカナを適切に使い、ローマ字に置き換えないでください。題名のある短い文章や会話を用い、推論・意図・文脈中の語彙・文章構成を問います。画像は使用せず、テキストのみとします。"
+    elif mapel_key == "bahasakorea":
+        subject_rules = "모든 지문, 문항, 선택지, 범주 문장을 자연스러운 한국어와 한글로 작성하세요. 제목이 있는 짧은 글이나 대화를 사용하고 추론, 글의 목적, 문맥상 어휘, 근거 평가를 묻습니다. 이미지 없이 텍스트만 사용하며 정답과 문법을 검토하세요."
+    elif mapel_key == "bahasamandarin":
+        subject_rules = "请使用自然、规范的中文汉字撰写全部学生可见内容，包括短文、题目、选项和分类陈述；不要用拼音代替汉字。使用有明确标题的短文或对话，考查推断、写作目的、语境词义、论证和信息整合。不得使用图片，只能使用文本，并核对语法与答案。"
+
+    if policy["mode"] == "TEXT_ONLY":
+        stimulus_rules = """STIMULUS POLICY: TEXT ONLY.
+- Jangan memasukkan gambar, image_id, diagram gambar, atau referensi asset visual.
+- image_id wajib null untuk semua soal.
+- Buat stimulus tekstual berjudul yang relevan jika diperlukan; satu teks boleh mendukung beberapa butir melalui stimulus_group yang sama.
+- Jika image_id diberikan di input secara tidak sengaja, abaikan seluruh gambar tersebut."""
+    elif policy["mode"] == "MAPPED_IMAGES":
+        source = f"{policy['source_mapel']} jenjang {policy['source_jenjang']}"
+        stimulus_rules = f"""STIMULUS POLICY: MAXIMUM TWO UNIQUE IMAGES.
+- Jika gambar tersedia, gambar hanya boleh berasal dari library mata uji sumber: {source}.
+- Maksimal dua gambar unik dalam satu paket; gambar yang sama boleh dipakai oleh beberapa soal bila relevan.
+- Jangan memaksa gambar pada setiap soal. Mayoritas soal tetap boleh berupa teks, cerita, penalaran, atau perhitungan.
+- Jika tidak ada gambar yang cocok, lanjutkan dengan teks saja; jangan gagal dan jangan mengarang image_id.
+- Jika tidak memakai gambar, image_id wajib null. Stimulus teks harus diberi judul yang jelas bila berupa bacaan/narasi."""
+    else:
+        stimulus_rules = """STIMULUS POLICY:
+- Gambar bersifat opsional; gunakan hanya jika relevan dan sesuai mata uji.
+- Jangan mengarang fakta visual yang tidak tersedia.
+- Stimulus teks dapat diberi judul dan dipakai bersama oleh beberapa soal melalui stimulus_group."""
+
+    if qtype == "MIXED":
+        balance_rule = "- Sebarkan posisi kunci PG secara wajar; jangan jadikan A sebagai kunci default atau membuat semua kunci sama. Kunci harus benar secara substansi."
+    else:
+        balance_rule = "- Untuk PG, jangan selalu memilih huruf A sebagai kunci; sebar posisi kunci secara wajar tanpa mengorbankan kebenaran."
+
+    return f"""Anda adalah perancang asesmen TKA RoboMANTAP untuk jenjang {normalize_tka_jenjang(jenjang)}, mata uji {mapel}.
 Buat tepat {count} butir bertipe {qtype}.
 
-ATURAN TKA YANG WAJIB:
-- TKA MTs: mata uji Bahasa Indonesia dan Matematika.
-- TKA MA: mata uji wajib Bahasa Indonesia, Matematika, Bahasa Inggris; mata uji pilihan hanya jika dipilih guru.
-- Bentuk soal yang didukung portal: PG, PG Kompleks-MCMA, dan PG Kompleks-Kategori.
-- Jangan membuat matching/menjodohkan, isian, atau uraian.
-- Stimulus TIDAK WAJIB berupa gambar.
-- Stimulus dapat berupa teks, puisi, pidato, dialog, tabel, grafik, diagram, gambar, atau kombinasi yang relevan dengan mapel.
-- Jika gambar diberikan, gunakan hanya fakta yang benar-benar tampak.
-- Jangan memaksa setiap butir memakai gambar.
-- Satu stimulus dapat dipakai bersama oleh beberapa butir melalui stimulus_group yang sama.
-- Soal matematika boleh berupa perhitungan biasa tanpa gambar.
-- Soal Bahasa Indonesia/Bahasa Inggris/Bahasa Arab boleh berupa teks polos tanpa gambar.
-- KESULITAN: buat soal menantang sesuai kompetensi jenjang, bukan soal definisi atau hafalan langsung.
-- Setiap soal harus membutuhkan penalaran/interpretasi atau penerapan konsep; untuk numerasi, gunakan langkah hitung yang bermakna dan konteks yang relevan.
-- Untuk literasi, minta siswa menyimpulkan, membandingkan bukti, menilai argumen, menafsirkan maksud/struktur, atau menerapkan informasi; jangan sekadar menanyakan kalimat yang tertulis eksplisit.
-- Target dominan C4 (analisis) dan C5 (evaluasi); gunakan C6 (merancang/menghasilkan keputusan/solusi) bila wajar untuk kompetensi dan bentuk soal.
-- Buat distraktor yang masuk akal dan mewakili miskonsepsi umum; panjang opsi relatif seimbang, tanpa petunjuk jawaban karena opsi paling panjang/berbeda gaya.
-- Hindari jawaban benar yang terlalu jelas, opsi tumpang tindih, soal ambigu, informasi yang tidak diperlukan, dan pola kunci yang berulang.
-- solution_basis harus menjelaskan alasan substantif jawaban benar serta mengapa pendekatan itu tepat; jangan hanya mengulang kunci.
-- Gunakan LaTeX $...$ hanya untuk rumus/pecahan/akar/variabel matematika.
-- Jangan menaruh teks biasa di dalam delimiter matematika.
-- Setiap butir wajib memiliki topic, cognitive_level, solution_basis.
+KERANGKA PORTAL TKA MA/MTs:
+- Gunakan hanya bentuk PG, PG Kompleks-MCMA, dan PG Kompleks-Kategori.
+- PG memiliki satu jawaban benar; MCMA memiliki lebih dari satu jawaban benar; Kategori memberi satu respons untuk setiap pernyataan.
+- Jangan membuat matching/menjodohkan, isian singkat, atau uraian.
+- Ikuti kompetensi mata uji dan jenjang yang diminta. Jangan mengklaim bahwa distribusi, jumlah per submateri, atau aturan rinci tertentu adalah ketentuan resmi jika tidak dinyatakan dalam kisi-kisi yang diberikan.
+
+PROFIL MATA UJI:
+{subject_rules}
+
+KUALITAS DAN KESULITAN:
+- Buat soal setara asesmen akhir jenjang MA/MTs, bukan latihan hafalan dasar.
+- Utamakan analisis, inferensi, evaluasi bukti, interpretasi, penerapan konsep pada konteks baru, dan pemecahan masalah multi-langkah jika sesuai disiplin.
+- Distraktor harus masuk akal dan mewakili miskonsepsi umum; jangan membuat jawaban benar paling panjang/paling rinci secara konsisten atau membuat distraktor yang jelas konyol.
+- Jangan menggunakan pola kunci yang mudah ditebak. {balance_rule}
+- Level C4-C6 digunakan jika benar-benar sesuai dengan proses berpikir soal; jangan memberi label kognitif tinggi pada soal hafalan.
+- Setiap soal wajib memiliki topic, cognitive_level, dan solution_basis yang menjelaskan alasan substantif mengapa kunci benar.
+- Verifikasi ulang fakta, logika, perhitungan, ejaan, dan semua kunci sebelum menghasilkan JSON.
 
 {type_rules}
 
-Jika tidak ada gambar, image_id harus null.
-Jika memakai gambar, image_id WAJIB salah satu dari daftar IMAGE_ID yang diberikan.
-Jika memakai stimulus teks, stimulus_text harus memuat teks stimulus yang diperlukan oleh siswa dan stimulus_group harus konsisten untuk butir yang memakai stimulus yang sama.
-Jika memakai gambar yang tersedia, image_id harus berisi ID gambar yang relevan dan stimulus_text boleh kosong jika gambar sudah cukup.
+{stimulus_rules}
 
-IMAGE_ID yang tersedia:
-{", ".join(str(x) for x in (image_ids or [])) or "(tidak ada)"}
+Jika menggunakan stimulus teks, stimulus_text harus memuat teks lengkap yang dibutuhkan siswa dan stimulus_group harus sama untuk soal yang berbagi stimulus. Jika tidak ada stimulus, stimulus_text dan stimulus_group boleh null.
+IMAGE_ID yang tersedia: {', '.join(str(x) for x in (image_ids or [])) or '(tidak ada)'}
+Jumlah gambar yang diberikan: {image_count}.
 
-OUTPUT JSON MURNI:
+OUTPUT JSON MURNI, tanpa markdown atau teks di luar JSON:
 {{
   "questions": [
     {{
       "id": 1,
-      "question_type": "{"PG|MCMA|KATEGORI" if qtype == "MIXED" else qtype}",
+      "question_type": "{'PG|MCMA|KATEGORI' if qtype == 'MIXED' else qtype}",
       "question": "...",
       {schema},
       "category_items": [],
@@ -1270,8 +1380,7 @@ OUTPUT JSON MURNI:
     }}
   ]
 }}
-'''
-
+"""
 
 def _option_map(options: list[str]) -> dict[str, str]:
     result = {}
@@ -1282,43 +1391,16 @@ def _option_map(options: list[str]) -> dict[str, str]:
     return result
 
 
-def _shuffle_options_preserving_keys(
-    options: list[str],
-    correct_labels: list[str],
-    labels: tuple[str, ...],
-) -> tuple[list[str], list[str]]:
-    """Acak posisi opsi sambil memetakan ulang kunci berdasarkan opsi asalnya."""
-    entries = []
-    seen = set()
-    for option in options:
-        old_label, body = _split_option_label(str(option), 0)
-        old_label = old_label.upper()
-        if old_label in seen or old_label not in labels:
-            return options, correct_labels
-        seen.add(old_label)
-        entries.append((old_label, body))
-
-    if set(seen) != set(labels):
-        return options, correct_labels
-
-    random.shuffle(entries)
-    old_to_new = {}
-    shuffled_options = []
-    for index, (old_label, body) in enumerate(entries):
-        new_label = labels[index]
-        old_to_new[old_label] = new_label
-        shuffled_options.append(f"{new_label}. {body}" if body else f"{new_label}.")
-
-    remapped_answers = [old_to_new[label] for label in correct_labels if label in old_to_new]
-    return shuffled_options, remapped_answers
-
-
 def _normalize_tka_questions(
     raw_questions: Any,
     jenjang: str,
     default_image_ids: list[str] | None = None,
 ) -> list[dict]:
-    """Normalisasi ketat: jangan pernah mengarang kunci saat respons AI tidak valid."""
+    """
+    Auto-correcting robust validator.
+    Menerima kesalahan kecil dari Gemini (case sensitivity, jumlah opsi lebih, 
+    halusinasi ID gambar) alih-alih menggagalkan seluruh batch TKA.
+    """
     labels = tka_option_labels(jenjang)
     label_set = set(labels)
 
@@ -1338,17 +1420,17 @@ def _normalize_tka_questions(
 
         qtype = _normalize_question_type(item.get("question_type") or item.get("type"))
         stimulus_text, stimulus_group, image_id = _normalize_stimulus(item)
+
+        # KOREKSI 1: Mengabaikan ID gambar yang dihalusinasikan AI (misal: "null", "none")
         if image_id:
-            if str(image_id).lower() in {"null", "none", "tidak ada", "false", ""}:
+            if str(image_id).lower() in ["null", "none", "tidak ada", "false", ""]:
                 image_id = None
-            elif str(image_id) not in default_image_ids:
+            elif not default_image_ids or str(image_id) not in default_image_ids:
                 image_id = None
 
-        topic = str(item.get("topic") or "").strip()[:120]
-        cognitive = str(item.get("cognitive_level") or "C4").strip()[:10].upper()
+        topic = str(item.get("topic") or "TKA").strip()[:120]
+        cognitive = str(item.get("cognitive_level") or "C4").strip()[:10]
         solution = str(item.get("solution_basis") or "").strip()
-        if not topic or not solution:
-            continue
 
         base = {
             "id": idx,
@@ -1366,87 +1448,127 @@ def _normalize_tka_questions(
             raw_options = item.get("options", [])
             if not isinstance(raw_options, list):
                 continue
+
             options, _ = normalize_quiz_options(raw_options, jenjang)
-            if len(options) != len(labels):
+            
+            # KOREKSI 2: Mentoleransi jumlah opsi berlebih atau kurang
+            if len(options) < len(labels):
                 continue
+            options = options[:len(labels)]
+            
             optmap = _option_map(options)
-            if set(optmap) != label_set or len(optmap) != len(options):
+            if set(optmap) != label_set:
                 continue
 
             raw_answers = item.get("correct_answers")
-            # Prompt schema lama mengirim correct_answers=[] untuk PG; dalam
-            # kondisi kosong gunakan correct_answer, bukan menganggap kunci hilang.
-            if raw_answers is None or raw_answers == [] or raw_answers == "":
+            if raw_answers is None:
                 raw_answers = item.get("correct_answer")
+
             if isinstance(raw_answers, str):
                 answers = [x.strip().upper() for x in re.split(r"[,;|]", raw_answers) if x.strip()]
             elif isinstance(raw_answers, list):
                 answers = []
                 for value in raw_answers:
-                    raw_value = str(value).strip()
-                    label, _body = _split_option_label(raw_value, -1)
-                    candidate = label.upper() if label in label_set else raw_value.upper()
+                    raw_value = str(value).strip().upper()
+                    if raw_value in label_set:
+                        candidate = raw_value
+                    else:
+                        label, _ = _split_option_label(str(value), 0)
+                        candidate = label.upper() if label else ""
                     if candidate in label_set:
                         answers.append(candidate)
             else:
                 answers = []
 
             answers = list(dict.fromkeys(answers))
-            if any(answer not in label_set for answer in answers):
+            valid_answers = [a for a in answers if a in label_set]
+            
+            # Kunci yang kosong/tidak valid tidak boleh diganti otomatis dengan A.
+            # Soal invalid ditolak agar tidak menerbitkan kunci jawaban palsu.
+            if qtype == "PG":
+                if len(valid_answers) != 1:
+                    continue
+            elif qtype == "MCMA":
+                if len(valid_answers) < 2:
+                    continue
+
+            # Acak posisi isi opsi, lalu hitung ulang label kunci berdasarkan isi.
+            # Ini mencegah pola semua-A tanpa mengubah jawaban yang benar.
+            original_map = _option_map(options)
+            correct_contents = {
+                _split_option_label(original_map[label], 0)[1].strip()
+                for label in valid_answers
+                if label in original_map
+            }
+            option_contents = [
+                _split_option_label(original_map[label], 0)[1].strip()
+                for label in labels
+            ]
+            random.shuffle(option_contents)
+            options = [f"{label}. {content}" for label, content in zip(labels, option_contents)]
+            shuffled_map = _option_map(options)
+            valid_answers = [
+                label for label in labels
+                if _split_option_label(shuffled_map[label], 0)[1].strip() in correct_contents
+            ]
+            if qtype == "PG" and len(valid_answers) != 1:
                 continue
-            if qtype == "PG" and len(answers) != 1:
-                continue
-            if qtype == "MCMA" and len(answers) < 2:
+            if qtype == "MCMA" and len(valid_answers) < 2:
                 continue
 
-            options, answers = _shuffle_options_preserving_keys(options, answers, labels)
-            if qtype == "PG" and len(answers) != 1:
-                continue
-            if qtype == "MCMA" and len(set(answers)) < 2:
-                continue
             base["options"] = options
-            base["correct_answers"] = answers
-            base["correct_answer"] = answers[0] if qtype == "PG" else answers
+            base["correct_answers"] = valid_answers
+            base["correct_answer"] = valid_answers[0] if qtype == "PG" else valid_answers
             base["category_items"] = []
-        elif qtype == "KATEGORI":
+
+        else:
             raw_items = item.get("category_items", [])
             if not isinstance(raw_items, list) or not 3 <= len(raw_items) <= 5:
                 continue
+
             category_items = []
             answers = []
-            invalid_item = False
+            invalid_category = False
+
             for cat in raw_items:
                 if not isinstance(cat, dict):
-                    invalid_item = True
-                    break
+                    continue
+
                 statement = str(cat.get("statement") or "").strip()
                 choices = cat.get("options")
                 correct_response = str(cat.get("correct_response") or cat.get("correct_answer") or "").strip()
-                if not statement or not isinstance(choices, list):
-                    invalid_item = True
-                    break
-                choices = [str(value).strip() for value in choices if str(value).strip()]
+
+                if not statement or not isinstance(choices, list) or len(choices) < 2:
+                    continue
+
+                choices = [str(x).strip() for x in choices if str(x).strip()]
                 if len(choices) < 2:
-                    invalid_item = True
+                    continue
+
+                # KOREKSI 4: Mengatasi sensitivitas huruf besar/kecil dari Gemini pada "Benar/Salah"
+                correct_response_upper = correct_response.upper()
+                matched_choice = next((c for c in choices if c.upper() == correct_response_upper), None)
+                
+                if matched_choice:
+                    correct_response = matched_choice
+                else:
+                    invalid_category = True
                     break
-                matched = next((choice for choice in choices if choice.casefold() == correct_response.casefold()), None)
-                if matched is None:
-                    invalid_item = True
-                    break
+
                 category_items.append({
                     "statement": statement,
                     "options": choices,
-                    "correct_response": matched,
+                    "correct_response": correct_response,
                 })
-                answers.append(matched)
-            if invalid_item or len(category_items) != len(raw_items) or len(category_items) < 3:
+                answers.append(correct_response)
+
+            if invalid_category or len(category_items) < 3:
                 continue
+
             base["options"] = []
             base["category_items"] = category_items
             base["correct_answers"] = answers
             base["correct_answer"] = answers
-        else:
-            continue
 
         out.append(base)
 
@@ -1581,71 +1703,6 @@ def generate_tka_questions_batch(
     return []
 
 
-def _generate_tka_chunk_resilient(
-    *,
-    jenjang: str,
-    mapel: str,
-    question_type: str,
-    count: int,
-    image_records: list[dict],
-) -> list[dict]:
-    """Generate a small chunk, splitting further on failure without partial output."""
-    if count <= 0:
-        return []
-    chunk = generate_tka_questions_batch(
-        jenjang=jenjang, mapel=mapel, question_type=question_type,
-        count=count, image_records=image_records,
-    )
-    if len(chunk) == count:
-        return chunk
-    if count == 1:
-        return []
-
-    left_count = count // 2
-    right_count = count - left_count
-    left = _generate_tka_chunk_resilient(
-        jenjang=jenjang, mapel=mapel, question_type=question_type,
-        count=left_count, image_records=image_records,
-    )
-    if len(left) != left_count:
-        return []
-    right = _generate_tka_chunk_resilient(
-        jenjang=jenjang, mapel=mapel, question_type=question_type,
-        count=right_count, image_records=image_records,
-    )
-    if len(right) != right_count:
-        return []
-    return left + right
-
-
-def _generate_tka_type_count(
-    *,
-    jenjang: str,
-    mapel: str,
-    question_type: str,
-    count: int,
-    image_records: list[dict],
-) -> list[dict]:
-    """Generate a requested type in bounded chunks; fail closed if any chunk fails."""
-    output: list[dict] = []
-    remaining = max(0, int(count))
-    while remaining:
-        chunk_size = min(TKA_STUDIO_BATCH_SIZE, remaining)
-        chunk = _generate_tka_chunk_resilient(
-            jenjang=jenjang, mapel=mapel, question_type=question_type,
-            count=chunk_size, image_records=image_records,
-        )
-        if len(chunk) != chunk_size:
-            print(
-                f"[TKA STUDIO] GAGAL batch {question_type}: "
-                f"{len(chunk)}/{chunk_size}; tidak mengembalikan paket parsial."
-            )
-            return []
-        output.extend(chunk)
-        remaining -= chunk_size
-    return output
-
-
 def generate_tka_studio(
     *,
     jenjang: str,
@@ -1654,79 +1711,111 @@ def generate_tka_studio(
     image_ids: list[str] | None = None,
     auto_select_images: bool = False,
     count: int = TKA_GENERATION_QUESTIONS,
+    owner_key: str | None = None,
 ) -> list[dict]:
     jenjang = normalize_tka_jenjang(jenjang)
     mapel = tka_mapel_name(mapel)
-    try:
-        requested_count = int(count or TKA_GENERATION_QUESTIONS)
-    except (TypeError, ValueError):
-        requested_count = TKA_GENERATION_QUESTIONS
-    if requested_count not in TKA_STUDIO_ALLOWED_COUNTS:
-        print(
-            f"[TKA STUDIO] count={requested_count} tidak didukung; "
-            f"menggunakan {TKA_GENERATION_QUESTIONS}."
-        )
-        requested_count = TKA_GENERATION_QUESTIONS
+    count = int(count or TKA_GENERATION_QUESTIONS)
+    if count not in (15, 20, 25):
+        print(f"[TKA STUDIO] Jumlah {count} tidak didukung; gunakan 15, 20, atau 25.")
+        return []
 
-    selected = list(dict.fromkeys(str(x) for x in (image_ids or []) if x))[:TKA_GENERATION_MAX_IMAGES]
-    if not selected and auto_select_images:
-        selected = [
-            str(record["image_id"])
-            for record in list_tka_images(
-                source_type="SYSTEM", jenjang=jenjang, mapel=mapel,
-                limit=TKA_GENERATION_MAX_IMAGES,
+    policy = tka_stimulus_policy(jenjang, mapel, mapel_type)
+    max_images = int(policy["max_images"])
+    selected = list(dict.fromkeys(str(x) for x in (image_ids or []) if x))[:max_images]
+
+    # Untuk teks-penuh, abaikan ID gambar dari state/UI secara tegas.
+    if policy["mode"] == "TEXT_ONLY":
+        selected = []
+    elif policy["mode"] == "MAPPED_IMAGES":
+        # Pastikan ID terpilih benar-benar milik mata uji sumber yang ditetapkan.
+        valid_source_images = {
+            str(row["image_id"]) for row in list_tka_images(
+                source_type=None, owner_key=owner_key,
+                jenjang=policy["source_jenjang"], mapel=policy["source_mapel"], limit=200,
             )
-            if record.get("image_id")
-        ]
-        if not selected:
+        }
+        selected = [image_id for image_id in selected if image_id in valid_source_images][:max_images]
+        if not selected and auto_select_images:
             selected = [
-                str(record["image_id"])
-                for record in list_tka_images(
-                    source_type="SYSTEM", jenjang=jenjang,
-                    limit=TKA_GENERATION_MAX_IMAGES,
+                str(row["image_id"]) for row in list_tka_images(
+                    source_type=None, owner_key=owner_key,
+                    jenjang=policy["source_jenjang"],
+                    mapel=policy["source_mapel"], limit=max_images,
                 )
-                if record.get("image_id")
-            ]
+            ][:max_images]
+    elif not selected and auto_select_images:
+        selected = [
+            str(row["image_id"]) for row in list_tka_images(
+                source_type="SYSTEM", jenjang=jenjang, mapel=mapel, limit=max_images,
+            )
+        ][:max_images]
 
     image_records = []
     for image_id in selected:
         record = get_tka_image(image_id)
-        if record and record.get("image_data"):
+        if record:
+            # Guard kedua agar metadata asset tidak bocor lintas mapel/jenjang.
+            if policy["mode"] == "MAPPED_IMAGES":
+                if normalize_tka_jenjang(record.get("jenjang", "")) != policy["source_jenjang"]:
+                    continue
+                if _mapel_key(record.get("mapel", "")) != _mapel_key(policy["source_mapel"]):
+                    continue
             image_records.append(record)
-    image_records = image_records[:TKA_GENERATION_MAX_IMAGES]
+    image_records = image_records[:max_images]
 
-    base, remainder = divmod(requested_count, len(TKA_STUDIO_BATCH_TYPES))
-    type_counts = {
-        question_type: base + (1 if index < remainder else 0)
-        for index, question_type in enumerate(TKA_STUDIO_BATCH_TYPES)
-    }
+    # Dukungan jumlah Studio 15/20/25: distribusi tipe seimbang, bukan aturan resmi.
+    if count == 15:
+        batch_plan = [("PG", 5), ("MCMA", 5), ("KATEGORI", 5)]
+    elif count == 20:
+        batch_plan = [("PG", 7), ("MCMA", 7), ("KATEGORI", 6)]
+    else:
+        batch_plan = [("PG", 9), ("MCMA", 8), ("KATEGORI", 8)]
+
     print(
-        f"[TKA STUDIO] mulai generate tepat {requested_count} soal: "
-        f"{type_counts}; gambar valid={len(image_records)}. "
-        "Gambar bersifat opsional."
+        f"[TKA STUDIO] mulai {count} soal mapel={mapel}, jenjang={jenjang}, "
+        f"policy={policy['mode']}, stimulus={len(image_records)}/{max_images}, "
+        f"batch={batch_plan}."
     )
-
     all_questions: list[dict] = []
-    for question_type in TKA_STUDIO_BATCH_TYPES:
-        needed = type_counts[question_type]
-        batch = _generate_tka_type_count(
-            jenjang=jenjang, mapel=mapel, question_type=question_type,
-            count=needed, image_records=image_records,
-        )
-        if len(batch) != needed:
-            print(
-                f"[TKA STUDIO] gagal pada {question_type}: "
-                f"{len(batch)}/{needed}. Paket parsial ditolak."
+    for question_type, target in batch_plan:
+        # Pecah setiap target menjadi sub-batch maksimal 5 untuk mengurangi timeout.
+        pending = target
+        type_questions: list[dict] = []
+        while pending > 0:
+            size = min(TKA_STUDIO_BATCH_SIZE, pending)
+            batch = generate_tka_questions_batch(
+                jenjang=jenjang, mapel=mapel, question_type=question_type,
+                count=size, image_records=image_records,
             )
-            return []
-        all_questions.extend(batch)
+            if len(batch) != size:
+                print(f"[TKA STUDIO] batch {question_type} {size} gagal; mencoba pecahan kecil.")
+                if size > 2:
+                    left = size // 2
+                    right = size - left
+                    first = generate_tka_questions_batch(
+                        jenjang=jenjang, mapel=mapel, question_type=question_type,
+                        count=left, image_records=image_records,
+                    )
+                    second = generate_tka_questions_batch(
+                        jenjang=jenjang, mapel=mapel, question_type=question_type,
+                        count=right, image_records=image_records,
+                    ) if len(first) == left else []
+                    if len(first) == left and len(second) == right:
+                        batch = first + second
+                if len(batch) != size:
+                    print(f"[TKA STUDIO] gagal total pada {question_type}: {len(batch)}/{size}; hasil parsial dibatalkan.")
+                    return []
+            type_questions.extend(batch)
+            pending -= size
+        all_questions.extend(type_questions)
 
-    if len(all_questions) != requested_count:
-        print(f"[TKA STUDIO] jumlah akhir tidak cocok: {len(all_questions)}/{requested_count}.")
+    if len(all_questions) != count:
+        print(f"[TKA STUDIO] jumlah akhir tidak sesuai: {len(all_questions)}/{count}.")
         return []
-    for index, question in enumerate(all_questions, 1):
-        question["id"] = index
-    print(f"[TKA STUDIO] BERHASIL: {len(all_questions)}/{requested_count} soal.")
+    for idx, question in enumerate(all_questions, 1):
+        question["id"] = idx
+    print(f"[TKA STUDIO] BERHASIL: {len(all_questions)}/{count} soal.")
     return all_questions
 
 
@@ -1738,15 +1827,78 @@ def generate_tka_30(
     image_ids: list[str] | None = None,
     auto_select_images: bool = True,
 ) -> list[dict]:
-    """Legacy-compatible entry point; follows the current 15-question TKA policy."""
-    return generate_tka_studio(
-        jenjang=jenjang,
-        mapel=mapel,
-        mapel_type=mapel_type,
-        image_ids=image_ids,
-        auto_select_images=auto_select_images,
-        count=TKA_TOTAL_QUESTIONS,
+    """Kompatibilitas nama lama; portal menghasilkan TKA_TOTAL_QUESTIONS (15) soal."""
+    jenjang = normalize_tka_jenjang(jenjang)
+    mapel = tka_mapel_name(mapel)
+    policy = tka_stimulus_policy(jenjang, mapel, mapel_type)
+    max_images = int(policy["max_images"])
+    selected = list(dict.fromkeys(str(x) for x in (image_ids or []) if x))[:max_images]
+
+    if policy["mode"] == "TEXT_ONLY":
+        selected = []
+    elif policy["mode"] == "MAPPED_IMAGES":
+        if not selected and auto_select_images:
+            selected = [
+                str(row["image_id"]) for row in list_tka_images(
+                    source_type="SYSTEM", jenjang=policy["source_jenjang"],
+                    mapel=policy["source_mapel"], limit=max_images,
+                )
+            ][:max_images]
+        valid_ids = {
+            str(row["image_id"]) for row in list_tka_images(
+                source_type="SYSTEM", jenjang=policy["source_jenjang"],
+                mapel=policy["source_mapel"], limit=200,
+            )
+        }
+        selected = [x for x in selected if x in valid_ids][:max_images]
+    elif not selected and auto_select_images:
+        selected = [
+            str(row["image_id"]) for row in list_tka_images(
+                source_type="SYSTEM", jenjang=jenjang, mapel=mapel, limit=max_images,
+            )
+        ][:max_images]
+
+    image_records = []
+    for image_id in selected:
+        record = get_tka_image(image_id)
+        if not record:
+            continue
+        if policy["mode"] == "MAPPED_IMAGES":
+            if normalize_tka_jenjang(record.get("jenjang", "")) != policy["source_jenjang"]:
+                continue
+            if _mapel_key(record.get("mapel", "")) != _mapel_key(policy["source_mapel"]):
+                continue
+        image_records.append(record)
+    image_records = image_records[:max_images]
+
+    # Latihan Mandiri mata uji pilihan memakai jalur batch yang sama dengan Studio.
+    if policy["is_elective"]:
+        batches = []
+        for qtype in TKA_STUDIO_BATCH_TYPES:
+            batch = generate_tka_questions_batch(
+                jenjang=jenjang, mapel=mapel, question_type=qtype,
+                count=5, image_records=image_records,
+            )
+            if len(batch) != 5:
+                print(f"[TKA MANDIRI] batch {qtype} gagal ({len(batch)}/5); paket dibatalkan.")
+                return []
+            batches.extend(batch)
+        if len(batches) != TKA_TOTAL_QUESTIONS:
+            return []
+        for idx, question in enumerate(batches, 1):
+            question["id"] = idx
+        return batches
+
+    # Jalur mapel wajib dipertahankan agar tidak mengubah perilaku selain mata uji pilihan.
+    batch = generate_tka_questions_batch(
+        jenjang=jenjang, mapel=mapel, question_type="MIXED",
+        count=TKA_TOTAL_QUESTIONS, image_records=image_records,
     )
+    if len(batch) != TKA_TOTAL_QUESTIONS:
+        return []
+    for idx, question in enumerate(batch, 1):
+        question["id"] = idx
+    return batch
 
 
 def validate_tka_questions(
@@ -1844,20 +1996,6 @@ def validate_tka_questions(
 
         if not q.get("topic"):
             return (False, f"Topik soal nomor {idx} kosong.")
-        if not str(q.get("solution_basis") or "").strip():
-            return (False, f"Dasar pembahasan soal nomor {idx} kosong.")
-        if qtype in {"PG", "MCMA"}:
-            mapped = [str(x).strip().upper() for x in (q.get("correct_answers") or [])]
-            expected_key = q.get("correct_answer")
-            if qtype == "PG" and (not mapped or str(expected_key).strip().upper() != mapped[0]):
-                return (False, f"Kunci PG nomor {idx} tidak konsisten.")
-            if qtype == "MCMA":
-                if not isinstance(expected_key, list) or set(str(x).strip().upper() for x in expected_key) != set(mapped):
-                    return (False, f"Kunci MCMA nomor {idx} tidak konsisten.")
-        else:
-            category_keys = [str(item.get("correct_response") or "") for item in q.get("category_items", [])]
-            if category_keys != [str(x) for x in (q.get("correct_answers") or [])]:
-                return (False, f"Kunci kategori nomor {idx} tidak konsisten dengan pernyataan.")
 
     missing = [qtype for qtype in TKA_QUESTION_TYPES if counts.get(qtype, 0) < 1]
     if missing:
@@ -1878,7 +2016,7 @@ def validate_tka_30(
     questions: list[dict],
     jenjang: str,
 ) -> tuple[bool, str]:
-    """Legacy-named validator; checks the current TKA total (15 questions)."""
+    """Backward-compatible strict validator for student/published 30-question TKA."""
     return validate_tka_questions(questions, jenjang, TKA_TOTAL_QUESTIONS)
 
 

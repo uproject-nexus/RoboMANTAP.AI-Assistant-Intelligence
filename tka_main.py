@@ -170,17 +170,11 @@ async def mandiri_start(
     target_kelas = "9" if jenjang == "MTs" else "12"
     kelas = target_kelas
     
-    # Latihan Mandiri: tepat 15 soal / 75 menit. Gambar stimulus opsional;
-    # generator internal membagi request AI agar tidak meminta 15 soal campuran sekaligus.
+    # Mode mandiri tetap default menggunakan 30 soal simulasi
     questions = generate_tka_30(jenjang=jenjang, mapel=mapel, auto_select_images=True)
     if len(questions) != TKA_TOTAL_QUESTIONS:
-        print(
-            f"[TKA MANDIRI] Paket gagal dibuat untuk {jenjang}/{mapel}: "
-            f"diharapkan {TKA_TOTAL_QUESTIONS}, diperoleh {len(questions)}. "
-            "Periksa log [TKA AI]/[TKA STUDIO]. Gambar tidak wajib."
-        )
         return templates.TemplateResponse(request=request, name="student_login.html", context={
-            "error": "⚠️ Soal Latihan Mandiri belum berhasil disiapkan. Ini bukan berarti gambar wajib tersedia. Silakan coba kembali; jika berulang, hubungi pengelola agar log generator diperiksa.",
+            "error": "⚠️ RoboMANTAP belum berhasil menyiapkan paket simulasi TKA. Coba lagi beberapa saat. Mata uji pilihan berbasis teks tidak memerlukan Library Gambar; mata uji tertentu hanya memakai gambar yang sesuai jika tersedia.",
             "mode": "mandiri",
         })
     session_id = str(uuid.uuid4())[:8]
@@ -286,14 +280,7 @@ async def image_api(image_id: str):
     record = get_tka_image(image_id)
     if not record:
         return Response(status_code=404)
-    image_data = record.get("image_data")
-    if isinstance(image_data, memoryview):
-        image_data = image_data.tobytes()
-    elif isinstance(image_data, bytearray):
-        image_data = bytes(image_data)
-    if not isinstance(image_data, bytes) or not image_data:
-        return Response(status_code=404)
-    return Response(content=image_data, media_type=record.get("mime_type") or "application/octet-stream", headers={"Cache-Control": "public, max-age=86400"})
+    return Response(content=record["image_data"], media_type=record["mime_type"], headers={"Cache-Control": "public, max-age=86400"})
 
 @app.post("/api/save-answer")
 async def save_answer(session_id: str = Form(...), q_index: int = Form(...), answer: str = Form(...)):
