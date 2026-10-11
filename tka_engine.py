@@ -1871,34 +1871,73 @@ def generate_tka_30(
         image_records.append(record)
     image_records = image_records[:max_images]
 
-    # Latihan Mandiri mata uji pilihan memakai jalur batch yang sama dengan Studio.
-    if policy["is_elective"]:
-        batches = []
-        for qtype in TKA_STUDIO_BATCH_TYPES:
+    # Semua mata uji Latihan Mandiri memakai batch kecil. Request MIXED 15 soal
+    # sekaligus sering gagal menghasilkan JSON lengkap; kegagalan tersebut sebelumnya
+    # ditampilkan sebagai pesan umum yang seolah-olah terkait Library Gambar.
+    batches: list[dict] = []
+    for qtype in TKA_STUDIO_BATCH_TYPES:
+        pending = 5
+        type_questions: list[dict] = []
+        while pending > 0:
+            size = min(TKA_STUDIO_BATCH_SIZE, pending)
             batch = generate_tka_questions_batch(
-                jenjang=jenjang, mapel=mapel, question_type=qtype,
-                count=5, image_records=image_records,
+                jenjang=jenjang,
+                mapel=mapel,
+                question_type=qtype,
+                count=size,
+                image_records=image_records,
             )
-            if len(batch) != 5:
-                print(f"[TKA MANDIRI] batch {qtype} gagal ({len(batch)}/5); paket dibatalkan.")
-                return []
-            batches.extend(batch)
-        if len(batches) != TKA_TOTAL_QUESTIONS:
-            return []
-        for idx, question in enumerate(batches, 1):
-            question["id"] = idx
-        return batches
 
-    # Jalur mapel wajib dipertahankan agar tidak mengubah perilaku selain mata uji pilihan.
-    batch = generate_tka_questions_batch(
-        jenjang=jenjang, mapel=mapel, question_type="MIXED",
-        count=TKA_TOTAL_QUESTIONS, image_records=image_records,
-    )
-    if len(batch) != TKA_TOTAL_QUESTIONS:
+            # Bila AI tidak memenuhi batch 5, pecah ke request lebih kecil.
+            # Gambar tetap opsional: batch dijalankan juga dengan image_records=[].
+            if len(batch) != size and size > 2:
+                left = size // 2
+                right = size - left
+                first = generate_tka_questions_batch(
+                    jenjang=jenjang, mapel=mapel, question_type=qtype,
+                    count=left, image_records=image_records,
+                )
+                second = generate_tka_questions_batch(
+                    jenjang=jenjang, mapel=mapel, question_type=qtype,
+                    count=right, image_records=image_records,
+                ) if len(first) == left else []
+                if len(first) == left and len(second) == right:
+                    batch = first + second
+
+            if len(batch) != size:
+                # Jika kegagalan hanya terjadi saat menyertakan aset, coba ulang
+                # batch tanpa gambar. Ini tidak memengaruhi mapel TEXT_ONLY.
+                if image_records:
+                    batch = generate_tka_questions_batch(
+                        jenjang=jenjang, mapel=mapel, question_type=qtype,
+                        count=size, image_records=[],
+                    )
+                if len(batch) != size:
+                    print(
+                        f"[TKA MANDIRI] batch {qtype} gagal "
+                        f"({len(batch)}/{size}); paket dibatalkan."
+                    )
+                    return []
+
+            type_questions.extend(batch)
+            pending -= size
+
+        batches.extend(type_questions)
+
+    if len(batches) != TKA_TOTAL_QUESTIONS:
+        print(
+            f"[TKA MANDIRI] jumlah akhir tidak sesuai: "
+            f"{len(batches)}/{TKA_TOTAL_QUESTIONS}."
+        )
         return []
-    for idx, question in enumerate(batch, 1):
+
+    for idx, question in enumerate(batches, 1):
         question["id"] = idx
-    return batch
+    print(
+        f"[TKA MANDIRI] BERHASIL: {len(batches)}/{TKA_TOTAL_QUESTIONS} soal "
+        f"mapel={mapel}, stimulus={len(image_records)}."
+    )
+    return batches
 
 
 def validate_tka_questions(
