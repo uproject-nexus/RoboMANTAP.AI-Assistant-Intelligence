@@ -245,18 +245,12 @@ def render_tka_studio():
         ),
     )
 
-    st.caption(
-        "Target peserta: **kelas 9 MTs** atau "
-        "**kelas 12 MA** sesuai juknis yang "
-        "menjadi acuan desain."
-    )
-
     mapel, mapel_type = _mapel_controls(
         jenjang
     )
 
     st.markdown(
-        "### 🖼️ Sumber Gambar / Stimulus TKA"
+        "### 🖼️ Sumber Gambar / Stimulus"
     )
 
     source_mode = st.radio(
@@ -537,11 +531,7 @@ def render_tka_studio():
                                     use_container_width=True,
                                 )
 
-    st.info(
-        f"🎯 Generator Studio kini beradaptasi penuh dengan kebutuhan Anda. "
-        f"{jenjang} menggunakan opsi {', '.join(tka_option_labels(jenjang))} untuk PG/MCMA. "
-        "Bentuk KATEGORI menggunakan respons per pernyataan."
-    )
+
 
     # --- TAMBAHAN KONTROL DINAMIS UNTUK GURU MANTAP ---
     col_opt1, col_opt2 = st.columns(2)
@@ -625,6 +615,10 @@ def render_tka_studio():
     config = st.session_state.get(
         "tka_draft_config",
         {},
+    )
+    
+    st.info(
+        " TKA Studio diprogram dan dikembangkan sesuai dengan Juknis TKA 2026."
     )
 
     if questions:
@@ -918,12 +912,7 @@ def render_tka_studio():
 
     st.markdown("---")
     st.markdown("### 🗂️ Library Gambar TKA")
-    st.caption(
-        "Kelola stimulus dengan filter metadata yang ringan. "
-        "Preview hanya dirender untuk halaman yang sedang dibuka; "
-        "gambar yang sudah dipakai TKA aktif akan meminta konfirmasi "
-        "dan tetap dilindungi sampai masa aktifnya selesai."
-    )
+    st.caption("Kelola stimulus dengan filter metadata yang ringan.")
 
     all_images = _cached_tka_library(200)
 
@@ -952,11 +941,7 @@ def render_tka_studio():
         )
 
         st.markdown("#### 🗑️ Kelola Stimulus")
-        st.caption(
-            "Mode kelola dibuat ringan: daftar di bawah hanya memuat metadata, "
-            "bukan me-render ulang seluruh gambar. Preview gambar hanya dimuat "
-            "saat Anda memilih satu stimulus."
-        )
+        st.caption("Kelola Stimulus sesuai dengan kebutuhan.")
 
         current_teacher = teacher_name.strip() or "GuruMANTAP"
 
@@ -986,7 +971,6 @@ def render_tka_studio():
         st.markdown("##### ☑️ Pilih Banyak untuk Dihapus")
         st.caption(
             "Centang beberapa stimulus lalu klik 'Periksa & Siapkan Penghapusan'. "
-            "Perubahan checkbox tidak menjalankan proses berat sampai tombol form ditekan."
         )
 
         with st.form("tka_bulk_delete_form", clear_on_submit=False):
