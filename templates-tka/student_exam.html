@@ -26,13 +26,11 @@
             min-height: 260px;
         }
 
-        /* CBT UX: jangan tampilkan LaTeX mentah saat soal sedang dipindahkan */
         #question-text.math-pending,
         #options-container.math-pending {
             visibility: hidden;
         }
 
-        /* FIX KATEX: Mencegah rumus matematika terdistorsi */
         .katex, .katex-html {
             text-align: left !important;
             text-justify: none !important;
@@ -45,7 +43,6 @@
             white-space: normal !important;
         }
 
-        /* HTMX Indicator Spinner Custom Style */
         .htmx-indicator {
             display: none;
         }
@@ -57,9 +54,6 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans select-none antialiased w-full flex flex-col justify-center items-center">
 
-    <!-- ============================================================================== -->
-    <!-- 1. CONTAINER LOBBY PRE-KUIS (TAMPIL DEFAUT SAAT HALAMAN DIBUKA) -->
-    <!-- ============================================================================== -->
     <div id="lobby-container" class="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6 my-auto mx-auto">
         <div class="border-b border-slate-800 pb-4">
             <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Informasi TKA</span>
@@ -93,9 +87,8 @@
             </ul>
         </div>
 
-        <span class="block text-center text-xs font-bold text-emerald-400 uppercase tracking-widest">Biasakan berdoa sebelum memulai ujian ya!</span>
+        <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Biasakan berdoa sebelum memulai ujian ya!</span>
 
-        <!-- Tombol Trigger Pindah dari Lobby ke Exam + Fullscreen -->
         <button type="button" 
                 onclick="startExamFromLobby()"
                 class="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-sm py-3.5 px-4 rounded-xl transition shadow-[0_0_20px_rgba(16,185,129,0.35)] mt-4">
@@ -103,12 +96,8 @@
         </button>
     </div>
 
-    <!-- ============================================================================== -->
-    <!-- 2. CONTAINER WORKSPACE EXAM (DISEMBUNYIKAN SEBELUM KLIK MULAI) -->
-    <!-- ============================================================================== -->
     <div id="exam-container" class="hidden w-full min-h-screen flex flex-col justify-start">
 
-        <!-- HEADER UTAMA -->
         <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-40 flex justify-between items-center w-full">
             <div class="flex items-center space-x-2">
                 <span class="bg-emerald-500 text-slate-950 font-black text-[8px] px-2 py-0.5 rounded">UPN v2.0</span>
@@ -119,7 +108,6 @@
             </div>
             
             <div class="flex items-center space-x-2 sm:space-x-3">
-                <!-- Tombol Fullscreen / Outfullscreen Dinamis -->
                 <button id="btn-fullscreen-toggle" 
                         onclick="toggleFullscreenMode()" 
                         class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-[8px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
@@ -133,12 +121,10 @@
             </div>
         </header>
 
-        <!-- CHEAT WARNING BAR -->
         <div id="cheat-warning-bar" class="hidden bg-amber-500/20 border-b border-amber-500/40 px-4 py-2 text-center text-xs text-amber-300 font-semibold">
             ⚠️ Warning Pelanggaran Pindah Tab: <span id="violation-count-text">0</span> / 3
         </div>
 
-        <!-- MAIN QUESTION AREA -->
         <main class="flex-1 max-w-4xl w-full mx-auto p-3 sm:p-5 flex flex-col justify-start">
             
             <div class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 mb-3 shadow-md flex-shrink-0">
@@ -161,9 +147,9 @@
                         <span id="question-type-label" class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">TKA</span>
                     </div>
 
-                    <div id="stimulus-block" class="hidden mb-4 rounded-xl border border-slate-800 bg-slate-950 p-3.5">
-                        <div id="stimulus-text" class="hidden text-slate-200 text-sm leading-relaxed whitespace-pre-wrap text-justify mb-3"></div>
-                        <div id="stimulus-image" class="hidden rounded-xl overflow-hidden border border-slate-800 bg-slate-950 p-2"></div>
+                    <div id="stimulus-block" class="hidden mb-4 rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                        <div id="stimulus-text" class="hidden text-slate-200 text-sm leading-relaxed whitespace-pre-wrap text-justify mb-2.5"></div>
+                        <div id="stimulus-image" class="hidden rounded-xl overflow-hidden border border-slate-800/80 bg-slate-900/50 p-1.5"></div>
                     </div>
                     <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-4 font-medium overflow-x-auto text-justify"></div>
 
@@ -184,7 +170,6 @@
                     </button>
                 </div>
 
-                <!-- BOX ROBOMANTAP HINT (HTMX CONSULTATION) -->
                 <details class="group my-3 border border-slate-800 bg-slate-950/80 rounded-xl overflow-hidden transition">
                     <summary class="flex items-center justify-between p-3 cursor-pointer font-semibold text-emerald-400 bg-slate-800/40 hover:bg-slate-800/70 select-none text-xs">
                         <span>Kamu bingung? Diskusi di sini sama aku, RoboMANTAP! 🧕🏼</span>
@@ -196,7 +181,6 @@
                             Fungsi kolom ini: Tulis ide awal atau rumus yang mau kamu coba, nanti RoboMANTAP bakal kasih petunjuk jalan keluarnya tanpa langsung bocorin jawaban!
                         </p>
                 
-                        <!-- Form HTMX -->
                         <form hx-post="/api/hint"
                               hx-target="#hint-result"
                               hx-indicator="#hint-loading"
@@ -223,7 +207,6 @@
                             </button>
                         </form>
                 
-                        <!-- SPINNER LOADING HTMX -->
                         <div id="hint-loading" class="htmx-indicator mt-2">
                             <div class="flex items-center gap-2 text-xs text-emerald-400 animate-pulse">
                                 <span>🧕🏼 RoboMANTAP sedang memproses diskusi kita...</span>
@@ -238,7 +221,6 @@
         </main>
     </div>
 
-    <!-- FORM SUBMIT EXAM HIDDEN -->
     <form id="form-submit-exam" action="/submit-exam" method="POST" class="hidden">
         <input type="hidden" name="session_id" value="{{ session_id }}">
         <input type="hidden" id="anti-cheat-detected" name="anti_cheat_detected" value="0">
@@ -246,7 +228,6 @@
         <input type="hidden" id="anti-cheat-count" name="anti_cheat_count" value="0">
     </form>
 
-    <!-- MODAL NAVIGASI SOAL -->
     <div id="nav-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
@@ -270,7 +251,6 @@
         </div>
     </div>
 
-    <!-- MODAL SUBMIT KONFIRMASI -->
     <div id="submit-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl max-w-sm w-full p-6 shadow-[0_0_30px_rgba(16,185,129,0.2)] text-center space-y-4">
             <div class="w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto text-2xl">
@@ -293,7 +273,6 @@
         </div>
     </div>
 
-    <!-- MODAL FULLSCREEN GAMBAR STIMULUS -->
     <div id="image-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-2 sm:p-4" onclick="closeImageModal()">
         <div class="relative max-w-5xl w-full max-h-full flex flex-col items-center justify-center" onclick="event.stopPropagation()">
             <button type="button" onclick="closeImageModal()" class="absolute top-2 right-2 bg-slate-800/80 hover:bg-slate-700 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center text-sm z-10 border border-slate-700 shadow-lg">✕</button>
@@ -301,15 +280,11 @@
         </div>
     </div>
 
-    <!-- ============================================================================== -->
-    <!-- LOGIKA JAVASCRIPT UTAMA -->
-    <!-- ============================================================================== -->
     <script>
-        let isSubmitting = false; // Penanda agar deteksi kecurangan mati saat submit
+        let isSubmitting = false;
         const sessionId = "{{ session_id }}";
-        // --- 1. PROSES PINDAH DARI LOBBY KE EXAM ---
+
         async function startExamFromLobby() {
-            // A. Trigger Fullscreen Mode
             const elem = document.documentElement;
             try {
                 if (elem.requestFullscreen) {
@@ -321,19 +296,16 @@
                 console.log("Fullscreen declined:", err);
             }
 
-            // B. Sembunyikan Lobby, Tampilkan Exam Workspace
             const lobbyElem = document.getElementById("lobby-container");
             const examElem = document.getElementById("exam-container");
 
             lobbyElem.classList.add("hidden");
             examElem.classList.remove("hidden");
 
-            // C. Aktifkan Pengunci Tombol Back & Initialize Engine
             activateBackLock();
             initExamEngine();
         }
 
-        // --- 2. PENGUNCI NAVIGASI KEMBALI (LOCK BROWSER BACK BUTTON) ---
         function activateBackLock() {
             history.pushState(null, null, location.href);
             window.addEventListener('popstate', function () {
@@ -342,7 +314,6 @@
             });
         }
 
-        // --- 3. LOGIKA DYNAMIC FULLSCREEN TOGGLE ---
         function updateFullscreenButtonUI() {
             const textElem = document.getElementById("fs-text");
             const iconElem = document.getElementById("fs-icon");
@@ -374,7 +345,6 @@
         document.addEventListener("fullscreenchange", updateFullscreenButtonUI);
         document.addEventListener("webkitfullscreenchange", updateFullscreenButtonUI);
 
-        // --- 4. ANTI-COPAS & TAB-SWITCH DETECTOR ---
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.addEventListener('copy', e => e.preventDefault());
         document.addEventListener('cut', e => e.preventDefault());
@@ -394,7 +364,6 @@
         }
         requestWakeLock();
 
-        // --- 4. ANTI-CHEAT, PERSISTEN SERVER & HEARTBEAT ---
         const antiCheatInitial = {{ anti_cheat_json | safe }};
         let violationCount = Number(antiCheatInitial?.violation_count || 0);
         const maxViolations = Number(antiCheatInitial?.max_violations || 3);
@@ -437,7 +406,6 @@
             formData.append("violation_count", String(violationCount));
             formData.append("reason", "Pindah tab");
 
-            // sendBeacon lebih tahan saat browser mulai menangguhkan tab.
             try {
                 const payload = new Blob([formData.toString()], {
                     type: "application/x-www-form-urlencoded;charset=UTF-8"
@@ -499,8 +467,6 @@
             }
         });
 
-        // Heartbeat mencegah dashboard menganggap siswa aktif sebagai "Terputus"
-        // hanya karena siswa lama pada satu soal tanpa memilih jawaban baru.
         const heartbeatInterval = setInterval(() => {
             if (isSubmitting || document.visibilityState !== "visible") return;
 
@@ -517,7 +483,6 @@
 
         updateCheatWarningBar();
 
-        // --- 5. LOGIKA UTAMA ENGINE CBT & KATEX RENDERER ---
         const quizData = {{ quiz_json | safe }};
         
         let answers = {{ answers_json | safe }}; 
@@ -597,7 +562,6 @@
         function submitExamNow() {
             isSubmitting = true;
 
-            // Submit manual selalu dianggap selesai normal.
             if (antiCheatDetectedInput) antiCheatDetectedInput.value = "0";
             if (antiCheatReasonInput) antiCheatReasonInput.value = "";
             if (antiCheatCountInput) antiCheatCountInput.value = String(violationCount);
@@ -747,73 +711,78 @@
                 stimulusBlock.classList.remove("hidden");
             }
 
-            // Penanganan Multi-Gambar Stimulus Komprehensif (Format Array, JSON List, Comma-Separated, atau Key Berurutan)
+            // Ekstraksi Objek Gambar Beserta Indeks Penomoran
             let imageList = [];
             const candidateFields = [
                 item.image_ids, item.images, item.stimulus_images, item.stimulus_image, item.image_id,
-                item.image_id_1, item.image_id_2, item.image_id_3,
-                item.image_1, item.image_2, item.image_3
+                item.image_id_1, item.image_id_2, item.image_id_3
             ];
 
             candidateFields.forEach(val => {
                 if (!val) return;
+                let arr = [];
                 if (Array.isArray(val)) {
-                    val.forEach(v => {
-                        const s = String(v).trim();
-                        if (s && !imageList.includes(s)) imageList.push(s);
-                    });
+                    arr = val;
                 } else if (typeof val === "string" && val.trim() !== "") {
                     let str = val.trim();
                     if (str.startsWith("[") && str.endsWith("]")) {
-                        try {
-                            let parsed = JSON.parse(str);
-                            if (Array.isArray(parsed)) {
-                                parsed.forEach(v => {
-                                    const s = String(v).trim();
-                                    if (s && !imageList.includes(s)) imageList.push(s);
-                                });
-                                return;
-                            }
-                        } catch (e) {}
+                        try { arr = JSON.parse(str); } catch (e) {}
+                    } else {
+                        arr = str.split(/[,|;]+/);
                     }
-                    str.split(/[,|;]+/).forEach(p => {
-                        const s = p.trim();
-                        if (s && !imageList.includes(s)) imageList.push(s);
-                    });
                 }
+
+                arr.forEach((v) => {
+                    let imgId = "";
+                    let imgNo = null;
+                    if (typeof v === "object" && v !== null) {
+                        imgId = String(v.id || v.image_id || "").trim();
+                        imgNo = v.no || v.num || null;
+                    } else if (typeof v === "string") {
+                        imgId = v.trim();
+                    }
+                    if (imgId && !imageList.some(item => item.id === imgId)) {
+                        imageList.push({ id: imgId, no: imgNo });
+                    }
+                });
             });
 
             if (imageList.length > 0) {
-                let gridColsClass = "grid-cols-1";
-                if (imageList.length === 2) gridColsClass = "grid-cols-1 sm:grid-cols-2";
-                else if (imageList.length >= 3) gridColsClass = "grid-cols-1 sm:grid-cols-3";
+                const isMulti = imageList.length > 1;
 
                 const imgGrid = document.createElement("div");
-                imgGrid.className = `grid ${gridColsClass} gap-3 w-full items-stretch justify-center`;
+                // Perbandingan Multi-Gambar dibuat Sejajar (2 Kolom) Khusus Mobile
+                imgGrid.className = isMulti
+                    ? "grid grid-cols-2 gap-2 w-full items-start"
+                    : "w-full flex justify-center";
 
-                imageList.forEach((imgId, imgIdx) => {
+                imageList.forEach((imgObj, imgIdx) => {
+                    const imgId = imgObj.id;
+                    const displayNo = imgObj.no || (imgIdx + 1);
+
                     const card = document.createElement("div");
-                    card.className = "flex flex-col items-center justify-between border border-slate-800 bg-slate-900 rounded-xl p-2.5 relative";
+                    card.className = `flex flex-col items-center border border-slate-800 bg-slate-900/90 rounded-xl ${isMulti ? 'p-1.5' : 'p-2.5'} w-full relative transition-all`;
 
-                    if (imageList.length > 1) {
+                    if (isMulti) {
                         const label = document.createElement("span");
-                        label.className = "text-[10px] font-bold text-emerald-400 bg-slate-950 border border-slate-800 px-2 py-0.5 rounded mb-2 self-start";
-                        label.textContent = `Gambar ${imgIdx + 1}`;
+                        label.className = "text-[9px] font-bold text-emerald-400 bg-slate-950 border border-slate-800 px-2 py-0.5 rounded mb-1.5 self-start";
+                        label.textContent = `Gambar ${displayNo}`;
                         card.appendChild(label);
                     }
 
                     const imgWrapper = document.createElement("div");
-                    imgWrapper.className = "w-full flex-1 flex items-center justify-center overflow-hidden rounded-lg bg-slate-950 p-1";
+                    imgWrapper.className = "w-full flex items-center justify-center overflow-hidden rounded-lg bg-slate-950 p-1 border border-slate-800/60";
 
                     const img = document.createElement("img");
                     img.src = `/api/image/${encodeURIComponent(imgId)}`;
-                    img.alt = `Stimulus TKA ${imgIdx + 1}`;
-                    img.className = "w-full max-h-[360px] object-contain cursor-pointer hover:opacity-90 transition";
+                    img.alt = `Gambar ${displayNo}`;
+                    const heightClass = isMulti ? "max-h-[135px] sm:max-h-[180px]" : "max-h-[200px] sm:max-h-[260px]";
+                    img.className = `w-full ${heightClass} object-contain cursor-pointer hover:opacity-95 transition rounded`;
                     img.loading = "lazy";
                     img.onclick = () => openImageModal(img.src);
-                    
+
                     img.onerror = () => {
-                        imgWrapper.innerHTML = `<p class="text-[11px] text-amber-300 text-center py-2">Gambar ${imgIdx + 1} tidak tersedia</p>`;
+                        imgWrapper.innerHTML = `<p class="text-[10px] text-amber-300 text-center py-2">Gambar ${displayNo} tidak dapat dimuat</p>`;
                     };
 
                     imgWrapper.appendChild(img);
@@ -821,8 +790,8 @@
 
                     const zoomBtn = document.createElement("button");
                     zoomBtn.type = "button";
-                    zoomBtn.className = "mt-2.5 w-full bg-slate-950 hover:bg-slate-800 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 transition active:scale-95";
-                    zoomBtn.innerHTML = imageList.length > 1 ? `🔍 Gambar ${imgIdx + 1}` : "🔍 Lihat Gambar Layar Penuh";
+                    zoomBtn.className = `mt-1.5 w-full bg-slate-950 hover:bg-slate-800 text-emerald-400 border border-emerald-500/30 ${isMulti ? 'text-[9px] py-1 px-1' : 'text-[10px] py-1.5 px-2'} font-semibold rounded-lg flex items-center justify-center gap-1 transition active:scale-95`;
+                    zoomBtn.innerHTML = `🔍 Perbesar`;
                     zoomBtn.onclick = (e) => {
                         e.preventDefault();
                         openImageModal(img.src);
@@ -1040,7 +1009,6 @@
             });
         }
 
-        // Timer Sinkron Server
         function startTimer() {
             if (timerInterval) clearInterval(timerInterval);
             const endTime = new Date().getTime() + (remainingSeconds * 1000);
@@ -1073,7 +1041,6 @@
             }, 1000);
         }
 
-        // Auto-Scroll Input ke Tengah Layar Saat Keyboard HP Aktif
         const inputHint = document.getElementById("hint-attempt-input");
         if (inputHint) {
             inputHint.addEventListener("focus", function() {
@@ -1083,12 +1050,10 @@
             });
         }
 
-        // Render KaTeX Otomatis Setelah HTMX Menempelkan Hint AI
         document.body.addEventListener('htmx:afterSettle', function(evt) {
             triggerKaTeX(evt.detail.target);
         });
 
-        // Inisialisasi Utama saat tombol Mulai diklik
         function initExamEngine() {
             renderQuestion(0);
             startTimer();
