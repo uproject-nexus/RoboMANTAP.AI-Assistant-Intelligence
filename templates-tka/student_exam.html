@@ -725,6 +725,15 @@
                 img.alt = "Stimulus TKA";
                 img.className = "w-full max-h-[520px] object-contain mx-auto";
                 img.loading = "lazy";
+                img.onerror = () => {
+                    img.remove();
+                    const fallback = document.createElement("p");
+                    fallback.className = "text-xs text-amber-300 text-center py-2";
+                    fallback.textContent = "Gambar stimulus tidak tersedia. Soal tetap dapat dikerjakan berdasarkan teks yang tampil.";
+                    stimulusImage.appendChild(fallback);
+                    stimulusImage.classList.remove("hidden");
+                    stimulusBlock.classList.remove("hidden");
+                };
                 stimulusImage.appendChild(img);
                 stimulusImage.classList.remove("hidden");
                 stimulusBlock.classList.remove("hidden");
