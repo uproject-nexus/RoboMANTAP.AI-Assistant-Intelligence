@@ -85,15 +85,13 @@
         <div class="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 text-xs text-slate-300 space-y-2">
             <p class="font-bold text-emerald-400">⚠️ Aturan Pengerjaan:</p>
             <ul class="list-disc list-outside ml-4 space-y-1 text-[11px] text-slate-400">
-                <li>Dilarang meninggalkan tab atau berpindah aplikasi</li>
-                <li>Gunakan 'navigasi soal' untuk bebas berpindah soal</li>
+                <li>Dilarang meninggalkan tab atau berpindah aplikasi (Maksimal 3 kali peringatan)</li>
+                <li>Gunakan navigasi nomor untuk berpindah soal secara bebas</li>
                 <li>TKA otomatis berakhir jika timer mencapai 00:00</li>
                 <li>Jawaban tersimpan otomatis saat memilih opsi</li>
                 <li>Klik tombol "Ragu-Ragu" bila keraguan mulai merasukimu</li>
             </ul>
         </div>
-        
-        <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Biasakan berdoa sebelum memulai ujian ya!</span>
 
         <!-- Tombol Trigger Pindah dari Lobby ke Exam + Fullscreen -->
         <button type="button" 
@@ -111,10 +109,10 @@
         <!-- HEADER UTAMA -->
         <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-40 flex justify-between items-center w-full">
             <div class="flex items-center space-x-2">
-                <span class="bg-emerald-500 text-slate-950 font-black text-[8px] px-2 py-0.5 rounded">UPN v2.0</span>
+                <span class="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded">UPN v2.0</span>
                 <div>
                     <h1 class="text-xs sm:text-sm font-bold text-white leading-none">RoboMANTAP TKA</h1>
-                    <p class="text-[8px] text-emerald-400 mt-0.5 truncate max-w-[130px] sm:max-w-none">{{ sess.config.mapel if sess.config else mapel }}</p>
+                    <p class="text-[10px] text-emerald-400 mt-0.5 truncate max-w-[130px] sm:max-w-none">{{ sess.config.mapel if sess.config else mapel }}</p>
                 </div>
             </div>
             
@@ -122,7 +120,7 @@
                 <!-- Tombol Fullscreen / Outfullscreen Dinamis -->
                 <button id="btn-fullscreen-toggle" 
                         onclick="toggleFullscreenMode()" 
-                        class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-[8px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+                        class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
                     <span id="fs-icon">📺</span> 
                     <span id="fs-text">Outfullscreen</span>
                 </button>
