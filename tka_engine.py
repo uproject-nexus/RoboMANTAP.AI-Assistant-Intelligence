@@ -21,16 +21,15 @@ from ai_engine import (
     _split_option_label,
 )
 
+# Latihan Mandiri TKA menggunakan tepat 15 soal. Studio Guru tetap dapat
+# memilih paket 15/20/25 sesuai kontrol UI.
 TKA_TOTAL_QUESTIONS = 15
-# Generator Studio dibuat ringan: satu batch hanya 5 soal.
-# Ini TIDAK mengubah requirement portal siswa yang tetap 30 soal.
 TKA_GENERATION_QUESTIONS = 15
 TKA_GENERATION_MAX_ATTEMPTS = 3
 TKA_GENERATION_MAX_IMAGES = 3
-# Studio selalu menghasilkan tepat 15 soal, tetapi dikirim ke AI dalam
-# tiga request kecil agar tidak terkena 504 DEADLINE_EXCEEDED.
 TKA_STUDIO_BATCH_SIZE = 5
 TKA_STUDIO_BATCH_TYPES = ("PG", "MCMA", "KATEGORI")
+TKA_STUDIO_ALLOWED_COUNTS = (15, 20, 25)
 TKA_STUDIO_RETRY_BACKOFF_SECONDS = 1.5
 TKA_DEFAULT_DURATION_SECONDS = 75 * 60
 TKA_DEFAULT_ACTIVE_HOURS = 24
@@ -1232,8 +1231,13 @@ ATURAN TKA YANG WAJIB:
 - Satu stimulus dapat dipakai bersama oleh beberapa butir melalui stimulus_group yang sama.
 - Soal matematika boleh berupa perhitungan biasa tanpa gambar.
 - Soal Bahasa Indonesia/Bahasa Inggris/Bahasa Arab boleh berupa teks polos tanpa gambar.
-- Utamakan penalaran, literasi/numerasi, analisis, interpretasi, dan pemecahan masalah sesuai materi.
-- level kognitif ditulis C4-C6 bila memang sesuai, jangan dipaksakan.
+- KESULITAN: buat soal menantang sesuai kompetensi jenjang, bukan soal definisi atau hafalan langsung.
+- Setiap soal harus membutuhkan penalaran/interpretasi atau penerapan konsep; untuk numerasi, gunakan langkah hitung yang bermakna dan konteks yang relevan.
+- Untuk literasi, minta siswa menyimpulkan, membandingkan bukti, menilai argumen, menafsirkan maksud/struktur, atau menerapkan informasi; jangan sekadar menanyakan kalimat yang tertulis eksplisit.
+- Target dominan C4 (analisis) dan C5 (evaluasi); gunakan C6 (merancang/menghasilkan keputusan/solusi) bila wajar untuk kompetensi dan bentuk soal.
+- Buat distraktor yang masuk akal dan mewakili miskonsepsi umum; panjang opsi relatif seimbang, tanpa petunjuk jawaban karena opsi paling panjang/berbeda gaya.
+- Hindari jawaban benar yang terlalu jelas, opsi tumpang tindih, soal ambigu, informasi yang tidak diperlukan, dan pola kunci yang berulang.
+- solution_basis harus menjelaskan alasan substantif jawaban benar serta mengapa pendekatan itu tepat; jangan hanya mengulang kunci.
 - Gunakan LaTeX $...$ hanya untuk rumus/pecahan/akar/variabel matematika.
 - Jangan menaruh teks biasa di dalam delimiter matematika.
 - Setiap butir wajib memiliki topic, cognitive_level, solution_basis.
@@ -1278,16 +1282,43 @@ def _option_map(options: list[str]) -> dict[str, str]:
     return result
 
 
+def _shuffle_options_preserving_keys(
+    options: list[str],
+    correct_labels: list[str],
+    labels: tuple[str, ...],
+) -> tuple[list[str], list[str]]:
+    """Acak posisi opsi sambil memetakan ulang kunci berdasarkan opsi asalnya."""
+    entries = []
+    seen = set()
+    for option in options:
+        old_label, body = _split_option_label(str(option), 0)
+        old_label = old_label.upper()
+        if old_label in seen or old_label not in labels:
+            return options, correct_labels
+        seen.add(old_label)
+        entries.append((old_label, body))
+
+    if set(seen) != set(labels):
+        return options, correct_labels
+
+    random.shuffle(entries)
+    old_to_new = {}
+    shuffled_options = []
+    for index, (old_label, body) in enumerate(entries):
+        new_label = labels[index]
+        old_to_new[old_label] = new_label
+        shuffled_options.append(f"{new_label}. {body}" if body else f"{new_label}.")
+
+    remapped_answers = [old_to_new[label] for label in correct_labels if label in old_to_new]
+    return shuffled_options, remapped_answers
+
+
 def _normalize_tka_questions(
     raw_questions: Any,
     jenjang: str,
     default_image_ids: list[str] | None = None,
 ) -> list[dict]:
-    """
-    Auto-correcting robust validator.
-    Menerima kesalahan kecil dari Gemini (case sensitivity, jumlah opsi lebih, 
-    halusinasi ID gambar) alih-alih menggagalkan seluruh batch TKA.
-    """
+    """Normalisasi ketat: jangan pernah mengarang kunci saat respons AI tidak valid."""
     labels = tka_option_labels(jenjang)
     label_set = set(labels)
 
@@ -1307,17 +1338,17 @@ def _normalize_tka_questions(
 
         qtype = _normalize_question_type(item.get("question_type") or item.get("type"))
         stimulus_text, stimulus_group, image_id = _normalize_stimulus(item)
-
-        # KOREKSI 1: Mengabaikan ID gambar yang dihalusinasikan AI (misal: "null", "none")
         if image_id:
-            if str(image_id).lower() in ["null", "none", "tidak ada", "false", ""]:
+            if str(image_id).lower() in {"null", "none", "tidak ada", "false", ""}:
                 image_id = None
-            elif default_image_ids and str(image_id) not in default_image_ids:
+            elif str(image_id) not in default_image_ids:
                 image_id = None
 
-        topic = str(item.get("topic") or "TKA").strip()[:120]
-        cognitive = str(item.get("cognitive_level") or "C4").strip()[:10]
+        topic = str(item.get("topic") or "").strip()[:120]
+        cognitive = str(item.get("cognitive_level") or "C4").strip()[:10].upper()
         solution = str(item.get("solution_basis") or "").strip()
+        if not topic or not solution:
+            continue
 
         base = {
             "id": idx,
@@ -1335,101 +1366,87 @@ def _normalize_tka_questions(
             raw_options = item.get("options", [])
             if not isinstance(raw_options, list):
                 continue
-
             options, _ = normalize_quiz_options(raw_options, jenjang)
-            
-            # KOREKSI 2: Mentoleransi jumlah opsi berlebih atau kurang
-            if len(options) < len(labels):
+            if len(options) != len(labels):
                 continue
-            options = options[:len(labels)]
-            
             optmap = _option_map(options)
-            if set(optmap) != label_set:
+            if set(optmap) != label_set or len(optmap) != len(options):
                 continue
 
             raw_answers = item.get("correct_answers")
-            if raw_answers is None:
+            # Prompt schema lama mengirim correct_answers=[] untuk PG; dalam
+            # kondisi kosong gunakan correct_answer, bukan menganggap kunci hilang.
+            if raw_answers is None or raw_answers == [] or raw_answers == "":
                 raw_answers = item.get("correct_answer")
-
             if isinstance(raw_answers, str):
                 answers = [x.strip().upper() for x in re.split(r"[,;|]", raw_answers) if x.strip()]
             elif isinstance(raw_answers, list):
                 answers = []
                 for value in raw_answers:
-                    label, _ = _split_option_label(str(value), 0)
-                    candidate = label.upper() if label else str(value).strip().upper()
+                    raw_value = str(value).strip()
+                    label, _body = _split_option_label(raw_value, -1)
+                    candidate = label.upper() if label in label_set else raw_value.upper()
                     if candidate in label_set:
                         answers.append(candidate)
             else:
                 answers = []
 
             answers = list(dict.fromkeys(answers))
-            valid_answers = [a for a in answers if a in label_set]
-            
-            # KOREKSI 3: Memastikan kunci jawaban tidak menggagalkan soal yang valid
-            if qtype == "PG":
-                if not valid_answers:
-                    valid_answers = [labels[0]]
-                valid_answers = [valid_answers[0]]
-                
-            if qtype == "MCMA":
-                if len(valid_answers) < 2:
-                    for lbl in labels:
-                        if lbl not in valid_answers:
-                            valid_answers.append(lbl)
-                            break
+            if any(answer not in label_set for answer in answers):
+                continue
+            if qtype == "PG" and len(answers) != 1:
+                continue
+            if qtype == "MCMA" and len(answers) < 2:
+                continue
 
+            options, answers = _shuffle_options_preserving_keys(options, answers, labels)
+            if qtype == "PG" and len(answers) != 1:
+                continue
+            if qtype == "MCMA" and len(set(answers)) < 2:
+                continue
             base["options"] = options
-            base["correct_answers"] = valid_answers
-            base["correct_answer"] = valid_answers[0] if qtype == "PG" else valid_answers
+            base["correct_answers"] = answers
+            base["correct_answer"] = answers[0] if qtype == "PG" else answers
             base["category_items"] = []
-
-        else:
+        elif qtype == "KATEGORI":
             raw_items = item.get("category_items", [])
             if not isinstance(raw_items, list) or not 3 <= len(raw_items) <= 5:
                 continue
-
             category_items = []
             answers = []
-
+            invalid_item = False
             for cat in raw_items:
                 if not isinstance(cat, dict):
-                    continue
-
+                    invalid_item = True
+                    break
                 statement = str(cat.get("statement") or "").strip()
                 choices = cat.get("options")
                 correct_response = str(cat.get("correct_response") or cat.get("correct_answer") or "").strip()
-
-                if not statement or not isinstance(choices, list) or len(choices) < 2:
-                    continue
-
-                choices = [str(x).strip() for x in choices if str(x).strip()]
+                if not statement or not isinstance(choices, list):
+                    invalid_item = True
+                    break
+                choices = [str(value).strip() for value in choices if str(value).strip()]
                 if len(choices) < 2:
-                    continue
-
-                # KOREKSI 4: Mengatasi sensitivitas huruf besar/kecil dari Gemini pada "Benar/Salah"
-                correct_response_upper = correct_response.upper()
-                matched_choice = next((c for c in choices if c.upper() == correct_response_upper), None)
-                
-                if matched_choice:
-                    correct_response = matched_choice
-                else:
-                    correct_response = choices[0] # Fallback aman
-
+                    invalid_item = True
+                    break
+                matched = next((choice for choice in choices if choice.casefold() == correct_response.casefold()), None)
+                if matched is None:
+                    invalid_item = True
+                    break
                 category_items.append({
                     "statement": statement,
                     "options": choices,
-                    "correct_response": correct_response,
+                    "correct_response": matched,
                 })
-                answers.append(correct_response)
-
-            if len(category_items) < 3:
+                answers.append(matched)
+            if invalid_item or len(category_items) != len(raw_items) or len(category_items) < 3:
                 continue
-
             base["options"] = []
             base["category_items"] = category_items
             base["correct_answers"] = answers
             base["correct_answer"] = answers
+        else:
+            continue
 
         out.append(base)
 
@@ -1564,6 +1581,71 @@ def generate_tka_questions_batch(
     return []
 
 
+def _generate_tka_chunk_resilient(
+    *,
+    jenjang: str,
+    mapel: str,
+    question_type: str,
+    count: int,
+    image_records: list[dict],
+) -> list[dict]:
+    """Generate a small chunk, splitting further on failure without partial output."""
+    if count <= 0:
+        return []
+    chunk = generate_tka_questions_batch(
+        jenjang=jenjang, mapel=mapel, question_type=question_type,
+        count=count, image_records=image_records,
+    )
+    if len(chunk) == count:
+        return chunk
+    if count == 1:
+        return []
+
+    left_count = count // 2
+    right_count = count - left_count
+    left = _generate_tka_chunk_resilient(
+        jenjang=jenjang, mapel=mapel, question_type=question_type,
+        count=left_count, image_records=image_records,
+    )
+    if len(left) != left_count:
+        return []
+    right = _generate_tka_chunk_resilient(
+        jenjang=jenjang, mapel=mapel, question_type=question_type,
+        count=right_count, image_records=image_records,
+    )
+    if len(right) != right_count:
+        return []
+    return left + right
+
+
+def _generate_tka_type_count(
+    *,
+    jenjang: str,
+    mapel: str,
+    question_type: str,
+    count: int,
+    image_records: list[dict],
+) -> list[dict]:
+    """Generate a requested type in bounded chunks; fail closed if any chunk fails."""
+    output: list[dict] = []
+    remaining = max(0, int(count))
+    while remaining:
+        chunk_size = min(TKA_STUDIO_BATCH_SIZE, remaining)
+        chunk = _generate_tka_chunk_resilient(
+            jenjang=jenjang, mapel=mapel, question_type=question_type,
+            count=chunk_size, image_records=image_records,
+        )
+        if len(chunk) != chunk_size:
+            print(
+                f"[TKA STUDIO] GAGAL batch {question_type}: "
+                f"{len(chunk)}/{chunk_size}; tidak mengembalikan paket parsial."
+            )
+            return []
+        output.extend(chunk)
+        remaining -= chunk_size
+    return output
+
+
 def generate_tka_studio(
     *,
     jenjang: str,
@@ -1573,113 +1655,78 @@ def generate_tka_studio(
     auto_select_images: bool = False,
     count: int = TKA_GENERATION_QUESTIONS,
 ) -> list[dict]:
-    
     jenjang = normalize_tka_jenjang(jenjang)
     mapel = tka_mapel_name(mapel)
-
-    requested_count = int(count or TKA_GENERATION_QUESTIONS)
-    if requested_count != TKA_GENERATION_QUESTIONS:
+    try:
+        requested_count = int(count or TKA_GENERATION_QUESTIONS)
+    except (TypeError, ValueError):
+        requested_count = TKA_GENERATION_QUESTIONS
+    if requested_count not in TKA_STUDIO_ALLOWED_COUNTS:
         print(
-            f"[TKA STUDIO] count={requested_count} diabaikan; "
-            f"Studio dikunci tepat {TKA_GENERATION_QUESTIONS} soal."
+            f"[TKA STUDIO] count={requested_count} tidak didukung; "
+            f"menggunakan {TKA_GENERATION_QUESTIONS}."
         )
-    count = TKA_GENERATION_QUESTIONS
+        requested_count = TKA_GENERATION_QUESTIONS
 
-    selected = list(
-        dict.fromkeys(
-            str(x) for x in (image_ids or []) if x
-        )
-    )[:TKA_GENERATION_MAX_IMAGES]
-
+    selected = list(dict.fromkeys(str(x) for x in (image_ids or []) if x))[:TKA_GENERATION_MAX_IMAGES]
     if not selected and auto_select_images:
         selected = [
-            str(x["image_id"])
-            for x in list_tka_images(
-                source_type="SYSTEM",
-                jenjang=jenjang,
-                mapel=mapel,
+            str(record["image_id"])
+            for record in list_tka_images(
+                source_type="SYSTEM", jenjang=jenjang, mapel=mapel,
                 limit=TKA_GENERATION_MAX_IMAGES,
             )
+            if record.get("image_id")
         ]
+        if not selected:
+            selected = [
+                str(record["image_id"])
+                for record in list_tka_images(
+                    source_type="SYSTEM", jenjang=jenjang,
+                    limit=TKA_GENERATION_MAX_IMAGES,
+                )
+                if record.get("image_id")
+            ]
 
     image_records = []
     for image_id in selected:
         record = get_tka_image(image_id)
-        if record:
+        if record and record.get("image_data"):
             image_records.append(record)
+    image_records = image_records[:TKA_GENERATION_MAX_IMAGES]
 
+    base, remainder = divmod(requested_count, len(TKA_STUDIO_BATCH_TYPES))
+    type_counts = {
+        question_type: base + (1 if index < remainder else 0)
+        for index, question_type in enumerate(TKA_STUDIO_BATCH_TYPES)
+    }
     print(
-        f"[TKA STUDIO] mulai generate tepat {count} soal: "
-        f"3 batch x {TKA_STUDIO_BATCH_SIZE} "
-        f"({', '.join(TKA_STUDIO_BATCH_TYPES)}), "
-        f"gambar={len(image_records)}."
+        f"[TKA STUDIO] mulai generate tepat {requested_count} soal: "
+        f"{type_counts}; gambar valid={len(image_records)}. "
+        "Gambar bersifat opsional."
     )
 
     all_questions: list[dict] = []
-
     for question_type in TKA_STUDIO_BATCH_TYPES:
-        batch = generate_tka_questions_batch(
-            jenjang=jenjang,
-            mapel=mapel,
-            question_type=question_type,
-            count=TKA_STUDIO_BATCH_SIZE,
-            image_records=image_records,
+        needed = type_counts[question_type]
+        batch = _generate_tka_type_count(
+            jenjang=jenjang, mapel=mapel, question_type=question_type,
+            count=needed, image_records=image_records,
         )
-
-        if len(batch) != TKA_STUDIO_BATCH_SIZE:
+        if len(batch) != needed:
             print(
-                f"[TKA STUDIO] batch {question_type} 5 soal gagal; "
-                "fallback internal 3 + 2 soal."
+                f"[TKA STUDIO] gagal pada {question_type}: "
+                f"{len(batch)}/{needed}. Paket parsial ditolak."
             )
-            batch_3 = generate_tka_questions_batch(
-                jenjang=jenjang,
-                mapel=mapel,
-                question_type=question_type,
-                count=3,
-                image_records=image_records,
-            )
-            if len(batch_3) == 3:
-                batch_2 = generate_tka_questions_batch(
-                    jenjang=jenjang,
-                    mapel=mapel,
-                    question_type=question_type,
-                    count=2,
-                    image_records=image_records,
-                )
-            else:
-                batch_2 = []
-
-            if len(batch_3) == 3 and len(batch_2) == 2:
-                batch = batch_3 + batch_2
-                print(
-                    f"[TKA STUDIO] fallback {question_type} berhasil: 3 + 2 = 5 soal."
-                )
-            else:
-                print(
-                    f"[TKA STUDIO] GAGAL: batch {question_type} hanya "
-                    f"{len(batch_3) + len(batch_2)}/5 setelah fallback. "
-                    "Tidak mengembalikan hasil parsial."
-                )
-                return []
-
+            return []
         all_questions.extend(batch)
-        print(
-            f"[TKA STUDIO] batch {question_type} selesai: "
-            f"{len(batch)}/{TKA_STUDIO_BATCH_SIZE}; "
-            f"total sementara {len(all_questions)}/{count}."
-        )
 
-    if len(all_questions) != count:
-        print(
-            f"[TKA STUDIO] GAGAL validasi jumlah akhir: "
-            f"{len(all_questions)}/{count}."
-        )
+    if len(all_questions) != requested_count:
+        print(f"[TKA STUDIO] jumlah akhir tidak cocok: {len(all_questions)}/{requested_count}.")
         return []
-
-    for idx, question in enumerate(all_questions, 1):
-        question["id"] = idx
-
-    print(f"[TKA STUDIO] BERHASIL: {len(all_questions)}/{count} soal.")
+    for index, question in enumerate(all_questions, 1):
+        question["id"] = index
+    print(f"[TKA STUDIO] BERHASIL: {len(all_questions)}/{requested_count} soal.")
     return all_questions
 
 
@@ -1691,60 +1738,15 @@ def generate_tka_30(
     image_ids: list[str] | None = None,
     auto_select_images: bool = True,
 ) -> list[dict]:
-
-    jenjang = normalize_tka_jenjang(jenjang)
-    mapel = tka_mapel_name(mapel)
-
-    selected = list(
-        dict.fromkeys(
-            str(x) for x in (image_ids or []) if x
-        )
-    )[:5]
-
-    if not selected and auto_select_images:
-        selected = [
-            str(x["image_id"])
-            for x in list_tka_images(
-                source_type="SYSTEM",
-                jenjang=jenjang,
-                mapel=mapel,
-                limit=5,
-            )
-        ]
-
-    if not selected and auto_select_images:
-        selected = [
-            str(x["image_id"])
-            for x in list_tka_images(
-                source_type="SYSTEM",
-                jenjang=jenjang,
-                limit=5,
-            )
-        ]
-
-    image_records = []
-    for image_id in selected:
-        record = get_tka_image(image_id)
-        if record:
-            image_records.append(record)
-
-    image_records = image_records[:5]
-
-    batch = generate_tka_questions_batch(
+    """Legacy-compatible entry point; follows the current 15-question TKA policy."""
+    return generate_tka_studio(
         jenjang=jenjang,
         mapel=mapel,
-        question_type="MIXED",
+        mapel_type=mapel_type,
+        image_ids=image_ids,
+        auto_select_images=auto_select_images,
         count=TKA_TOTAL_QUESTIONS,
-        image_records=image_records,
     )
-
-    if len(batch) != TKA_TOTAL_QUESTIONS:
-        return []
-
-    for idx, question in enumerate(batch, 1):
-        question["id"] = idx
-
-    return batch
 
 
 def validate_tka_questions(
@@ -1842,6 +1844,20 @@ def validate_tka_questions(
 
         if not q.get("topic"):
             return (False, f"Topik soal nomor {idx} kosong.")
+        if not str(q.get("solution_basis") or "").strip():
+            return (False, f"Dasar pembahasan soal nomor {idx} kosong.")
+        if qtype in {"PG", "MCMA"}:
+            mapped = [str(x).strip().upper() for x in (q.get("correct_answers") or [])]
+            expected_key = q.get("correct_answer")
+            if qtype == "PG" and (not mapped or str(expected_key).strip().upper() != mapped[0]):
+                return (False, f"Kunci PG nomor {idx} tidak konsisten.")
+            if qtype == "MCMA":
+                if not isinstance(expected_key, list) or set(str(x).strip().upper() for x in expected_key) != set(mapped):
+                    return (False, f"Kunci MCMA nomor {idx} tidak konsisten.")
+        else:
+            category_keys = [str(item.get("correct_response") or "") for item in q.get("category_items", [])]
+            if category_keys != [str(x) for x in (q.get("correct_answers") or [])]:
+                return (False, f"Kunci kategori nomor {idx} tidak konsisten dengan pernyataan.")
 
     missing = [qtype for qtype in TKA_QUESTION_TYPES if counts.get(qtype, 0) < 1]
     if missing:
@@ -1862,7 +1878,7 @@ def validate_tka_30(
     questions: list[dict],
     jenjang: str,
 ) -> tuple[bool, str]:
-    """Backward-compatible strict validator for student/published 30-question TKA."""
+    """Legacy-named validator; checks the current TKA total (15 questions)."""
     return validate_tka_questions(questions, jenjang, TKA_TOTAL_QUESTIONS)
 
 
