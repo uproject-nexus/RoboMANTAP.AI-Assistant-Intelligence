@@ -554,6 +554,10 @@ def get_tka_image_usage(image_id: str) -> list[dict]:
                                     COALESCE(tka_data, '[]'::jsonb)
                                 ) AS question
                                 WHERE question->>'image_id' = :image_id
+                                   OR (
+                                       jsonb_typeof(question->'image_ids') = 'array'
+                                       AND (question->'image_ids') ? :image_id
+                                   )
                             )
                         ORDER BY created_at DESC
                         """
@@ -644,7 +648,8 @@ def get_tka_images_usage_bulk(image_ids: list[str]) -> dict[str, list[dict]]:
                             t.config,
                             t.created_at,
                             t.updated_at,
-                            q->>'image_id' AS image_id
+                            q->>'image_id' AS image_id_single,
+                            q->'image_ids' AS image_ids_array
                         FROM tka_custom AS t
                         CROSS JOIN LATERAL jsonb_array_elements(
                             CASE
@@ -654,6 +659,17 @@ def get_tka_images_usage_bulk(image_ids: list[str]) -> dict[str, list[dict]]:
                             END
                         ) AS q
                         WHERE q->>'image_id' = ANY(:image_ids)
+                           OR EXISTS (
+                               SELECT 1
+                               FROM jsonb_array_elements_text(
+                                   CASE
+                                       WHEN jsonb_typeof(q->'image_ids') = 'array'
+                                       THEN q->'image_ids'
+                                       ELSE '[]'::jsonb
+                                   END
+                               ) AS elem
+                               WHERE elem = ANY(:image_ids)
+                           )
                         ORDER BY t.created_at DESC
                         """
                     ),
@@ -667,10 +683,6 @@ def get_tka_images_usage_bulk(image_ids: list[str]) -> dict[str, list[dict]]:
         now = _now_wib_naive()
 
         for row in rows:
-            image_id = str(row.get("image_id") or "")
-            if image_id not in result:
-                continue
-
             config = _json(row.get("config"), {})
             active_until = config.get("active_until")
             is_active_window = True
@@ -685,16 +697,29 @@ def get_tka_images_usage_bulk(image_ids: list[str]) -> dict[str, list[dict]]:
                 except Exception:
                     is_active_window = True
 
-            result[image_id].append({
-                "kode_tka": str(row.get("kode_tka") or ""),
-                "jenjang": config.get("jenjang") or "-",
-                "mapel": config.get("mapel") or "-",
-                "active_from": config.get("active_from"),
-                "active_until": active_until,
-                "is_active_window": is_active_window,
-                "created_at": row.get("created_at"),
-                "updated_at": row.get("updated_at"),
-            })
+            matched_ids = set()
+            single_id = str(row.get("image_id_single") or "").strip()
+            if single_id in result:
+                matched_ids.add(single_id)
+
+            arr = _json(row.get("image_ids_array"), [])
+            if isinstance(arr, list):
+                for item in arr:
+                    s_item = str(item or "").strip()
+                    if s_item in result:
+                        matched_ids.add(s_item)
+
+            for image_id in matched_ids:
+                result[image_id].append({
+                    "kode_tka": str(row.get("kode_tka") or ""),
+                    "jenjang": config.get("jenjang") or "-",
+                    "mapel": config.get("mapel") or "-",
+                    "active_from": config.get("active_from"),
+                    "active_until": active_until,
+                    "is_active_window": is_active_window,
+                    "created_at": row.get("created_at"),
+                    "updated_at": row.get("updated_at"),
+                })
 
         return result
     except Exception as exc:
@@ -1114,7 +1139,7 @@ def _normalize_question_type(value: Any) -> str:
 
 def _normalize_stimulus(
     item: dict,
-) -> tuple[str | None, str | None, str | None]:
+) -> tuple[str | None, str | None, str | None, list[str]]:
 
     stimulus_text = str(
         item.get("stimulus_text")
@@ -1127,15 +1152,34 @@ def _normalize_stimulus(
         or ""
     ).strip() or None
 
-    image_id = str(
-        item.get("image_id")
-        or ""
-    ).strip() or None
+    raw_ids: list[str] = []
+    candidate_keys = (
+        "image_ids", "images", "stimulus_images",
+        "image_id", "image_id_1", "image_id_2", "image_id_3"
+    )
+
+    for key in candidate_keys:
+        val = item.get(key)
+        if not val:
+            continue
+        if isinstance(val, list):
+            for v in val:
+                s = str(v).strip()
+                if s and s not in raw_ids:
+                    raw_ids.append(s)
+        elif isinstance(val, str) and val.strip():
+            for part in re.split(r"[,;|]+", val.strip()):
+                s = part.strip()
+                if s and s not in raw_ids:
+                    raw_ids.append(s)
+
+    image_id = raw_ids[0] if raw_ids else None
 
     return (
         stimulus_text or None,
         stimulus_group,
         image_id,
+        raw_ids,
     )
 
 
@@ -1242,12 +1286,13 @@ ATURAN TKA YANG WAJIB:
 - Jangan menaruh teks biasa di dalam delimiter matematika.
 - Setiap butir wajib memiliki topic, cognitive_level, solution_basis.
 
-{type_rules}
+ATURAN PENANGANAN GAMBAR/STIMULUS VISUAL:
+- Jika tidak ada gambar, image_id harus null dan image_ids harus [].
+- Jika memakai 1 gambar, isi image_id dengan ID tersebut dan image_ids dengan array 1 elemen, misal: ["ID_GAMBAR"].
+- SANGAT PENTING (MULTI-GAMBAR): Jika soal membandingkan/mengacu pada 2 atau lebih gambar/infografis (misal: Gambar 1 & Gambar 2, Infographic 1 & Infographic 2, Stimulus 1 & Stimulus 3), WAJIB masukkan seluruh IMAGE_ID yang relevan ke dalam array "image_ids", misal: ["ID_GAMBAR_1", "ID_GAMBAR_2"], dan isi "image_id" dengan ID gambar pertama.
+- DILARANG MERANGKUM ISI GAMBAR MENJADI TEKS PARAGRAPH/RINGKASAN TEBAL JIKA GAMBAR VISUAL SUDAH DISEDIAKAN. Gunakan rujukan visual gambar secara langsung.
 
-Jika tidak ada gambar, image_id harus null.
-Jika memakai gambar, image_id WAJIB salah satu dari daftar IMAGE_ID yang diberikan.
-Jika memakai stimulus teks, stimulus_text harus memuat teks stimulus yang diperlukan oleh siswa dan stimulus_group harus konsisten untuk butir yang memakai stimulus yang sama.
-Jika memakai gambar yang tersedia, image_id harus berisi ID gambar yang relevan dan stimulus_text boleh kosong jika gambar sudah cukup.
+{type_rules}
 
 IMAGE_ID yang tersedia:
 {", ".join(str(x) for x in (image_ids or [])) or "(tidak ada)"}
@@ -1264,6 +1309,7 @@ OUTPUT JSON MURNI:
       "stimulus_text": null,
       "stimulus_group": null,
       "image_id": null,
+      "image_ids": [],
       "topic": "...",
       "cognitive_level": "C4",
       "solution_basis": "..."
@@ -1337,12 +1383,30 @@ def _normalize_tka_questions(
             continue
 
         qtype = _normalize_question_type(item.get("question_type") or item.get("type"))
-        stimulus_text, stimulus_group, image_id = _normalize_stimulus(item)
-        if image_id:
-            if str(image_id).lower() in {"null", "none", "tidak ada", "false", ""}:
-                image_id = None
-            elif str(image_id) not in default_image_ids:
-                image_id = None
+        stimulus_text, stimulus_group, single_image_id, raw_image_ids = _normalize_stimulus(item)
+
+        extracted_ids: list[str] = []
+        for cand in raw_image_ids:
+            if cand.lower() in {"null", "none", "tidak ada", "false", ""}:
+                continue
+            if cand in default_image_ids and cand not in extracted_ids:
+                extracted_ids.append(cand)
+
+        # Fallback Cerdas: Jika AI membuat soal perbandingan/multi-gambar namun mengembalikan ID kurang lengkap
+        if default_image_ids and len(default_image_ids) > 1:
+            combo_text = f"{question} {stimulus_text or ''}".lower()
+            multi_keywords = [
+                "both", "kedua", "gambar 1", "gambar 2", "infographic 1", "infographic 2",
+                "stimulus 1", "stimulus 2", "stimulus 3", "membandingkan", "comparing",
+                "lintas", "infografis", "infographic"
+            ]
+            if any(kw in combo_text for kw in multi_keywords):
+                for did in default_image_ids:
+                    if did not in extracted_ids:
+                        extracted_ids.append(did)
+
+        image_id = extracted_ids[0] if extracted_ids else None
+        image_ids_list = extracted_ids
 
         topic = str(item.get("topic") or "").strip()[:120]
         cognitive = str(item.get("cognitive_level") or "C4").strip()[:10].upper()
@@ -1360,6 +1424,7 @@ def _normalize_tka_questions(
             "stimulus_text": stimulus_text,
             "stimulus_group": stimulus_group,
             "image_id": image_id,
+            "image_ids": image_ids_list,
         }
 
         if qtype in {"PG", "MCMA"}:
@@ -1374,8 +1439,6 @@ def _normalize_tka_questions(
                 continue
 
             raw_answers = item.get("correct_answers")
-            # Prompt schema lama mengirim correct_answers=[] untuk PG; dalam
-            # kondisi kosong gunakan correct_answer, bukan menganggap kunci hilang.
             if raw_answers is None or raw_answers == [] or raw_answers == "":
                 raw_answers = item.get("correct_answer")
             if isinstance(raw_answers, str):
