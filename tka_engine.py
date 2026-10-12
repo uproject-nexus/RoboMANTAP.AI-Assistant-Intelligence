@@ -21,8 +21,6 @@ from ai_engine import (
     _split_option_label,
 )
 
-# Latihan Mandiri TKA menggunakan tepat 15 soal. Studio Guru tetap dapat
-# memilih paket 15/20/25 sesuai kontrol UI.
 TKA_TOTAL_QUESTIONS = 15
 TKA_GENERATION_QUESTIONS = 15
 TKA_GENERATION_MAX_ATTEMPTS = 3
@@ -76,7 +74,6 @@ def infer_tka_topic(
     jenjang: str | None = None,
     mapel: str | None = None,
 ) -> str:
-    """Fallback metadata: derive a readable stimulus topic from a descriptive filename."""
     stem = re.sub(
         r"\.[A-Za-z0-9]+$",
         "",
@@ -368,10 +365,6 @@ def list_tka_images(
 
 
 def backfill_tka_image_topics(limit: int = 500) -> int:
-    """
-    Fill blank topic metadata from the already-descriptive filename;
-    no image bytes are changed.
-    """
 
     conn = init_db_connection()
 
@@ -552,7 +545,14 @@ def get_tka_image_usage(image_id: str) -> list[dict]:
                                 WHERE question->>'image_id' = :image_id
                                    OR (
                                        jsonb_typeof(question->'image_ids') = 'array'
-                                       AND (question->'image_ids') ? :image_id
+                                       AND (
+                                           question->'image_ids' ? :image_id
+                                           OR EXISTS (
+                                               SELECT 1
+                                               FROM jsonb_array_elements(question->'image_ids') AS elem
+                                               WHERE elem->>'id' = :image_id
+                                           )
+                                       )
                                    )
                             )
                         ORDER BY created_at DESC
@@ -656,14 +656,14 @@ def get_tka_images_usage_bulk(image_ids: list[str]) -> dict[str, list[dict]]:
                         WHERE q->>'image_id' = ANY(:image_ids)
                            OR EXISTS (
                                SELECT 1
-                               FROM jsonb_array_elements_text(
+                               FROM jsonb_array_elements(
                                    CASE
                                        WHEN jsonb_typeof(q->'image_ids') = 'array'
                                        THEN q->'image_ids'
                                        ELSE '[]'::jsonb
                                    END
                                ) AS elem
-                               WHERE elem = ANY(:image_ids)
+                               WHERE elem::text ILIKE ANY(ARRAY(SELECT '%' || unnest || '%' FROM unnest(:image_ids)))
                            )
                         ORDER BY t.created_at DESC
                         """
@@ -700,7 +700,7 @@ def get_tka_images_usage_bulk(image_ids: list[str]) -> dict[str, list[dict]]:
             arr = _json(row.get("image_ids_array"), [])
             if isinstance(arr, list):
                 for item in arr:
-                    s_item = str(item or "").strip()
+                    s_item = str(item.get("id") if isinstance(item, dict) else item or "").strip()
                     if s_item in result:
                         matched_ids.add(s_item)
 
@@ -1050,7 +1050,6 @@ def delete_tka_image_safe(
 
 
 def _image_part(data: bytes, mime_type: str):
-    """Build a compact image part for AI generation."""
     try:
         from google.genai import types
 
@@ -1122,7 +1121,7 @@ def _normalize_question_type(value: Any) -> str:
 
 def _normalize_stimulus(
     item: dict,
-) -> tuple[str | None, str | None, str | None, list[str]]:
+) -> tuple[str | None, str | None, str | None, list[Any]]:
 
     stimulus_text = str(
         item.get("stimulus_text")
@@ -1135,7 +1134,7 @@ def _normalize_stimulus(
         or ""
     ).strip() or None
 
-    raw_ids: list[str] = []
+    raw_candidates: list[Any] = []
     candidate_keys = (
         "image_ids", "images", "stimulus_images",
         "image_id", "image_id_1", "image_id_2", "image_id_3"
@@ -1147,22 +1146,28 @@ def _normalize_stimulus(
             continue
         if isinstance(val, list):
             for v in val:
-                s = str(v).strip()
-                if s and s not in raw_ids:
-                    raw_ids.append(s)
-        elif isinstance(val, str) and val.strip():
-            for part in re.split(r"[,;|]+", val.strip()):
-                s = part.strip()
-                if s and s not in raw_ids:
-                    raw_ids.append(s)
+                if v and v not in raw_candidates:
+                    raw_candidates.append(v)
+        elif isinstance(val, (str, dict)) and val:
+            if isinstance(val, dict):
+                if val not in raw_candidates:
+                    raw_candidates.append(val)
+            else:
+                for part in re.split(r"[,;|]+", val.strip()):
+                    s = part.strip()
+                    if s and s not in raw_candidates:
+                        raw_candidates.append(s)
 
-    image_id = raw_ids[0] if raw_ids else None
+    single_id = None
+    if raw_candidates:
+        first = raw_candidates[0]
+        single_id = str(first.get("id") if isinstance(first, dict) else first).strip()
 
     return (
         stimulus_text or None,
         stimulus_group,
-        image_id,
-        raw_ids,
+        single_id,
+        raw_candidates,
     )
 
 
@@ -1273,7 +1278,7 @@ ATURAN PENANGANAN GAMBAR/STIMULUS VISUAL:
 - Jika tidak ada gambar, image_id harus null dan image_ids harus [].
 - Jika memakai 1 gambar spesifik, isi image_id dengan ID tersebut dan image_ids berisi array ID tersebut, misal: ["ID_GAMBAR_1"].
 - SANGAT PENTING: Jangan memasukkan semua gambar jika soal HANYA menanyakan 1 gambar spesifik (seperti "pada Gambar 1").
-- Hanya isi array "image_ids" dengan 2 atau lebih ID jika soal BENAR-BENAR MEMBANDINGKAN kedua/ketiga gambar tersebut (misal: "Bandingkan Gambar 1 dan Gambar 2", "kedua infografis tersebut").
+- Hanya isi array "image_ids" dengan 2 atau lebih ID jika soal BENAR-BENAR MEMBANDINGKAN kedua/ketiga gambar tersebut (misal: "Bandingkan Gambar 1 dan Gambar 3", "kedua infografis tersebut").
 
 {type_rules}
 
@@ -1356,6 +1361,7 @@ def _normalize_tka_questions(
 
     out = []
     default_image_ids = [str(x) for x in (default_image_ids or []) if x]
+    id_to_no = {img_id: i + 1 for i, img_id in enumerate(default_image_ids)}
 
     for idx, item in enumerate(raw_questions, 1):
         if not isinstance(item, dict):
@@ -1366,50 +1372,51 @@ def _normalize_tka_questions(
             continue
 
         qtype = _normalize_question_type(item.get("question_type") or item.get("type"))
-        stimulus_text, stimulus_group, single_image_id, raw_image_ids = _normalize_stimulus(item)
+        stimulus_text, stimulus_group, single_image_id, raw_candidates = _normalize_stimulus(item)
 
-        extracted_ids: list[str] = []
-        for cand in raw_image_ids:
-            if cand.lower() in {"null", "none", "tidak ada", "false", ""}:
+        extracted_items: list[dict] = []
+
+        for cand in raw_candidates:
+            c_id = cand.get("id") if isinstance(cand, dict) else str(cand).strip()
+            if not c_id or c_id.lower() in {"null", "none", "tidak ada", "false", ""}:
                 continue
-            if cand in default_image_ids and cand not in extracted_ids:
-                extracted_ids.append(cand)
+            if c_id in id_to_no and not any(x["id"] == c_id for x in extracted_items):
+                extracted_items.append({"id": c_id, "no": id_to_no[c_id]})
 
         combo_text = f"{question} {stimulus_text or ''}".lower()
 
-        # Deteksi apakah benar-benar soal perbandingan multi-gambar
+        # Deteksi perbandingan multi-gambar
         is_multi_comparison = any(kw in combo_text for kw in [
             "kedua", "membandingkan", "comparing", "both", "persamaan", "perbedaan",
-            "gambar 1 dan 2", "gambar 1 & 2", "infografis 1 dan 2", "infografis 1 & 2",
-            "infographic 1 and 2", "infographic 1 & 2"
+            "gambar 1 dan 2", "gambar 1 & 2", "gambar 1 dan 3", "gambar 1 & 3",
+            "infografis 1 dan 2", "infografis 1 dan 3", "infografis 1 & 3"
         ])
 
         if default_image_ids:
             if is_multi_comparison:
                 for did in default_image_ids:
-                    if did not in extracted_ids:
-                        extracted_ids.append(did)
+                    if not any(x["id"] == did for x in extracted_items):
+                        extracted_items.append({"id": did, "no": id_to_no[did]})
             else:
-                # Cari rujukan tunggal spesifik
                 has_g1 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*1\b", combo_text))
                 has_g2 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*2\b", combo_text))
                 has_g3 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*3\b", combo_text))
 
                 single_matches = []
-                if has_g1 and len(default_image_ids) >= 1: single_matches.append(default_image_ids[0])
-                if has_g2 and len(default_image_ids) >= 2: single_matches.append(default_image_ids[1])
-                if has_g3 and len(default_image_ids) >= 3: single_matches.append(default_image_ids[2])
+                if has_g1 and len(default_image_ids) >= 1:
+                    single_matches.append({"id": default_image_ids[0], "no": 1})
+                if has_g2 and len(default_image_ids) >= 2:
+                    single_matches.append({"id": default_image_ids[1], "no": 2})
+                if has_g3 and len(default_image_ids) >= 3:
+                    single_matches.append({"id": default_image_ids[2], "no": 3})
 
-                if len(single_matches) == 1:
-                    extracted_ids = single_matches
-                elif len(single_matches) > 1:
-                    extracted_ids = single_matches
-                elif not extracted_ids and default_image_ids:
-                    # Fallback default: ambil gambar pertama saja
-                    extracted_ids = [default_image_ids[0]]
+                if single_matches:
+                    extracted_items = single_matches
+                elif not extracted_items and default_image_ids:
+                    extracted_items = [{"id": default_image_ids[0], "no": 1}]
 
-        image_id = extracted_ids[0] if extracted_ids else None
-        image_ids_list = extracted_ids
+        image_id = extracted_items[0]["id"] if extracted_items else None
+        image_ids_list = extracted_items
 
         topic = str(item.get("topic") or "").strip()[:120]
         cognitive = str(item.get("cognitive_level") or "C4").strip()[:10].upper()
