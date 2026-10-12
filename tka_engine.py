@@ -519,10 +519,6 @@ def get_tka_image(image_id: str) -> dict | None:
 
 
 def get_tka_image_usage(image_id: str) -> list[dict]:
-    """
-    Cari paket TKA yang benar-benar mereferensikan image_id.
-    Read-only. Tidak mengubah database.
-    """
 
     image_id = str(image_id or "").strip()
 
@@ -628,7 +624,6 @@ def get_tka_image_usage(image_id: str) -> list[dict]:
 
 
 def get_tka_images_usage_bulk(image_ids: list[str]) -> dict[str, list[dict]]:
-    """Cari penggunaan banyak stimulus dalam satu query PostgreSQL."""
     ids = [str(x or "").strip() for x in (image_ids or []) if str(x or "").strip()]
     if not ids:
         return {}
@@ -730,11 +725,7 @@ def get_tka_images_usage_bulk(image_ids: list[str]) -> dict[str, list[dict]]:
 def delete_tka_images_safe_bulk(
     items: list[dict],
 ) -> tuple[list[str], list[dict]]:
-    """
-    Hapus banyak stimulus secara aman dengan satu pembacaan metadata dan
-    satu UPDATE database. Usage sudah diperiksa sebelumnya oleh UI.
-    Return: (deleted_ids, blocked_items)
-    """
+
     normalized = []
     for item in items or []:
         image_id = str(item.get("image_id") or "").strip()
@@ -862,11 +853,6 @@ def can_delete_tka_image(
     owner_key: str | None = None,
     allow_system: bool = False,
 ) -> tuple[bool, str, list[dict]]:
-    """
-    Validasi apakah sebuah image aman untuk dihapus.
-    Return:
-        (boleh_hapus, pesan, usages)
-    """
 
     image_id = str(image_id or "").strip()
 
@@ -1006,9 +992,6 @@ def delete_tka_image_safe(
     allow_system: bool = False,
     known_usages: list[dict] | None = None,
 ) -> tuple[bool, str, list[dict]]:
-    """
-    Soft-delete image setelah seluruh pemeriksaan keamanan lolos.
-    """
 
     if known_usages is None:
         allowed, message, usages = can_delete_tka_image(
@@ -1288,9 +1271,9 @@ ATURAN TKA YANG WAJIB:
 
 ATURAN PENANGANAN GAMBAR/STIMULUS VISUAL:
 - Jika tidak ada gambar, image_id harus null dan image_ids harus [].
-- Jika memakai 1 gambar, isi image_id dengan ID tersebut dan image_ids dengan array 1 elemen, misal: ["ID_GAMBAR"].
-- SANGAT PENTING (MULTI-GAMBAR): Jika soal membandingkan/mengacu pada 2 atau lebih gambar/infografis (misal: Gambar 1 & Gambar 2, Infographic 1 & Infographic 2, Stimulus 1 & Stimulus 3), WAJIB masukkan seluruh IMAGE_ID yang relevan ke dalam array "image_ids", misal: ["ID_GAMBAR_1", "ID_GAMBAR_2"], dan isi "image_id" dengan ID gambar pertama.
-- DILARANG MERANGKUM ISI GAMBAR MENJADI TEKS PARAGRAPH/RINGKASAN TEBAL JIKA GAMBAR VISUAL SUDAH DISEDIAKAN. Gunakan rujukan visual gambar secara langsung.
+- Jika memakai 1 gambar spesifik, isi image_id dengan ID tersebut dan image_ids berisi array ID tersebut, misal: ["ID_GAMBAR_1"].
+- SANGAT PENTING: Jangan memasukkan semua gambar jika soal HANYA menanyakan 1 gambar spesifik (seperti "pada Gambar 1").
+- Hanya isi array "image_ids" dengan 2 atau lebih ID jika soal BENAR-BENAR MEMBANDINGKAN kedua/ketiga gambar tersebut (misal: "Bandingkan Gambar 1 dan Gambar 2", "kedua infografis tersebut").
 
 {type_rules}
 
@@ -1333,7 +1316,7 @@ def _shuffle_options_preserving_keys(
     correct_labels: list[str],
     labels: tuple[str, ...],
 ) -> tuple[list[str], list[str]]:
-    """Acak posisi opsi sambil memetakan ulang kunci berdasarkan opsi asalnya."""
+
     entries = []
     seen = set()
     for option in options:
@@ -1364,7 +1347,7 @@ def _normalize_tka_questions(
     jenjang: str,
     default_image_ids: list[str] | None = None,
 ) -> list[dict]:
-    """Normalisasi ketat: jangan pernah mengarang kunci saat respons AI tidak valid."""
+
     labels = tka_option_labels(jenjang)
     label_set = set(labels)
 
@@ -1392,18 +1375,38 @@ def _normalize_tka_questions(
             if cand in default_image_ids and cand not in extracted_ids:
                 extracted_ids.append(cand)
 
-        # Fallback Cerdas: Jika AI membuat soal perbandingan/multi-gambar namun mengembalikan ID kurang lengkap
-        if default_image_ids and len(default_image_ids) > 1:
-            combo_text = f"{question} {stimulus_text or ''}".lower()
-            multi_keywords = [
-                "both", "kedua", "gambar 1", "gambar 2", "infographic 1", "infographic 2",
-                "stimulus 1", "stimulus 2", "stimulus 3", "membandingkan", "comparing",
-                "lintas", "infografis", "infographic"
-            ]
-            if any(kw in combo_text for kw in multi_keywords):
+        combo_text = f"{question} {stimulus_text or ''}".lower()
+
+        # Deteksi apakah benar-benar soal perbandingan multi-gambar
+        is_multi_comparison = any(kw in combo_text for kw in [
+            "kedua", "membandingkan", "comparing", "both", "persamaan", "perbedaan",
+            "gambar 1 dan 2", "gambar 1 & 2", "infografis 1 dan 2", "infografis 1 & 2",
+            "infographic 1 and 2", "infographic 1 & 2"
+        ])
+
+        if default_image_ids:
+            if is_multi_comparison:
                 for did in default_image_ids:
                     if did not in extracted_ids:
                         extracted_ids.append(did)
+            else:
+                # Cari rujukan tunggal spesifik
+                has_g1 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*1\b", combo_text))
+                has_g2 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*2\b", combo_text))
+                has_g3 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*3\b", combo_text))
+
+                single_matches = []
+                if has_g1 and len(default_image_ids) >= 1: single_matches.append(default_image_ids[0])
+                if has_g2 and len(default_image_ids) >= 2: single_matches.append(default_image_ids[1])
+                if has_g3 and len(default_image_ids) >= 3: single_matches.append(default_image_ids[2])
+
+                if len(single_matches) == 1:
+                    extracted_ids = single_matches
+                elif len(single_matches) > 1:
+                    extracted_ids = single_matches
+                elif not extracted_ids and default_image_ids:
+                    # Fallback default: ambil gambar pertama saja
+                    extracted_ids = [default_image_ids[0]]
 
         image_id = extracted_ids[0] if extracted_ids else None
         image_ids_list = extracted_ids
@@ -1524,7 +1527,7 @@ def generate_tka_questions_batch(
     count: int,
     image_records: list[dict] | None = None,
 ) -> list[dict]:
-    
+
     clients = get_gemini_clients()
     if not clients or count <= 0:
         return []
@@ -1652,7 +1655,7 @@ def _generate_tka_chunk_resilient(
     count: int,
     image_records: list[dict],
 ) -> list[dict]:
-    """Generate a small chunk, splitting further on failure without partial output."""
+
     if count <= 0:
         return []
     chunk = generate_tka_questions_batch(
@@ -1689,7 +1692,7 @@ def _generate_tka_type_count(
     count: int,
     image_records: list[dict],
 ) -> list[dict]:
-    """Generate a requested type in bounded chunks; fail closed if any chunk fails."""
+
     output: list[dict] = []
     remaining = max(0, int(count))
     while remaining:
@@ -1718,6 +1721,7 @@ def generate_tka_studio(
     auto_select_images: bool = False,
     count: int = TKA_GENERATION_QUESTIONS,
 ) -> list[dict]:
+
     jenjang = normalize_tka_jenjang(jenjang)
     mapel = tka_mapel_name(mapel)
     try:
@@ -1801,7 +1805,7 @@ def generate_tka_30(
     image_ids: list[str] | None = None,
     auto_select_images: bool = True,
 ) -> list[dict]:
-    """Legacy-compatible entry point; follows the current 15-question TKA policy."""
+
     return generate_tka_studio(
         jenjang=jenjang,
         mapel=mapel,
@@ -1941,7 +1945,7 @@ def validate_tka_30(
     questions: list[dict],
     jenjang: str,
 ) -> tuple[bool, str]:
-    """Legacy-named validator; checks the current TKA total (15 questions)."""
+
     return validate_tka_questions(questions, jenjang, TKA_TOTAL_QUESTIONS)
 
 
@@ -1951,7 +1955,6 @@ def publish_tka_to_db(
     questions: list[dict],
 ) -> bool:
 
-    # KOREKSI 5: Validasi saat Publish tidak lagi dikunci statis 30 soal
     expected_count = int(config.get("generation_count") or len(questions) or TKA_TOTAL_QUESTIONS)
 
     ok, reason = validate_tka_questions(
