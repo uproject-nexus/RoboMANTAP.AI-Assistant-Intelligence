@@ -747,14 +747,41 @@
                 stimulusBlock.classList.remove("hidden");
             }
 
-            // Penanganan Multi-Gambar Stimulus (Support 1, 2, atau 3 Gambar Sejajar)
-            let rawImages = item.image_ids || item.images || item.image_id;
+            // Penanganan Multi-Gambar Stimulus Komprehensif (Format Array, JSON List, Comma-Separated, atau Key Berurutan)
             let imageList = [];
-            if (Array.isArray(rawImages)) {
-                imageList = rawImages;
-            } else if (typeof rawImages === "string" && rawImages.trim() !== "") {
-                imageList = rawImages.includes(",") ? rawImages.split(",").map(s => s.trim()) : [rawImages.trim()];
-            }
+            const candidateFields = [
+                item.image_ids, item.images, item.stimulus_images, item.stimulus_image, item.image_id,
+                item.image_id_1, item.image_id_2, item.image_id_3,
+                item.image_1, item.image_2, item.image_3
+            ];
+
+            candidateFields.forEach(val => {
+                if (!val) return;
+                if (Array.isArray(val)) {
+                    val.forEach(v => {
+                        const s = String(v).trim();
+                        if (s && !imageList.includes(s)) imageList.push(s);
+                    });
+                } else if (typeof val === "string" && val.trim() !== "") {
+                    let str = val.trim();
+                    if (str.startsWith("[") && str.endsWith("]")) {
+                        try {
+                            let parsed = JSON.parse(str);
+                            if (Array.isArray(parsed)) {
+                                parsed.forEach(v => {
+                                    const s = String(v).trim();
+                                    if (s && !imageList.includes(s)) imageList.push(s);
+                                });
+                                return;
+                            }
+                        } catch (e) {}
+                    }
+                    str.split(/[,|;]+/).forEach(p => {
+                        const s = p.trim();
+                        if (s && !imageList.includes(s)) imageList.push(s);
+                    });
+                }
+            });
 
             if (imageList.length > 0) {
                 let gridColsClass = "grid-cols-1";
