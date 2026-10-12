@@ -1,1149 +1,2230 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
-    <title>Workspace TKA - RoboMANTAP</title>
+from __future__ import annotations
 
-    <!-- TailWind CSS & HTMX -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    
-    <!-- KaTeX Mathematics Renderer -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+import json
+import os
+import random
+import re
+import time
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
-    <style>
-        * {
-            -webkit-user-select: none !important;
-            -moz-user-select: none !important;
-            -ms-user-select: none !important;
-            user-select: none !important;
-            -webkit-touch-callout: none !important;
-        }
-        #question-box {
-            min-height: 260px;
-        }
+from sqlalchemy import text
 
-        /* CBT UX: jangan tampilkan LaTeX mentah saat soal sedang dipindahkan */
-        #question-text.math-pending,
-        #options-container.math-pending {
-            visibility: hidden;
-        }
+from ai_engine import (
+    init_db_connection,
+    get_gemini_clients,
+    option_labels_for_jenjang,
+    option_count_for_jenjang,
+    normalize_quiz_options,
+    clean_json_text,
+    _split_option_label,
+)
 
-        /* FIX KATEX: Mencegah rumus matematika terdistorsi */
-        .katex, .katex-html {
-            text-align: left !important;
-            text-justify: none !important;
-            white-space: nowrap !important;
-            display: inline-block !important;
-        }
-        .katex-display {
-            text-align: center !important;
-            display: block !important;
-            white-space: normal !important;
-        }
+TKA_TOTAL_QUESTIONS = 15
+TKA_GENERATION_QUESTIONS = 15
+TKA_GENERATION_MAX_ATTEMPTS = 3
+TKA_GENERATION_MAX_IMAGES = 3
+TKA_STUDIO_BATCH_SIZE = 5
+TKA_STUDIO_BATCH_TYPES = ("PG", "MCMA", "KATEGORI")
+TKA_STUDIO_ALLOWED_COUNTS = (15, 20, 25)
+TKA_STUDIO_RETRY_BACKOFF_SECONDS = 1.5
+TKA_DEFAULT_DURATION_SECONDS = 75 * 60
+TKA_DEFAULT_ACTIVE_HOURS = 24
+TKA_IMAGE_MAX_BYTES = 8 * 1024 * 1024
+TKA_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+TKA_MODELS = ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
 
-        /* HTMX Indicator Spinner Custom Style */
-        .htmx-indicator {
-            display: none;
-        }
-        .htmx-request .htmx-indicator, 
-        .htmx-request.htmx-indicator {
-            display: flex !important;
-        }
-    </style>
-</head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans select-none antialiased w-full flex flex-col justify-center items-center">
 
-    <!-- ============================================================================== -->
-    <!-- 1. CONTAINER LOBBY PRE-KUIS (TAMPIL DEFAUT SAAT HALAMAN DIBUKA) -->
-    <!-- ============================================================================== -->
-    <div id="lobby-container" class="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6 my-auto mx-auto">
-        <div class="border-b border-slate-800 pb-4">
-            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Informasi TKA</span>
-            <h1 class="text-xl font-bold text-white mt-1">{{ sess.config.mapel if sess.config else mapel }}</h1>
-            <p class="text-xs text-slate-400">Materi: {{ sess.config.materi if sess.config else materi }}</p>
-        </div>
+def _now_wib_naive() -> datetime:
+    return datetime.now(timezone.utc).astimezone(
+        timezone(timedelta(hours=7))
+    ).replace(tzinfo=None)
 
-        <div class="grid grid-cols-2 gap-4 text-sm">
-            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <p class="text-xs text-slate-400">Peserta TKA</p>
-                <p class="font-semibold text-emerald-300 mt-1 truncate">{{ sess.nama if sess else nama }}</p>
-                <p class="text-xs text-slate-500 mt-0.5">
-                    Kelas: {{ sess.kelas if sess else kelas }} • Absen: {{ sess.absen if sess else absen }}
-                </p>
-            </div>
-            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <p class="text-xs text-slate-400">Jumlah Soal & Durasi</p>
-                <p class="font-semibold text-emerald-300 mt-1">{{ jumlah_soal if jumlah_soal is defined else (sess.quiz|length if sess and sess.quiz else 0) }} Soal</p>
-                <p class="text-xs text-slate-500 mt-0.5">Waktu: {{ durasi_label if durasi_label is defined else (((sess.config.timer_seconds // 3600) ~ " jam " ~ ((sess.config.timer_seconds % 3600) // 60) ~ " menit") if sess and sess.config and sess.config.timer_seconds and sess.config.timer_seconds >= 3600 else (((sess.config.timer_seconds // 60) ~ " menit") if sess and sess.config and sess.config.timer_seconds else "Tanpa batas waktu")) }}</p>
-            </div>
-        </div>
 
-        <div class="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 text-xs text-slate-300 space-y-2">
-            <p class="font-bold text-emerald-400">⚠️ Aturan Pengerjaan:</p>
-            <ul class="list-disc list-outside ml-4 space-y-1 text-[11px] text-slate-400">
-                <li>Dilarang meninggalkan tab atau berpindah aplikasi</li>
-                <li>Gunakan 'navigasi soal' untuk bebas berpindah soal</li>
-                <li>TKA otomatis berakhir jika timer mencapai 00:00</li>
-                <li>Jawaban tersimpan otomatis saat memilih opsi</li>
-                <li>Klik tombol "Ragu-Ragu" bila keraguan mulai merasukimu</li>
-            </ul>
-        </div>
+def _json(value: Any, default: Any):
+    if isinstance(value, (dict, list)):
+        return value
+    if value is None:
+        return default
+    try:
+        return json.loads(value)
+    except Exception:
+        return default
 
-        <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Biasakan berdoa sebelum memulai ujian ya!</span>
 
-        <!-- Tombol Trigger Pindah dari Lobby ke Exam + Fullscreen -->
-        <button type="button" 
-                onclick="startExamFromLobby()"
-                class="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-sm py-3.5 px-4 rounded-xl transition shadow-[0_0_20px_rgba(16,185,129,0.35)] mt-4">
-            🚀 Mulai TKA Sekarang!
-        </button>
-    </div>
+def normalize_tka_jenjang(value: str) -> str:
+    raw = str(value or "MTs").strip().lower()
+    if "ma" in raw or "aliyah" in raw:
+        return "MA"
+    return "MTs"
 
-    <!-- ============================================================================== -->
-    <!-- 2. CONTAINER WORKSPACE EXAM (DISEMBUNYIKAN SEBELUM KLIK MULAI) -->
-    <!-- ============================================================================== -->
-    <div id="exam-container" class="hidden w-full min-h-screen flex flex-col justify-start">
 
-        <!-- HEADER UTAMA -->
-        <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-40 flex justify-between items-center w-full">
-            <div class="flex items-center space-x-2">
-                <span class="bg-emerald-500 text-slate-950 font-black text-[8px] px-2 py-0.5 rounded">UPN v2.0</span>
-                <div>
-                    <h1 class="text-xs sm:text-sm font-bold text-white leading-none">RoboMANTAP TKA</h1>
-                    <p class="text-[8px] text-emerald-400 mt-0.5 truncate max-w-[130px] sm:max-w-none">{{ sess.config.mapel if sess.config else mapel }}</p>
-                </div>
-            </div>
-            
-            <div class="flex items-center space-x-2 sm:space-x-3">
-                <!-- Tombol Fullscreen / Outfullscreen Dinamis -->
-                <button id="btn-fullscreen-toggle" 
-                        onclick="toggleFullscreenMode()" 
-                        class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-[8px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
-                    <span id="fs-icon">📺</span> 
-                    <span id="fs-text">Outfullscreen</span>
-                </button>
-                
-                <div class="bg-slate-950 border border-slate-800 px-3 py-1 rounded-lg text-xs">
-                    ⏱️ <span id="timer-display" class="font-mono text-emerald-400 font-bold">--:--</span>
-                </div>
-            </div>
-        </header>
+def tka_option_labels(jenjang: str) -> tuple[str, ...]:
+    return option_labels_for_jenjang(normalize_tka_jenjang(jenjang))
 
-        <!-- CHEAT WARNING BAR -->
-        <div id="cheat-warning-bar" class="hidden bg-amber-500/20 border-b border-amber-500/40 px-4 py-2 text-center text-xs text-amber-300 font-semibold">
-            ⚠️ Warning Pelanggaran Pindah Tab: <span id="violation-count-text">0</span> / 3
-        </div>
 
-        <!-- MAIN QUESTION AREA -->
-        <main class="flex-1 max-w-4xl w-full mx-auto p-3 sm:p-5 flex flex-col justify-start">
-            
-            <div class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 mb-3 shadow-md flex-shrink-0">
-                <div class="flex items-center space-x-2 text-xs truncate mr-2">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
-                    <span class="text-slate-200 font-semibold truncate">{{ sess.nama if sess else nama }}</span>
-                    <span class="text-slate-600">•</span>
-                    <span class="text-emerald-400 font-medium text-[11px] flex-shrink-0">Kelas {{ sess.kelas if sess else kelas }}</span>
-                </div>
+def tka_mapel_name(value: str) -> str:
+    value = re.sub(r"\s+", " ", str(value or "").strip())
+    return value[:80] or "Matematika"
 
-                <button onclick="toggleNavModal(true)" class="bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-400 border border-emerald-500/30 text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0">
-                    📑 Navigasi Soal
-                </button>
-            </div>
 
-            <section id="question-box" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col justify-between">
-                <div>
-                    <div class="flex justify-between items-center border-b border-slate-800 pb-2.5 mb-3">
-                        <span id="label-no-soal" class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Memuat...</span>
-                        <span id="question-type-label" class="text-[10px] sm:text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">TKA</span>
-                    </div>
+def infer_tka_topic(
+    filename: str,
+    jenjang: str | None = None,
+    mapel: str | None = None,
+) -> str:
+    stem = re.sub(
+        r"\.[A-Za-z0-9]+$",
+        "",
+        os.path.basename(str(filename or "")),
+    )
+    stem = re.sub(r"[_]+", "-", stem)
 
-                    <div id="stimulus-block" class="hidden mb-4 rounded-xl border border-slate-800 bg-slate-950 p-3">
-                        <div id="stimulus-text" class="hidden text-slate-200 text-sm leading-relaxed whitespace-pre-wrap text-justify mb-3"></div>
-                        <div id="stimulus-image" class="hidden rounded-xl overflow-hidden border border-slate-800/80 bg-slate-900/50 p-2"></div>
-                    </div>
-                    <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-4 font-medium overflow-x-auto text-justify"></div>
+    prefixes = []
 
-                    <div id="options-container" class="space-y-2.5"></div>
-                </div>
+    if mapel:
+        prefixes.append(
+            re.sub(
+                r"[^a-z0-9]+",
+                "-",
+                tka_mapel_name(mapel).lower(),
+            ).strip("-")
+        )
 
-                <div class="flex items-center justify-between border-t border-slate-800/80 pt-3.5 mt-4 gap-2">
-                    <button id="btn-prev" onclick="prevQuestion()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-3.5 rounded-xl transition text-center disabled:opacity-40 disabled:cursor-not-allowed">
-                        ← Prev
-                    </button>
+    if jenjang:
+        prefixes.append(
+            normalize_tka_jenjang(jenjang).lower()
+        )
 
-                    <button id="btn-ragu" onclick="toggleRagu()" class="flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold py-2.5 px-2 rounded-xl transition text-center whitespace-nowrap">
-                        ⚠️ Ragu-Ragu
-                    </button>
+    for prefix in prefixes:
+        stem = re.sub(
+            rf"^{re.escape(prefix)}(?:-+|$)",
+            "",
+            stem,
+            flags=re.I,
+        )
 
-                    <button id="btn-next-submit" onclick="handleNextOrSubmit()" class="flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center">
-                        Next →
-                    </button>
-                </div>
+    stem = re.sub(r"[-_]+", " ", stem)
+    stem = re.sub(r"\s+", " ", stem).strip(" -_")
 
-                <!-- BOX ROBOMANTAP HINT (HTMX CONSULTATION) -->
-                <details class="group my-3 border border-slate-800 bg-slate-950/80 rounded-xl overflow-hidden transition">
-                    <summary class="flex items-center justify-between p-3 cursor-pointer font-semibold text-emerald-400 bg-slate-800/40 hover:bg-slate-800/70 select-none text-xs">
-                        <span>Kamu bingung? Diskusi di sini sama aku, RoboMANTAP! 🧕🏼</span>
-                        <span class="text-[10px] transition-transform group-open:rotate-180">▼</span>
-                    </summary>
-                
-                    <div class="p-3.5 space-y-2.5 text-slate-200">
-                        <p class="text-[11px] text-slate-400 leading-relaxed">
-                            Fungsi kolom ini: Tulis ide awal atau rumus yang mau kamu coba, nanti RoboMANTAP bakal kasih petunjuk jalan keluarnya tanpa langsung bocorin jawaban!
-                        </p>
-                
-                        <!-- Form HTMX -->
-                        <form hx-post="/api/hint"
-                              hx-target="#hint-result"
-                              hx-indicator="#hint-loading"
-                              class="space-y-2">
-                            
-                            <input type="hidden" id="hint-curr-idx" name="curr_idx" value="0">
-                            <input type="hidden" id="hint-mapel" name="mapel" value="{{ sess.config.mapel if sess.config else mapel }}">
-                            <input type="hidden" id="hint-question" name="question" value="">
-                
-                            <div>
-                                <label class="block text-[11px] font-medium text-slate-300 mb-1">
-                                    Gagasan / Ide Logika Kamu apa coba?:
-                                </label>
-                                <input type="text" 
-                                       id="hint-attempt-input"
-                                       name="attempt_input" 
-                                       placeholder="Contoh: Jawaban-nya apa ya? 🤔"
-                                       class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none">
-                            </div>
-                
-                            <button type="submit" 
-                                    class="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold text-xs rounded-lg transition">
-                                Diskusi Yuk!
-                            </button>
-                        </form>
-                
-                        <!-- SPINNER LOADING HTMX -->
-                        <div id="hint-loading" class="htmx-indicator mt-2">
-                            <div class="flex items-center gap-2 text-xs text-emerald-400 animate-pulse">
-                                <span>🧕🏼 RoboMANTAP sedang memproses diskusi kita...</span>
-                            </div>
-                        </div>
-                
-                        <div id="hint-result" class="mt-2"></div>
-                    </div>
-                </details>
-            </section>
+    return stem[:160].strip().title() or "Stimulus TKA"
 
-        </main>
-    </div>
 
-    <!-- FORM SUBMIT EXAM HIDDEN -->
-    <form id="form-submit-exam" action="/submit-exam" method="POST" class="hidden">
-        <input type="hidden" name="session_id" value="{{ session_id }}">
-        <input type="hidden" id="anti-cheat-detected" name="anti_cheat_detected" value="0">
-        <input type="hidden" id="anti-cheat-reason" name="anti_cheat_reason" value="">
-        <input type="hidden" id="anti-cheat-count" name="anti_cheat_count" value="0">
-    </form>
+def ensure_tka_tables() -> bool:
+    conn = init_db_connection()
 
-    <!-- MODAL NAVIGASI SOAL -->
-    <div id="nav-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="text-sm font-bold text-white flex items-center space-x-2">
-                    <span>📑 Navigasi Soal</span>
-                </h3>
-                <button onclick="toggleNavModal(false)" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
-            </div>
+    if not conn:
+        return False
 
-            <div class="grid grid-cols-3 gap-1.5 text-[10px] text-center">
-                <div class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 p-1.5 rounded-lg font-medium">Sudah Dijawab</div>
-                <div class="bg-amber-500/20 text-amber-300 border border-amber-500/40 p-1.5 rounded-lg font-medium">Ragu-Ragu</div>
-                <div class="bg-slate-950 text-slate-400 border border-slate-800 p-1.5 rounded-lg font-medium">Belum Dijawab</div>
-            </div>
+    statements = [
+        """
+        CREATE TABLE IF NOT EXISTS tka_custom (
+            kode_tka VARCHAR(40) PRIMARY KEY,
+            config JSONB NOT NULL DEFAULT '{}'::jsonb,
+            tka_data JSONB NOT NULL DEFAULT '[]'::jsonb,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS tka_image_library (
+            image_id UUID PRIMARY KEY,
+            source_type VARCHAR(20) NOT NULL DEFAULT 'GURU',
+            owner_key VARCHAR(180),
+            filename VARCHAR(255) NOT NULL,
+            mime_type VARCHAR(80) NOT NULL,
+            image_data BYTEA NOT NULL,
+            jenjang VARCHAR(40),
+            mapel VARCHAR(100),
+            topic VARCHAR(160),
+            tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_tka_image_library_source
+        ON tka_image_library(source_type, is_active)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_tka_image_library_owner
+        ON tka_image_library(owner_key, is_active)
+        """,
+    ]
 
-            <div id="nav-grid" class="grid grid-cols-5 gap-2 max-h-[60vh] overflow-y-auto p-1"></div>
+    try:
+        with conn.session as s:
+            for statement in statements:
+                s.execute(text(statement))
 
-            <button onclick="toggleNavModal(false)" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-2.5 rounded-xl">
-                Tutup
-            </button>
-        </div>
-    </div>
+            s.commit()
 
-    <!-- MODAL SUBMIT KONFIRMASI -->
-    <div id="submit-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl max-w-sm w-full p-6 shadow-[0_0_30px_rgba(16,185,129,0.2)] text-center space-y-4">
-            <div class="w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto text-2xl">
-                🚀
-            </div>
-            <div>
-                <h3 class="text-base font-bold text-white">Konfirmasi Selesai TKA</h3>
-                <p class="text-xs text-slate-300 mt-2 leading-relaxed">
-                    Apakah Kamu yakin ingin mengakhiri sesi TKA ini? Pastikan seluruh soal sudah Kamu periksa kembali dengan teliti ya!
-                </p>
-            </div>
-            <div class="flex space-x-2.5 pt-2">
-                <button onclick="toggleSubmitModal(false)" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold py-3 rounded-xl transition">
-                    Batal
-                </button>
-                <button onclick="submitExamNow()" class="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold py-3 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.35)]">
-                    Ya, Selesaikan!
-                </button>
-            </div>
-        </div>
-    </div>
+        return True
 
-    <!-- MODAL FULLSCREEN GAMBAR STIMULUS -->
-    <div id="image-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-2 sm:p-4" onclick="closeImageModal()">
-        <div class="relative max-w-5xl w-full max-h-full flex flex-col items-center justify-center" onclick="event.stopPropagation()">
-            <button type="button" onclick="closeImageModal()" class="absolute top-2 right-2 bg-slate-800/80 hover:bg-slate-700 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center text-sm z-10 border border-slate-700 shadow-lg">✕</button>
-            <img id="image-modal-src" src="" alt="Gambar Stimulus Layar Penuh" class="max-w-full max-h-[90vh] object-contain rounded-xl border border-slate-800 shadow-2xl">
-        </div>
-    </div>
+    except Exception as exc:
+        print(f"[TKA DB INIT] {exc}")
+        return False
 
-    <!-- ============================================================================== -->
-    <!-- LOGIKA JAVASCRIPT UTAMA -->
-    <!-- ============================================================================== -->
-    <script>
-        let isSubmitting = false;
-        const sessionId = "{{ session_id }}";
 
-        // --- 1. PROSES PINDAH DARI LOBBY KE EXAM ---
-        async function startExamFromLobby() {
-            const elem = document.documentElement;
-            try {
-                if (elem.requestFullscreen) {
-                    await elem.requestFullscreen();
-                } else if (elem.webkitRequestFullscreen) {
-                    await elem.webkitRequestFullscreen();
+def save_tka_image(
+    *,
+    data: bytes,
+    filename: str,
+    mime_type: str,
+    source_type: str,
+    owner_key: str = "",
+    jenjang: str = "",
+    mapel: str = "",
+    topic: str = "",
+    tags: list[str] | None = None,
+) -> str | None:
+
+    if (
+        not data
+        or len(data) > TKA_IMAGE_MAX_BYTES
+        or mime_type not in TKA_IMAGE_MIME_TYPES
+    ):
+        return None
+
+    image_id = str(uuid.uuid4())
+
+    conn = init_db_connection()
+
+    if not conn:
+        return None
+
+    query = """
+    INSERT INTO tka_image_library
+      (
+        image_id,
+        source_type,
+        owner_key,
+        filename,
+        mime_type,
+        image_data,
+        jenjang,
+        mapel,
+        topic,
+        tags,
+        is_active,
+        created_at,
+        updated_at
+      )
+    VALUES
+      (
+        :id,
+        :source,
+        :owner,
+        :filename,
+        :mime,
+        :data,
+        :jenjang,
+        :mapel,
+        :topic,
+        :tags,
+        TRUE,
+        NOW() AT TIME ZONE 'Asia/Jakarta',
+        NOW() AT TIME ZONE 'Asia/Jakarta'
+      )
+    """
+
+    try:
+        with conn.session as s:
+            s.execute(
+                text(query),
+                {
+                    "id": image_id,
+                    "source": (
+                        "SYSTEM"
+                        if str(source_type).upper() == "SYSTEM"
+                        else "GURU"
+                    ),
+                    "owner": owner_key[:180] if owner_key else None,
+                    "filename": os.path.basename(filename)[:255],
+                    "mime": mime_type,
+                    "data": data,
+                    "jenjang": (
+                        normalize_tka_jenjang(jenjang)
+                        if jenjang
+                        else None
+                    ),
+                    "mapel": (
+                        tka_mapel_name(mapel)
+                        if mapel
+                        else None
+                    ),
+                    "topic": (
+                        str(topic or "").strip()[:160]
+                        or infer_tka_topic(
+                            filename,
+                            jenjang,
+                            mapel,
+                        )
+                    ),
+                    "tags": json.dumps(tags or []),
+                },
+            )
+
+            s.commit()
+
+        return image_id
+
+    except Exception as exc:
+        print(f"[TKA IMAGE SAVE] {exc}")
+        return None
+
+
+def list_tka_images(
+    source_type: str | None = None,
+    owner_key: str | None = None,
+    jenjang: str | None = None,
+    mapel: str | None = None,
+    search: str | None = None,
+    limit: int = 100,
+) -> list[dict]:
+
+    conn = init_db_connection()
+
+    if not conn:
+        return []
+
+    clauses = ["is_active = TRUE"]
+
+    params: dict[str, Any] = {
+        "limit": max(1, min(int(limit), 500))
+    }
+
+    if source_type:
+        clauses.append("source_type = :source_type")
+        params["source_type"] = source_type.upper()
+
+    if owner_key:
+        clauses.append(
+            "(source_type = 'SYSTEM' OR LOWER(owner_key) = LOWER(:owner_key))"
+        )
+        params["owner_key"] = owner_key
+
+    if jenjang:
+        clauses.append("jenjang = :jenjang")
+        params["jenjang"] = normalize_tka_jenjang(jenjang)
+
+    if mapel:
+        clauses.append("LOWER(mapel) = LOWER(:mapel)")
+        params["mapel"] = tka_mapel_name(mapel)
+
+    if search and str(search).strip():
+        clauses.append(
+            """
+            (
+                LOWER(filename) LIKE LOWER(:search)
+                OR LOWER(COALESCE(topic, '')) LIKE LOWER(:search)
+                OR CAST(
+                    COALESCE(tags, '[]'::jsonb)
+                    AS TEXT
+                ) ILIKE :search
+            )
+            """
+        )
+
+        params["search"] = f"%{str(search).strip()}%"
+
+    query = f"""
+      SELECT
+        image_id,
+        source_type,
+        owner_key,
+        filename,
+        mime_type,
+        jenjang,
+        mapel,
+        topic,
+        tags,
+        created_at,
+        updated_at
+      FROM tka_image_library
+      WHERE {' AND '.join(clauses)}
+      ORDER BY created_at DESC
+      LIMIT :limit
+    """
+
+    try:
+        with conn.session as s:
+            rows = (
+                s.execute(text(query), params)
+                .mappings()
+                .all()
+            )
+
+        return [dict(r) for r in rows]
+
+    except Exception as exc:
+        print(f"[TKA IMAGE LIST] {exc}")
+        return []
+
+
+def backfill_tka_image_topics(limit: int = 500) -> int:
+
+    conn = init_db_connection()
+
+    if not conn:
+        return 0
+
+    try:
+        with conn.session as s:
+            rows = (
+                s.execute(
+                    text(
+                        """
+                        SELECT
+                            image_id,
+                            filename,
+                            jenjang,
+                            mapel
+                        FROM tka_image_library
+                        WHERE
+                            is_active = TRUE
+                            AND (
+                                topic IS NULL
+                                OR BTRIM(topic) = ''
+                            )
+                        ORDER BY created_at ASC
+                        LIMIT :limit
+                        """
+                    ),
+                    {
+                        "limit": max(
+                            1,
+                            min(int(limit), 500),
+                        )
+                    },
+                )
+                .mappings()
+                .all()
+            )
+
+            updated = 0
+
+            for row in rows:
+                topic = infer_tka_topic(
+                    row.get("filename"),
+                    row.get("jenjang"),
+                    row.get("mapel"),
+                )
+
+                if topic:
+                    result = s.execute(
+                        text(
+                            """
+                            UPDATE tka_image_library
+                            SET
+                                topic = :topic,
+                                updated_at =
+                                    NOW()
+                                    AT TIME ZONE 'Asia/Jakarta'
+                            WHERE
+                                image_id = :id
+                                AND (
+                                    topic IS NULL
+                                    OR BTRIM(topic) = ''
+                                )
+                            """
+                        ),
+                        {
+                            "id": str(row["image_id"]),
+                            "topic": topic[:160],
+                        },
+                    )
+
+                    updated += int(result.rowcount or 0)
+
+            if updated:
+                s.commit()
+
+            return updated
+
+    except Exception as exc:
+        print(f"[TKA TOPIC BACKFILL] {exc}")
+        return 0
+
+
+def get_tka_image(image_id: str) -> dict | None:
+    conn = init_db_connection()
+
+    if not conn:
+        return None
+
+    try:
+        with conn.session as s:
+            row = (
+                s.execute(
+                    text(
+                        """
+                        SELECT
+                            image_id,
+                            source_type,
+                            owner_key,
+                            filename,
+                            mime_type,
+                            image_data,
+                            jenjang,
+                            mapel,
+                            topic,
+                            tags,
+                            created_at
+                        FROM tka_image_library
+                        WHERE
+                            image_id = :id
+                            AND is_active = TRUE
+                        LIMIT 1
+                        """
+                    ),
+                    {"id": str(image_id)},
+                )
+                .mappings()
+                .first()
+            )
+
+        result = dict(row) if row else None
+
+        if result and isinstance(
+            result.get("image_data"),
+            memoryview,
+        ):
+            result["image_data"] = (
+                result["image_data"].tobytes()
+            )
+
+        elif result and isinstance(
+            result.get("image_data"),
+            bytearray,
+        ):
+            result["image_data"] = bytes(
+                result["image_data"]
+            )
+
+        return result
+
+    except Exception as exc:
+        print(f"[TKA IMAGE GET] {exc}")
+        return None
+
+
+def get_tka_image_usage(image_id: str) -> list[dict]:
+
+    image_id = str(image_id or "").strip()
+
+    if not image_id:
+        return []
+
+    conn = init_db_connection()
+
+    if not conn:
+        return []
+
+    try:
+        with conn.session as s:
+            rows = (
+                s.execute(
+                    text(
+                        """
+                        SELECT
+                            kode_tka,
+                            config,
+                            created_at,
+                            updated_at
+                        FROM tka_custom
+                        WHERE
+                            jsonb_typeof(COALESCE(tka_data, '[]'::jsonb)) = 'array'
+                            AND EXISTS (
+                                SELECT 1
+                                FROM jsonb_array_elements(
+                                    COALESCE(tka_data, '[]'::jsonb)
+                                ) AS question
+                                WHERE question->>'image_id' = :image_id
+                                   OR (
+                                       jsonb_typeof(question->'image_ids') = 'array'
+                                       AND (
+                                           question->'image_ids' ? :image_id
+                                           OR EXISTS (
+                                               SELECT 1
+                                               FROM jsonb_array_elements(question->'image_ids') AS elem
+                                               WHERE elem->>'id' = :image_id
+                                           )
+                                       )
+                                   )
+                            )
+                        ORDER BY created_at DESC
+                        """
+                    ),
+                    {"image_id": image_id},
+                )
+                .mappings()
+                .all()
+            )
+
+        usages = []
+
+        for row in rows:
+            config = _json(
+                row.get("config"),
+                {},
+            )
+
+            active_from = config.get("active_from")
+            active_until = config.get("active_until")
+
+            is_active_window = True
+            if active_until:
+                try:
+                    end_dt = active_until
+                    if not isinstance(end_dt, datetime):
+                        end_dt = datetime.fromisoformat(
+                            str(end_dt).replace("Z", "+00:00")
+                        )
+                    if getattr(end_dt, "tzinfo", None):
+                        end_dt = end_dt.astimezone(
+                            timezone(timedelta(hours=7))
+                        ).replace(tzinfo=None)
+                    is_active_window = end_dt >= _now_wib_naive()
+                except Exception:
+                    is_active_window = True
+
+            usages.append(
+                {
+                    "kode_tka": str(
+                        row.get("kode_tka") or ""
+                    ),
+                    "jenjang": (
+                        config.get("jenjang")
+                        or "-"
+                    ),
+                    "mapel": (
+                        config.get("mapel")
+                        or "-"
+                    ),
+                    "active_from": active_from,
+                    "active_until": active_until,
+                    "is_active_window": is_active_window,
+                    "created_at": row.get(
+                        "created_at"
+                    ),
+                    "updated_at": row.get(
+                        "updated_at"
+                    ),
                 }
-            } catch (err) {
-                console.log("Fullscreen declined:", err);
+            )
+
+        return usages
+
+    except Exception as exc:
+        print(f"[TKA IMAGE USAGE] {exc}")
+        return []
+
+
+def get_tka_images_usage_bulk(image_ids: list[str]) -> dict[str, list[dict]]:
+    ids = [str(x or "").strip() for x in (image_ids or []) if str(x or "").strip()]
+    if not ids:
+        return {}
+
+    conn = init_db_connection()
+    if not conn:
+        return {image_id: [] for image_id in ids}
+
+    try:
+        with conn.session as s:
+            rows = (
+                s.execute(
+                    text(
+                        """
+                        SELECT
+                            t.kode_tka,
+                            t.config,
+                            t.created_at,
+                            t.updated_at,
+                            q->>'image_id' AS image_id_single,
+                            q->'image_ids' AS image_ids_array
+                        FROM tka_custom AS t
+                        CROSS JOIN LATERAL jsonb_array_elements(
+                            CASE
+                                WHEN jsonb_typeof(COALESCE(t.tka_data, '[]'::jsonb)) = 'array'
+                                THEN t.tka_data
+                                ELSE '[]'::jsonb
+                            END
+                        ) AS q
+                        WHERE q->>'image_id' = ANY(:image_ids)
+                           OR EXISTS (
+                               SELECT 1
+                               FROM jsonb_array_elements(
+                                   CASE
+                                       WHEN jsonb_typeof(q->'image_ids') = 'array'
+                                       THEN q->'image_ids'
+                                       ELSE '[]'::jsonb
+                                   END
+                               ) AS elem
+                               WHERE elem::text ILIKE ANY(ARRAY(SELECT '%' || unnest || '%' FROM unnest(:image_ids)))
+                           )
+                        ORDER BY t.created_at DESC
+                        """
+                    ),
+                    {"image_ids": ids},
+                )
+                .mappings()
+                .all()
+            )
+
+        result = {image_id: [] for image_id in ids}
+        now = _now_wib_naive()
+
+        for row in rows:
+            config = _json(row.get("config"), {})
+            active_until = config.get("active_until")
+            is_active_window = True
+            if active_until:
+                try:
+                    end_dt = active_until
+                    if not isinstance(end_dt, datetime):
+                        end_dt = datetime.fromisoformat(str(end_dt).replace("Z", "+00:00"))
+                    if getattr(end_dt, "tzinfo", None):
+                        end_dt = end_dt.astimezone(timezone(timedelta(hours=7))).replace(tzinfo=None)
+                    is_active_window = end_dt >= now
+                except Exception:
+                    is_active_window = True
+
+            matched_ids = set()
+            single_id = str(row.get("image_id_single") or "").strip()
+            if single_id in result:
+                matched_ids.add(single_id)
+
+            arr = _json(row.get("image_ids_array"), [])
+            if isinstance(arr, list):
+                for item in arr:
+                    s_item = str(item.get("id") if isinstance(item, dict) else item or "").strip()
+                    if s_item in result:
+                        matched_ids.add(s_item)
+
+            for image_id in matched_ids:
+                result[image_id].append({
+                    "kode_tka": str(row.get("kode_tka") or ""),
+                    "jenjang": config.get("jenjang") or "-",
+                    "mapel": config.get("mapel") or "-",
+                    "active_from": config.get("active_from"),
+                    "active_until": active_until,
+                    "is_active_window": is_active_window,
+                    "created_at": row.get("created_at"),
+                    "updated_at": row.get("updated_at"),
+                })
+
+        return result
+    except Exception as exc:
+        print(f"[TKA IMAGE USAGE BULK] {exc}")
+        return {image_id: [] for image_id in ids}
+
+
+def delete_tka_images_safe_bulk(
+    items: list[dict],
+) -> tuple[list[str], list[dict]]:
+
+    normalized = []
+    for item in items or []:
+        image_id = str(item.get("image_id") or "").strip()
+        if image_id:
+            normalized.append({**item, "image_id": image_id})
+
+    if not normalized:
+        return [], []
+
+    conn = init_db_connection()
+    if not conn:
+        return [], [{"image_id": item["image_id"], "message": "Database tidak tersedia.", "usages": item.get("known_usages") or []} for item in normalized]
+
+    ids = [item["image_id"] for item in normalized]
+    placeholders = ", ".join(f":id_{i}" for i in range(len(ids)))
+    params = {f"id_{i}": image_id for i, image_id in enumerate(ids)}
+
+    try:
+        with conn.session as s:
+            rows = (
+                s.execute(
+                    text(
+                        f"""
+                        SELECT image_id, source_type, owner_key, is_active
+                        FROM tka_image_library
+                        WHERE image_id::text IN ({placeholders})
+                        """
+                    ),
+                    params,
+                )
+                .mappings()
+                .all()
+            )
+
+            metadata = {str(row["image_id"]): dict(row) for row in rows}
+            blocked = []
+            safe_items = []
+
+            for item in normalized:
+                image_id = item["image_id"]
+                image = metadata.get(image_id)
+                usages = list(item.get("known_usages") or [])
+
+                if not image or not image.get("is_active"):
+                    blocked.append({"image_id": image_id, "message": "Gambar tidak ditemukan atau sudah tidak aktif.", "usages": usages})
+                    continue
+
+                source_type = str(image.get("source_type") or "").upper()
+                owner_key = item.get("owner_key")
+                allow_system = bool(item.get("allow_system"))
+                image_owner = str(image.get("owner_key") or "").strip()
+
+                if source_type == "SYSTEM" and not allow_system:
+                    blocked.append({"image_id": image_id, "message": "Gambar Sistem UPN tidak dapat dihapus dari area Guru.", "usages": usages})
+                    continue
+
+                if source_type == "GURU" and owner_key and image_owner.lower() != str(owner_key).strip().lower():
+                    blocked.append({"image_id": image_id, "message": "Gambar Guru ini bukan milik akun/guru yang sedang aktif.", "usages": usages})
+                    continue
+
+                active_usages = [u for u in usages if u.get("is_active_window", True)]
+                if active_usages:
+                    blocked.append({"image_id": image_id, "message": "Masih digunakan oleh TKA yang masa aktifnya belum selesai.", "usages": active_usages})
+                    continue
+
+                safe_items.append(item)
+
+            if not safe_items:
+                return [], blocked
+
+            conditions = []
+            update_params = {}
+            for i, item in enumerate(safe_items):
+                image_id = item["image_id"]
+                p_id = f"safe_id_{i}"
+                update_params[p_id] = image_id
+                if bool(item.get("allow_system")):
+                    conditions.append(f"(image_id = :{p_id} AND source_type = 'SYSTEM')")
+                else:
+                    p_owner = f"safe_owner_{i}"
+                    update_params[p_owner] = item.get("owner_key") or ""
+                    conditions.append(
+                        f"(image_id = :{p_id} AND source_type = 'GURU' AND LOWER(owner_key) = LOWER(:{p_owner}))"
+                    )
+
+            update_sql = f"""
+                UPDATE tka_image_library
+                SET
+                    is_active = FALSE,
+                    updated_at = NOW() AT TIME ZONE 'Asia/Jakarta'
+                WHERE is_active = TRUE
+                  AND ({" OR ".join(conditions)})
+                RETURNING image_id
+            """
+            result = s.execute(text(update_sql), update_params)
+            returned = result.mappings().all()
+            s.commit()
+
+            deleted_ids = [str(row["image_id"]) for row in returned]
+            returned_set = set(deleted_ids)
+            for item in safe_items:
+                if item["image_id"] not in returned_set:
+                    blocked.append({
+                        "image_id": item["image_id"],
+                        "message": "Gambar berubah status sebelum proses selesai dan tidak dihapus.",
+                        "usages": item.get("known_usages") or [],
+                    })
+
+            return deleted_ids, blocked
+
+    except Exception as exc:
+        print(f"[TKA IMAGE DELETE BULK] {exc}")
+        return [], [
+            {
+                "image_id": item["image_id"],
+                "message": f"Penghapusan massal gagal: {exc}",
+                "usages": item.get("known_usages") or [],
+            }
+            for item in normalized
+        ]
+
+
+def can_delete_tka_image(
+    image_id: str,
+    owner_key: str | None = None,
+    allow_system: bool = False,
+) -> tuple[bool, str, list[dict]]:
+
+    image_id = str(image_id or "").strip()
+
+    if not image_id:
+        return (
+            False,
+            "Image ID tidak valid.",
+            [],
+        )
+
+    image = get_tka_image(image_id)
+
+    if not image:
+        return (
+            False,
+            "Gambar tidak ditemukan atau sudah tidak aktif.",
+            [],
+        )
+
+    source_type = str(
+        image.get("source_type") or ""
+    ).upper()
+
+    image_owner = str(
+        image.get("owner_key") or ""
+    ).strip()
+
+    if source_type == "SYSTEM" and not allow_system:
+        return (
+            False,
+            "Gambar Sistem UPN tidak dapat dihapus dari area Guru.",
+            [],
+        )
+
+    if source_type == "GURU" and owner_key:
+        if (
+            image_owner.lower()
+            != str(owner_key).strip().lower()
+        ):
+            return (
+                False,
+                "Gambar Guru ini bukan milik akun/guru yang sedang aktif.",
+                [],
+            )
+
+    usages = get_tka_image_usage(image_id)
+
+    active_usages = [
+        usage
+        for usage in usages
+        if usage.get("is_active_window", True)
+    ]
+
+    if active_usages:
+        return (
+            False,
+            "Gambar masih digunakan oleh TKA yang masa aktifnya belum selesai. "
+            "Tunggu sampai TKA tersebut selesai/expired sebelum menghapus stimulus.",
+            active_usages,
+        )
+
+    if usages:
+        return (
+            True,
+            "Semua paket TKA yang pernah memakai stimulus ini sudah selesai. "
+            "Gambar aman dikeluarkan dari Library aktif.",
+            usages,
+        )
+
+    return (
+        True,
+        "Gambar aman untuk dihapus.",
+        [],
+    )
+
+
+def delete_tka_image(
+    image_id: str,
+    owner_key: str | None = None,
+    allow_system: bool = False,
+) -> bool:
+
+    conn = init_db_connection()
+
+    if not conn:
+        return False
+
+    clauses = [
+        "image_id = :id",
+        "is_active = TRUE",
+    ]
+
+    params = {
+        "id": str(image_id)
+    }
+
+    if not allow_system:
+        clauses.append(
+            "source_type = 'GURU'"
+        )
+
+        if owner_key:
+            clauses.append(
+                "LOWER(owner_key) = LOWER(:owner)"
+            )
+            params["owner"] = owner_key
+
+    try:
+        with conn.session as s:
+            result = s.execute(
+                text(
+                    f"""
+                    UPDATE tka_image_library
+                    SET
+                        is_active = FALSE,
+                        updated_at =
+                            NOW()
+                            AT TIME ZONE 'Asia/Jakarta'
+                    WHERE {' AND '.join(clauses)}
+                    """
+                ),
+                params,
+            )
+
+            s.commit()
+
+            return result.rowcount > 0
+
+    except Exception as exc:
+        print(f"[TKA IMAGE DELETE] {exc}")
+        return False
+
+
+def delete_tka_image_safe(
+    image_id: str,
+    owner_key: str | None = None,
+    allow_system: bool = False,
+    known_usages: list[dict] | None = None,
+) -> tuple[bool, str, list[dict]]:
+
+    if known_usages is None:
+        allowed, message, usages = can_delete_tka_image(
+            image_id=image_id,
+            owner_key=owner_key,
+            allow_system=allow_system,
+        )
+    else:
+        image = get_tka_image(image_id)
+        usages = list(known_usages or [])
+        if not image:
+            return False, "Gambar tidak ditemukan atau sudah tidak aktif.", usages
+
+        source_type = str(image.get("source_type") or "").upper()
+        image_owner = str(image.get("owner_key") or "").strip()
+        if source_type == "SYSTEM" and not allow_system:
+            return False, "Gambar Sistem UPN tidak dapat dihapus dari area Guru.", usages
+        if source_type == "GURU" and owner_key and image_owner.lower() != str(owner_key).strip().lower():
+            return False, "Gambar Guru ini bukan milik akun/guru yang sedang aktif.", usages
+
+        active_usages = [u for u in usages if u.get("is_active_window", True)]
+        if active_usages:
+            return (
+                False,
+                "Gambar masih digunakan oleh TKA yang masa aktifnya belum selesai.",
+                active_usages,
+            )
+        allowed = True
+        message = "Gambar aman untuk dihapus."
+
+    if not allowed:
+        return (
+            False,
+            message,
+            usages,
+        )
+
+    deleted = delete_tka_image(
+        image_id=image_id,
+        owner_key=owner_key,
+        allow_system=allow_system,
+    )
+
+    if deleted:
+        return (
+            True,
+            "Gambar berhasil dihapus dari Library TKA.",
+            [],
+        )
+
+    return (
+        False,
+        "Gambar gagal dihapus.",
+        [],
+    )
+
+
+def _image_part(data: bytes, mime_type: str):
+    try:
+        from google.genai import types
+
+        try:
+            from PIL import Image
+            import io
+
+            src = Image.open(io.BytesIO(data))
+            src.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+
+            buf = io.BytesIO()
+            if src.mode not in ("RGB", "L"):
+                src = src.convert("RGB")
+            elif src.mode == "L":
+                src = src.convert("RGB")
+            src.save(buf, format="JPEG", quality=82, optimize=True)
+            data = buf.getvalue()
+            mime_type = "image/jpeg"
+        except Exception:
+            pass
+
+        return types.Part.from_bytes(
+            data=data,
+            mime_type=mime_type,
+        )
+
+    except Exception:
+        return None
+
+
+TKA_QUESTION_TYPES = (
+    "PG",
+    "MCMA",
+    "KATEGORI",
+)
+
+
+def _normalize_question_type(value: Any) -> str:
+    raw = (
+        str(value or "PG")
+        .strip()
+        .upper()
+        .replace("-", "_")
+        .replace(" ", "_")
+    )
+
+    if raw == "MIXED":
+        return "MIXED"
+
+    if raw in {
+        "MCMA",
+        "PG_KOMPLEKS",
+        "PILIHAN_GANDA_KOMPLEKS",
+        "PILIHAN_GANDA_KOMPLEKS_MCMA",
+    }:
+        return "MCMA"
+
+    if raw in {
+        "KATEGORI",
+        "CATEGORY",
+        "PG_KOMPLEKS_KATEGORI",
+        "BENAR_SALAH",
+        "SETUJU_TIDAK_SETUJU",
+    }:
+        return "KATEGORI"
+
+    return "PG"
+
+
+def _normalize_stimulus(
+    item: dict,
+) -> tuple[str | None, str | None, str | None, list[Any]]:
+
+    stimulus_text = str(
+        item.get("stimulus_text")
+        or item.get("stimulus")
+        or ""
+    ).strip()
+
+    stimulus_group = str(
+        item.get("stimulus_group")
+        or ""
+    ).strip() or None
+
+    raw_candidates: list[Any] = []
+    candidate_keys = (
+        "image_ids", "images", "stimulus_images",
+        "image_id", "image_id_1", "image_id_2", "image_id_3"
+    )
+
+    for key in candidate_keys:
+        val = item.get(key)
+        if not val:
+            continue
+        if isinstance(val, list):
+            for v in val:
+                if v and v not in raw_candidates:
+                    raw_candidates.append(v)
+        elif isinstance(val, (str, dict)) and val:
+            if isinstance(val, dict):
+                if val not in raw_candidates:
+                    raw_candidates.append(val)
+            else:
+                for part in re.split(r"[,;|]+", val.strip()):
+                    s = part.strip()
+                    if s and s not in raw_candidates:
+                        raw_candidates.append(s)
+
+    single_id = None
+    if raw_candidates:
+        first = raw_candidates[0]
+        single_id = str(first.get("id") if isinstance(first, dict) else first).strip()
+
+    return (
+        stimulus_text or None,
+        stimulus_group,
+        single_id,
+        raw_candidates,
+    )
+
+
+def _tka_prompt(
+    *,
+    jenjang: str,
+    mapel: str,
+    question_type: str,
+    count: int,
+    image_count: int,
+    image_ids: list[str] | None = None,
+) -> str:
+
+    labels = tka_option_labels(jenjang)
+    qtype = _normalize_question_type(question_type)
+
+    if qtype == "MIXED":
+        type_rules = "\n".join(
+            [
+                "BENTUK: CAMPURAN TKA",
+                "- Gunakan ketiga bentuk: PG, MCMA, dan KATEGORI.",
+                "- Tidak ada rasio resmi yang boleh diasumsikan; distribusi boleh bervariasi secara wajar.",
+                "- Wajib ada minimal satu butir dari masing-masing bentuk dalam batch.",
+                f"- Untuk PG: satu jawaban benar. Untuk MCMA: minimal dua jawaban benar. Untuk KATEGORI: 3-5 pernyataan dengan respons masing-masing.",
+                f"- options wajib tepat {len(labels)} pilihan untuk PG/MCMA.",
+            ]
+        )
+        schema = (
+            '"options": [],\n'
+            '      "correct_answer": [],\n'
+            '      "correct_answers": [],\n'
+            '      "category_items": []'
+        )
+    elif qtype == "PG":
+        type_rules = f"""
+BENTUK: PILIHAN GANDA (PG)
+- Tepat satu jawaban benar.
+- options wajib tepat {len(labels)} pilihan dengan label {', '.join(labels)}.
+- correct_answer adalah SATU label, misalnya "B".
+"""
+        schema = f"""
+"options": ["{labels[0]}. ...", "{labels[1]}. ...", ...],
+      "correct_answer": "B",
+      "correct_answers": []
+"""
+    elif qtype == "MCMA":
+        type_rules = f"""
+BENTUK: PILIHAN GANDA KOMPLEKS - MCMA
+- Tepat {len(labels)} pilihan tersedia dengan label {', '.join(labels)}.
+- Dua atau lebih jawaban harus benar; jangan hanya satu.
+- correct_answers berisi 2 atau lebih LABEL unik, misalnya ["A", "C"].
+- correct_answer harus sama dengan correct_answers untuk kompatibilitas.
+"""
+        schema = f"""
+"options": ["{labels[0]}. ...", "{labels[1]}. ...", ...],
+      "correct_answer": ["A", "C"],
+      "correct_answers": ["A", "C"]
+"""
+    else:
+        type_rules = """
+BENTUK: PILIHAN GANDA KOMPLEKS - KATEGORI
+- Buat 3-5 pernyataan yang semuanya berkaitan dengan satu stimulus/konsep.
+- Setiap pernyataan memiliki kategori/respons sendiri.
+- Kategori boleh Benar/Salah, Setuju/Tidak Setuju, atau kategori lain yang jelas ditentukan oleh soal.
+- Setiap pernyataan hanya memiliki satu correct_response.
+"""
+        schema = """
+"options": [],
+      "correct_answer": ["Benar", "Salah", "Benar"],
+      "correct_answers": ["Benar", "Salah", "Benar"],
+      "category_items": [
+        {
+          "statement": "...",
+          "options": ["Benar", "Salah"],
+          "correct_response": "Benar"
+        }
+      ]
+"""
+
+    return f'''
+Anda adalah Question Architect TKA RoboMANTAP untuk jenjang {jenjang}, mata uji {mapel}.
+Buat tepat {count} butir bertipe {qtype}.
+
+ATURAN TKA YANG WAJIB:
+- TKA MTs: mata uji Bahasa Indonesia dan Matematika.
+- TKA MA: mata uji wajib Bahasa Indonesia, Matematika, Bahasa Inggris; mata uji pilihan hanya jika dipilih guru.
+- Bentuk soal yang didukung portal: PG, PG Kompleks-MCMA, dan PG Kompleks-Kategori.
+- Jangan membuat matching/menjodohkan, isian, atau uraian.
+- Stimulus TIDAK WAJIB berupa gambar.
+- Stimulus dapat berupa teks, puisi, pidato, dialog, tabel, grafik, diagram, gambar, atau kombinasi yang relevan dengan mapel.
+- Jika gambar diberikan, gunakan hanya fakta yang benar-benar tampak.
+- Jangan memaksa setiap butir memakai gambar.
+- Satu stimulus dapat dipakai bersama oleh beberapa butir melalui stimulus_group yang sama.
+- Soal matematika boleh berupa perhitungan biasa tanpa gambar.
+- Soal Bahasa Indonesia/Bahasa Inggris/Bahasa Arab boleh berupa teks polos tanpa gambar.
+- KESULITAN: buat soal menantang sesuai kompetensi jenjang, bukan soal definisi atau hafalan langsung.
+- Setiap soal harus membutuhkan penalaran/interpretasi atau penerapan konsep; untuk numerasi, gunakan langkah hitung yang bermakna dan konteks yang relevan.
+- Untuk literasi, minta siswa menyimpulkan, membandingkan bukti, menilai argumen, menafsirkan maksud/struktur, atau menerapkan informasi; jangan sekadar menanyakan kalimat yang tertulis eksplisit.
+- Target dominan C4 (analisis) dan C5 (evaluasi); gunakan C6 (merancang/menghasilkan keputusan/solusi) bila wajar untuk kompetensi dan bentuk soal.
+- Buat distraktor yang masuk akal dan mewakili miskonsepsi umum; panjang opsi relatif seimbang, tanpa petunjuk jawaban karena opsi paling panjang/berbeda gaya.
+- Hindari jawaban benar yang terlalu jelas, opsi tumpang tindih, soal ambigu, informasi yang tidak diperlukan, dan pola kunci yang berulang.
+- solution_basis harus menjelaskan alasan substantif jawaban benar serta mengapa pendekatan itu tepat; jangan hanya mengulang kunci.
+- Gunakan LaTeX $...$ hanya untuk rumus/pecahan/akar/variabel matematika.
+- Jangan menaruh teks biasa di dalam delimiter matematika.
+- Setiap butir wajib memiliki topic, cognitive_level, solution_basis.
+
+ATURAN PENANGANAN GAMBAR/STIMULUS VISUAL:
+- Jika tidak ada gambar, image_id harus null dan image_ids harus [].
+- Jika memakai 1 gambar spesifik, isi image_id dengan ID tersebut dan image_ids berisi array ID tersebut, misal: ["ID_GAMBAR_1"].
+- SANGAT PENTING: Jangan memasukkan semua gambar jika soal HANYA menanyakan 1 gambar spesifik (seperti "pada Gambar 1").
+- Hanya isi array "image_ids" dengan 2 atau lebih ID jika soal BENAR-BENAR MEMBANDINGKAN kedua/ketiga gambar tersebut (misal: "Bandingkan Gambar 1 dan Gambar 3", "kedua infografis tersebut").
+
+{type_rules}
+
+IMAGE_ID yang tersedia:
+{", ".join(str(x) for x in (image_ids or [])) or "(tidak ada)"}
+
+OUTPUT JSON MURNI:
+{{
+  "questions": [
+    {{
+      "id": 1,
+      "question_type": "{"PG|MCMA|KATEGORI" if qtype == "MIXED" else qtype}",
+      "question": "...",
+      {schema},
+      "category_items": [],
+      "stimulus_text": null,
+      "stimulus_group": null,
+      "image_id": null,
+      "image_ids": [],
+      "topic": "...",
+      "cognitive_level": "C4",
+      "solution_basis": "..."
+    }}
+  ]
+}}
+'''
+
+
+def _option_map(options: list[str]) -> dict[str, str]:
+    result = {}
+    for opt in options:
+        label, _ = _split_option_label(str(opt), 0)
+        if label:
+            result[label.upper()] = str(opt).strip()
+    return result
+
+
+def _shuffle_options_preserving_keys(
+    options: list[str],
+    correct_labels: list[str],
+    labels: tuple[str, ...],
+) -> tuple[list[str], list[str]]:
+
+    entries = []
+    seen = set()
+    for option in options:
+        old_label, body = _split_option_label(str(option), 0)
+        old_label = old_label.upper()
+        if old_label in seen or old_label not in labels:
+            return options, correct_labels
+        seen.add(old_label)
+        entries.append((old_label, body))
+
+    if set(seen) != set(labels):
+        return options, correct_labels
+
+    random.shuffle(entries)
+    old_to_new = {}
+    shuffled_options = []
+    for index, (old_label, body) in enumerate(entries):
+        new_label = labels[index]
+        old_to_new[old_label] = new_label
+        shuffled_options.append(f"{new_label}. {body}" if body else f"{new_label}.")
+
+    remapped_answers = [old_to_new[label] for label in correct_labels if label in old_to_new]
+    return shuffled_options, remapped_answers
+
+
+def _normalize_tka_questions(
+    raw_questions: Any,
+    jenjang: str,
+    default_image_ids: list[str] | None = None,
+) -> list[dict]:
+
+    labels = tka_option_labels(jenjang)
+    label_set = set(labels)
+
+    if not isinstance(raw_questions, list):
+        return []
+
+    out = []
+    default_image_ids = [str(x) for x in (default_image_ids or []) if x]
+    id_to_no = {img_id: i + 1 for i, img_id in enumerate(default_image_ids)}
+
+    for idx, item in enumerate(raw_questions, 1):
+        if not isinstance(item, dict):
+            continue
+
+        question = str(item.get("question", "")).strip()
+        if not question:
+            continue
+
+        qtype = _normalize_question_type(item.get("question_type") or item.get("type"))
+        stimulus_text, stimulus_group, single_image_id, raw_candidates = _normalize_stimulus(item)
+
+        extracted_items: list[dict] = []
+
+        for cand in raw_candidates:
+            c_id = cand.get("id") if isinstance(cand, dict) else str(cand).strip()
+            if not c_id or c_id.lower() in {"null", "none", "tidak ada", "false", ""}:
+                continue
+            if c_id in id_to_no and not any(x["id"] == c_id for x in extracted_items):
+                extracted_items.append({"id": c_id, "no": id_to_no[c_id]})
+
+        combo_text = f"{question} {stimulus_text or ''}".lower()
+
+        # Deteksi perbandingan multi-gambar
+        is_multi_comparison = any(kw in combo_text for kw in [
+            "kedua", "membandingkan", "comparing", "both", "persamaan", "perbedaan",
+            "gambar 1 dan 2", "gambar 1 & 2", "gambar 1 dan 3", "gambar 1 & 3",
+            "infografis 1 dan 2", "infografis 1 dan 3", "infografis 1 & 3"
+        ])
+
+        if default_image_ids:
+            if is_multi_comparison:
+                for did in default_image_ids:
+                    if not any(x["id"] == did for x in extracted_items):
+                        extracted_items.append({"id": did, "no": id_to_no[did]})
+            else:
+                has_g1 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*1\b", combo_text))
+                has_g2 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*2\b", combo_text))
+                has_g3 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*3\b", combo_text))
+
+                single_matches = []
+                if has_g1 and len(default_image_ids) >= 1:
+                    single_matches.append({"id": default_image_ids[0], "no": 1})
+                if has_g2 and len(default_image_ids) >= 2:
+                    single_matches.append({"id": default_image_ids[1], "no": 2})
+                if has_g3 and len(default_image_ids) >= 3:
+                    single_matches.append({"id": default_image_ids[2], "no": 3})
+
+                if single_matches:
+                    extracted_items = single_matches
+                elif not extracted_items and default_image_ids:
+                    extracted_items = [{"id": default_image_ids[0], "no": 1}]
+
+        image_id = extracted_items[0]["id"] if extracted_items else None
+        image_ids_list = extracted_items
+
+        topic = str(item.get("topic") or "").strip()[:120]
+        cognitive = str(item.get("cognitive_level") or "C4").strip()[:10].upper()
+        solution = str(item.get("solution_basis") or "").strip()
+        if not topic or not solution:
+            continue
+
+        base = {
+            "id": idx,
+            "question_type": qtype,
+            "question": question,
+            "topic": topic,
+            "cognitive_level": cognitive,
+            "solution_basis": solution,
+            "stimulus_text": stimulus_text,
+            "stimulus_group": stimulus_group,
+            "image_id": image_id,
+            "image_ids": image_ids_list,
+        }
+
+        if qtype in {"PG", "MCMA"}:
+            raw_options = item.get("options", [])
+            if not isinstance(raw_options, list):
+                continue
+            options, _ = normalize_quiz_options(raw_options, jenjang)
+            if len(options) != len(labels):
+                continue
+            optmap = _option_map(options)
+            if set(optmap) != label_set or len(optmap) != len(options):
+                continue
+
+            raw_answers = item.get("correct_answers")
+            if raw_answers is None or raw_answers == [] or raw_answers == "":
+                raw_answers = item.get("correct_answer")
+            if isinstance(raw_answers, str):
+                answers = [x.strip().upper() for x in re.split(r"[,;|]", raw_answers) if x.strip()]
+            elif isinstance(raw_answers, list):
+                answers = []
+                for value in raw_answers:
+                    raw_value = str(value).strip()
+                    label, _body = _split_option_label(raw_value, -1)
+                    candidate = label.upper() if label in label_set else raw_value.upper()
+                    if candidate in label_set:
+                        answers.append(candidate)
+            else:
+                answers = []
+
+            answers = list(dict.fromkeys(answers))
+            if any(answer not in label_set for answer in answers):
+                continue
+            if qtype == "PG" and len(answers) != 1:
+                continue
+            if qtype == "MCMA" and len(answers) < 2:
+                continue
+
+            options, answers = _shuffle_options_preserving_keys(options, answers, labels)
+            if qtype == "PG" and len(answers) != 1:
+                continue
+            if qtype == "MCMA" and len(set(answers)) < 2:
+                continue
+            base["options"] = options
+            base["correct_answers"] = answers
+            base["correct_answer"] = answers[0] if qtype == "PG" else answers
+            base["category_items"] = []
+        elif qtype == "KATEGORI":
+            raw_items = item.get("category_items", [])
+            if not isinstance(raw_items, list) or not 3 <= len(raw_items) <= 5:
+                continue
+            category_items = []
+            answers = []
+            invalid_item = False
+            for cat in raw_items:
+                if not isinstance(cat, dict):
+                    invalid_item = True
+                    break
+                statement = str(cat.get("statement") or "").strip()
+                choices = cat.get("options")
+                correct_response = str(cat.get("correct_response") or cat.get("correct_answer") or "").strip()
+                if not statement or not isinstance(choices, list):
+                    invalid_item = True
+                    break
+                choices = [str(value).strip() for value in choices if str(value).strip()]
+                if len(choices) < 2:
+                    invalid_item = True
+                    break
+                matched = next((choice for choice in choices if choice.casefold() == correct_response.casefold()), None)
+                if matched is None:
+                    invalid_item = True
+                    break
+                category_items.append({
+                    "statement": statement,
+                    "options": choices,
+                    "correct_response": matched,
+                })
+                answers.append(matched)
+            if invalid_item or len(category_items) != len(raw_items) or len(category_items) < 3:
+                continue
+            base["options"] = []
+            base["category_items"] = category_items
+            base["correct_answers"] = answers
+            base["correct_answer"] = answers
+        else:
+            continue
+
+        out.append(base)
+
+    return out
+
+
+def generate_tka_questions_batch(
+    *,
+    jenjang: str,
+    mapel: str,
+    question_type: str,
+    count: int,
+    image_records: list[dict] | None = None,
+) -> list[dict]:
+
+    clients = get_gemini_clients()
+    if not clients or count <= 0:
+        return []
+
+    records = [
+        r for r in (image_records or [])
+        if r and r.get("image_id") and r.get("image_data")
+    ][:TKA_GENERATION_MAX_IMAGES]
+
+    image_ids = [str(r["image_id"]) for r in records]
+    contents: list[Any] = []
+
+    for n, record in enumerate(records, 1):
+        data = record.get("image_data")
+        if isinstance(data, memoryview):
+            data = data.tobytes()
+        elif isinstance(data, bytearray):
+            data = bytes(data)
+
+        part = _image_part(
+            data,
+            record.get("mime_type") or "image/png",
+        ) if data else None
+
+        if part is not None:
+            contents.append(part)
+            contents.append(
+                f"IMAGE_ID={record['image_id']} | "
+                f"Stimulus gambar {n}: {record.get('filename', '')}"
+            )
+
+    normalized_jenjang = normalize_tka_jenjang(jenjang)
+    normalized_type = _normalize_question_type(question_type)
+
+    contents.append(
+        _tka_prompt(
+            jenjang=normalized_jenjang,
+            mapel=tka_mapel_name(mapel),
+            question_type=normalized_type,
+            count=count,
+            image_count=len(records),
+            image_ids=image_ids,
+        )
+    )
+
+    attempts = []
+    candidate_pairs = []
+    if clients:
+        candidate_pairs.append((clients[0], TKA_MODELS[0]))
+        if len(TKA_MODELS) > 1:
+            candidate_pairs.append((clients[0], TKA_MODELS[1]))
+        if len(clients) > 1:
+            candidate_pairs.append((clients[1], TKA_MODELS[0]))
+
+    for pair in candidate_pairs:
+        attempts.append(pair)
+        if len(attempts) >= TKA_GENERATION_MAX_ATTEMPTS:
+            break
+
+    if normalized_type == "KATEGORI":
+        max_output_tokens = 6500
+    else:
+        max_output_tokens = 5000
+
+    for attempt_no, (client, model) in enumerate(attempts, 1):
+        try:
+            from google.genai import types
+
+            response = client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.25,
+                    max_output_tokens=max_output_tokens,
+                ),
+            )
+
+            raw = getattr(response, "text", "") or ""
+            try:
+                data = json.loads(clean_json_text(raw), strict=False)
+            except Exception:
+                m = re.search(r"\{.*\}", raw, flags=re.S)
+                data = json.loads(m.group(0), strict=False) if m else {}
+
+            if not isinstance(data, dict):
+                data = {}
+
+            normalized = _normalize_tka_questions(
+                data.get("questions", []),
+                normalized_jenjang,
+                image_ids,
+            )
+
+            if len(normalized) == count:
+                print(
+                    f"[TKA AI] batch {normalized_type} berhasil: "
+                    f"{len(normalized)}/{count} soal (attempt {attempt_no})."
+                )
+                return normalized
+
+            print(
+                f"[TKA AI] batch {normalized_type} output tidak lengkap/invalid: "
+                f"{len(normalized)}/{count} soal (attempt {attempt_no})."
+            )
+
+        except Exception as exc:
+            print(
+                f"[TKA AI] batch {normalized_type} gagal "
+                f"(attempt {attempt_no}/{len(attempts)}): "
+                f"{type(exc).__name__}: {exc}"
+            )
+
+        if attempt_no < len(attempts):
+            time.sleep(TKA_STUDIO_RETRY_BACKOFF_SECONDS)
+
+    return []
+
+
+def _generate_tka_chunk_resilient(
+    *,
+    jenjang: str,
+    mapel: str,
+    question_type: str,
+    count: int,
+    image_records: list[dict],
+) -> list[dict]:
+
+    if count <= 0:
+        return []
+    chunk = generate_tka_questions_batch(
+        jenjang=jenjang, mapel=mapel, question_type=question_type,
+        count=count, image_records=image_records,
+    )
+    if len(chunk) == count:
+        return chunk
+    if count == 1:
+        return []
+
+    left_count = count // 2
+    right_count = count - left_count
+    left = _generate_tka_chunk_resilient(
+        jenjang=jenjang, mapel=mapel, question_type=question_type,
+        count=left_count, image_records=image_records,
+    )
+    if len(left) != left_count:
+        return []
+    right = _generate_tka_chunk_resilient(
+        jenjang=jenjang, mapel=mapel, question_type=question_type,
+        count=right_count, image_records=image_records,
+    )
+    if len(right) != right_count:
+        return []
+    return left + right
+
+
+def _generate_tka_type_count(
+    *,
+    jenjang: str,
+    mapel: str,
+    question_type: str,
+    count: int,
+    image_records: list[dict],
+) -> list[dict]:
+
+    output: list[dict] = []
+    remaining = max(0, int(count))
+    while remaining:
+        chunk_size = min(TKA_STUDIO_BATCH_SIZE, remaining)
+        chunk = _generate_tka_chunk_resilient(
+            jenjang=jenjang, mapel=mapel, question_type=question_type,
+            count=chunk_size, image_records=image_records,
+        )
+        if len(chunk) != chunk_size:
+            print(
+                f"[TKA STUDIO] GAGAL batch {question_type}: "
+                f"{len(chunk)}/{chunk_size}; tidak mengembalikan paket parsial."
+            )
+            return []
+        output.extend(chunk)
+        remaining -= chunk_size
+    return output
+
+
+def generate_tka_studio(
+    *,
+    jenjang: str,
+    mapel: str,
+    mapel_type: str = "Wajib",
+    image_ids: list[str] | None = None,
+    auto_select_images: bool = False,
+    count: int = TKA_GENERATION_QUESTIONS,
+) -> list[dict]:
+
+    jenjang = normalize_tka_jenjang(jenjang)
+    mapel = tka_mapel_name(mapel)
+    try:
+        requested_count = int(count or TKA_GENERATION_QUESTIONS)
+    except (TypeError, ValueError):
+        requested_count = TKA_GENERATION_QUESTIONS
+    if requested_count not in TKA_STUDIO_ALLOWED_COUNTS:
+        print(
+            f"[TKA STUDIO] count={requested_count} tidak didukung; "
+            f"menggunakan {TKA_GENERATION_QUESTIONS}."
+        )
+        requested_count = TKA_GENERATION_QUESTIONS
+
+    selected = list(dict.fromkeys(str(x) for x in (image_ids or []) if x))[:TKA_GENERATION_MAX_IMAGES]
+    if not selected and auto_select_images:
+        selected = [
+            str(record["image_id"])
+            for record in list_tka_images(
+                source_type="SYSTEM", jenjang=jenjang, mapel=mapel,
+                limit=TKA_GENERATION_MAX_IMAGES,
+            )
+            if record.get("image_id")
+        ]
+        if not selected:
+            selected = [
+                str(record["image_id"])
+                for record in list_tka_images(
+                    source_type="SYSTEM", jenjang=jenjang,
+                    limit=TKA_GENERATION_MAX_IMAGES,
+                )
+                if record.get("image_id")
+            ]
+
+    image_records = []
+    for image_id in selected:
+        record = get_tka_image(image_id)
+        if record and record.get("image_data"):
+            image_records.append(record)
+    image_records = image_records[:TKA_GENERATION_MAX_IMAGES]
+
+    base, remainder = divmod(requested_count, len(TKA_STUDIO_BATCH_TYPES))
+    type_counts = {
+        question_type: base + (1 if index < remainder else 0)
+        for index, question_type in enumerate(TKA_STUDIO_BATCH_TYPES)
+    }
+    print(
+        f"[TKA STUDIO] mulai generate tepat {requested_count} soal: "
+        f"{type_counts}; gambar valid={len(image_records)}. "
+        "Gambar bersifat opsional."
+    )
+
+    all_questions: list[dict] = []
+    for question_type in TKA_STUDIO_BATCH_TYPES:
+        needed = type_counts[question_type]
+        batch = _generate_tka_type_count(
+            jenjang=jenjang, mapel=mapel, question_type=question_type,
+            count=needed, image_records=image_records,
+        )
+        if len(batch) != needed:
+            print(
+                f"[TKA STUDIO] gagal pada {question_type}: "
+                f"{len(batch)}/{needed}. Paket parsial ditolak."
+            )
+            return []
+        all_questions.extend(batch)
+
+    if len(all_questions) != requested_count:
+        print(f"[TKA STUDIO] jumlah akhir tidak cocok: {len(all_questions)}/{requested_count}.")
+        return []
+    for index, question in enumerate(all_questions, 1):
+        question["id"] = index
+    print(f"[TKA STUDIO] BERHASIL: {len(all_questions)}/{requested_count} soal.")
+    return all_questions
+
+
+def generate_tka_30(
+    *,
+    jenjang: str,
+    mapel: str,
+    mapel_type: str = "Wajib",
+    image_ids: list[str] | None = None,
+    auto_select_images: bool = True,
+) -> list[dict]:
+
+    return generate_tka_studio(
+        jenjang=jenjang,
+        mapel=mapel,
+        mapel_type=mapel_type,
+        image_ids=image_ids,
+        auto_select_images=auto_select_images,
+        count=TKA_TOTAL_QUESTIONS,
+    )
+
+
+def validate_tka_questions(
+    questions: list[dict],
+    jenjang: str,
+    expected_count: int = TKA_TOTAL_QUESTIONS,
+) -> tuple[bool, str]:
+
+    if (
+        not isinstance(questions, list)
+        or len(questions) != expected_count
+    ):
+        return (
+            False,
+            f"Paket harus tepat {expected_count} soal.",
+        )
+
+    labels = tka_option_labels(jenjang)
+    label_set = set(labels)
+
+    counts = {
+        x: 0
+        for x in TKA_QUESTION_TYPES
+    }
+
+    for idx, q in enumerate(questions, 1):
+        if (
+            not isinstance(q, dict)
+            or not str(q.get("question", "")).strip()
+        ):
+            return (False, f"Soal nomor {idx} tidak valid.")
+
+        qtype = _normalize_question_type(q.get("question_type"))
+        counts[qtype] += 1
+
+        if qtype in {"PG", "MCMA"}:
+            options = q.get("options")
+
+            if not isinstance(options, list) or len(options) != len(labels):
+                return (
+                    False,
+                    f"Soal nomor {idx} harus memiliki tepat "
+                    f"{len(labels)} opsi ({'/'.join(labels)}).",
+                )
+
+            normalized_labels = {
+                (_split_option_label(str(o), 0)[0] or "").upper()
+                for o in options
             }
 
-            const lobbyElem = document.getElementById("lobby-container");
-            const examElem = document.getElementById("exam-container");
+            if normalized_labels != label_set:
+                return (
+                    False,
+                    f"Opsi soal nomor {idx} harus berlabel "
+                    f"{', '.join(labels)}.",
+                )
 
-            lobbyElem.classList.add("hidden");
-            examElem.classList.remove("hidden");
+            answers = q.get("correct_answers")
+            if not isinstance(answers, list):
+                answers = [q.get("correct_answer")] if q.get("correct_answer") else []
 
-            activateBackLock();
-            initExamEngine();
+            answers = [str(x).strip().upper() for x in answers if str(x).strip()]
+
+            if qtype == "PG" and len(answers) != 1:
+                return (False, f"PG nomor {idx} harus memiliki tepat satu jawaban benar.")
+
+            if qtype == "MCMA" and len(set(answers)) < 2:
+                return (False, f"MCMA nomor {idx} harus memiliki minimal dua jawaban benar.")
+
+            if any(x not in label_set for x in answers):
+                return (False, f"Kunci soal nomor {idx} tidak sesuai label opsi.")
+
+        else:
+            items = q.get("category_items")
+            answers = q.get("correct_answers")
+
+            if not isinstance(items, list) or not 3 <= len(items) <= 5:
+                return (
+                    False,
+                    f"Soal kategori nomor {idx} harus memiliki 3-5 pernyataan.",
+                )
+
+            if not isinstance(answers, list) or len(answers) != len(items):
+                return (False, f"Kunci kategori nomor {idx} tidak lengkap.")
+
+            for pos, item in enumerate(items, 1):
+                if not isinstance(item, dict) or not str(item.get("statement", "")).strip():
+                    return (False, f"Pernyataan kategori nomor {idx}.{pos} tidak valid.")
+
+                choices = item.get("options")
+                correct = str(item.get("correct_response") or "").strip()
+
+                if not isinstance(choices, list) or len(choices) < 2 or correct not in choices:
+                    return (False, f"Respons kategori nomor {idx}.{pos} tidak valid.")
+
+        if not q.get("topic"):
+            return (False, f"Topik soal nomor {idx} kosong.")
+        if not str(q.get("solution_basis") or "").strip():
+            return (False, f"Dasar pembahasan soal nomor {idx} kosong.")
+        if qtype in {"PG", "MCMA"}:
+            mapped = [str(x).strip().upper() for x in (q.get("correct_answers") or [])]
+            expected_key = q.get("correct_answer")
+            if qtype == "PG" and (not mapped or str(expected_key).strip().upper() != mapped[0]):
+                return (False, f"Kunci PG nomor {idx} tidak konsisten.")
+            if qtype == "MCMA":
+                if not isinstance(expected_key, list) or set(str(x).strip().upper() for x in expected_key) != set(mapped):
+                    return (False, f"Kunci MCMA nomor {idx} tidak konsisten.")
+        else:
+            category_keys = [str(item.get("correct_response") or "") for item in q.get("category_items", [])]
+            if category_keys != [str(x) for x in (q.get("correct_answers") or [])]:
+                return (False, f"Kunci kategori nomor {idx} tidak konsisten dengan pernyataan.")
+
+    missing = [qtype for qtype in TKA_QUESTION_TYPES if counts.get(qtype, 0) < 1]
+    if missing:
+        return (
+            False,
+            "Paket TKA harus memuat semua bentuk soal: "
+            + ", ".join(missing)
+            + " belum ada.",
+        )
+
+    return (
+        True,
+        f"OK • PG {counts['PG']} • MCMA {counts['MCMA']} • Kategori {counts['KATEGORI']}",
+    )
+
+
+def validate_tka_30(
+    questions: list[dict],
+    jenjang: str,
+) -> tuple[bool, str]:
+
+    return validate_tka_questions(questions, jenjang, TKA_TOTAL_QUESTIONS)
+
+
+def publish_tka_to_db(
+    kode_tka: str,
+    config: dict,
+    questions: list[dict],
+) -> bool:
+
+    expected_count = int(config.get("generation_count") or len(questions) or TKA_TOTAL_QUESTIONS)
+
+    ok, reason = validate_tka_questions(
+        questions,
+        config.get("jenjang", "MTs"),
+        expected_count=expected_count,
+    )
+
+    if not ok:
+        print(f"[TKA PUBLISH] {reason}")
+        return False
+
+    code = re.sub(r"[^A-Z0-9_-]", "", str(kode_tka or "").upper())[:40]
+    if not code:
+        return False
+
+    active_from = config.get("active_from") or _now_wib_naive().isoformat()
+    active_until = config.get("active_until") or (
+        _now_wib_naive() + timedelta(hours=TKA_DEFAULT_ACTIVE_HOURS)
+    ).isoformat()
+
+    cfg = {
+        **config,
+        "jenis": "TKA",
+        "total_soal": expected_count,
+        "jenjang": normalize_tka_jenjang(config.get("jenjang", "MTs")),
+        "mapel": tka_mapel_name(config.get("mapel", "Matematika")),
+        "timer_seconds": int(config.get("timer_seconds") or TKA_DEFAULT_DURATION_SECONDS),
+        "active_from": active_from,
+        "active_until": active_until,
+    }
+
+    conn = init_db_connection()
+    if not conn:
+        return False
+
+    try:
+        with conn.session as s:
+            s.execute(
+                text(
+                    """
+                    INSERT INTO tka_custom
+                    (
+                        kode_tka,
+                        config,
+                        tka_data,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES
+                    (
+                        :code,
+                        :cfg,
+                        :data,
+                        NOW() AT TIME ZONE 'Asia/Jakarta',
+                        NOW() AT TIME ZONE 'Asia/Jakarta'
+                    )
+                    ON CONFLICT (kode_tka)
+                    DO UPDATE SET
+                        config = EXCLUDED.config,
+                        tka_data = EXCLUDED.tka_data,
+                        updated_at = NOW() AT TIME ZONE 'Asia/Jakarta'
+                    """
+                ),
+                {
+                    "code": code,
+                    "cfg": json.dumps(cfg, default=str),
+                    "data": json.dumps(questions, default=str),
+                },
+            )
+            s.commit()
+        return True
+    except Exception as exc:
+        print(f"[TKA PUBLISH] {exc}")
+        return False
+
+
+def get_tka_from_db(
+    kode_tka: str,
+) -> dict | None:
+
+    conn = init_db_connection()
+
+    if not conn:
+        return None
+
+    try:
+        with conn.session as s:
+            row = (
+                s.execute(
+                    text(
+                        """
+                        SELECT
+                            config,
+                            tka_data
+                        FROM tka_custom
+                        WHERE
+                            UPPER(kode_tka)
+                            =
+                            UPPER(:code)
+                        LIMIT 1
+                        """
+                    ),
+                    {"code": str(kode_tka).strip()},
+                )
+                .mappings()
+                .first()
+            )
+
+        if not row:
+            return None
+
+        return {
+            "config": _json(row["config"], {}),
+            "tka": _json(row["tka_data"], []),
         }
 
-        // --- 2. PENGUNCI NAVIGASI KEMBALI ---
-        function activateBackLock() {
-            history.pushState(null, null, location.href);
-            window.addEventListener('popstate', function () {
-                history.pushState(null, null, location.href);
-                alert("⚠️ NAVIGASI KEMBALI DIMATIKAN!\n\nDemi ketertiban ujian, Anda tidak dapat kembali ke halaman sebelumnya. Selesaikan seluruh soal lalu klik tombol Selesai Ujian.");
-            });
-        }
-
-        // --- 3. LOGIKA DYNAMIC FULLSCREEN TOGGLE ---
-        function updateFullscreenButtonUI() {
-            const textElem = document.getElementById("fs-text");
-            const iconElem = document.getElementById("fs-icon");
-            if (!textElem) return;
-            const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-
-            if (isFS) {
-                textElem.textContent = "Outfullscreen";
-                if (iconElem) iconElem.textContent = "📺";
-            } else {
-                textElem.textContent = "Fullscreen";
-                if (iconElem) iconElem.textContent = "📺";
-            }
-        }
-
-        function toggleFullscreenMode() {
-            const elem = document.documentElement;
-            const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-
-            if (!isFS) {
-                if (elem.requestFullscreen) elem.requestFullscreen().catch(() => {});
-                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-            } else {
-                if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
-                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-            }
-        }
-
-        document.addEventListener("fullscreenchange", updateFullscreenButtonUI);
-        document.addEventListener("webkitfullscreenchange", updateFullscreenButtonUI);
-
-        // --- 4. ANTI-COPAS & TAB-SWITCH DETECTOR ---
-        document.addEventListener('contextmenu', e => e.preventDefault());
-        document.addEventListener('copy', e => e.preventDefault());
-        document.addEventListener('cut', e => e.preventDefault());
-        document.addEventListener('paste', e => e.preventDefault());
-
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && ['c', 'v', 'a', 'u', 's', 'p'].includes(e.key.toLowerCase())) e.preventDefault();
-            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(e.key.toLowerCase()))) e.preventDefault();
-            if (e.key === 'Escape') closeImageModal();
-        });
-
-        let wakeLock = null;
-        async function requestWakeLock() {
-            try {
-                if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
-            } catch (err) {}
-        }
-        requestWakeLock();
-
-        const antiCheatInitial = {{ anti_cheat_json | safe }};
-        let violationCount = Number(antiCheatInitial?.violation_count || 0);
-        const maxViolations = Number(antiCheatInitial?.max_violations || 3);
-        let lastBlurTime = 0;
-
-        const antiCheatDetectedInput = document.getElementById("anti-cheat-detected");
-        const antiCheatReasonInput = document.getElementById("anti-cheat-reason");
-        const antiCheatCountInput = document.getElementById("anti-cheat-count");
-
-        function syncAntiCheatHiddenFields() {
-            if (antiCheatDetectedInput) {
-                antiCheatDetectedInput.value = violationCount >= maxViolations ? "1" : "0";
-            }
-            if (antiCheatReasonInput) {
-                antiCheatReasonInput.value = violationCount > 0 ? "Pindah tab" : "";
-            }
-            if (antiCheatCountInput) {
-                antiCheatCountInput.value = String(violationCount);
-            }
-        }
-
-        function updateCheatWarningBar() {
-            const warningBar = document.getElementById("cheat-warning-bar");
-            const countText = document.getElementById("violation-count-text");
-
-            if (violationCount > 0 && warningBar) {
-                warningBar.classList.remove("hidden");
-            }
-
-            if (countText) {
-                countText.textContent = `${Math.min(violationCount, maxViolations)} / ${maxViolations}`;
-            }
-
-            syncAntiCheatHiddenFields();
-        }
-
-        function persistAntiCheatViolation() {
-            const formData = new URLSearchParams();
-            formData.append("session_id", sessionId);
-            formData.append("violation_count", String(violationCount));
-            formData.append("reason", "Pindah tab");
-
-            try {
-                const payload = new Blob([formData.toString()], {
-                    type: "application/x-www-form-urlencoded;charset=UTF-8"
-                });
-                if (navigator.sendBeacon) {
-                    navigator.sendBeacon("/api/anti-cheat", payload);
-                    return;
-                }
-            } catch (err) {
-                console.warn("Beacon anti-cheat gagal:", err);
-            }
-
-            fetch("/api/anti-cheat", {
-                method: "POST",
-                headers: {"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"},
-                body: formData.toString(),
-                keepalive: true
-            }).catch(() => {});
-        }
-
-        function handleTabSwitch() {
-            if (isSubmitting) return;
-
-            const now = Date.now();
-            if (now - lastBlurTime < 1500) return;
-            lastBlurTime = now;
-
-            violationCount = Math.min(violationCount + 1, maxViolations);
-            updateCheatWarningBar();
-            persistAntiCheatViolation();
-
-            if (violationCount >= maxViolations) {
-                isSubmitting = true;
-                updateCheatWarningBar();
-
-                alert(
-                    "🚨 DETEKSI KECURANGAN!\n\n" +
-                    `Anda meninggalkan tab ujian ${maxViolations} kali.\n` +
-                    "Ujian otomatis dihentikan dan dikirim ke guru."
-                );
-
-                const form = document.getElementById("form-submit-exam");
-                if (form) form.submit();
-            } else {
-                alert(
-                    `⚠️ PERINGATAN KECURANGAN (${violationCount}/${maxViolations})!\n\n` +
-                    "Dilarang meninggalkan tab ujian."
-                );
-            }
-        }
-
-        document.addEventListener("visibilitychange", async () => {
-            if (isSubmitting) return;
-
-            if (document.visibilityState === "visible") {
-                if (wakeLock !== null) await requestWakeLock();
-            } else if (document.hidden) {
-                handleTabSwitch();
-            }
-        });
-
-        const heartbeatInterval = setInterval(() => {
-            if (isSubmitting || document.visibilityState !== "visible") return;
-
-            const formData = new URLSearchParams();
-            formData.append("session_id", sessionId);
-
-            fetch("/api/session-heartbeat", {
-                method: "POST",
-                headers: {"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"},
-                body: formData.toString(),
-                keepalive: true
-            }).catch(() => {});
-        }, 15000);
-
-        updateCheatWarningBar();
-
-        // --- 5. LOGIKA UTAMA ENGINE CBT & KATEX RENDERER ---
-        const quizData = {{ quiz_json | safe }};
-        
-        let answers = {{ answers_json | safe }}; 
-        let remainingSeconds = {{ remaining_seconds }};
-        let currentIndex = 0;
-        let raguState = {};
-        let timerInterval = null;
-
-        function openImageModal(src) {
-            const modal = document.getElementById("image-modal");
-            const imgModal = document.getElementById("image-modal-src");
-            if (modal && imgModal) {
-                imgModal.src = src;
-                modal.classList.remove("hidden");
-            }
-        }
-
-        function closeImageModal() {
-            const modal = document.getElementById("image-modal");
-            if (modal) {
-                modal.classList.add("hidden");
-            }
-        }
-
-        function waitForMathRenderer(timeoutMs = 2500) {
-            return new Promise(resolve => {
-                if (window.renderMathInElement) {
-                    resolve(true);
-                    return;
-                }
-
-                const started = Date.now();
-                const poll = () => {
-                    if (window.renderMathInElement) {
-                        resolve(true);
-                    } else if (Date.now() - started >= timeoutMs) {
-                        resolve(false);
-                    } else {
-                        requestAnimationFrame(poll);
-                    }
-                };
-                poll();
-            });
-        }
-
-        async function triggerKaTeX(targetElem) {
-            const container = targetElem || document.getElementById("question-box") || document.body;
-            const ready = await waitForMathRenderer();
-            if (ready && container) {
-                renderMathInElement(container, {
-                    delimiters: [
-                        {left: "$$", right: "$$", display: true},
-                        {left: "$", right: "$", display: false}
-                    ],
-                    throwOnError: false
-                });
-            }
-            return ready;
-        }
-
-        function toggleNavModal(show) {
-            const modal = document.getElementById("nav-modal");
-            if (show) {
-                renderGrid();
-                modal.classList.remove("hidden");
-            } else {
-                modal.classList.add("hidden");
-            }
-        }
-
-        function toggleSubmitModal(show) {
-            const modal = document.getElementById("submit-modal");
-            if (show) modal.classList.remove("hidden");
-            else modal.classList.add("hidden");
-        }
-
-        function submitExamNow() {
-            isSubmitting = true;
-
-            if (antiCheatDetectedInput) antiCheatDetectedInput.value = "0";
-            if (antiCheatReasonInput) antiCheatReasonInput.value = "";
-            if (antiCheatCountInput) antiCheatCountInput.value = String(violationCount);
-
-            document.getElementById("form-submit-exam").submit();
-        }
-
-        let questionRenderToken = 0;
-        let selectedOptionIndex = null;
-        let answerSaveQueue = Promise.resolve();
-
-        function setOptionVisualState(btn, selected) {
-            if (!btn) return;
-
-            btn.classList.toggle("bg-emerald-500/10", selected);
-            btn.classList.toggle("border-emerald-500", selected);
-            btn.classList.toggle("text-emerald-300", selected);
-            btn.classList.toggle("font-medium", selected);
-            btn.classList.toggle("shadow-[0_0_10px_rgba(16,185,129,0.15)]", selected);
-
-            btn.classList.toggle("bg-slate-950", !selected);
-            btn.classList.toggle("border-slate-800", !selected);
-            btn.classList.toggle("text-slate-300", !selected);
-            btn.classList.toggle("active:border-slate-700", !selected);
-
-            const badge = btn.querySelector("[data-option-badge]");
-            if (badge) {
-                badge.classList.toggle("border-emerald-500", selected);
-                badge.classList.toggle("bg-emerald-500", selected);
-                badge.classList.toggle("text-slate-950", selected);
-            }
-        }
-
-        function queueAnswerSave(index, value) {
-            const payload = {
-                session_id: sessionId,
-                q_index: index,
-                answer: value
-            };
-
-            answerSaveQueue = answerSaveQueue
-                .catch(() => {})
-                .then(() => {
-                    const formData = new FormData();
-                    formData.append("session_id", payload.session_id);
-                    formData.append("q_index", payload.q_index);
-                    formData.append("answer", typeof payload.answer === "string" ? payload.answer : JSON.stringify(payload.answer));
-
-                    return fetch("/api/save-answer", {
-                        method: "POST",
-                        body: formData,
-                        keepalive: true
-                    }).catch(() => {});
-                });
-        }
-
-        function selectedValuesForMCMA(index) {
-            const value = answers[index];
-            if (Array.isArray(value)) return value.map(v => String(v).toUpperCase());
-            return [];
-        }
-
-        function setQuestionTypeLabel(item) {
-            const label = document.getElementById("question-type-label");
-            const qtype = String(item.question_type || "PG").toUpperCase();
-            const names = {
-                PG: "Pilihan Ganda",
-                MCMA: "Pilihan Ganda Kompleks • MCMA",
-                KATEGORI: "Pilihan Ganda Kompleks • Kategori"
-            };
-            label.textContent = names[qtype] || "TKA";
-        }
-
-        function renderCategoryItems(item, index, optsDiv) {
-            const current = Array.isArray(answers[index]) ? answers[index] : [];
-            (item.category_items || []).forEach((cat, catIdx) => {
-                const row = document.createElement("div");
-                row.className = "border border-slate-800 bg-slate-950 rounded-xl p-3.5 space-y-2.5";
-
-                const statement = document.createElement("div");
-                statement.className = "text-slate-200 text-xs sm:text-sm leading-relaxed text-justify";
-                statement.innerHTML = `<span class="font-bold text-emerald-400 mr-1">${catIdx + 1}.</span>${cat.statement || ""}`;
-                row.appendChild(statement);
-
-                const select = document.createElement("select");
-                select.className = "w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none";
-                select.dataset.categoryIndex = String(catIdx);
-                const placeholder = document.createElement("option");
-                placeholder.value = "";
-                placeholder.textContent = "Pilih respons...";
-                placeholder.disabled = true;
-                placeholder.selected = !current[catIdx];
-                select.appendChild(placeholder);
-
-                (cat.options || []).forEach(choice => {
-                    const opt = document.createElement("option");
-                    opt.value = choice;
-                    opt.textContent = choice;
-                    opt.selected = String(current[catIdx] || "") === String(choice);
-                    select.appendChild(opt);
-                });
-
-                select.addEventListener("change", () => {
-                    const values = Array.isArray(answers[index]) ? [...answers[index]] : [];
-                    while (values.length < (item.category_items || []).length) values.push("");
-                    values[catIdx] = select.value;
-                    answers[index] = values;
-                    queueAnswerSave(index, values);
-                    renderGrid();
-                });
-                row.appendChild(select);
-                optsDiv.appendChild(row);
-            });
-        }
-
-        // --- MANAJEMEN SWITCH TAB GAMBAR UNTUK MULTI-GAMBAR RAMAH HP ---
-        function switchImageTab(tabIndex, totalImages) {
-            for (let i = 0; i < totalImages; i++) {
-                const card = document.getElementById(`img-card-${i}`);
-                const tabBtn = document.getElementById(`img-tab-btn-${i}`);
-                if (card) {
-                    if (tabIndex === 'all' || tabIndex === i) {
-                        card.classList.remove('hidden');
-                    } else {
-                        card.classList.add('hidden');
-                    }
-                }
-                if (tabBtn) {
-                    if (tabIndex === i) {
-                        tabBtn.className = "px-3 py-1.5 bg-emerald-500 text-slate-950 font-bold text-xs rounded-lg shadow-md transition";
-                    } else {
-                        tabBtn.className = "px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs rounded-lg transition border border-slate-700";
-                    }
-                }
-            }
-            const tabBtnAll = document.getElementById("img-tab-btn-all");
-            if (tabBtnAll) {
-                if (tabIndex === 'all') {
-                    tabBtnAll.className = "px-3 py-1.5 bg-emerald-500 text-slate-950 font-bold text-xs rounded-lg shadow-md transition";
-                } else {
-                    tabBtnAll.className = "px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs rounded-lg transition border border-slate-700";
-                }
-            }
-        }
-
-        async function renderQuestion(index) {
-            if (index < 0 || index >= quizData.length) return;
-
-            const token = ++questionRenderToken;
-            currentIndex = index;
-            selectedOptionIndex = null;
-
-            const item = quizData[index];
-            const questionText = document.getElementById("question-text");
-            const stimulusBlock = document.getElementById("stimulus-block");
-            const stimulusText = document.getElementById("stimulus-text");
-            const stimulusImage = document.getElementById("stimulus-image");
-            const optsDiv = document.getElementById("options-container");
-
-            questionText.classList.add("math-pending");
-            optsDiv.classList.add("math-pending");
-
-            document.getElementById("label-no-soal").textContent =
-                `Soal No. ${index + 1} dari ${quizData.length}`;
-            setQuestionTypeLabel(item);
-
-            questionText.innerHTML = item.question || "";
-            stimulusText.innerHTML = "";
-            stimulusImage.innerHTML = "";
-            stimulusText.classList.add("hidden");
-            stimulusImage.classList.add("hidden");
-            stimulusBlock.classList.add("hidden");
-
-            if (item.stimulus_text) {
-                stimulusText.textContent = item.stimulus_text;
-                stimulusText.classList.remove("hidden");
-                stimulusBlock.classList.remove("hidden");
-            }
-
-            // Ekstraksi Daftar ID Gambar Relevan
-            let imageList = [];
-            const candidateFields = [
-                item.image_ids, item.images, item.stimulus_images, item.stimulus_image, item.image_id,
-                item.image_id_1, item.image_id_2, item.image_id_3
-            ];
-
-            candidateFields.forEach(val => {
-                if (!val) return;
-                if (Array.isArray(val)) {
-                    val.forEach(v => {
-                        const s = String(v).trim();
-                        if (s && !imageList.includes(s)) imageList.push(s);
-                    });
-                } else if (typeof val === "string" && val.trim() !== "") {
-                    let str = val.trim();
-                    if (str.startsWith("[") && str.endsWith("]")) {
-                        try {
-                            let parsed = JSON.parse(str);
-                            if (Array.isArray(parsed)) {
-                                parsed.forEach(v => {
-                                    const s = String(v).trim();
-                                    if (s && !imageList.includes(s)) imageList.push(s);
-                                });
-                                return;
-                            }
-                        } catch (e) {}
-                    }
-                    str.split(/[,|;]+/).forEach(p => {
-                        const s = p.trim();
-                        if (s && !imageList.includes(s)) imageList.push(s);
-                    });
-                }
-            });
-
-            if (imageList.length > 0) {
-                const containerWrapper = document.createElement("div");
-                containerWrapper.className = "flex flex-col gap-2.5 w-full";
-
-                // Jika lebih dari 1 gambar, tampilkan Bilah Tab (Mobile-Friendly)
-                if (imageList.length > 1) {
-                    const tabContainer = document.createElement("div");
-                    tabContainer.className = "flex items-center gap-1.5 overflow-x-auto pb-1 mb-1 border-b border-slate-800/80 no-scrollbar";
-
-                    imageList.forEach((_, imgIdx) => {
-                        const btn = document.createElement("button");
-                        btn.type = "button";
-                        btn.id = `img-tab-btn-${imgIdx}`;
-                        btn.textContent = `📷 Gambar ${imgIdx + 1}`;
-                        btn.onclick = () => switchImageTab(imgIdx, imageList.length);
-                        tabContainer.appendChild(btn);
-                    });
-
-                    const btnAll = document.createElement("button");
-                    btnAll.type = "button";
-                    btnAll.id = `img-tab-btn-all`;
-                    btnAll.textContent = `👁️ Semua (${imageList.length})`;
-                    btnAll.onclick = () => switchImageTab('all', imageList.length);
-                    tabContainer.appendChild(btnAll);
-
-                    containerWrapper.appendChild(tabContainer);
-                }
-
-                const imgGrid = document.createElement("div");
-                imgGrid.className = imageList.length > 1 
-                    ? "grid grid-cols-1 sm:grid-cols-2 gap-3 w-full items-start" 
-                    : "w-full flex justify-center";
-
-                imageList.forEach((imgId, imgIdx) => {
-                    const card = document.createElement("div");
-                    card.id = `img-card-${imgIdx}`;
-                    card.className = "flex flex-col items-center border border-slate-800 bg-slate-900/90 rounded-xl p-2.5 w-full relative transition-all";
-
-                    if (imageList.length > 1) {
-                        const label = document.createElement("span");
-                        label.className = "text-[10px] font-bold text-emerald-400 bg-slate-950 border border-slate-800 px-2.5 py-0.5 rounded mb-2 self-start";
-                        label.textContent = `Gambar ${imgIdx + 1}`;
-                        card.appendChild(label);
-                    }
-
-                    const imgWrapper = document.createElement("div");
-                    imgWrapper.className = "w-full flex items-center justify-center overflow-hidden rounded-lg bg-slate-950 p-1.5 border border-slate-800/60";
-
-                    const img = document.createElement("img");
-                    img.src = `/api/image/${encodeURIComponent(imgId)}`;
-                    img.alt = `Stimulus TKA ${imgIdx + 1}`;
-                    img.className = "w-full max-h-[260px] object-contain cursor-pointer hover:opacity-95 transition rounded";
-                    img.loading = "lazy";
-                    img.onclick = () => openImageModal(img.src);
-                    
-                    img.onerror = () => {
-                        imgWrapper.innerHTML = `<p class="text-[11px] text-amber-300 text-center py-2">Gambar ${imgIdx + 1} tidak dapat dimuat</p>`;
-                    };
-
-                    imgWrapper.appendChild(img);
-                    card.appendChild(imgWrapper);
-
-                    const zoomBtn = document.createElement("button");
-                    zoomBtn.type = "button";
-                    zoomBtn.className = "mt-2 w-full bg-slate-950 hover:bg-slate-800 text-emerald-400 border border-emerald-500/30 text-[10px] font-semibold py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 transition active:scale-95";
-                    zoomBtn.innerHTML = `🔍 Perbesar Layar Penuh`;
-                    zoomBtn.onclick = (e) => {
-                        e.preventDefault();
-                        openImageModal(img.src);
-                    };
-                    card.appendChild(zoomBtn);
-
-                    imgGrid.appendChild(card);
-                });
-
-                containerWrapper.appendChild(imgGrid);
-                stimulusImage.appendChild(containerWrapper);
-                stimulusImage.classList.remove("hidden");
-                stimulusBlock.classList.remove("hidden");
-
-                // Aktifkan Tab 1 secara default jika multi-gambar
-                if (imageList.length > 1) {
-                    switchImageTab(0, imageList.length);
-                }
-            }
-
-            optsDiv.innerHTML = "";
-            const qtype = String(item.question_type || "PG").toUpperCase();
-
-            if (qtype === "KATEGORI") {
-                renderCategoryItems(item, index, optsDiv);
-            } else {
-                const selected = qtype === "MCMA" ? selectedValuesForMCMA(index) : [String(answers[index] || "").toUpperCase()];
-                item.options.forEach((opt, optIdx) => {
-                    const label = String(opt).split(".")[0].trim().toUpperCase();
-                    const isSelected = selected.includes(label);
-                    if (isSelected && qtype === "PG") selectedOptionIndex = optIdx;
-
-                    const btn = document.createElement("button");
-                    btn.type = "button";
-                    btn.id = `opt-btn-${optIdx}`;
-                    btn.dataset.optionIndex = String(optIdx);
-                    btn.className =
-                        "w-full text-left p-3.5 rounded-xl border text-xs sm:text-sm transition flex items-start space-x-3 bg-slate-950 border-slate-800 text-slate-300 active:border-slate-700";
-
-                    btn.innerHTML = `
-                        <span data-option-badge class="w-6 h-6 rounded-full border border-slate-700 flex-shrink-0 flex items-center justify-center text-[11px] font-bold mt-0.5">${label}</span>
-                        <span class="leading-relaxed">${opt.substring(opt.indexOf(".") + 1).trim()}</span>
-                    `;
-
-                    btn.addEventListener("click", function (e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (qtype === "MCMA") {
-                            const values = selectedValuesForMCMA(index);
-                            const pos = values.indexOf(label);
-                            if (pos >= 0) values.splice(pos, 1);
-                            else values.push(label);
-                            answers[index] = values;
-                            setOptionVisualState(btn, values.includes(label));
-                            queueAnswerSave(index, values);
-                            renderGrid();
-                        } else {
-                            selectAnswer(index, opt, optIdx, label);
-                        }
-                    });
-
-                    setOptionVisualState(btn, isSelected);
-                    optsDiv.appendChild(btn);
-                });
-            }
-
-            updateNavButtons();
-            updateRaguButtonUI();
-
-            document.getElementById("hint-curr-idx").value = index;
-            document.getElementById("hint-question").value = item.question || "";
-            document.getElementById("hint-attempt-input").value = "";
-            document.getElementById("hint-result").innerHTML = "";
-
-            await triggerKaTeX(document.getElementById("question-box"));
-
-            if (token === questionRenderToken) {
-                requestAnimationFrame(() => {
-                    if (token !== questionRenderToken) return;
-                    questionText.classList.remove("math-pending");
-                    optsDiv.classList.remove("math-pending");
-                });
-            }
-        }
-
-        function selectAnswer(index, opt, optIdx, label) {
-            if (index !== currentIndex || !quizData[index]) return;
-
-            const previousIndex = selectedOptionIndex;
-            answers[index] = label;
-            selectedOptionIndex = optIdx;
-
-            if (previousIndex !== null && previousIndex !== optIdx) {
-                setOptionVisualState(document.getElementById(`opt-btn-${previousIndex}`), false);
-            }
-            setOptionVisualState(document.getElementById(`opt-btn-${optIdx}`), true);
-            queueAnswerSave(index, label);
-            renderGrid();
-        }
-
-        function toggleRagu() {
-            raguState[currentIndex] = !raguState[currentIndex];
-            updateRaguButtonUI();
-        }
-
-        function updateRaguButtonUI() {
-            const btnRagu = document.getElementById("btn-ragu");
-            if (raguState[currentIndex]) {
-                btnRagu.className = "flex-1 sm:flex-none bg-amber-500 text-slate-950 border border-amber-400 font-bold text-[10px] py-2.5 px-2 rounded-xl transition text-center shadow-[0_0_12px_rgba(245,158,11,0.4)] whitespace-nowrap";
-            } else {
-                btnRagu.className = "flex-1 sm:flex-none bg-amber-500/10 active:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold py-2.5 px-2 rounded-xl transition text-center whitespace-nowrap";
-            }
-        }
-
-        function updateNavButtons() {
-            const btnPrev = document.getElementById("btn-prev");
-            const btnNextSubmit = document.getElementById("btn-next-submit");
-
-            btnPrev.disabled = currentIndex === 0 || navigationBusy;
-
-            if (currentIndex === quizData.length - 1) {
-                btnNextSubmit.textContent = "🚀 Selesai!";
-                btnNextSubmit.className = "flex-1 sm:flex-none bg-rose-500 hover:bg-rose-400 active:bg-rose-600 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(244,63,94,0.4)] text-center";
-            } else {
-                btnNextSubmit.textContent = "Next →";
-                btnNextSubmit.className = "flex-1 sm:flex-none bg-emerald-500 active:bg-emerald-400 text-slate-950 font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-[0_0_15px_rgba(16,185,129,0.3)] text-center";
-            }
-
-            btnNextSubmit.disabled = navigationBusy;
-        }
-
-        let navigationBusy = false;
-
-        function setNavigationBusy(busy) {
-            navigationBusy = busy;
-
-            const prev = document.getElementById("btn-prev");
-            const next = document.getElementById("btn-next-submit");
-
-            if (prev) {
-                prev.disabled = busy || currentIndex === 0;
-                prev.setAttribute("aria-busy", busy ? "true" : "false");
-            }
-
-            if (next) {
-                next.disabled = busy;
-                next.setAttribute("aria-busy", busy ? "true" : "false");
-                next.classList.toggle("opacity-80", busy);
-                next.classList.toggle("cursor-wait", busy);
-            }
-        }
-
-        async function prevQuestion() {
-            if (navigationBusy || currentIndex <= 0) return;
-
-            setNavigationBusy(true);
-            try {
-                await renderQuestion(currentIndex - 1);
-            } finally {
-                setNavigationBusy(false);
-                updateNavButtons();
-            }
-        }
-
-        async function handleNextOrSubmit() {
-            if (navigationBusy) return;
-
-            if (currentIndex < quizData.length - 1) {
-                setNavigationBusy(true);
-                try {
-                    await renderQuestion(currentIndex + 1);
-                } finally {
-                    setNavigationBusy(false);
-                    updateNavButtons();
-                }
-            } else {
-                toggleSubmitModal(true);
-            }
-        }
-
-        function renderGrid() {
-            const grid = document.getElementById("nav-grid");
-            grid.innerHTML = "";
-
-            quizData.forEach((_, idx) => {
-                const btn = document.createElement("button");
-                const q = quizData[idx] || {};
-                const rawAnswer = answers[idx];
-                let isAnswered = rawAnswer !== undefined && rawAnswer !== null && rawAnswer !== "";
-                if (String(q.question_type || "PG").toUpperCase() === "MCMA") {
-                    isAnswered = Array.isArray(rawAnswer) && rawAnswer.length > 0;
-                } else if (String(q.question_type || "PG").toUpperCase() === "KATEGORI") {
-                    isAnswered = Array.isArray(rawAnswer) && rawAnswer.length === (q.category_items || []).length && rawAnswer.every(v => String(v || "").trim() !== "");
-                }
-                const isRagu = raguState[idx] === true;
-                const isCurrent = idx === currentIndex;
-
-                let colorClasses = "bg-slate-950 border-slate-800 text-slate-400";
-                if (isRagu) {
-                    colorClasses = "bg-amber-500/20 border-amber-500/60 text-amber-300 font-bold";
-                } else if (isAnswered) {
-                    colorClasses = "bg-emerald-500/20 border-emerald-500/60 text-emerald-300 font-bold";
-                }
-
-                btn.className = `h-10 text-xs rounded-xl border transition ${colorClasses} ${
-                    isCurrent ? 'ring-2 ring-emerald-400 border-emerald-400' : ''
-                }`;
-                btn.textContent = idx + 1;
-                btn.onclick = async () => {
-                    if (navigationBusy) return;
-                    toggleNavModal(false);
-                    setNavigationBusy(true);
-                    try {
-                        await renderQuestion(idx);
-                    } finally {
-                        setNavigationBusy(false);
-                        updateNavButtons();
-                    }
-                };
-                grid.appendChild(btn);
-            });
-        }
-
-        function startTimer() {
-            if (timerInterval) clearInterval(timerInterval);
-            const endTime = new Date().getTime() + (remainingSeconds * 1000);
-            
-            timerInterval = setInterval(() => {
-                const now = new Date().getTime();
-                const diff = endTime - now;
-
-                if (diff <= 0) {
-                    clearInterval(timerInterval);
-                    isSubmitting = true;
-
-                    if (antiCheatDetectedInput) antiCheatDetectedInput.value = "0";
-                    if (antiCheatReasonInput) antiCheatReasonInput.value = "";
-                    if (antiCheatCountInput) antiCheatCountInput.value = String(violationCount);
-
-                    alert("Waktu Ujian telah Habis!");
-                    document.getElementById('form-submit-exam').submit();
-                    return;
-                }
-
-                const totalSec = Math.floor(diff / 1000);
-                const h = Math.floor(totalSec / 3600);
-                const m = Math.floor((totalSec % 3600) / 60);
-                const s = totalSec % 60;
-                const hh = h < 10 ? '0' + h : String(h);
-                const mm = m < 10 ? '0' + m : String(m);
-                const ss = s < 10 ? '0' + s : String(s);
-                document.getElementById("timer-display").textContent = h > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
-            }, 1000);
-        }
-
-        const inputHint = document.getElementById("hint-attempt-input");
-        if (inputHint) {
-            inputHint.addEventListener("focus", function() {
-                setTimeout(() => {
-                    this.scrollIntoView({ behavior: "smooth", block: "center" });
-                }, 300);
-            });
-        }
-
-        document.body.addEventListener('htmx:afterSettle', function(evt) {
-            triggerKaTeX(evt.detail.target);
-        });
-
-        function initExamEngine() {
-            renderQuestion(0);
-            startTimer();
-            updateFullscreenButtonUI();
-        }
-    </script>
-</body>
-</html>
+    except Exception as exc:
+        print(f"[TKA GET] {exc}")
+        return None
+
+
+def update_tka_progress(
+    *,
+    session_id: str,
+    nama: str,
+    jenjang: str,
+    mapel: str,
+    soal_sekarang: int,
+    detail_jawaban: list,
+    status: str = "BERJALAN",
+    user_answers: dict | None = None,
+    questions: list | None = None,
+    anti_cheat: dict | None = None,
+) -> bool:
+
+    conn = init_db_connection()
+
+    if not conn:
+        return False
+
+    detail = detail_jawaban if isinstance(detail_jawaban, list) else []
+    total = len(detail) or (len(questions) if isinstance(questions, list) else TKA_TOTAL_QUESTIONS)
+
+    benar = sum(1 for x in detail if x is True)
+    salah = sum(1 for x in detail if x is False)
+    nilai = int(round(benar / total * 100)) if total else 0
+
+    payload = {
+        "activity_type": "TKA",
+        "detail_boolean": detail,
+        "user_answers": (user_answers or {}),
+        "quiz_data": (questions or []),
+    }
+
+    if anti_cheat is not None:
+        payload["anti_cheat"] = anti_cheat
+
+    mapel_db = mapel if "(TKA)" in mapel else f"{mapel} (TKA)"
+
+    query = """
+    INSERT INTO sesi_ujian
+      (
+        id_sesi,
+        nama_siswa,
+        jenjang,
+        mapel,
+        soal_sekarang,
+        detail_jawaban,
+        jumlah_benar,
+        jumlah_salah,
+        nilai_akhir,
+        status,
+        created_at,
+        updated_at
+      )
+    VALUES
+      (
+        :id,
+        :nama,
+        :jenjang,
+        :mapel,
+        :soal,
+        :detail,
+        :benar,
+        :salah,
+        :nilai,
+        :status,
+        NOW() AT TIME ZONE 'Asia/Jakarta',
+        NOW() AT TIME ZONE 'Asia/Jakarta'
+      )
+    ON CONFLICT (id_sesi)
+    DO UPDATE SET
+      nama_siswa = EXCLUDED.nama_siswa,
+      jenjang = EXCLUDED.jenjang,
+      mapel = EXCLUDED.mapel,
+      soal_sekarang = EXCLUDED.soal_sekarang,
+      detail_jawaban = EXCLUDED.detail_jawaban,
+      jumlah_benar = EXCLUDED.jumlah_benar,
+      jumlah_salah = EXCLUDED.jumlah_salah,
+      nilai_akhir = EXCLUDED.nilai_akhir,
+      status =
+        CASE
+          WHEN sesi_ujian.status IN ('SELESAI', 'TRIAL', 'ARCHIVED')
+          THEN sesi_ujian.status
+          ELSE EXCLUDED.status
+        END,
+      created_at = sesi_ujian.created_at,
+      updated_at =
+        CASE
+          WHEN sesi_ujian.status IN ('SELESAI', 'TRIAL', 'ARCHIVED')
+          THEN sesi_ujian.updated_at
+          ELSE NOW() AT TIME ZONE 'Asia/Jakarta'
+        END
+    """
+
+    try:
+        with conn.session as s:
+            s.execute(
+                text(query),
+                {
+                    "id": session_id,
+                    "nama": nama,
+                    "jenjang": normalize_tka_jenjang(jenjang),
+                    "mapel": mapel_db,
+                    "soal": int(soal_sekarang or 1),
+                    "detail": json.dumps(payload, default=str),
+                    "benar": benar,
+                    "salah": salah,
+                    "nilai": nilai,
+                    "status": status,
+                },
+            )
+            s.commit()
+        return True
+
+    except Exception as exc:
+        print(f"[TKA PROGRESS] {exc}")
+        return False
+
+
+def touch_tka_heartbeat(
+    session_id: str,
+) -> bool:
+
+    conn = init_db_connection()
+    if not conn:
+        return False
+
+    try:
+        with conn.session as s:
+            s.execute(
+                text(
+                    """
+                    UPDATE sesi_ujian
+                    SET updated_at = NOW() AT TIME ZONE 'Asia/Jakarta'
+                    WHERE id_sesi = :id AND status = 'BERJALAN'
+                    """
+                ),
+                {"id": session_id},
+            )
+            s.commit()
+        return True
+
+    except Exception:
+        return False
