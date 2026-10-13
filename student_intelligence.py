@@ -23,7 +23,7 @@ from sqlalchemy import text
 from ai_engine import init_db_connection
 
 
-STUDENT_INTELLIGENCE_VERSION = "1.0"
+STUDENT_INTELLIGENCE_VERSION = "1.1"
 
 
 def ensure_student_intelligence_tables() -> bool:
@@ -71,6 +71,7 @@ def ensure_student_intelligence_tables() -> bool:
 
 def _norm_name(value: str) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip()).casefold()
+
 
 def _is_practice_100_scale(mapel: str) -> bool:
     """Quiz Custom dan TKA sudah menyimpan nilai langsung pada skala 0-100."""
@@ -157,7 +158,6 @@ def _question_topic(question: str, mapel: str) -> str:
 def build_student_profile(sessions: list[dict]) -> dict:
     completed = [s for s in sessions if str(s.get("status", "")).upper() == "SELESAI"]
     total_attempts = len(completed)
-    scores = [float(s.get("nilai_akhir") or 0) for s in completed]
 
     normalized_scores = []
     for s in completed:
@@ -332,7 +332,7 @@ def _subject_recommendations(profile: dict) -> list[str]:
     recs = []
     weakest = profile.get("weakest_subject")
     if weakest:
-        recs.append(f"🎯 <b>[PRIORITAS UTAMA]</b> Alokasikan 60% waktu belajar berikutnya untuk <b>{weakest}</b> sebelum berpindah ke matapelajaran baru.")
+        recs.append(f"🎯 <b>[PRIORITAS UTAMA]</b> Alokasikan 60% waktu belajar berikutnya untuk <b>{weakest}</b> sebelum berpindah ke mata pelajaran baru.")
         
     for topic, mastery in profile.get("weakest_topics", [])[:2]:
         if mastery < 70:
@@ -342,44 +342,56 @@ def _subject_recommendations(profile: dict) -> list[str]:
     if profile.get("answer_completion", 100) < 80:
         recs.append("⚡ <b>[STRATEGI EKSEKUSI]</b> Akurasi jawaban masih di bawah 80%. Prioritaskan <b>eliminasi jawaban</b> yang pasti salah sebelum memilih opsi akhir.")
     if not recs:
-        recs.append("🌟 <b>[OPTIMASI PERFORMA]</b> Pemahaman dasar sudah sangat baik, Tantang dirimu dengan simulasi soal tingkat kesulitan tinggi.")
+        recs.append("🌟 <b>[OPTIMASI PERFORMA]</b> Pemahaman dasar sudah sangat baik. Tantang dirimu dengan simulasi soal tingkat kesulitan tinggi.")
     return recs[:4]
 
 
 def _start_adaptive_practice(name: str, grade: str, profile: dict) -> tuple[bool, str]:
-    focus = profile.get("weakest_subject")
-    topics = [topic for topic, mastery in profile.get("weakest_topics", []) if mastery < 80][:3]
-    if not focus or grade == "Semua Jenjang":
+    """Mulai Latihan Mandiri Adaptif menggunakan mesin TKA Studio (path_type='MANDIRI')."""
+    focus = profile.get("weakest_subject") or "Matematika"
+    if grade == "Semua Jenjang":
         return False, "Pilih jenjang yang spesifik agar generator latihan dapat memilih kisi-kisi yang tepat."
 
-    if "(Quiz)" in str(focus) or "(TKA)" in str(focus):
-        return False, "Area terlemah berasal dari Kuis GuruMANTAP. Gunakan latihan adaptif dari sesi guru terlebih dahulu."
+    jenjang_code = "MA" if "MA" in str(grade).upper() else "MTs"
 
     try:
-        from ai_engine import generate_quiz_batch, update_progress_siswa
-        quiz = generate_quiz_batch(grade, focus, "Internal", topics)
-        if not quiz or len(quiz) != 10:
-            return False, "Generator belum berhasil membuat 10 soal adaptif. Silakan coba lagi."
+        from tka_engine import generate_tka_mandiri_siswa, update_tka_progress
 
-        session_id = str(uuid.uuid4())
-        st.session_state.jenjang = grade
+        quiz = generate_tka_mandiri_siswa(
+            jenjang=jenjang_code,
+            mapel=focus,
+            count=15,
+        )
+
+        if not quiz or len(quiz) != 15:
+            return False, "Generator TKA Mandiri belum berhasil menyusun 15 soal adaptif. Silakan coba lagi."
+
+        session_id = f"TKA-MANDIRI-{uuid.uuid4().hex[:8].upper()}"
+        st.session_state.jenjang = jenjang_code
         st.session_state.mapel = focus
-        st.session_state.stage = "Internal"
-        st.session_state.selected_submateri = topics
         st.session_state.quiz_data = quiz
         st.session_state.user_answers = {}
         st.session_state.current_index = 0
         st.session_state.session_id = session_id
         st.session_state.nama_siswa = name
-        st.session_state.is_custom_quiz = False
-        st.session_state.ai_hint_cache = {}
-        st.session_state.ai_solution_cache = {}
-        update_progress_siswa(
-            session_id, name, grade, focus, 1, [], "BERJALAN",
-            is_custom=False, user_answers_dict={}, quiz_data_list=quiz
+        st.session_state.is_tka = True
+        st.session_state.tka_questions = quiz
+
+        update_tka_progress(
+            session_id=session_id,
+            nama=name,
+            jenjang=jenjang_code,
+            mapel=focus,
+            soal_sekarang=1,
+            detail_jawaban=[],
+            status="BERJALAN",
+            user_answers={},
+            questions=quiz,
         )
-        st.session_state.page = "quiz"
-        return True, "Latihan adaptif siap."
+
+        st.session_state.page = "tka_quiz"
+        return True, f"Latihan TKA Adaptif ({focus}) siap dikerjakan!"
+
     except Exception as exc:
         print(f"[STUDENT INTELLIGENCE] adaptive practice warning: {exc}")
         return False, "Latihan adaptif gagal dibuat. Silakan coba lagi beberapa saat."
@@ -388,9 +400,6 @@ def _start_adaptive_practice(name: str, grade: str, profile: dict) -> tuple[bool
 def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "Semua Jenjang") -> None:
     """Render the additive Student Intelligence workspace with World-Class Responsive UI."""
     
-    # -------------------------------------------------------------------------
-    # 1. INJECT HIGH-END GLASSMORPHIC & SCORECARD CSS
-    # -------------------------------------------------------------------------
     ui_css = """
     <style>
     /* Metric Scorecard Grid */
@@ -523,9 +532,6 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     """
     st.markdown(ui_css, unsafe_allow_html=True)
 
-    # -------------------------------------------------------------------------
-    # 2. HERO HEADER
-    # -------------------------------------------------------------------------
     st.markdown("""
     <div class="premium-hero automation-hero" style="margin-bottom: 20px;">
       <div class="premium-kicker">UPN • STUDENT INTELLIGENCE</div>
@@ -540,9 +546,6 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     </div>
     """, unsafe_allow_html=True)
 
-    # -------------------------------------------------------------------------
-    # 3. IDENTITY FORM
-    # -------------------------------------------------------------------------
     with st.form("student_intelligence_identity", clear_on_submit=False):
         c1, c2 = st.columns([2.2, 1.2])
         with c1:
@@ -569,9 +572,6 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     st.session_state.student_intelligence_name = name
     st.session_state.student_intelligence_grade = grade
 
-    # -------------------------------------------------------------------------
-    # 4. SCORECARD GRID METRICS (MODERN MOBILE-FRIENDLY UI)
-    # -------------------------------------------------------------------------
     avg = profile["average_score"]
     attempts = profile["attempts"]
     completion = profile["answer_completion"]
@@ -581,7 +581,6 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     trend_icon = {"improving": "📈", "declining": "📉", "stable": "➡️"}.get(trend_raw, "➡️")
     trend_title = {"improving": "Meningkat", "declining": "Menurun", "stable": "Stabil"}.get(trend_raw, "Stable")
 
-    # Dynamic styling for trend card
     if trend_raw == "improving":
         trend_card_bg = "background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%); border: 1px solid rgba(5, 150, 105, 0.45);"
         trend_title_color = "#a7f3d0"
@@ -597,22 +596,18 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
 
     eval_html = f"""
     <div class="eval-grid">
-        <!-- Rata-rata Skor -->
         <div class="eval-card" style="background: linear-gradient(135deg, rgba(120, 53, 15, 0.45) 0%, rgba(69, 26, 3, 0.75) 100%); border: 1px solid rgba(245, 158, 11, 0.5);">
             <div class="eval-title" style="color: #fde68a;">🎯 Rata-Rata</div>
             <div class="eval-value" style="color: #fbbf24;">{avg:.0f}%</div>
         </div>
-        <!-- Sesi Selesai -->
         <div class="eval-card" style="background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%); border: 1px solid rgba(5, 150, 105, 0.45);">
             <div class="eval-title" style="color: #a7f3d0;">🎓 Sesi Selesai</div>
             <div class="eval-value" style="color: #34d399;">{attempts}</div>
         </div>
-        <!-- Kelengkapan Jawaban -->
         <div class="eval-card" style="background: linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.75) 100%); border: 1px solid rgba(59, 130, 246, 0.45);">
             <div class="eval-title" style="color: #bfdbfe;">✅ Akurasi Jawaban</div>
             <div class="eval-value" style="color: #60a5fa;">{completion:.0f}%</div>
         </div>
-        <!-- Tren Performa -->
         <div class="eval-card" style="{trend_card_bg}">
             <div class="eval-title" style="color: {trend_title_color};">{trend_icon} Perkembangan</div>
             <div class="eval-value" style="color: {trend_val_color}; font-size: 18px;">{trend_title}</div>
@@ -623,14 +618,11 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🎯 Kondisi Belajar Saat Ini</div>', unsafe_allow_html=True)
     st.markdown(eval_html, unsafe_allow_html=True)
 
-    # -------------------------------------------------------------------------
-    # 5. STATUS RISK BANNER
-    # -------------------------------------------------------------------------
     if risk == "HIGH ATTENTION":
         st.markdown("""
         <div class="status-banner status-banner-red">
             <span style="font-size: 18px;">🚨</span>
-            <div><b>PERLU PERHATIAN EKSTRA</b> — Ada beberapa materi yang nilainya masih di bawah target, Yuk luangkan waktu untuk mempelajari dan latihan ulang topik tersebut!</div>
+            <div><b>PERLU PERHATIAN EKSTRA</b> — Ada beberapa materi yang nilainya masih di bawah target. Yuk luangkan waktu untuk mempelajari dan latihan ulang topik tersebut!</div>
         </div>
         """, unsafe_allow_html=True)
     elif risk == "WATCH":
@@ -644,16 +636,12 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         st.markdown("""
         <div class="status-banner status-banner-green">
             <span style="font-size: 18px;">🟢</span>
-            <div><b>PERFORMA SANGAT BAIK</b> — Luar biasa! Progres dan nilai belajarmu sudah sangat baik serta konsisten, Pertahankan semangat belajarmu!</div>
+            <div><b>PERFORMA SANGAT BAIK</b> — Luar biasa! Progres dan nilai belajarmu sudah sangat baik serta konsisten. Pertahankan semangat belajarmu!</div>
         </div>
         """, unsafe_allow_html=True)
 
-    # -------------------------------------------------------------------------
-    # 6. MASTERY & TOPIC BREAKDOWN
-    # -------------------------------------------------------------------------
     left, right = st.columns(2)
     with left:
-        # Judul Ringkas & Ukuran Pas untuk HP (15px)
         st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
         st.markdown('<div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Rata-rata nilai akhir ujian, kuis atau pengerjaan secara keseluruhan</div>', unsafe_allow_html=True)
         if profile["subject_mastery"]:
@@ -678,7 +666,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
 
     with right:
         st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🧩 Topik Perlu Perhatian</div>', unsafe_allow_html=True)
-        st.markdown('<div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Akurasi kebenaran menjawab soal dibawah 80% (< 80%)</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Akurasi kebenaran menjawab soal di bawah 80% (< 80%)</div>', unsafe_allow_html=True)
         weak = [(topic, mastery) for topic, mastery in profile.get("weakest_topics", []) if mastery < 80]    
         if weak:
             for topic, mastery in weak[:5]:
@@ -700,9 +688,6 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         else:
             st.success("🎉 Luar biasa! Semua topik yang kamu kerjakan nilainya sudah di atas target (≥80%).")
 
-    # -------------------------------------------------------------------------
-    # 7. ACTION RECOMMENDATIONS & ADAPTIVE PRACTICE
-    # -------------------------------------------------------------------------
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('<div style="font-size: 21px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">🚀 What Should I Do Now?</div>', unsafe_allow_html=True)
     recommendations = _subject_recommendations(profile)
@@ -716,20 +701,11 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         """
         st.markdown(rec_html, unsafe_allow_html=True)
 
-    # -------------------------------------------------------------------------
-    # BANNER WHATSAPP BOT INTEGRATION
-    # -------------------------------------------------------------------------
-    # 1. Masukkan nomor WhatsApp Bot Anda (Gunakan format internasional tanpa '+', contoh: 6281234567890)
-    NO_WA_BOT = "6283141694735"  # <-- Ganti dengan nomor WA Bot Anda
-    
-    # 2. Pesan otomatis awal dari siswa
-    # Pesan awal yang ringkas & bersih
+    NO_WA_BOT = "6283141694735"
     pesan_otomatis = f"Halo RoboMANTAP! Saya {name} ({grade}), ingin latihan soal dan belajar lewat WhatsApp."
-    
     pesan_encoded = urllib.parse.quote(pesan_otomatis)
     wa_link = f"https://wa.me/{NO_WA_BOT}?text={pesan_encoded}"
     
-    # 3. HTML Banner Bergaya Modern & Responsive
     wa_card_html = f"""
     <a href="{wa_link}" target="_blank" style="text-decoration: none;">
         <div style="
@@ -786,9 +762,15 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     st.markdown("<br>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("🔄 MULAI LATIHAN ADAPTIF", type="primary", use_container_width=True):
-            record_student_action(name, grade, "ADAPTIVE_PRACTICE", "Mulai latihan adaptif", {"weakest_subject": profile.get("weakest_subject"), "weakest_topics": profile.get("weakest_topics", [])})
-            with st.spinner("RoboMANTAP sedang merancang latihan berdasarkan area yang perlu diperkuat..."):
+        if st.button("🔄 MULAI LATIHAN ADAPTIF TKA", type="primary", use_container_width=True):
+            record_student_action(
+                name,
+                grade,
+                "ADAPTIVE_PRACTICE",
+                "Mulai latihan adaptif TKA",
+                {"weakest_subject": profile.get("weakest_subject"), "weakest_topics": profile.get("weakest_topics", [])},
+            )
+            with st.spinner("RoboMANTAP sedang merancang latihan TKA Mandiri berdasarkan area yang perlu diperkuat..."):
                 ok, message = _start_adaptive_practice(name, grade, profile)
             if ok:
                 st.success(message)
@@ -800,9 +782,6 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
             record_student_action(name, grade, "STUDY_PLAN", "Rencana belajar siswa", {"recommendations": recommendations})
             st.success("✅ Rencana belajar tersimpan sebagai aktivitas Student Intelligence.")
 
-    # -------------------------------------------------------------------------
-    # 8. AUDIT SESSION HISTORY
-    # -------------------------------------------------------------------------
     with st.expander("🔎 Lihat riwayat sesi yang menjadi dasar analisis"):
         rows = []
         for s in sessions[:20]:
