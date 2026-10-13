@@ -151,7 +151,7 @@
                         <div id="stimulus-text" class="hidden text-slate-200 text-sm leading-relaxed whitespace-pre-wrap text-justify mb-2.5"></div>
                         <div id="stimulus-image" class="hidden rounded-xl overflow-hidden border border-slate-800/80 bg-slate-900/50 p-1.5"></div>
                     </div>
-                    <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-4 font-medium overflow-x-auto text-justify"></div>
+                    <div id="question-text" class="text-slate-100 text-sm sm:text-base leading-relaxed mb-4 font-medium overflow-x-auto text-justify whitespace-pre-line"></div>
 
                     <div id="options-container" class="space-y-2.5"></div>
                 </div>
@@ -635,6 +635,14 @@
             label.textContent = names[qtype] || "TKA";
         }
 
+        function cleanTextFormatting(str) {
+            if (!str) return "";
+            return String(str)
+                .replace(/\\n/g, "\n")
+                .replace(/\r\n/g, "\n")
+                .trim();
+        }
+
         function renderCategoryItems(item, index, optsDiv) {
             const current = Array.isArray(answers[index]) ? answers[index] : [];
             (item.category_items || []).forEach((cat, catIdx) => {
@@ -643,7 +651,7 @@
 
                 const statement = document.createElement("div");
                 statement.className = "text-slate-200 text-xs sm:text-sm leading-relaxed text-justify";
-                statement.innerHTML = `<span class="font-bold text-emerald-400 mr-1">${catIdx + 1}.</span>${cat.statement || ""}`;
+                statement.innerHTML = `<span class="font-bold text-emerald-400 mr-1">${catIdx + 1}.</span>${cleanTextFormatting(cat.statement) || ""}`;
                 row.appendChild(statement);
 
                 const select = document.createElement("select");
@@ -698,23 +706,45 @@
                 `Soal No. ${index + 1} dari ${quizData.length}`;
             setQuestionTypeLabel(item);
 
-            questionText.innerHTML = item.question || "";
+            let stimText = cleanTextFormatting(item.stimulus_text);
+            let qText = cleanTextFormatting(item.question);
+
+            // Deduplikasi jika stimulus_text identik atau sudah tercantum di dalam question_text
+            if (stimText && (qText.includes(stimText) || stimText.includes(qText))) {
+                if (qText.length >= stimText.length) {
+                    stimText = "";
+                } else {
+                    qText = stimText;
+                    stimText = "";
+                }
+            }
+
+            questionText.innerHTML = qText || "";
             stimulusText.innerHTML = "";
             stimulusImage.innerHTML = "";
             stimulusText.classList.add("hidden");
             stimulusImage.classList.add("hidden");
             stimulusBlock.classList.add("hidden");
 
-            if (item.stimulus_text) {
-                stimulusText.textContent = item.stimulus_text;
+            if (stimText) {
+                stimulusText.textContent = stimText;
                 stimulusText.classList.remove("hidden");
                 stimulusBlock.classList.remove("hidden");
             }
 
-            // Ekstraksi Objek Gambar Beserta Indeks Penomoran
+            // Ekstraksi Objek Gambar Beserta Indeks Penomoran (Presisi & Bebas Bug)
             let imageList = [];
+
+            // 1. Cek jika ada single image_id spesifik
+            let singleId = "";
+            if (item.image_id && typeof item.image_id === "string" && item.image_id.trim() !== "" && item.image_id !== "null" && item.image_id !== "none") {
+                singleId = item.image_id.trim();
+            }
+
+            // 2. Kumpulkan seluruh kandidat gambar
+            let rawList = [];
             const candidateFields = [
-                item.image_ids, item.images, item.stimulus_images, item.stimulus_image, item.image_id,
+                item.image_ids, item.images, item.stimulus_images, item.stimulus_image,
                 item.image_id_1, item.image_id_2, item.image_id_3
             ];
 
@@ -741,29 +771,40 @@
                     } else if (typeof v === "string") {
                         imgId = v.trim();
                     }
-                    if (imgId && !imageList.some(item => item.id === imgId)) {
-                        imageList.push({ id: imgId, no: imgNo });
+                    if (imgId && !rawList.some(x => x.id === imgId)) {
+                        rawList.push({ id: imgId, no: imgNo });
                     }
                 });
             });
+
+            if (singleId) {
+                // Jika ada single image_id spesifik, prioritaskan HANYA gambar tersebut
+                const matched = rawList.find(x => x.id === singleId);
+                imageList.push({
+                    id: singleId,
+                    no: matched ? matched.no : null
+                });
+            } else {
+                // Jika tidak ada single image_id, gunakan rawList (untuk soal komparasi multi-gambar)
+                imageList = rawList;
+            }
 
             if (imageList.length > 0) {
                 const isMulti = imageList.length > 1;
 
                 const imgGrid = document.createElement("div");
-                // Perbandingan Multi-Gambar dibuat Sejajar (2 Kolom) Khusus Mobile
                 imgGrid.className = isMulti
                     ? "grid grid-cols-2 gap-2 w-full items-start"
                     : "w-full flex justify-center";
 
                 imageList.forEach((imgObj, imgIdx) => {
                     const imgId = imgObj.id;
-                    const displayNo = imgObj.no || (imgIdx + 1);
+                    const displayNo = imgObj.no || (isMulti ? imgIdx + 1 : null);
 
                     const card = document.createElement("div");
                     card.className = `flex flex-col items-center border border-slate-800 bg-slate-900/90 rounded-xl ${isMulti ? 'p-1.5' : 'p-2.5'} w-full relative transition-all`;
 
-                    if (isMulti) {
+                    if (displayNo) {
                         const label = document.createElement("span");
                         label.className = "text-[9px] font-bold text-emerald-400 bg-slate-950 border border-slate-800 px-2 py-0.5 rounded mb-1.5 self-start";
                         label.textContent = `Gambar ${displayNo}`;
@@ -775,14 +816,14 @@
 
                     const img = document.createElement("img");
                     img.src = `/api/image/${encodeURIComponent(imgId)}`;
-                    img.alt = `Gambar ${displayNo}`;
+                    img.alt = displayNo ? `Gambar ${displayNo}` : "Gambar Stimulus";
                     const heightClass = isMulti ? "max-h-[135px] sm:max-h-[180px]" : "max-h-[200px] sm:max-h-[260px]";
                     img.className = `w-full ${heightClass} object-contain cursor-pointer hover:opacity-95 transition rounded`;
                     img.loading = "lazy";
                     img.onclick = () => openImageModal(img.src);
 
                     img.onerror = () => {
-                        imgWrapper.innerHTML = `<p class="text-[10px] text-amber-300 text-center py-2">Gambar ${displayNo} tidak dapat dimuat</p>`;
+                        imgWrapper.innerHTML = `<p class="text-[10px] text-amber-300 text-center py-2">Gambar ${displayNo || ''} tidak dapat dimuat</p>`;
                     };
 
                     imgWrapper.appendChild(img);
@@ -827,7 +868,7 @@
 
                     btn.innerHTML = `
                         <span data-option-badge class="w-6 h-6 rounded-full border border-slate-700 flex-shrink-0 flex items-center justify-center text-[11px] font-bold mt-0.5">${label}</span>
-                        <span class="leading-relaxed">${opt.substring(opt.indexOf(".") + 1).trim()}</span>
+                        <span class="leading-relaxed">${cleanTextFormatting(opt.substring(opt.indexOf(".") + 1))}</span>
                     `;
 
                     btn.addEventListener("click", function (e) {
