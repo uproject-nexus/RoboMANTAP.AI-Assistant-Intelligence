@@ -1119,6 +1119,5 @@ def render_tka_studio():
                     st.session_state.pop(batch_state_key, None)
                     st.rerun(scope="fragment")
 
-    else:
-        st.info("Library Gambar TKA belum memiliki stimulus.")
-
+else:
+    st.info("Library Gambar TKA belum memiliki stimulus.")
