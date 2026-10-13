@@ -102,7 +102,7 @@ if "review_session" in st.query_params:
 
 st.set_page_config(
     page_title="RoboMANTAP-Intelligence",
-    page_icon="logo.png",
+    page_icon="nexus_logo.png",
     layout="wide",
     initial_sidebar_state="auto"
 )
