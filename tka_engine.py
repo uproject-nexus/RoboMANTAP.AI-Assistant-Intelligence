@@ -15,11 +15,13 @@ from ai_engine import (
     init_db_connection,
     get_gemini_clients,
     option_labels_for_jenjang,
-    option_count_for_jenjang,
     normalize_quiz_options,
     clean_json_text,
     _split_option_label,
 )
+
+# IMPOR PROMPT MODUL BARU
+from tka_prompts import build_tka_prompt, detect_subject_context
 
 TKA_TOTAL_QUESTIONS = 15
 TKA_GENERATION_QUESTIONS = 15
@@ -1129,9 +1131,11 @@ def _clean_text_formatting(val: str) -> str:
     s = s.replace("\\n", "\n").replace("\r\n", "\n")
 
     # 2. Perbaiki artefak LaTeX garbled buatan AI
-    s = re.sub(r"tte?ₓ?st?([a-zA-Z]+)", r"\\text{\1}", s)
-    s = re.sub(r"\btext\s+([a-zA-Z0-9³²]+)", r"\\text{\1}", s)
-    s = re.sub(r"\bapprox\b", r"\\approx", s)
+    s = re.sub(r"\\text\{([^}]+)\}", r"\1", s)
+    s = re.sub(r"tte?ₓ?st?([a-zA-Z]+)", r"\1", s)
+    s = re.sub(r"\btext\s+([a-zA-Z0-9³²]+)", r"\1", s)
+    s = re.sub(r"\\approx", "≈", s)
+    s = re.sub(r"\bapprox\b", "≈", s)
 
     # 3. Hilangkan baris kosong berlebih
     s = re.sub(r"\n{3,}", "\n\n", s)
@@ -1144,7 +1148,6 @@ def _clean_solution_basis(val: str) -> str:
     if not s:
         return ""
 
-    # Hapus frasa revisi internal AI jika terbawa ke pembahasan
     lines = s.split("\n")
     cleaned_lines = []
     for line in lines:
@@ -1217,127 +1220,6 @@ def _normalize_stimulus(
     )
 
 
-def _tka_prompt(
-    *,
-    jenjang: str,
-    mapel: str,
-    question_type: str,
-    count: int,
-    image_count: int,
-    image_ids: list[str] | None = None,
-) -> str:
-
-    labels = tka_option_labels(jenjang)
-    qtype = _normalize_question_type(question_type)
-
-    if qtype == "MIXED":
-        type_rules = "\n".join(
-            [
-                "BENTUK: CAMPURAN TKA",
-                "- Gunakan ketiga bentuk: PG, MCMA, dan KATEGORI.",
-                "- Wajib ada minimal satu butir dari masing-masing bentuk dalam batch.",
-                f"- Untuk PG: satu jawaban benar. Untuk MCMA: minimal dua jawaban benar. Untuk KATEGORI: 3-5 pernyataan dengan respons masing-masing.",
-                f"- options wajib tepat {len(labels)} pilihan untuk PG/MCMA.",
-            ]
-        )
-        schema = (
-            '"options": [],\n'
-            '      "correct_answer": [],\n'
-            '      "correct_answers": [],\n'
-            '      "category_items": []'
-        )
-    elif qtype == "PG":
-        type_rules = f"""
-BENTUK: PILIHAN GANDA (PG)
-- Tepat satu jawaban benar.
-- options wajib tepat {len(labels)} pilihan dengan label {', '.join(labels)}.
-- correct_answer adalah SATU label, misalnya "B".
-"""
-        schema = f"""
-"options": ["{labels[0]}. ...", "{labels[1]}. ...", ...],
-      "correct_answer": "B",
-      "correct_answers": []
-"""
-    elif qtype == "MCMA":
-        type_rules = f"""
-BENTUK: PILIHAN GANDA KOMPLEKS - MCMA
-- Tepat {len(labels)} pilihan tersedia dengan label {', '.join(labels)}.
-- Dua atau lebih jawaban harus benar; jangan hanya satu.
-- correct_answers berisi 2 atau lebih LABEL unik dan WAJIB URUT ALFABETIS, misalnya ["A", "C"].
-- correct_answer harus sama dengan correct_answers untuk kompatibilitas.
-"""
-        schema = f"""
-"options": ["{labels[0]}. ...", "{labels[1]}. ...", ...],
-      "correct_answer": ["A", "C"],
-      "correct_answers": ["A", "C"]
-"""
-    else:
-        type_rules = """
-BENTUK: PILIHAN GANDA KOMPLEKS - KATEGORI
-- Buat 3-5 pernyataan yang semuanya berkaitan dengan satu stimulus/konsep.
-- Setiap pernyataan memiliki kategori/respons sendiri.
-- Kategori boleh Benar/Salah, Setuju/Tidak Setuju, atau kategori lain yang jelas ditentukan oleh soal.
-- Setiap pernyataan hanya memiliki satu correct_response.
-"""
-        schema = """
-"options": [],
-      "correct_answer": ["Benar", "Salah", "Benar"],
-      "correct_answers": ["Benar", "Salah", "Benar"],
-      "category_items": [
-        {
-          "statement": "...",
-          "options": ["Benar", "Salah"],
-          "correct_response": "Benar"
-        }
-      ]
-"""
-
-    return f'''
-Anda adalah Question Architect TKA RoboMANTAP untuk jenjang {jenjang}, mata uji {mapel}.
-Buat tepat {count} butir bertipe {qtype}.
-
-ATURAN KETAT ALOKASI STIMULUS & GAMBAR (WAJIB DITURUTI):
-1. DALAM BATCH {count} SOAL INI, WAJIB MINIMAL 1 HINGGA 2 SOAL BERSTATUS "TEKS POLOS TANPA GAMBAR" (`image_id`: null, `image_ids`: []).
-2. DILARANG KERAS memakai gambar untuk SELURUH {count} soal. Harus ada variasi soal cerita / studi kasus nalar tanpa gambar sama sekali.
-3. Jika soal TIDAK menggunakan gambar (soal teks murni): isi `"image_id": null` dan `"image_ids": []` serta sertakan teks stimulus cerita di `"stimulus_text"`.
-4. Jika soal HANYA menanyakan 1 gambar spesifik (misal "pada Gambar 1"): isi `"image_id": "ID_GAMBAR_1"` dan `"image_ids": [{{"id": "ID_GAMBAR_1", "no": 1}}].
-5. Hanya gunakan 2 atau lebih ID gambar pada `"image_ids"` jika soal BENAR-BENAR MEMBANDINGKAN kedua/ketiga gambar tersebut secara bersamaan (misal "membandingkan Gambar 1 dan Gambar 2").
-
-STANDAR TINGKAT KESULITAN, HOTS & PEMBAHASAN TKA 2026:
-- LEVEL KOGNITIF: Hanya buat soal level C4 (Analisis), C5 (Evaluasi), atau C6 (Solusi/Kreasi). DILARANG KERAS membuat soal C1–C3 (hafalan, definisi, atau sekadar mencari informasi eksplisit).
-- PEMBAHASAN BERSIH (`solution_basis`): WAJIB berupa langkah penyelesaian final yang bersih, lugas, dan terstruktur. DILARANG KERAS mencantumkan proses trial-and-error, koreksi diri, atau kalimat seperti "Mari periksa kembali", "Koreksi opsi", "salah/salah lagi", atau "terdapat ketidaksesuaian".
-- KONSISTENSI KUNCI JAWABAN: Kunci jawaban (`correct_answer` / `correct_answers`) WAJIB SANGAT KONSISTEN dengan hasil perhitungan di `solution_basis`.
-- SOAL LITERASI & NUMERASI: Wajib berbasis studi kasus nyata / multi-step problem solving.
-- FORMAT LATEX: Gunakan $...$ hanya untuk rumus, pecahan, akar, atau variabel matematika. Jangan gunakan kata 'text' atau 'ttekst' secara tidak sah.
-- Setiap butir wajib memiliki topic, cognitive_level, dan solution_basis yang mendalam.
-
-{type_rules}
-
-IMAGE_ID yang tersedia:
-{", ".join(str(x) for x in (image_ids or [])) or "(tidak ada)"}
-
-OUTPUT JSON MURNI:
-{{
-  "questions": [
-    {{
-      "id": 1,
-      "question_type": "{"PG|MCMA|KATEGORI" if qtype == "MIXED" else qtype}",
-      "question": "...",
-      {schema},
-      "category_items": [],
-      "stimulus_text": "...",
-      "stimulus_group": null,
-      "image_id": null,
-      "image_ids": [],
-      "topic": "...",
-      "cognitive_level": "C4",
-      "solution_basis": "..."
-    }}
-  ]
-}}
-'''
-
-
 def _option_map(options: list[str]) -> dict[str, str]:
     result = {}
     for opt in options:
@@ -1407,23 +1289,24 @@ def _normalize_tka_questions(
 
         if stimulus_text:
             stimulus_text = _clean_text_formatting(stimulus_text)
-            # Deduplikasi jika stimulus_text sudah tercantum di awal question
             if stimulus_text.lower() in question.lower() or question.lower().startswith(stimulus_text.lower()):
                 stimulus_text = None
 
         combo_text = f"{question} {stimulus_text or ''}".lower()
 
-        # Determiniasi Gambar Presisi
+        # Determinasi Gambar Multi-Bahasa (Indonesia & Inggris)
         extracted_items: list[dict] = []
 
-        has_g1 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*1\b", combo_text))
-        has_g2 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*2\b", combo_text))
-        has_g3 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*3\b", combo_text))
+        has_g1 = bool(re.search(r"\b(gambar|infografis|infographic|image|figure|chart|stimulus)\s*1\b", combo_text))
+        has_g2 = bool(re.search(r"\b(gambar|infografis|infographic|image|figure|chart|stimulus)\s*2\b", combo_text))
+        has_g3 = bool(re.search(r"\b(gambar|infografis|infographic|image|figure|chart|stimulus)\s*3\b", combo_text))
 
         has_multi_explicit = any(kw in combo_text for kw in [
             "kedua gambar", "ketiga gambar", "semua gambar", "membandingkan gambar",
+            "both infographics", "both images", "both figures", "comparing image", "comparing both",
             "gambar 1 dan 2", "gambar 1 & 2", "gambar 1 dan 3", "gambar 1 & 3",
-            "gambar 2 dan 3", "gambar 2 & 3", "infografis 1 dan 2", "infografis 1 dan 3"
+            "image 1 and 2", "image 1 & 2", "image 1 and 3", "image 1 & 3",
+            "infographic 1 and 2", "infographic 1 & 2"
         ])
 
         if default_image_ids:
@@ -1442,7 +1325,6 @@ def _normalize_tka_questions(
                 if single_matches:
                     extracted_items = single_matches
 
-        # Fallback jika tidak ada deteksi teks tapi AI mengirim candidates
         if not extracted_items and raw_candidates:
             for cand in raw_candidates:
                 c_id = cand.get("id") if isinstance(cand, dict) else str(cand).strip()
@@ -1514,7 +1396,6 @@ def _normalize_tka_questions(
             if qtype == "MCMA" and len(set(answers)) < 2:
                 continue
 
-            # Urutkan kunci MCMA secara alfabetis
             answers = sorted(list(set(answers))) if qtype == "MCMA" else answers
 
             base["options"] = options
@@ -1573,6 +1454,7 @@ def generate_tka_questions_batch(
     question_type: str,
     count: int,
     image_records: list[dict] | None = None,
+    path_type: str = "GURU",
 ) -> list[dict]:
 
     clients = get_gemini_clients()
@@ -1608,17 +1490,21 @@ def generate_tka_questions_batch(
 
     normalized_jenjang = normalize_tka_jenjang(jenjang)
     normalized_type = _normalize_question_type(question_type)
+    labels = tka_option_labels(normalized_jenjang)
 
-    contents.append(
-        _tka_prompt(
-            jenjang=normalized_jenjang,
-            mapel=tka_mapel_name(mapel),
-            question_type=normalized_type,
-            count=count,
-            image_count=len(records),
-            image_ids=image_ids,
-        )
+    # MEMANGGIL DARI PUSTAKA PROMPT BARU
+    prompt_str = build_tka_prompt(
+        jenjang=normalized_jenjang,
+        mapel=tka_mapel_name(mapel),
+        question_type=normalized_type,
+        count=count,
+        image_count=len(records),
+        image_ids=image_ids,
+        option_labels=labels,
+        path_type=path_type,
     )
+
+    contents.append(prompt_str)
 
     attempts = []
     candidate_pairs = []
@@ -1634,10 +1520,7 @@ def generate_tka_questions_batch(
         if len(attempts) >= TKA_GENERATION_MAX_ATTEMPTS:
             break
 
-    if normalized_type == "KATEGORI":
-        max_output_tokens = 6500
-    else:
-        max_output_tokens = 5000
+    max_output_tokens = 6500 if normalized_type == "KATEGORI" else 5000
 
     for attempt_no, (client, model) in enumerate(attempts, 1):
         try:
@@ -1671,19 +1554,19 @@ def generate_tka_questions_batch(
 
             if len(normalized) == count:
                 print(
-                    f"[TKA AI] batch {normalized_type} berhasil: "
+                    f"[TKA AI ({path_type})] batch {normalized_type} berhasil: "
                     f"{len(normalized)}/{count} soal (attempt {attempt_no})."
                 )
                 return normalized
 
             print(
-                f"[TKA AI] batch {normalized_type} output tidak lengkap/invalid: "
+                f"[TKA AI ({path_type})] batch {normalized_type} output tidak lengkap/invalid: "
                 f"{len(normalized)}/{count} soal (attempt {attempt_no})."
             )
 
         except Exception as exc:
             print(
-                f"[TKA AI] batch {normalized_type} gagal "
+                f"[TKA AI ({path_type})] batch {normalized_type} gagal "
                 f"(attempt {attempt_no}/{len(attempts)}): "
                 f"{type(exc).__name__}: {exc}"
             )
@@ -1701,13 +1584,14 @@ def _generate_tka_chunk_resilient(
     question_type: str,
     count: int,
     image_records: list[dict],
+    path_type: str = "GURU",
 ) -> list[dict]:
 
     if count <= 0:
         return []
     chunk = generate_tka_questions_batch(
         jenjang=jenjang, mapel=mapel, question_type=question_type,
-        count=count, image_records=image_records,
+        count=count, image_records=image_records, path_type=path_type,
     )
     if len(chunk) == count:
         return chunk
@@ -1718,13 +1602,13 @@ def _generate_tka_chunk_resilient(
     right_count = count - left_count
     left = _generate_tka_chunk_resilient(
         jenjang=jenjang, mapel=mapel, question_type=question_type,
-        count=left_count, image_records=image_records,
+        count=left_count, image_records=image_records, path_type=path_type,
     )
     if len(left) != left_count:
         return []
     right = _generate_tka_chunk_resilient(
         jenjang=jenjang, mapel=mapel, question_type=question_type,
-        count=right_count, image_records=image_records,
+        count=right_count, image_records=image_records, path_type=path_type,
     )
     if len(right) != right_count:
         return []
@@ -1738,6 +1622,7 @@ def _generate_tka_type_count(
     question_type: str,
     count: int,
     image_records: list[dict],
+    path_type: str = "GURU",
 ) -> list[dict]:
 
     output: list[dict] = []
@@ -1746,11 +1631,11 @@ def _generate_tka_type_count(
         chunk_size = min(TKA_STUDIO_BATCH_SIZE, remaining)
         chunk = _generate_tka_chunk_resilient(
             jenjang=jenjang, mapel=mapel, question_type=question_type,
-            count=chunk_size, image_records=image_records,
+            count=chunk_size, image_records=image_records, path_type=path_type,
         )
         if len(chunk) != chunk_size:
             print(
-                f"[TKA STUDIO] GAGAL batch {question_type}: "
+                f"[TKA ENGINE ({path_type})] GAGAL batch {question_type}: "
                 f"{len(chunk)}/{chunk_size}; tidak mengembalikan paket parsial."
             )
             return []
@@ -1767,6 +1652,7 @@ def generate_tka_studio(
     image_ids: list[str] | None = None,
     auto_select_images: bool = False,
     count: int = TKA_GENERATION_QUESTIONS,
+    path_type: str = "GURU",
 ) -> list[dict]:
 
     jenjang = normalize_tka_jenjang(jenjang)
@@ -1776,10 +1662,6 @@ def generate_tka_studio(
     except (TypeError, ValueError):
         requested_count = TKA_GENERATION_QUESTIONS
     if requested_count not in TKA_STUDIO_ALLOWED_COUNTS:
-        print(
-            f"[TKA STUDIO] count={requested_count} tidak didukung; "
-            f"menggunakan {TKA_GENERATION_QUESTIONS}."
-        )
         requested_count = TKA_GENERATION_QUESTIONS
 
     selected = list(dict.fromkeys(str(x) for x in (image_ids or []) if x))[:TKA_GENERATION_MAX_IMAGES]
@@ -1815,9 +1697,8 @@ def generate_tka_studio(
         for index, question_type in enumerate(TKA_STUDIO_BATCH_TYPES)
     }
     print(
-        f"[TKA STUDIO] mulai generate tepat {requested_count} soal: "
-        f"{type_counts}; gambar valid={len(image_records)}. "
-        "Gambar bersifat opsional."
+        f"[TKA ENGINE ({path_type})] mulai generate tepat {requested_count} soal: "
+        f"{type_counts}; gambar valid={len(image_records)}."
     )
 
     all_questions: list[dict] = []
@@ -1825,41 +1706,40 @@ def generate_tka_studio(
         needed = type_counts[question_type]
         batch = _generate_tka_type_count(
             jenjang=jenjang, mapel=mapel, question_type=question_type,
-            count=needed, image_records=image_records,
+            count=needed, image_records=image_records, path_type=path_type,
         )
         if len(batch) != needed:
             print(
-                f"[TKA STUDIO] gagal pada {question_type}: "
+                f"[TKA ENGINE ({path_type})] gagal pada {question_type}: "
                 f"{len(batch)}/{needed}. Paket parsial ditolak."
             )
             return []
         all_questions.extend(batch)
 
     if len(all_questions) != requested_count:
-        print(f"[TKA STUDIO] jumlah akhir tidak cocok: {len(all_questions)}/{requested_count}.")
         return []
     for index, question in enumerate(all_questions, 1):
         question["id"] = index
-    print(f"[TKA STUDIO] BERHASIL: {len(all_questions)}/{requested_count} soal.")
+    print(f"[TKA ENGINE ({path_type})] BERHASIL: {len(all_questions)}/{requested_count} soal.")
     return all_questions
 
 
-def generate_tka_30(
+def generate_tka_mandiri_siswa(
     *,
     jenjang: str,
     mapel: str,
-    mapel_type: str = "Wajib",
-    image_ids: list[str] | None = None,
-    auto_select_images: bool = True,
+    count: int = 15,
 ) -> list[dict]:
-
+    """
+    Fungsi khusus untuk Latihan Mandiri Siswa.
+    Memanggil generator TKA dengan path_type='MANDIRI' dan auto-select gambar sistem.
+    """
     return generate_tka_studio(
         jenjang=jenjang,
         mapel=mapel,
-        mapel_type=mapel_type,
-        image_ids=image_ids,
-        auto_select_images=auto_select_images,
-        count=TKA_TOTAL_QUESTIONS,
+        auto_select_images=True,
+        count=count,
+        path_type="MANDIRI",
     )
 
 
@@ -1960,18 +1840,6 @@ def validate_tka_questions(
             return (False, f"Topik soal nomor {idx} kosong.")
         if not str(q.get("solution_basis") or "").strip():
             return (False, f"Dasar pembahasan soal nomor {idx} kosong.")
-        if qtype in {"PG", "MCMA"}:
-            mapped = [str(x).strip().upper() for x in (q.get("correct_answers") or [])]
-            expected_key = q.get("correct_answer")
-            if qtype == "PG" and (not mapped or str(expected_key).strip().upper() != mapped[0]):
-                return (False, f"Kunci PG nomor {idx} tidak konsisten.")
-            if qtype == "MCMA":
-                if not isinstance(expected_key, list) or set(str(x).strip().upper() for x in expected_key) != set(mapped):
-                    return (False, f"Kunci MCMA nomor {idx} tidak konsisten.")
-        else:
-            category_keys = [str(item.get("correct_response") or "") for item in q.get("category_items", [])]
-            if category_keys != [str(x) for x in (q.get("correct_answers") or [])]:
-                return (False, f"Kunci kategori nomor {idx} tidak konsisten dengan pernyataan.")
 
     missing = [qtype for qtype in TKA_QUESTION_TYPES if counts.get(qtype, 0) < 1]
     if missing:
@@ -1986,14 +1854,6 @@ def validate_tka_questions(
         True,
         f"OK • PG {counts['PG']} • MCMA {counts['MCMA']} • Kategori {counts['KATEGORI']}",
     )
-
-
-def validate_tka_30(
-    questions: list[dict],
-    jenjang: str,
-) -> tuple[bool, str]:
-
-    return validate_tka_questions(questions, jenjang, TKA_TOTAL_QUESTIONS)
 
 
 def publish_tka_to_db(
