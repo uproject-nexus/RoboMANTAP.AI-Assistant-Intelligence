@@ -2669,14 +2669,6 @@ elif st.session_state.page == "guru_dashboard":
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("""
-        <div class="source-warning">
-            <div class="source-warning-title">📌 PENTING!</div>
-            Mohon Ustadzah untuk ketik di kolom <b>Materi Utama</b> dengan teks <code>materi dilampirkan</code>
-            agar RoboMANTAP menggunakan file yang sudah di-drop sebagai sumber utama pembuatan soal dengan lebih akurat dan presisi.
-        </div>
-        """, unsafe_allow_html=True)
-
         st.markdown("#### 📚 Material Hub • File Drop Guru")
         st.caption("Paket materi serbaguna untuk Quiz, LKPD, dan Media Ajar!")
 
@@ -2745,6 +2737,12 @@ elif st.session_state.page == "guru_dashboard":
                     st.error("Kode File Drop tidak ditemukan di Material Hub.")
 
         st.markdown("---")
+        st.markdown("""
+        <div class="source-warning">
+            <div class="source-warning-title">📌 PENTING!</div>
+            Mohon Ustadzah ketik <code>materi dilampirkan</code> di kolom <b>Materi Utama</b> bila ingin memuat soal sesuai dengan file yang di upload.
+        </div>
+        """, unsafe_allow_html=True)
         st.markdown("#### ⚙️ Konfigurasi Quiz Custom")
 
         with st.form("robomantap_quiz_custom_form", clear_on_submit=False):
@@ -2776,6 +2774,29 @@ elif st.session_state.page == "guru_dashboard":
                     value=custom_cfg.get("submateri", ""),
                     placeholder="Contoh: Persamaan logaritma",
                 )
+
+            option_rule = (
+                "A–D • 4 pilihan"
+                if option_count_for_jenjang(custom_jenjang) == 4
+                else "A–E • 5 pilihan"
+            )
+            
+            st.markdown(
+                f"""
+                <div style="
+                    background-color: #1e293b;
+                    border-left: 4px solid #3b82f6;
+                    padding: 10px 14px;
+                    border-radius: 6px;
+                    font-size: 8px;
+                    color: #e2e8f0;
+                    margin-bottom: 1rem;
+                ">
+                    🎯 <b>Aturan opsi {custom_jenjang}: {option_rule}.</b> RoboMANTAP akan memvalidasi jumlah opsi kembali sebelum kuis diterbitkan.
+                </div>
+            """,
+                unsafe_allow_html=True,
+            )
 
             with cqb:
                 custom_jumlah = st.number_input(
@@ -2811,9 +2832,6 @@ elif st.session_state.page == "guru_dashboard":
                     context_options,
                     index=context_options.index(custom_cfg.get("konteks", "Standar Sekolah")),
                 )
-
-            option_rule = "A–D • 4 pilihan" if option_count_for_jenjang(custom_jenjang) == 4 else "A–E • 5 pilihan"
-            st.info(f"🎯 **Aturan opsi {custom_jenjang}: {option_rule}.** RoboMANTAP akan memvalidasi jumlah opsi kembali sebelum kuis diterbitkan.")
 
             st.markdown("##### ⏱️ Durasi Pengerjaan Kuis")
             t1, t2, t3 = st.columns(3)
