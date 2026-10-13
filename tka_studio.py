@@ -617,12 +617,17 @@ def render_tka_studio():
         {},
     )
     
-    <div class="premium-pills">
-        <span>SOAL FLEKSIBEL</span>
-        <span>PG • MCMA • KATEGORI</span>
-        <span>📜 STANDAR JUKNIS TKA 2026</span>
-        <span>MASA AKTIF CUSTOM</span>
-    </div>
+    st.markdown(
+        """
+        <div style="background-color: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 10px; padding: 10px 14px; margin: 12px 0; display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 11px; color: #94a3b8;">
+                <strong style="color: #34d399;">📜 Standar UPN:</strong> Penyusunan HOTS & alokasi stimulus dikunci sesuai Juknis TKA 2026.
+            </span>
+            <span style="font-size: 10px; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 2px 8px; rounded: 6px; font-weight: 600;">AI Verified</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     if questions:
 
