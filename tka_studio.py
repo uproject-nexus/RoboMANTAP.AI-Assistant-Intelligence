@@ -621,7 +621,7 @@ def render_tka_studio():
         """
         <div style="background-color: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 10px; padding: 10px 14px; margin: 12px 0; display: flex; align-items: center; justify-content: space-between;">
             <span style="font-size: 11px; color: #94a3b8;">
-                <strong style="color: #34d399;">🛡️ Standar UPN:</strong> Penyusunan HOTS & alokasi stimulus dikunci sesuai Juknis TKA 2026.
+                <strong style="color: #34d399;">🛡️ Standar UPN:</strong> Penyusunan Soal HOTS & alokasi stimulus dikunci sesuai Juknis TKA 2026.
             </span>
             <span style="font-size: 10px; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 2px 8px; rounded: 6px; font-weight: 600;">UPN AI Verified</span>
         </div>
@@ -948,42 +948,6 @@ def render_tka_studio():
             hide_index=True,
         )
 
-        # Preview hanya SATU gambar jika memang diperlukan. Dengan default False,
-        # klik hapus tidak memaksa Streamlit mengirim ulang puluhan gambar.
-        preview_options = {
-            str(r.get("image_id")): r
-            for r in page_images
-            if r.get("image_id")
-        }
-        preview_ids = list(preview_options.keys())
-        if preview_ids:
-            preview_choice = st.selectbox(
-                "Preview stimulus (opsional)",
-                [""] + preview_ids,
-                key="tka_manage_preview_id",
-                format_func=lambda image_id: (
-                    "— Tidak menampilkan preview —"
-                    if not image_id
-                    else str(preview_options[image_id].get("filename") or image_id)
-                ),
-            )
-            if preview_choice:
-                preview_record = preview_options.get(preview_choice, {})
-                preview = _cached_stimulus_preview(
-                    preview_choice,
-                    str(
-                        preview_record.get("updated_at")
-                        or preview_record.get("created_at")
-                        or ""
-                    ),
-                )
-                if preview is not None:
-                    st.image(
-                        preview,
-                        caption=str(preview_record.get("filename") or "Stimulus"),
-                        width=360,
-                    )
-
         st.markdown("##### ♻️ Kelola Stimulus")
         st.caption("Hapus gambar stimulus yang salah atau kurang tepat.")
 
@@ -1125,6 +1089,42 @@ def render_tka_studio():
                 ):
                     st.session_state.pop(batch_state_key, None)
                     st.rerun(scope="fragment")
+
+        # Preview hanya SATU gambar jika memang diperlukan. Dengan default False,
+        # klik hapus tidak memaksa Streamlit mengirim ulang puluhan gambar.
+        preview_options = {
+            str(r.get("image_id")): r
+            for r in page_images
+            if r.get("image_id")
+        }
+        preview_ids = list(preview_options.keys())
+        if preview_ids:
+            preview_choice = st.selectbox(
+                "Preview stimulus (opsional)",
+                [""] + preview_ids,
+                key="tka_manage_preview_id",
+                format_func=lambda image_id: (
+                    "— Tidak menampilkan preview —"
+                    if not image_id
+                    else str(preview_options[image_id].get("filename") or image_id)
+                ),
+            )
+            if preview_choice:
+                preview_record = preview_options.get(preview_choice, {})
+                preview = _cached_stimulus_preview(
+                    preview_choice,
+                    str(
+                        preview_record.get("updated_at")
+                        or preview_record.get("created_at")
+                        or ""
+                    ),
+                )
+                if preview is not None:
+                    st.image(
+                        preview,
+                        caption=str(preview_record.get("filename") or "Stimulus"),
+                        width=360,
+                    )
 
     else:
         st.info("Library Gambar TKA belum memiliki stimulus.")
