@@ -109,25 +109,56 @@ st.set_page_config(
 
 LOGO_PUBLIC_URL = "https://raw.githubusercontent.com/uproject-nexus/RoboMANTAP.AI-Assistant-Intelligence/main/logo.png"
 
-# Script untuk menyuntikkan icon layar utama ke head induk Streamlit
+# Script gabungan untuk menimpa Icon, Apple Touch Icon, dan Web App Manifest
 components.html(
     f"""
     <script>
-        const head = window.parent.document.getElementsByTagName('head')[0];
-        
-        // Update Apple Touch Icon (Dipakai iOS & Android PWA Shortcut)
-        let appleIcon = window.parent.document.querySelector("link[rel='apple-touch-icon']");
+        const doc = window.parent.document;
+        const head = doc.getElementsByTagName('head')[0];
+
+        // 1. Update Apple Touch Icon & Favicon
+        let appleIcon = doc.querySelector("link[rel='apple-touch-icon']");
         if (!appleIcon) {{
-            appleIcon = window.parent.document.createElement('link');
+            appleIcon = doc.createElement('link');
             appleIcon.rel = 'apple-touch-icon';
             head.appendChild(appleIcon);
         }}
         appleIcon.href = '{LOGO_PUBLIC_URL}';
 
-        // Update Shortcut Icon
-        let icon = window.parent.document.querySelector("link[rel='icon']");
+        let icon = doc.querySelector("link[rel='icon']");
         if (icon) {{
             icon.href = '{LOGO_PUBLIC_URL}';
+        }}
+
+        // 2. Timpa Manifest PWA (Mengubah Nama & Logo pada Pop-up Install App)
+        const myManifest = {{
+            "short_name": "UPN",
+            "name": "U.Project Nexus",
+            "icons": [
+                {{
+                    "src": "{LOGO_PUBLIC_URL}",
+                    "sizes": "192x192 512x512",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                }}
+            ],
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#0e1117",
+            "theme_color": "#0e1117"
+        }};
+
+        const blob = new Blob([JSON.stringify(myManifest)], {{type: 'application/json'}});
+        const manifestURL = URL.createObjectURL(blob);
+
+        let manifestLink = doc.querySelector("link[rel='manifest']");
+        if (manifestLink) {{
+            manifestLink.href = manifestURL;
+        }} else {{
+            manifestLink = doc.createElement('link');
+            manifestLink.rel = 'manifest';
+            manifestLink.href = manifestURL;
+            head.appendChild(manifestLink);
         }}
     </script>
     """,
