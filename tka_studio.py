@@ -948,7 +948,7 @@ def render_tka_studio():
             hide_index=True,
         )
 
-        st.markdown("##### ♻️ Kelola Stimulus")
+        st.markdown("##### ♻️ Kelola gambar yang tersimpan")
         st.caption("Hapus gambar stimulus yang salah atau kurang tepat.")
 
         current_teacher = teacher_name.strip() or "GuruMANTAP"
@@ -957,7 +957,7 @@ def render_tka_studio():
         page_count = max(1, (len(all_images) + page_size - 1) // page_size)
         page_options = list(range(1, page_count + 1))
         page = st.selectbox(
-            "Halaman stimulus",
+            "Daftar Gambar",
             page_options,
             key="tka_manage_library_page",
             format_func=lambda n: (
