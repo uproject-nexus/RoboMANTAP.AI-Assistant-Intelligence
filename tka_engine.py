@@ -1189,7 +1189,6 @@ def _tka_prompt(
             [
                 "BENTUK: CAMPURAN TKA",
                 "- Gunakan ketiga bentuk: PG, MCMA, dan KATEGORI.",
-                "- Tidak ada rasio resmi yang boleh diasumsikan; distribusi boleh bervariasi secara wajar.",
                 "- Wajib ada minimal satu butir dari masing-masing bentuk dalam batch.",
                 f"- Untuk PG: satu jawaban benar. Untuk MCMA: minimal dua jawaban benar. Untuk KATEGORI: 3-5 pernyataan dengan respons masing-masing.",
                 f"- options wajib tepat {len(labels)} pilihan untuk PG/MCMA.",
@@ -1251,34 +1250,21 @@ BENTUK: PILIHAN GANDA KOMPLEKS - KATEGORI
 Anda adalah Question Architect TKA RoboMANTAP untuk jenjang {jenjang}, mata uji {mapel}.
 Buat tepat {count} butir bertipe {qtype}.
 
-ATURAN TKA YANG WAJIB:
-- TKA MTs: mata uji Bahasa Indonesia dan Matematika.
-- TKA MA: mata uji wajib Bahasa Indonesia, Matematika, Bahasa Inggris; mata uji pilihan hanya jika dipilih guru.
-- Bentuk soal yang didukung portal: PG, PG Kompleks-MCMA, dan PG Kompleks-Kategori.
-- Jangan membuat matching/menjodohkan, isian, atau uraian.
-- Stimulus TIDAK WAJIB berupa gambar.
-- Stimulus dapat berupa teks, puisi, pidato, dialog, tabel, grafik, diagram, gambar, atau kombinasi yang relevan dengan mapel.
-- Jika gambar diberikan, gunakan hanya fakta yang benar-benar tampak.
-- Jangan memaksa setiap butir memakai gambar.
-- Satu stimulus dapat dipakai bersama oleh beberapa butir melalui stimulus_group yang sama.
-- Soal matematika boleh berupa perhitungan biasa tanpa gambar.
-- Soal Bahasa Indonesia/Bahasa Inggris/Bahasa Arab boleh berupa teks polos tanpa gambar.
-- KESULITAN: buat soal menantang sesuai kompetensi jenjang, bukan soal definisi atau hafalan langsung.
-- Setiap soal harus membutuhkan penalaran/interpretasi atau penerapan konsep; untuk numerasi, gunakan langkah hitung yang bermakna dan konteks yang relevan.
-- Untuk literasi, minta siswa menyimpulkan, membandingkan bukti, menilai argumen, menafsirkan maksud/struktur, atau menerapkan informasi; jangan sekadar menanyakan kalimat yang tertulis eksplisit.
-- Target dominan C4 (analisis) dan C5 (evaluasi); gunakan C6 (merancang/menghasilkan keputusan/solusi) bila wajar untuk kompetensi dan bentuk soal.
-- Buat distraktor yang masuk akal dan mewakili miskonsepsi umum; panjang opsi relatif seimbang, tanpa petunjuk jawaban karena opsi paling panjang/berbeda gaya.
-- Hindari jawaban benar yang terlalu jelas, opsi tumpang tindih, soal ambigu, informasi yang tidak diperlukan, dan pola kunci yang berulang.
-- solution_basis harus menjelaskan alasan substantif jawaban benar serta mengapa pendekatan itu tepat; jangan hanya mengulang kunci.
-- Gunakan LaTeX $...$ hanya untuk rumus/pecahan/akar/variabel matematika.
-- Jangan menaruh teks biasa di dalam delimiter matematika.
-- Setiap butir wajib memiliki topic, cognitive_level, solution_basis.
+ATURAN KETAT ALOKASI STIMULUS & GAMBAR (WAJIB DITURUTI):
+1. DALAM BATCH {count} SOAL INI, WAJIB MINIMAL 1 HINGGA 2 SOAL BERSTATUS "TEKS POLOS TANPA GAMBAR" (`image_id`: null, `image_ids`: []).
+2. DILARANG KERAS memakai gambar untuk SELURUH {count} soal. Harus ada variasi soal cerita / studi kasus nalar tanpa gambar sama sekali.
+3. Jika soal TIDAK menggunakan gambar (soal teks murni): isi `"image_id": null` dan `"image_ids": []` serta sertakan teks stimulus cerita di `"stimulus_text"`.
+4. Jika soal HANYA menanyakan 1 gambar spesifik (misal "pada Gambar 1"): isi `"image_id": "ID_GAMBAR_1"` dan `"image_ids": [{"id": "ID_GAMBAR_1", "no": 1}]`.
+5. Hanya gunakan 2 atau lebih ID gambar pada `"image_ids"` jika soal BENAR-BENAR MEMBANDINGKAN kedua/ketiga gambar tersebut secara bersamaan.
 
-ATURAN PENANGANAN GAMBAR/STIMULUS VISUAL:
-- Jika tidak ada gambar, image_id harus null dan image_ids harus [].
-- Jika memakai 1 gambar spesifik, isi image_id dengan ID tersebut dan image_ids berisi array ID tersebut, misal: ["ID_GAMBAR_1"].
-- SANGAT PENTING: Jangan memasukkan semua gambar jika soal HANYA menanyakan 1 gambar spesifik (seperti "pada Gambar 1").
-- Hanya isi array "image_ids" dengan 2 atau lebih ID jika soal BENAR-BENAR MEMBANDINGKAN kedua/ketiga gambar tersebut (misal: "Bandingkan Gambar 1 dan Gambar 3", "kedua infografis tersebut").
+STANDAR TINGKAT KESULITAN & HOTS TKA 2026:
+- LEVEL KOGNITIF: Hanya buat soal level C4 (Analisis), C5 (Evaluasi), atau C6 (Solusi/Kreasi). DILARANG KERAS membuat soal C1–C3 (hafalan, definisi, atau sekadar mencari informasi yang tertulis eksplisit).
+- SOAL LITERASI (Teks Polos maupun Gambar): Berbasis Studi Kasus / Dilema Logika / Skenario Nyata. Minta siswa mengevaluasi validitas argumen, menentukan implikasi keputusan, menyimpulkan hipotesis implisit, atau membandingkan perspektif. Jangan pernah menanyakan kalimat yang tertulis eksplisit!
+- SOAL NUMERASI / MATEMATIKA: Wajib berbasis Multi-Step Problem Solving (minimal 2–3 langkah penalaran/hitungan bertahap) atau menganalisis kekeliruan logika/prosedur hitung dari suatu skenario cerita.
+- KONSTRUKSI DISTRAKTOR (PENGECOH): Setiap opsi salah WAJIB dirancang dari miskonsepsi umum siswa (misal: kesalahan mengisolasi variabel, kesalahan logika korelasi semu, atau kesalahan perhitungan bertahap). Hindari opsi pengecoh yang terlalu mudah dieliminasi!
+- BENTUK SOAL PORTAL: Hanya PG, PG Kompleks-MCMA, dan PG Kompleks-Kategori. Jangan buat isian, uraian, atau menjodohkan.
+- FORMAT LATEX: Gunakan $...$ hanya untuk rumus, pecahan, akar, atau variabel matematika. Jangan menaruh teks bahasa sehari-hari di dalam delimiter matematika.
+- Setiap butir wajib memiliki topic, cognitive_level, dan solution_basis yang mendalam.
 
 {type_rules}
 
@@ -1294,7 +1280,7 @@ OUTPUT JSON MURNI:
       "question": "...",
       {schema},
       "category_items": [],
-      "stimulus_text": null,
+      "stimulus_text": "...",
       "stimulus_group": null,
       "image_id": null,
       "image_ids": [],
@@ -1385,7 +1371,6 @@ def _normalize_tka_questions(
 
         combo_text = f"{question} {stimulus_text or ''}".lower()
 
-        # Deteksi perbandingan multi-gambar
         is_multi_comparison = any(kw in combo_text for kw in [
             "kedua", "membandingkan", "comparing", "both", "persamaan", "perbedaan",
             "gambar 1 dan 2", "gambar 1 & 2", "gambar 1 dan 3", "gambar 1 & 3",
@@ -1412,8 +1397,6 @@ def _normalize_tka_questions(
 
                 if single_matches:
                     extracted_items = single_matches
-                elif not extracted_items and default_image_ids:
-                    extracted_items = [{"id": default_image_ids[0], "no": 1}]
 
         image_id = extracted_items[0]["id"] if extracted_items else None
         image_ids_list = extracted_items
