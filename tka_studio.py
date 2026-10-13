@@ -69,48 +69,28 @@ TKA_MA_PILIHAN = [
 
 def _now_wib():
     return (
-        datetime.now(
-            timezone.utc
-        )
-        .astimezone(
-            timezone(timedelta(hours=7))
-        )
+        datetime.now(timezone.utc)
+        .astimezone(timezone(timedelta(hours=7)))
         .replace(tzinfo=None)
     )
 
 
 def _safe_code(value: str) -> str:
-    return re.sub(
-        r"[^A-Z0-9_-]",
-        "",
-        str(value or "").upper(),
-    )[:40]
+    return re.sub(r"[^A-Z0-9_-]", "", str(value or "").upper())[:40]
 
 
 def _image_for_streamlit(data):
     if data is None:
         return None
 
-    if isinstance(
-        data,
-        memoryview,
-    ):
+    if isinstance(data, memoryview):
         data = data.tobytes()
-
-    elif isinstance(
-        data,
-        bytearray,
-    ):
+    elif isinstance(data, bytearray):
         data = bytes(data)
 
-    if isinstance(
-        data,
-        bytes,
-    ):
+    if isinstance(data, bytes):
         try:
-            return Image.open(
-                io.BytesIO(data)
-            )
+            return Image.open(io.BytesIO(data))
         except Exception:
             return None
 
@@ -141,44 +121,26 @@ def _cached_stimulus_preview(image_id: str, cache_key: str = ""):
     return image
 
 
-def _mapel_controls(
-    jenjang: str,
-) -> tuple[str, str]:
-
+def _mapel_controls(jenjang: str) -> tuple[str, str]:
     if jenjang == "MTs":
         mapel_type = "Wajib"
-
         mapel = st.selectbox(
             "Mata Uji",
             TKA_MTS_MAPEL,
             key="tka_studio_mapel_mts",
-            help=(
-                "TKA MTs: Bahasa Indonesia dan "
-                "Matematika; tidak ada mata uji pilihan."
-            ),
+            help="TKA MTs: Bahasa Indonesia dan Matematika; tidak ada mata uji pilihan.",
         )
-
-        return (
-            mapel,
-            mapel_type,
-        )
+        return mapel, mapel_type
 
     mapel_type = st.radio(
         "Kategori Mata Uji MA",
         ["Wajib", "Pilihan"],
         horizontal=True,
         key="tka_studio_mapel_type_ma",
-        help=(
-            "MA memiliki 3 mata uji wajib "
-            "dan 2 mata uji pilihan."
-        ),
+        help="MA memiliki 3 mata uji wajib dan 2 mata uji pilihan.",
     )
 
-    options = (
-        TKA_MA_WAJIB
-        if mapel_type == "Wajib"
-        else TKA_MA_PILIHAN
-    )
+    options = TKA_MA_WAJIB if mapel_type == "Wajib" else TKA_MA_PILIHAN
 
     mapel = st.selectbox(
         "Mata Uji",
@@ -186,20 +148,13 @@ def _mapel_controls(
         key=f"tka_studio_mapel_ma_{mapel_type}",
     )
 
-    return (
-        mapel,
-        mapel_type,
-    )
+    return mapel, mapel_type
 
 
 @st.fragment
 def render_tka_studio():
-
-    if not st.session_state.get(
-        "_tka_topics_backfilled"
-    ):
+    if not st.session_state.get("_tka_topics_backfilled"):
         backfill_tka_image_topics()
-
         st.session_state._tka_topics_backfilled = True
 
     st.markdown(
@@ -212,8 +167,7 @@ def render_tka_studio():
                 🎓 RoboMANTAP <span>TKA STUDIO</span>
             </div>
             <div class="premium-subtitle">
-                Library stimulus → paket latihan TKA →
-                review → token → siswa
+                Library stimulus → paket latihan TKA → review → token → siswa
             </div>
             <div class="premium-pills">
                 <span>30 SOAL PORTAL</span>
@@ -228,10 +182,7 @@ def render_tka_studio():
 
     teacher_name = st.text_input(
         "Nama / Identitas Guru",
-        value=st.session_state.get(
-            "tka_teacher_name",
-            "GuruMANTAP",
-        ),
+        value=st.session_state.get("tka_teacher_name", "GuruMANTAP"),
         key="tka_teacher_name",
     )
 
@@ -239,19 +190,12 @@ def render_tka_studio():
         "Jenjang TKA",
         ["MTs", "MA"],
         key="tka_studio_jenjang",
-        help=(
-            "Peserta TKA pada dokumen acuan: "
-            "kelas 9 untuk MTs dan kelas 12 untuk MA."
-        ),
+        help="Peserta TKA pada dokumen acuan: kelas 9 untuk MTs dan kelas 12 untuk MA.",
     )
 
-    mapel, mapel_type = _mapel_controls(
-        jenjang
-    )
+    mapel, mapel_type = _mapel_controls(jenjang)
 
-    st.markdown(
-        "##### 🖼️ Sumber Gambar / Stimulus TKA"
-    )
+    st.markdown("##### 🖼️ Sumber Gambar / Stimulus TKA")
 
     source_mode = st.radio(
         "Sumber stimulus",
@@ -266,7 +210,6 @@ def render_tka_studio():
     selected_ids: list[str] = []
 
     if source_mode == "Upload Gambar Baru":
-
         owner_type = st.radio(
             "Simpan sebagai",
             [
@@ -278,30 +221,16 @@ def render_tka_studio():
         )
 
         uploads = st.file_uploader(
-            f"Upload 1–5 gambar stimulus untuk "
-            f"{mapel} • {jenjang}",
-            type=[
-                "jpg",
-                "jpeg",
-                "png",
-                "webp",
-            ],
+            f"Upload 1–5 gambar stimulus untuk {mapel} • {jenjang}",
+            type=["jpg", "jpeg", "png", "webp"],
             accept_multiple_files=True,
             key="tka_image_uploads",
-            help=(
-                "Metadata jenjang dan mapel "
-                "mengikuti filter aktif."
-            ),
+            help="Metadata jenjang dan mapel mengikuti filter aktif.",
         )
 
         if uploads:
-
             if len(uploads) > 5:
-                st.warning(
-                    "Maksimal 5 stimulus digunakan "
-                    "untuk satu paket. Hanya 5 pertama "
-                    "yang dipakai."
-                )
+                st.warning("Maksimal 5 stimulus digunakan untuk satu paket. Hanya 5 pertama yang dipakai.")
 
             if st.button(
                 "💾 Simpan ke Library TKA",
@@ -309,80 +238,34 @@ def render_tka_studio():
                 use_container_width=True,
                 key="save_tka_images",
             ):
-
-                source = (
-                    "SYSTEM"
-                    if owner_type
-                    == "Gambar Sistem UPN"
-                    else "GURU"
-                )
-
-                owner = (
-                    "UPN-SYSTEM"
-                    if source == "SYSTEM"
-                    else (
-                        teacher_name.strip()
-                        or "GuruMANTAP"
-                    )
-                )
-
+                source = "SYSTEM" if owner_type == "Gambar Sistem UPN" else "GURU"
+                owner = "UPN-SYSTEM" if source == "SYSTEM" else (teacher_name.strip() or "GuruMANTAP")
                 saved = []
 
                 for item in uploads[:5]:
-
-                    topic = infer_tka_topic(
-                        item.name,
-                        jenjang,
-                        mapel,
-                    )
-
+                    topic = infer_tka_topic(item.name, jenjang, mapel)
                     image_id = save_tka_image(
                         data=item.getvalue(),
                         filename=item.name,
-                        mime_type=(
-                            item.type
-                            or "image/png"
-                        ),
+                        mime_type=(item.type or "image/png"),
                         source_type=source,
                         owner_key=owner,
                         jenjang=jenjang,
                         mapel=mapel,
                         topic=topic,
                     )
-
                     if image_id:
-                        saved.append(
-                            image_id
-                        )
+                        saved.append(image_id)
 
-                st.session_state[
-                    "tka_selected_image_ids"
-                ] = saved
+                st.session_state["tka_selected_image_ids"] = saved
+                st.success(f"✅ {len(saved)} gambar tersimpan untuk {mapel} • {jenjang}.")
+                st.rerun(scope="fragment")
 
-                st.success(
-                    f"✅ {len(saved)} gambar tersimpan "
-                    f"untuk {mapel} • {jenjang}."
-                )
-
-                st.rerun(
-                    scope="fragment"
-                )
-
-        selected_ids = (
-            st.session_state.get(
-                "tka_selected_image_ids",
-                [],
-            )[:5]
-        )
-
+        selected_ids = st.session_state.get("tka_selected_image_ids", [])[:5]
         if selected_ids:
-            st.caption(
-                f"Stimulus aktif: "
-                f"{len(selected_ids)} gambar"
-            )
+            st.caption(f"Stimulus aktif: {len(selected_ids)} gambar")
 
     else:
-
         source_filter = st.selectbox(
             "Filter sumber library",
             [
@@ -395,30 +278,18 @@ def render_tka_studio():
 
         search_term = st.text_input(
             "🔎 Cari stimulus",
-            placeholder=(
-                "Contoh: lingkaran, peluang, "
-                "teks eksposisi, sistem pernapasan..."
-            ),
+            placeholder="Contoh: lingkaran, peluang, teks eksposisi, sistem pernapasan...",
             key="tka_library_search",
-            help=(
-                "Pencarian hanya dilakukan pada gambar "
-                "yang sudah lolos filter jenjang dan "
-                "mata uji."
-            ),
+            help="Pencarian hanya dilakukan pada gambar yang sudah lolos filter jenjang dan mata uji.",
         )
 
-        owner = (
-            teacher_name.strip()
-            or "GuruMANTAP"
-        )
-
+        owner = teacher_name.strip() or "GuruMANTAP"
         source_type = None
         owner_key = owner
 
         if source_filter == "Gambar Sistem":
             source_type = "SYSTEM"
             owner_key = None
-
         elif source_filter == "Gambar Saya":
             source_type = "GURU"
 
@@ -432,108 +303,50 @@ def render_tka_studio():
         )
 
         if not library:
-            st.info(
-                f"Belum ada stimulus yang cocok "
-                f"untuk **{mapel} • {jenjang}** "
-                "dengan filter saat ini."
-            )
-
+            st.info(f"Belum ada stimulus yang cocok untuk **{mapel} • {jenjang}** dengan filter saat ini.")
         else:
-
             labels = {
-                str(x["image_id"]):
+                str(x["image_id"]): (
                     f"{x['filename']} • "
                     f"{x.get('source_type','GURU')} • "
                     f"{x.get('topic') or infer_tka_topic(x['filename'], jenjang, mapel)}"
+                )
                 for x in library
             }
 
-            options = [
-                str(x["image_id"])
-                for x in library
-            ]
-
+            options = [str(x["image_id"]) for x in library]
             valid_previous = [
                 str(x)
-                for x in st.session_state.get(
-                    "tka_library_selection",
-                    [],
-                )
+                for x in st.session_state.get("tka_library_selection", [])
                 if str(x) in options
             ]
-
-            st.session_state[
-                "tka_library_selection"
-            ] = valid_previous
+            st.session_state["tka_library_selection"] = valid_previous
 
             selected_ids = st.multiselect(
-                f"Pilih maksimal 5 stimulus • "
-                f"{mapel} • {jenjang}",
+                f"Pilih maksimal 5 stimulus • {mapel} • {jenjang}",
                 options,
                 max_selections=5,
-                format_func=lambda x:
-                    labels.get(x, x),
+                format_func=lambda x: labels.get(x, x),
                 key="tka_library_selection",
             )
 
             if selected_ids:
+                st.caption(f"Stimulus dipilih: {len(selected_ids)}/5")
+                cols = st.columns(min(5, len(selected_ids)))
+                selected_lookup = {str(x["image_id"]): x for x in library}
 
-                st.caption(
-                    f"Stimulus dipilih: "
-                    f"{len(selected_ids)}/5"
-                )
-
-                cols = st.columns(
-                    min(
-                        5,
-                        len(selected_ids),
-                    )
-                )
-
-                selected_lookup = {
-                    str(x["image_id"]): x
-                    for x in library
-                }
-
-                for col, image_id in zip(
-                    cols,
-                    selected_ids,
-                ):
-
-                    record = get_tka_image(
-                        image_id
-                    )
-
+                for col, image_id in zip(cols, selected_ids):
+                    record = get_tka_image(image_id)
                     if record:
-
                         with col:
-
-                            image = (
-                                _image_for_streamlit(
-                                    record.get(
-                                        "image_data"
-                                    )
-                                )
-                            )
-
+                            image = _image_for_streamlit(record.get("image_data"))
                             if image is not None:
                                 st.image(
                                     image,
-                                    caption=(
-                                        selected_lookup.get(
-                                            image_id,
-                                            record,
-                                        ).get(
-                                            "filename",
-                                            "Stimulus",
-                                        )
-                                    ),
+                                    caption=selected_lookup.get(image_id, record).get("filename", "Stimulus"),
                                     use_container_width=True,
                                 )
 
-
-
-    # --- TAMBAHAN KONTROL DINAMIS UNTUK GURU MANTAP ---
     col_opt1, col_opt2 = st.columns(2)
     with col_opt1:
         jumlah_soal_pilihan = st.pills(
@@ -547,13 +360,11 @@ def render_tka_studio():
             "Pilih Masa Aktif Kuis:",
             ["12 Jam", "24 Jam", "3 Hari"],
             index=1,
-            key="tka_studio_masa_aktif"
+            key="tka_studio_masa_aktif",
         )
-        # Mapping durasi string ke hitungan Jam
         durasi_jam_map = {"12 Jam": 12, "24 Jam": 24, "3 Hari": 72}
         jam_aktif = durasi_jam_map.get(masa_aktif_pilihan, 24)
 
-    # Jika guru iseng menghapus pilihan pill, kita kembalikan ke default 15
     if not jumlah_soal_pilihan:
         jumlah_soal_pilihan = 15
 
@@ -563,7 +374,6 @@ def render_tka_studio():
         use_container_width=True,
         key="generate_tka_dinamis",
     ):
-
         with st.spinner(f"RoboMANTAP sedang menyusun tepat {jumlah_soal_pilihan} soal TKA (PG • MCMA • Kategori)..."):
             generated = generate_tka_studio(
                 jenjang=jenjang,
@@ -571,7 +381,8 @@ def render_tka_studio():
                 mapel_type=mapel_type,
                 image_ids=selected_ids[:5],
                 auto_select_images=False,
-                count=jumlah_soal_pilihan, # Lempar variabel ini ke Engine
+                count=jumlah_soal_pilihan,
+                path_type="GURU",
             )
 
         if len(generated) == jumlah_soal_pilihan:
@@ -585,38 +396,17 @@ def render_tka_studio():
                 "generation_count": jumlah_soal_pilihan,
                 "active_from": None,
                 "active_until": None,
-                "active_hours": jam_aktif, # Lempar durasi pilihan guru 
+                "active_hours": jam_aktif,
             }
-            # Lanjut ke baris default UUID Anda seperti biasa...
 
-
-            st.session_state.tka_default_code = (
-                f"TKA-"
-                f"{uuid.uuid4().hex[:6].upper()}"
-            )
-
-            st.success(
-                f"✅ {jumlah_soal_pilihan} soal berhasil dibuat "
-                "dan siap direview."
-            )
-
+            st.session_state.tka_default_code = f"TKA-{uuid.uuid4().hex[:6].upper()}"
+            st.success(f"✅ {jumlah_soal_pilihan} soal berhasil dibuat dan siap direview.")
         else:
+            st.error(f"❌ AI belum menghasilkan tepat {jumlah_soal_pilihan} soal. Paket tidak disimpan agar tidak ada TKA parsial.")
 
-            st.error(
-                f"❌ AI belum menghasilkan tepat {jumlah_soal_pilihan} soal. Paket tidak disimpan agar "
-                "tidak ada TKA parsial."
-            )
+    questions = st.session_state.get("tka_draft", [])
+    config = st.session_state.get("tka_draft_config", {})
 
-    questions = st.session_state.get(
-        "tka_draft",
-        [],
-    )
-
-    config = st.session_state.get(
-        "tka_draft_config",
-        {},
-    )
-    
     st.markdown(
         """
         <div style="background-color: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 10px; padding: 10px 14px; margin: 12px 0; display: flex; align-items: center; justify-content: space-between;">
@@ -626,253 +416,96 @@ def render_tka_studio():
             <span style="font-size: 10px; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 2px 8px; rounded: 6px; font-weight: 600;">UPN AI Verified</span>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     if questions:
-
         ok, reason = validate_tka_questions(
             questions,
-            config.get(
-                "jenjang",
-                jenjang,
-            ),
+            config.get("jenjang", jenjang),
             expected_count=len(questions),
         )
 
         if not ok:
             st.error(reason)
-
         else:
-
             st.markdown("---")
-            st.markdown(
-                "##### 🔎 Review TKA"
-            )
-
+            st.markdown("##### 🔎 Review TKA")
             st.caption(
-                f"{config.get('jenjang')} • "
-                f"{config.get('mapel')} • "
-                f"{len(questions)} soal • "
-                "Paket latihan portal • "
-                f"Masa aktif {config.get('active_hours', 24)} jam"
+                f"{config.get('jenjang')} • {config.get('mapel')} • {len(questions)} soal • "
+                f"Paket latihan portal • Masa aktif {config.get('active_hours', 24)} jam"
             )
 
-            for idx, q in enumerate(
-                questions,
-                1,
-            ):
-
+            for idx, q in enumerate(questions, 1):
                 with st.expander(
-                    f"{idx:02d}. "
-                    f"{q.get('topic','TKA')} • "
-                    f"{q.get('cognitive_level','C4')}",
-                    expanded=(
-                        idx == 1
-                    ),
+                    f"{idx:02d}. {q.get('topic','TKA')} • {q.get('cognitive_level','C4')}",
+                    expanded=(idx == 1),
                 ):
-
-                    qtype = str(
-                        q.get(
-                            "question_type"
-                        )
-                        or "PG"
-                    ).upper()
-
+                    qtype = str(q.get("question_type") or "PG").upper()
                     type_label = {
-                        "PG": (
-                            "Pilihan Ganda"
-                        ),
-                        "MCMA": (
-                            "Pilihan Ganda "
-                            "Kompleks • MCMA"
-                        ),
-                        "KATEGORI": (
-                            "Pilihan Ganda "
-                            "Kompleks • Kategori"
-                        ),
-                    }.get(
-                        qtype,
-                        qtype,
-                    )
+                        "PG": "Pilihan Ganda",
+                        "MCMA": "Pilihan Ganda Kompleks • MCMA",
+                        "KATEGORI": "Pilihan Ganda Kompleks • Kategori",
+                    }.get(qtype, qtype)
 
-                    st.markdown(
-                        f"**Bentuk:** "
-                        f"{type_label}"
-                    )
+                    st.markdown(f"**Bentuk:** {type_label}")
 
-                    if q.get(
-                        "stimulus_text"
-                    ):
-                        st.markdown(
-                            "**Stimulus:**\n\n"
-                            f"{q.get('stimulus_text')}"
-                        )
+                    if q.get("stimulus_text"):
+                        st.markdown(f"**Stimulus:**\n\n{q.get('stimulus_text')}")
 
-                    st.markdown(
-                        q.get(
-                            "question",
-                            "",
-                        )
-                    )
+                    st.markdown(q.get("question", ""))
 
-                    image_id = q.get(
-                        "image_id"
-                    )
-
+                    image_id = q.get("image_id")
                     if image_id:
-
-                        record = get_tka_image(
-                            str(image_id)
-                        )
-
+                        record = get_tka_image(str(image_id))
                         if record:
-
-                            image = (
-                                _image_for_streamlit(
-                                    record.get(
-                                        "image_data"
-                                    )
-                                )
-                            )
-
+                            image = _image_for_streamlit(record.get("image_data"))
                             if image is not None:
                                 st.image(
                                     image,
-                                    caption=(
-                                        "Stimulus • "
-                                        f"{record['filename']}"
-                                    ),
+                                    caption=f"Stimulus • {record['filename']}",
                                     use_container_width=True,
                                 )
 
-                    if qtype in {
-                        "PG",
-                        "MCMA",
-                    }:
-
-                        for option in q.get(
-                            "options",
-                            [],
-                        ):
-                            st.markdown(
-                                f"- {option}"
-                            )
-
-                        st.success(
-                            f"Kunci: "
-                            f"{q.get('correct_answer','-')}"
-                        )
-
+                    if qtype in {"PG", "MCMA"}:
+                        for option in q.get("options", []):
+                            st.markdown(f"- {option}")
+                        st.success(f"Kunci: {q.get('correct_answer','-')}")
                     else:
+                        for pos, category in enumerate(q.get("category_items", []), 1):
+                            st.markdown(f"**{pos}.** {category.get('statement','')}")
+                            st.caption("Respons: " + " / ".join(str(x) for x in (category.get("options") or [])))
+                        st.success("Kunci kategori: " + " | ".join(str(x) for x in (q.get("correct_answers") or [])))
 
-                        for pos, category in enumerate(
-                            q.get(
-                                "category_items",
-                                [],
-                            ),
-                            1,
-                        ):
+                    st.caption(f"Level: {q.get('cognitive_level','-')} • Topik: {q.get('topic','-')}")
 
-                            st.markdown(
-                                f"**{pos}.** "
-                                f"{category.get('statement','')}"
-                            )
-
-                            st.caption(
-                                "Respons: "
-                                + " / ".join(
-                                    str(x)
-                                    for x in (
-                                        category.get(
-                                            "options"
-                                        )
-                                        or []
-                                    )
-                                )
-                            )
-
-                        st.success(
-                            "Kunci kategori: "
-                            + " | ".join(
-                                str(x)
-                                for x in (
-                                    q.get(
-                                        "correct_answers"
-                                    )
-                                    or []
-                                )
-                            )
-                        )
-
-                    st.caption(
-                        f"Level: "
-                        f"{q.get('cognitive_level','-')} "
-                        f"• Topik: "
-                        f"{q.get('topic','-')}"
-                    )
-
-            st.markdown(
-                "##### 📄 Download TKA"
-            )
-
+            st.markdown("##### 📄 Download TKA")
             try:
-
-                docx_bytes = build_tka_docx(
-                    config,
-                    questions,
-                )
-
-                safe_mapel = re.sub(
-                    r"[^A-Za-z0-9_-]+",
-                    "_",
-                    config.get(
-                        "mapel",
-                        "TKA",
-                    ),
-                )
+                docx_bytes = build_tka_docx(config, questions)
+                safe_mapel = re.sub(r"[^A-Za-z0-9_-]+", "_", config.get("mapel", "TKA"))
 
                 st.download_button(
                     "⬇️ DOWNLOAD TKA (.DOCX)",
                     data=docx_bytes,
-                    file_name=(
-                        f"RoboMANTAP_TKA_"
-                        f"{config.get('jenjang','')}_"
-                        f"{safe_mapel}.docx"
-                    ),
-                    mime=(
-                        "application/vnd.openxmlformats-"
-                        "officedocument.wordprocessingml.document"
-                    ),
+                    file_name=f"RoboMANTAP_TKA_{config.get('jenjang','')}_{safe_mapel}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True,
                     key="download_tka_docx",
                     on_click="ignore",
                 )
-
             except Exception as exc:
+                st.error(f"DOCX TKA gagal disiapkan: {exc}")
 
-                st.error(
-                    f"DOCX TKA gagal disiapkan: {exc}"
-                )
-
-            st.markdown(
-                "##### 🚀 Terbitkan TKA"
-            )
+            st.markdown("##### 🚀 Terbitkan TKA")
 
             code_default = st.session_state.get(
                 "tka_default_code",
                 f"TKA-{uuid.uuid4().hex[:6].upper()}",
             )
 
-            code = st.text_input(
-                "Kode / Token TKA",
-                value=code_default,
-                key="tka_publish_code",
-            )
-
+            code = st.text_input("Kode / Token TKA", value=code_default, key="tka_publish_code")
             st.caption(
-                f"Masa aktif ({config.get('active_hours', 24)} Jam) akan otomatis "
-                "dimulai saat Anda menekan tombol Terbitkan TKA."
+                f"Masa aktif ({config.get('active_hours', 24)} Jam) akan otomatis dimulai saat Anda menekan tombol Terbitkan TKA."
             )
 
             if st.button("🚀 TERBITKAN TKA", type="primary", use_container_width=True, key="publish_tka"):
@@ -883,40 +516,15 @@ def render_tka_studio():
                     config["kode_tka"] = clean
                     publish_start = _now_wib()
                     config["active_from"] = publish_start.isoformat()
-                    # Menambahkan jam secara dinamis berdasarkan pilihan guru
                     config["active_until"] = (
                         publish_start + timedelta(hours=config.get("active_hours", 24))
                     ).isoformat()
 
-
-                    if publish_tka_to_db(
-                        clean,
-                        config,
-                        questions,
-                    ):
-
-                        st.session_state[
-                            "tka_last_published"
-                        ] = clean
-
-                        st.success(
-                            f"✅ Kode: {clean} berhasil "
-                            "diterbitkan. Siswa dapat "
-                            "mengerjakannya melalui "
-                            "Portal TKA → By GuruMANTAP."
-                        )
-
+                    if publish_tka_to_db(clean, config, questions):
+                        st.session_state["tka_last_published"] = clean
+                        st.success(f"✅ Kode: {clean} berhasil diterbitkan. Siswa dapat mengerjakannya melalui Portal TKA → By GuruMANTAP.")
                     else:
-
-                        st.error(
-                            "❌ TKA gagal diterbitkan. "
-                            "Pastikan database tersedia "
-                            "dan paket lolos validasi."
-                        )
-
-    # =========================================================
-    # TKA IMAGE LIBRARY
-    # =========================================================
+                        st.error("❌ TKA gagal diterbitkan. Pastikan database tersedia dan paket lolos validasi.")
 
     st.markdown("---")
     st.markdown("##### 🗂️ Library Gambar TKA")
@@ -935,11 +543,7 @@ def render_tka_studio():
                     "Mapel": x.get("mapel") or "-",
                     "Topik": (
                         x.get("topic")
-                        or infer_tka_topic(
-                            x["filename"],
-                            x.get("jenjang"),
-                            x.get("mapel"),
-                        )
+                        or infer_tka_topic(x["filename"], x.get("jenjang"), x.get("mapel"))
                     ),
                 }
                 for x in all_images
@@ -960,24 +564,15 @@ def render_tka_studio():
             "Daftar Gambar",
             page_options,
             key="tka_manage_library_page",
-            format_func=lambda n: (
-                f"Halaman {n} • "
-                f"{min(page_size, len(all_images) - (n-1)*page_size)} gambar"
-            ),
+            format_func=lambda n: f"Halaman {n} • {min(page_size, len(all_images) - (n-1)*page_size)} gambar",
         )
 
         start = (page - 1) * page_size
-        page_images = all_images[start:start + page_size]
+        page_images = all_images[start : start + page_size]
 
-        # ---------------------------------------------------------------
-        # HAPUS MASSAL: checkbox berada di dalam form supaya memilih banyak
-        # gambar tidak memicu rerun setiap kali checkbox diklik.
-        # ---------------------------------------------------------------
         batch_state_key = "tka_batch_delete_pending"
-        batch_pending = st.session_state.get(batch_state_key)
-
         st.markdown("##### ☑️ Pilih Banyak untuk Dihapus")
- 
+
         with st.form("tka_bulk_delete_form", clear_on_submit=False):
             selected_batch_ids = []
             selected_batch_items = {}
@@ -996,10 +591,7 @@ def render_tka_studio():
                     continue
 
                 label = str(record.get("filename") or image_id)
-                if st.checkbox(
-                    label,
-                    key=f"tka_bulk_select_{image_id}",
-                ):
+                if st.checkbox(label, key=f"tka_bulk_select_{image_id}"):
                     selected_batch_ids.append(image_id)
                     selected_batch_items[image_id] = {
                         "image_id": image_id,
@@ -1052,9 +644,7 @@ def render_tka_studio():
                     status = "⛔ TKA masih aktif" if active else "✅ Siap dihapus"
                     st.caption(f"{status} — {filename}")
                     for usage in active:
-                        st.caption(
-                            f"   ↳ {usage.get('kode_tka', '-')} aktif sampai {usage.get('active_until') or '-'}"
-                        )
+                        st.caption(f"   ↳ {usage.get('kode_tka', '-')} aktif sampai {usage.get('active_until') or '-'}")
 
             c1, c2 = st.columns(2)
             with c1:
@@ -1076,28 +666,17 @@ def render_tka_studio():
                         for item in blocked:
                             st.caption(f"• {item.get('message', 'Tidak dapat dihapus.')}")
                             for usage in item.get("usages") or []:
-                                st.caption(
-                                    f"  ↳ {usage.get('kode_tka', '-')} aktif sampai {usage.get('active_until') or '-'}"
-                                )
+                                st.caption(f"  ↳ {usage.get('kode_tka', '-')} aktif sampai {usage.get('active_until') or '-'}")
                     st.rerun(scope="fragment")
 
             with c2:
-                if st.button(
-                    "Batal Pilihan Massal",
-                    key="tka_bulk_cancel_delete",
-                    use_container_width=True,
-                ):
+                if st.button("Batal Pilihan Massal", key="tka_bulk_cancel_delete", use_container_width=True):
                     st.session_state.pop(batch_state_key, None)
                     st.rerun(scope="fragment")
 
-        # Preview hanya SATU gambar jika memang diperlukan. Dengan default False,
-        # klik hapus tidak memaksa Streamlit mengirim ulang puluhan gambar.
-        preview_options = {
-            str(r.get("image_id")): r
-            for r in page_images
-            if r.get("image_id")
-        }
+        preview_options = {str(r.get("image_id")): r for r in page_images if r.get("image_id")}
         preview_ids = list(preview_options.keys())
+
         if preview_ids:
             preview_choice = st.selectbox(
                 "Preview stimulus (opsional)",
@@ -1128,4 +707,3 @@ def render_tka_studio():
 
     else:
         st.info("Library Gambar TKA belum memiliki stimulus.")
-
