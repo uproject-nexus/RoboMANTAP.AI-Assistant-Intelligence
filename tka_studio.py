@@ -942,40 +942,40 @@ def render_tka_studio():
             hide_index=True,
         )
         
-        # Preview 
-        preview_options = {
-            str(r.get("image_id")): r
-            for r in page_images
-            if r.get("image_id")
-        }
-        preview_ids = list(preview_options.keys())
-        if preview_ids:
-            preview_choice = st.selectbox(
-                "Preview stimulus (opsional)",
-                [""] + preview_ids,
-                key="tka_manage_preview_id",
-                format_func=lambda image_id: (
-                    "— Tidak menampilkan preview —"
-                    if not image_id
-                    else str(preview_options[image_id].get("filename") or image_id)
+    # Preview 
+    preview_options = {
+        str(r.get("image_id")): r
+        for r in page_images
+        if r.get("image_id")
+    }
+    preview_ids = list(preview_options.keys())
+    if preview_ids:
+        preview_choice = st.selectbox(
+            "Preview stimulus (opsional)",
+            [""] + preview_ids,
+            key="tka_manage_preview_id",
+            format_func=lambda image_id: (
+                "— Tidak menampilkan preview —"
+                if not image_id
+                else str(preview_options[image_id].get("filename") or image_id)
+            ),
+        )
+        if preview_choice:
+            preview_record = preview_options.get(preview_choice, {})
+            preview = _cached_stimulus_preview(
+                preview_choice,
+                str(
+                    preview_record.get("updated_at")
+                    or preview_record.get("created_at")
+                    or ""
                 ),
             )
-            if preview_choice:
-                preview_record = preview_options.get(preview_choice, {})
-                preview = _cached_stimulus_preview(
-                    preview_choice,
-                    str(
-                        preview_record.get("updated_at")
-                        or preview_record.get("created_at")
-                        or ""
-                    ),
+            if preview is not None:
+                st.image(
+                    preview,
+                    caption=str(preview_record.get("filename") or "Stimulus"),
+                    width=360,
                 )
-                if preview is not None:
-                    st.image(
-                        preview,
-                        caption=str(preview_record.get("filename") or "Stimulus"),
-                        width=360,
-                    )
 
         st.markdown('<p style="font-size: 20px; font-weight: bold; color: #f8fafc;">♻️  Kelola Stimulus''yang telah tersimpan</p>',unsafe_allow_html=True,)
         st.caption("Hapus gambar yang salah atau kurang tepat.")
