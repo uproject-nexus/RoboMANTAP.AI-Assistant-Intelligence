@@ -616,7 +616,7 @@ def render_tka_studio():
         "tka_draft_config",
         {},
     )
-    
+
     <div class="premium-pills">
         <span>SOAL FLEKSIBEL</span>
         <span>PG • MCMA • KATEGORI</span>
@@ -895,7 +895,7 @@ def render_tka_studio():
                         ] = clean
 
                         st.success(
-                            f"✅ Kode: {clean} berhasil "
+                            f"✅ KOde: {clean} berhasil "
                             "diterbitkan. Siswa dapat "
                             "mengerjakannya melalui "
                             "Portal TKA → By GuruMANTAP."
@@ -912,9 +912,14 @@ def render_tka_studio():
     # =========================================================
     # TKA IMAGE LIBRARY
     # =========================================================
+
     st.markdown("---")
-    st.markdown('<p style="font-size: 20px; font-weight: bold; color: #f8fafc;">🗂️ Library'' Gambar TKA</p>',unsafe_allow_html=True,)
-    st.caption("Daftar seluruh sumber gambar soal yang tersedia.")
+    st.markdown(
+        '<p style="font-size: 21px; font-weight: bold; color: #f8fafc;">🗂️ Library'
+        ' Gambar TKA</p>',
+        unsafe_allow_html=True,
+    )
+    st.caption("Daftar seluruh sumber gambar yang tersimpan.")
 
     all_images = _cached_tka_library(200)
 
@@ -941,44 +946,13 @@ def render_tka_studio():
             use_container_width=True,
             hide_index=True,
         )
-        
-    # Preview 
-    preview_options = {
-        str(r.get("image_id")): r
-        for r in page_images
-        if r.get("image_id")
-    }
-    preview_ids = list(preview_options.keys())
-    if preview_ids:
-        preview_choice = st.selectbox(
-            "Preview stimulus (opsional)",
-            [""] + preview_ids,
-            key="tka_manage_preview_id",
-            format_func=lambda image_id: (
-                "— Tidak menampilkan preview —"
-                if not image_id
-                else str(preview_options[image_id].get("filename") or image_id)
-            ),
-        )
-        if preview_choice:
-            preview_record = preview_options.get(preview_choice, {})
-            preview = _cached_stimulus_preview(
-                preview_choice,
-                str(
-                    preview_record.get("updated_at")
-                    or preview_record.get("created_at")
-                    or ""
-                ),
-            )
-            if preview is not None:
-                st.image(
-                    preview,
-                    caption=str(preview_record.get("filename") or "Stimulus"),
-                    width=360,
-                )
 
-        st.markdown('<p style="font-size: 20px; font-weight: bold; color: #f8fafc;">♻️  Kelola Stimulus''yang telah tersimpan</p>',unsafe_allow_html=True,)
-        st.caption("Hapus gambar yang salah atau kurang tepat.")
+        st.markdown(
+            '<p style="font-size: 21px; font-weight: bold; color: #f8fafc;">♻️ Kelola'
+            ' Stimulus yang tersimpan</p>',
+            unsafe_allow_html=True,
+        )
+        st.caption("Hapus gambar/stimulus yang salah.")
 
         current_teacher = teacher_name.strip() or "GuruMANTAP"
 
@@ -1005,7 +979,11 @@ def render_tka_studio():
         batch_state_key = "tka_batch_delete_pending"
         batch_pending = st.session_state.get(batch_state_key)
 
-        st.markdown('<p style="font-size: 20px; font-weight: bold; color: #f8fafc;">☑️ Pilih''untuk menghapus gambar</p>',unsafe_allow_html=True,)
+        st.markdown(
+            '<p style="font-size: 21px; font-weight: bold; color: #f8fafc;">☑️ Pilih'
+            ' untuk menghapus gambar</p>',
+            unsafe_allow_html=True,
+        )
 
         with st.form("tka_bulk_delete_form", clear_on_submit=False):
             selected_batch_ids = []
@@ -1119,5 +1097,189 @@ def render_tka_studio():
                     st.session_state.pop(batch_state_key, None)
                     st.rerun(scope="fragment")
 
-else:
-    st.info("Library Gambar TKA belum memiliki stimulus.")
+        # Preview hanya SATU gambar jika memang diperlukan. Dengan default False,
+        # klik hapus tidak memaksa Streamlit mengirim ulang puluhan gambar.
+        preview_options = {
+            str(r.get("image_id")): r
+            for r in page_images
+            if r.get("image_id")
+        }
+        preview_ids = list(preview_options.keys())
+        if preview_ids:
+            preview_choice = st.selectbox(
+                "Preview stimulus (opsional)",
+                [""] + preview_ids,
+                key="tka_manage_preview_id",
+                format_func=lambda image_id: (
+                    "— Tidak menampilkan preview —"
+                    if not image_id
+                    else str(preview_options[image_id].get("filename") or image_id)
+                ),
+            )
+            if preview_choice:
+                preview_record = preview_options.get(preview_choice, {})
+                preview = _cached_stimulus_preview(
+                    preview_choice,
+                    str(
+                        preview_record.get("updated_at")
+                        or preview_record.get("created_at")
+                        or ""
+                    ),
+                )
+                if preview is not None:
+                    st.image(
+                        preview,
+                        caption=str(preview_record.get("filename") or "Stimulus"),
+                        width=360,
+                    )
+
+        # Tidak ada st.image() di dalam loop daftar. Ini adalah titik penting untuk
+        # performa: satu klik hapus sekarang hanya merender metadata + tombol.
+        for record in page_images:
+            image_id = str(record.get("image_id") or "")
+            filename = str(record.get("filename") or "Stimulus")
+            source_type = str(record.get("source_type") or "GURU").upper()
+            owner_key = str(record.get("owner_key") or "")
+
+            if not image_id:
+                continue
+
+            can_show_delete = (
+                source_type == "SYSTEM"
+                or (
+                    source_type == "GURU"
+                    and owner_key.lower() == current_teacher.lower()
+                )
+            )
+            allow_system_delete = source_type == "SYSTEM"
+
+            with st.container(border=True):
+                col_info, col_action = st.columns(
+                    [7, 1.5],
+                    vertical_alignment="center",
+                )
+
+                with col_info:
+                    st.markdown(f"**{filename}**")
+                    st.caption(
+                        f"{source_type} • {record.get('jenjang') or '-'} • "
+                        f"{record.get('mapel') or '-'}"
+                    )
+                    topic = (
+                        record.get("topic")
+                        or infer_tka_topic(
+                            filename,
+                            record.get("jenjang"),
+                            record.get("mapel"),
+                        )
+                    )
+                    st.caption(f"Topik: {topic}")
+
+                with col_action:
+                    if can_show_delete:
+                        if st.button(
+                            "🗑️ Hapus",
+                            key=f"delete_tka_image_{image_id}",
+                            use_container_width=True,
+                        ):
+                            # Cek penggunaan hanya saat tombol benar-benar ditekan.
+                            # Hasilnya disimpan agar tombol konfirmasi tidak melakukan
+                            # query usage kedua kali.
+                            usages = get_tka_image_usage(image_id)
+                            st.session_state[f"tka_delete_pending_{image_id}"] = {
+                                "usages": usages,
+                                "allow_system": allow_system_delete,
+                                "owner_key": (
+                                    None if allow_system_delete else current_teacher
+                                ),
+                            }
+
+                    elif source_type == "GURU":
+                        st.caption("🔒 Bukan milik Anda")
+
+                pending = st.session_state.get(
+                    f"tka_delete_pending_{image_id}"
+                )
+
+                if pending is not None:
+                    usages = pending.get("usages") or []
+                    now = _now_wib()
+                    active_usages = []
+                    expired_usages = []
+
+                    for usage in usages:
+                        is_active = bool(usage.get("is_active_window", True))
+                        if is_active:
+                            active_usages.append(usage)
+                        else:
+                            expired_usages.append(usage)
+
+                    st.warning(f"⚠️ Konfirmasi penghapusan **{filename}**")
+
+                    if active_usages:
+                        st.error(
+                            "Stimulus masih digunakan oleh TKA yang masa aktifnya "
+                            "belum selesai. Tunggu sampai TKA expired sebelum menghapus."
+                        )
+                        for usage in active_usages:
+                            st.caption(
+                                f"• {usage.get('kode_tka', '-')} • "
+                                f"{usage.get('mapel', '-')} • aktif sampai "
+                                f"{usage.get('active_until') or '-'}"
+                            )
+                    elif expired_usages:
+                        st.info(
+                            "TKA yang pernah memakai stimulus ini sudah expired. "
+                            "Stimulus dapat dikeluarkan dari Library aktif."
+                        )
+                    else:
+                        st.info("Stimulus belum digunakan oleh paket TKA lain.")
+
+                    confirm_col, cancel_col = st.columns(2)
+
+                    with confirm_col:
+                        if st.button(
+                            "✅ Ya, Hapus dari Library",
+                            key=f"confirm_delete_{image_id}",
+                            type="primary",
+                            use_container_width=True,
+                            disabled=bool(active_usages),
+                        ):
+                            deleted, delete_message, delete_usages = delete_tka_image_safe(
+                                image_id=image_id,
+                                owner_key=pending.get("owner_key"),
+                                allow_system=bool(pending.get("allow_system")),
+                                known_usages=usages,
+                            )
+
+                            st.session_state.pop(
+                                f"tka_delete_pending_{image_id}",
+                                None,
+                            )
+                            _cached_tka_library.clear()
+                            _cached_stimulus_preview.clear()
+
+                            if deleted:
+                                st.success(delete_message)
+                            else:
+                                st.error(delete_message)
+                                for usage in delete_usages or []:
+                                    st.caption(
+                                        f"• {usage.get('kode_tka', '-')} • "
+                                        f"aktif sampai {usage.get('active_until') or '-'}"
+                                    )
+
+                    with cancel_col:
+                        if st.button(
+                            "Batal",
+                            key=f"cancel_delete_{image_id}",
+                            use_container_width=True,
+                        ):
+                            st.session_state.pop(
+                                f"tka_delete_pending_{image_id}",
+                                None,
+                            )
+                            st.info("Penghapusan dibatalkan.")
+
+    else:
+        st.info("Library Gambar TKA belum memiliki stimulus.")
