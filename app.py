@@ -2788,7 +2788,7 @@ elif st.session_state.page == "guru_dashboard":
                     border-left: 4px solid #3b82f6;
                     padding: 10px 14px;
                     border-radius: 6px;
-                    font-size: 10px;
+                    font-size: 12px;
                     color: #e2e8f0;
                     margin-bottom: 1rem;
                 ">
