@@ -1119,6 +1119,52 @@ def _normalize_question_type(value: Any) -> str:
     return "PG"
 
 
+def _clean_text_formatting(val: str) -> str:
+    """Membersihkan literal escape sequence, merapikan LaTeX, dan menghilangkan spasi ganda."""
+    if not val:
+        return ""
+    s = str(val)
+
+    # 1. Konversi literal \n atau \\n menjadi newline sungguhan
+    s = s.replace("\\n", "\n").replace("\r\n", "\n")
+
+    # 2. Perbaiki artefak LaTeX garbled buatan AI
+    s = re.sub(r"tte?ₓ?st?([a-zA-Z]+)", r"\\text{\1}", s)
+    s = re.sub(r"\btext\s+([a-zA-Z0-9³²]+)", r"\\text{\1}", s)
+    s = re.sub(r"\bapprox\b", r"\\approx", s)
+
+    # 3. Hilangkan baris kosong berlebih
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip()
+
+
+def _clean_solution_basis(val: str) -> str:
+    """Membersihkan pembahasan dari coretan trial-and-error/self-correction AI."""
+    s = _clean_text_formatting(val)
+    if not s:
+        return ""
+
+    # Hapus frasa revisi internal AI jika terbawa ke pembahasan
+    lines = s.split("\n")
+    cleaned_lines = []
+    for line in lines:
+        l_str = line.strip()
+        if any(
+            l_str.lower().startswith(prefix)
+            for prefix in [
+                "koreksi opsi",
+                "mari periksa kembali",
+                "mari cek ulang",
+                "terdapat ketidaksesuaian",
+                "salah, harusnya",
+            ]
+        ):
+            continue
+        cleaned_lines.append(line)
+
+    return "\n".join(cleaned_lines).strip()
+
+
 def _normalize_stimulus(
     item: dict,
 ) -> tuple[str | None, str | None, str | None, list[Any]]:
@@ -1217,7 +1263,7 @@ BENTUK: PILIHAN GANDA (PG)
 BENTUK: PILIHAN GANDA KOMPLEKS - MCMA
 - Tepat {len(labels)} pilihan tersedia dengan label {', '.join(labels)}.
 - Dua atau lebih jawaban harus benar; jangan hanya satu.
-- correct_answers berisi 2 atau lebih LABEL unik, misalnya ["A", "C"].
+- correct_answers berisi 2 atau lebih LABEL unik dan WAJIB URUT ALFABETIS, misalnya ["A", "C"].
 - correct_answer harus sama dengan correct_answers untuk kompatibilitas.
 """
         schema = f"""
@@ -1254,16 +1300,15 @@ ATURAN KETAT ALOKASI STIMULUS & GAMBAR (WAJIB DITURUTI):
 1. DALAM BATCH {count} SOAL INI, WAJIB MINIMAL 1 HINGGA 2 SOAL BERSTATUS "TEKS POLOS TANPA GAMBAR" (`image_id`: null, `image_ids`: []).
 2. DILARANG KERAS memakai gambar untuk SELURUH {count} soal. Harus ada variasi soal cerita / studi kasus nalar tanpa gambar sama sekali.
 3. Jika soal TIDAK menggunakan gambar (soal teks murni): isi `"image_id": null` dan `"image_ids": []` serta sertakan teks stimulus cerita di `"stimulus_text"`.
-4. Jika soal HANYA menanyakan 1 gambar spesifik (misal "pada Gambar 1"): isi `"image_id": "ID_GAMBAR_1"` dan `"image_ids": [{{"id": "ID_GAMBAR_1", "no": 1}}]`.
-5. Hanya gunakan 2 atau lebih ID gambar pada `"image_ids"` jika soal BENAR-BENAR MEMBANDINGKAN kedua/ketiga gambar tersebut secara bersamaan.
+4. Jika soal HANYA menanyakan 1 gambar spesifik (misal "pada Gambar 1"): isi `"image_id": "ID_GAMBAR_1"` dan `"image_ids": [{{"id": "ID_GAMBAR_1", "no": 1}}].
+5. Hanya gunakan 2 atau lebih ID gambar pada `"image_ids"` jika soal BENAR-BENAR MEMBANDINGKAN kedua/ketiga gambar tersebut secara bersamaan (misal "membandingkan Gambar 1 dan Gambar 2").
 
-STANDAR TINGKAT KESULITAN & HOTS TKA 2026:
-- LEVEL KOGNITIF: Hanya buat soal level C4 (Analisis), C5 (Evaluasi), atau C6 (Solusi/Kreasi). DILARANG KERAS membuat soal C1–C3 (hafalan, definisi, atau sekadar mencari informasi yang tertulis eksplisit).
-- SOAL LITERASI (Teks Polos maupun Gambar): Berbasis Studi Kasus / Dilema Logika / Skenario Nyata. Minta siswa mengevaluasi validitas argumen, menentukan implikasi keputusan, menyimpulkan hipotesis implisit, atau membandingkan perspektif. Jangan pernah menanyakan kalimat yang tertulis eksplisit!
-- SOAL NUMERASI / MATEMATIKA: Wajib berbasis Multi-Step Problem Solving (minimal 2–3 langkah penalaran/hitungan bertahap) atau menganalisis kekeliruan logika/prosedur hitung dari suatu skenario cerita.
-- KONSTRUKSI DISTRAKTOR (PENGECOH): Setiap opsi salah WAJIB dirancang dari miskonsepsi umum siswa (misal: kesalahan mengisolasi variabel, kesalahan logika korelasi semu, atau kesalahan perhitungan bertahap). Hindari opsi pengecoh yang terlalu mudah dieliminasi!
-- BENTUK SOAL PORTAL: Hanya PG, PG Kompleks-MCMA, dan PG Kompleks-Kategori. Jangan buat isian, uraian, atau menjodohkan.
-- FORMAT LATEX: Gunakan $...$ hanya untuk rumus, pecahan, akar, atau variabel matematika. Jangan menaruh teks bahasa sehari-hari di dalam delimiter matematika.
+STANDAR TINGKAT KESULITAN, HOTS & PEMBAHASAN TKA 2026:
+- LEVEL KOGNITIF: Hanya buat soal level C4 (Analisis), C5 (Evaluasi), atau C6 (Solusi/Kreasi). DILARANG KERAS membuat soal C1–C3 (hafalan, definisi, atau sekadar mencari informasi eksplisit).
+- PEMBAHASAN BERSIH (`solution_basis`): WAJIB berupa langkah penyelesaian final yang bersih, lugas, dan terstruktur. DILARANG KERAS mencantumkan proses trial-and-error, koreksi diri, atau kalimat seperti "Mari periksa kembali", "Koreksi opsi", "salah/salah lagi", atau "terdapat ketidaksesuaian".
+- KONSISTENSI KUNCI JAWABAN: Kunci jawaban (`correct_answer` / `correct_answers`) WAJIB SANGAT KONSISTEN dengan hasil perhitungan di `solution_basis`.
+- SOAL LITERASI & NUMERASI: Wajib berbasis studi kasus nyata / multi-step problem solving.
+- FORMAT LATEX: Gunakan $...$ hanya untuk rumus, pecahan, akar, atau variabel matematika. Jangan gunakan kata 'text' atau 'ttekst' secara tidak sah.
 - Setiap butir wajib memiliki topic, cognitive_level, dan solution_basis yang mendalam.
 
 {type_rules}
@@ -1346,47 +1391,46 @@ def _normalize_tka_questions(
         return []
 
     out = []
-    default_image_ids = [str(x) for x in (default_image_ids or []) if x]
+    default_image_ids = [str(x) for x in (default_image_ids or []) if str(x).strip()]
     id_to_no = {img_id: i + 1 for i, img_id in enumerate(default_image_ids)}
 
     for idx, item in enumerate(raw_questions, 1):
         if not isinstance(item, dict):
             continue
 
-        question = str(item.get("question", "")).strip()
+        question = _clean_text_formatting(item.get("question", ""))
         if not question:
             continue
 
         qtype = _normalize_question_type(item.get("question_type") or item.get("type"))
         stimulus_text, stimulus_group, single_image_id, raw_candidates = _normalize_stimulus(item)
 
-        extracted_items: list[dict] = []
-
-        for cand in raw_candidates:
-            c_id = cand.get("id") if isinstance(cand, dict) else str(cand).strip()
-            if not c_id or c_id.lower() in {"null", "none", "tidak ada", "false", ""}:
-                continue
-            if c_id in id_to_no and not any(x["id"] == c_id for x in extracted_items):
-                extracted_items.append({"id": c_id, "no": id_to_no[c_id]})
+        if stimulus_text:
+            stimulus_text = _clean_text_formatting(stimulus_text)
+            # Deduplikasi jika stimulus_text sudah tercantum di awal question
+            if stimulus_text.lower() in question.lower() or question.lower().startswith(stimulus_text.lower()):
+                stimulus_text = None
 
         combo_text = f"{question} {stimulus_text or ''}".lower()
 
-        is_multi_comparison = any(kw in combo_text for kw in [
-            "kedua", "membandingkan", "comparing", "both", "persamaan", "perbedaan",
+        # Determiniasi Gambar Presisi
+        extracted_items: list[dict] = []
+
+        has_g1 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*1\b", combo_text))
+        has_g2 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*2\b", combo_text))
+        has_g3 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*3\b", combo_text))
+
+        has_multi_explicit = any(kw in combo_text for kw in [
+            "kedua gambar", "ketiga gambar", "semua gambar", "membandingkan gambar",
             "gambar 1 dan 2", "gambar 1 & 2", "gambar 1 dan 3", "gambar 1 & 3",
-            "infografis 1 dan 2", "infografis 1 dan 3", "infografis 1 & 3"
+            "gambar 2 dan 3", "gambar 2 & 3", "infografis 1 dan 2", "infografis 1 dan 3"
         ])
 
         if default_image_ids:
-            if is_multi_comparison:
+            if has_multi_explicit:
                 for did in default_image_ids:
-                    if not any(x["id"] == did for x in extracted_items):
-                        extracted_items.append({"id": did, "no": id_to_no[did]})
+                    extracted_items.append({"id": did, "no": id_to_no[did]})
             else:
-                has_g1 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*1\b", combo_text))
-                has_g2 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*2\b", combo_text))
-                has_g3 = bool(re.search(r"\b(gambar|infografis|infographic|stimulus)\s*3\b", combo_text))
-
                 single_matches = []
                 if has_g1 and len(default_image_ids) >= 1:
                     single_matches.append({"id": default_image_ids[0], "no": 1})
@@ -1398,12 +1442,21 @@ def _normalize_tka_questions(
                 if single_matches:
                     extracted_items = single_matches
 
-        image_id = extracted_items[0]["id"] if extracted_items else None
-        image_ids_list = extracted_items
+        # Fallback jika tidak ada deteksi teks tapi AI mengirim candidates
+        if not extracted_items and raw_candidates:
+            for cand in raw_candidates:
+                c_id = cand.get("id") if isinstance(cand, dict) else str(cand).strip()
+                if not c_id or c_id.lower() in {"null", "none", "tidak ada", "false", ""}:
+                    continue
+                if c_id in id_to_no and not any(x["id"] == c_id for x in extracted_items):
+                    extracted_items.append({"id": c_id, "no": id_to_no[c_id]})
 
-        topic = str(item.get("topic") or "").strip()[:120]
+        image_id = extracted_items[0]["id"] if extracted_items else None
+        image_ids_list = extracted_items if extracted_items else []
+
+        topic = _clean_text_formatting(str(item.get("topic") or ""))[:120]
         cognitive = str(item.get("cognitive_level") or "C4").strip()[:10].upper()
-        solution = str(item.get("solution_basis") or "").strip()
+        solution = _clean_solution_basis(str(item.get("solution_basis") or ""))
         if not topic or not solution:
             continue
 
@@ -1460,6 +1513,10 @@ def _normalize_tka_questions(
                 continue
             if qtype == "MCMA" and len(set(answers)) < 2:
                 continue
+
+            # Urutkan kunci MCMA secara alfabetis
+            answers = sorted(list(set(answers))) if qtype == "MCMA" else answers
+
             base["options"] = options
             base["correct_answers"] = answers
             base["correct_answer"] = answers[0] if qtype == "PG" else answers
@@ -1475,7 +1532,7 @@ def _normalize_tka_questions(
                 if not isinstance(cat, dict):
                     invalid_item = True
                     break
-                statement = str(cat.get("statement") or "").strip()
+                statement = _clean_text_formatting(cat.get("statement") or "")
                 choices = cat.get("options")
                 correct_response = str(cat.get("correct_response") or cat.get("correct_answer") or "").strip()
                 if not statement or not isinstance(choices, list):
