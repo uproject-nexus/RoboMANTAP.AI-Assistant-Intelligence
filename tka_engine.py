@@ -1254,7 +1254,7 @@ ATURAN KETAT ALOKASI STIMULUS & GAMBAR (WAJIB DITURUTI):
 1. DALAM BATCH {count} SOAL INI, WAJIB MINIMAL 1 HINGGA 2 SOAL BERSTATUS "TEKS POLOS TANPA GAMBAR" (`image_id`: null, `image_ids`: []).
 2. DILARANG KERAS memakai gambar untuk SELURUH {count} soal. Harus ada variasi soal cerita / studi kasus nalar tanpa gambar sama sekali.
 3. Jika soal TIDAK menggunakan gambar (soal teks murni): isi `"image_id": null` dan `"image_ids": []` serta sertakan teks stimulus cerita di `"stimulus_text"`.
-4. Jika soal HANYA menanyakan 1 gambar spesifik (misal "pada Gambar 1"): isi `"image_id": "ID_GAMBAR_1"` dan `"image_ids": [{"id": "ID_GAMBAR_1", "no": 1}]`.
+4. Jika soal HANYA menanyakan 1 gambar spesifik (misal "pada Gambar 1"): isi `"image_id": "ID_GAMBAR_1"` dan `"image_ids": [{{"id": "ID_GAMBAR_1", "no": 1}}]`.
 5. Hanya gunakan 2 atau lebih ID gambar pada `"image_ids"` jika soal BENAR-BENAR MEMBANDINGKAN kedua/ketiga gambar tersebut secara bersamaan.
 
 STANDAR TINGKAT KESULITAN & HOTS TKA 2026:
