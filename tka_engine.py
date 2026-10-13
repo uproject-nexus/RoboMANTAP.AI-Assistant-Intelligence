@@ -1492,7 +1492,6 @@ def generate_tka_questions_batch(
     normalized_type = _normalize_question_type(question_type)
     labels = tka_option_labels(normalized_jenjang)
 
-    # MEMANGGIL DARI PUSTAKA PROMPT BARU
     prompt_str = build_tka_prompt(
         jenjang=normalized_jenjang,
         mapel=tka_mapel_name(mapel),
@@ -1724,6 +1723,26 @@ def generate_tka_studio(
     return all_questions
 
 
+def generate_tka_30(
+    *,
+    jenjang: str,
+    mapel: str,
+    mapel_type: str = "Wajib",
+    image_ids: list[str] | None = None,
+    auto_select_images: bool = True,
+) -> list[dict]:
+    """Fungsi kompatibilitas untuk generate paket soal TKA (default 15/30 soal)."""
+    return generate_tka_studio(
+        jenjang=jenjang,
+        mapel=mapel,
+        mapel_type=mapel_type,
+        image_ids=image_ids,
+        auto_select_images=auto_select_images,
+        count=TKA_TOTAL_QUESTIONS,
+        path_type="GURU",
+    )
+
+
 def generate_tka_mandiri_siswa(
     *,
     jenjang: str,
@@ -1854,6 +1873,14 @@ def validate_tka_questions(
         True,
         f"OK • PG {counts['PG']} • MCMA {counts['MCMA']} • Kategori {counts['KATEGORI']}",
     )
+
+
+def validate_tka_30(
+    questions: list[dict],
+    jenjang: str,
+) -> tuple[bool, str]:
+    """Fungsi kompatibilitas untuk validasi paket TKA (default 15/30 soal)."""
+    return validate_tka_questions(questions, jenjang, TKA_TOTAL_QUESTIONS)
 
 
 def publish_tka_to_db(
