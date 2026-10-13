@@ -3033,7 +3033,7 @@ elif st.session_state.page == "guru_dashboard":
         auto1, auto2, auto3 = st.tabs(["📄 LKPD Studio", "📊 Media Ajar PPT", "📦 Paket Pembelajaran"])
 
         with auto1:
-            st.markdown("#### 📄 LKPD Studio")
+            st.markdown("##### 📄 LKPD Studio")
             st.caption("LKPD generatif premium yang sesuai dengan Material Hub.")
             with st.form("lkpd_generation_form", clear_on_submit=False):
                 lk_source_col, lk_code_col = st.columns([1.4, 1])
@@ -3079,7 +3079,7 @@ elif st.session_state.page == "guru_dashboard":
                 )
 
         with auto2:
-            st.markdown("#### 📊 Media Ajar Studio")
+            st.markdown("##### 📊 Media Ajar Studio")
             st.caption("Storyboard → visual shape → speaker notes → Siap presentasi!")
             with st.form("media_generation_form", clear_on_submit=False):
                 media_source_col, media_info_col = st.columns([1.5, 1])
@@ -3150,7 +3150,7 @@ elif st.session_state.page == "guru_dashboard":
                 )
 
         with auto3:
-            st.markdown("#### 📦 Paket Pembelajaran Terintegrasi")
+            st.markdown("##### 📦 Paket Pembelajaran Terintegrasi")
             st.caption("Gunakan satu topik / satu File Drop untuk menghasilkan LKPD PDF dan Media Ajar PPT dalam satu alur kerja.")
             with st.form("package_generation_form", clear_on_submit=False):
                 package_topic = st.text_input("Topik Paket", placeholder="Contoh: Fungsi Kuadrat", key="package_topic")
