@@ -596,14 +596,14 @@ def render_tka_studio():
             )
 
             st.success(
-                f"✅ {jumlah_soal_pilihan} soal berhasil dibuat "
+                f"✅ {TKA_GENERATION_QUESTIONS} soal berhasil dibuat "
                 "dan siap direview."
             )
 
         else:
 
             st.error(
-                f"❌ AI belum menghasilkan tepat {jumlah_soal_pilihan} soal. Paket tidak disimpan agar "
+                f"❌ AI belum menghasilkan tepat {TKA_GENERATION_QUESTIONS} soal. Paket tidak disimpan agar "
                 "tidak ada TKA parsial."
             )
 
@@ -616,13 +616,10 @@ def render_tka_studio():
         "tka_draft_config",
         {},
     )
-
-    <div class="premium-pills">
-        <span>SOAL FLEKSIBEL</span>
-        <span>PG • MCMA • KATEGORI</span>
-        <span>📜 STANDAR JUKNIS TKA 2026</span>
-        <span>MASA AKTIF CUSTOM</span>
-    </div>
+    
+    st.info(
+        " TKA Studio diprogram dan dikembangkan sesuai dengan Juknis TKA 2026."
+    )
 
     if questions:
 
@@ -650,7 +647,7 @@ def render_tka_studio():
                 f"{config.get('mapel')} • "
                 f"{len(questions)} soal • "
                 "Paket latihan portal • "
-                f"Masa aktif {config.get('active_hours', 24)} jam"
+                "Masa aktif 24 jam"
             )
 
             for idx, q in enumerate(
@@ -895,7 +892,7 @@ def render_tka_studio():
                         ] = clean
 
                         st.success(
-                            f"✅ KOde: {clean} berhasil "
+                            f"✅ TKA {clean} berhasil "
                             "diterbitkan. Siswa dapat "
                             "mengerjakannya melalui "
                             "Portal TKA → By GuruMANTAP."
@@ -914,12 +911,8 @@ def render_tka_studio():
     # =========================================================
 
     st.markdown("---")
-    st.markdown(
-        '<p style="font-size: 21px; font-weight: bold; color: #f8fafc;">🗂️ Library'
-        ' Gambar TKA</p>',
-        unsafe_allow_html=True,
-    )
-    st.caption("Daftar seluruh sumber gambar yang tersimpan.")
+    st.markdown("### 🗂️ Library Gambar TKA")
+    st.caption("Kelola stimulus dengan filter metadata yang ringan.")
 
     all_images = _cached_tka_library(200)
 
@@ -947,16 +940,12 @@ def render_tka_studio():
             hide_index=True,
         )
 
-        st.markdown(
-            '<p style="font-size: 21px; font-weight: bold; color: #f8fafc;">♻️ Kelola'
-            ' Stimulus yang tersimpan</p>',
-            unsafe_allow_html=True,
-        )
-        st.caption("Hapus gambar/stimulus yang salah.")
+        st.markdown("#### 🗑️ Kelola Stimulus")
+        st.caption("Kelola Stimulus sesuai dengan kebutuhan.")
 
         current_teacher = teacher_name.strip() or "GuruMANTAP"
 
-        page_size = 15
+        page_size = 50
         page_count = max(1, (len(all_images) + page_size - 1) // page_size)
         page_options = list(range(1, page_count + 1))
         page = st.selectbox(
@@ -979,10 +968,9 @@ def render_tka_studio():
         batch_state_key = "tka_batch_delete_pending"
         batch_pending = st.session_state.get(batch_state_key)
 
-        st.markdown(
-            '<p style="font-size: 21px; font-weight: bold; color: #f8fafc;">☑️ Pilih'
-            ' untuk menghapus gambar</p>',
-            unsafe_allow_html=True,
+        st.markdown("##### ☑️ Pilih Banyak untuk Dihapus")
+        st.caption(
+            "Centang beberapa stimulus lalu klik 'Periksa & Siapkan Penghapusan'. "
         )
 
         with st.form("tka_bulk_delete_form", clear_on_submit=False):
@@ -1283,3 +1271,4 @@ def render_tka_studio():
 
     else:
         st.info("Library Gambar TKA belum memiliki stimulus.")
+
