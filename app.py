@@ -102,9 +102,37 @@ if "review_session" in st.query_params:
 
 st.set_page_config(
     page_title="RoboMANTAP-Intelligence",
-    page_icon="nexus_logo.png",
+    page_icon="logo.png",
     layout="wide",
     initial_sidebar_state="auto"
+)
+
+LOGO_PUBLIC_URL = "https://raw.githubusercontent.com/uproject-nexus/RoboMANTAP.AI-Assistant-Intelligence/main/logo.png"
+
+# Script untuk menyuntikkan icon layar utama ke head induk Streamlit
+components.html(
+    f"""
+    <script>
+        const head = window.parent.document.getElementsByTagName('head')[0];
+        
+        // Update Apple Touch Icon (Dipakai iOS & Android PWA Shortcut)
+        let appleIcon = window.parent.document.querySelector("link[rel='apple-touch-icon']");
+        if (!appleIcon) {{
+            appleIcon = window.parent.document.createElement('link');
+            appleIcon.rel = 'apple-touch-icon';
+            head.appendChild(appleIcon);
+        }}
+        appleIcon.href = '{LOGO_PUBLIC_URL}';
+
+        // Update Shortcut Icon
+        let icon = window.parent.document.querySelector("link[rel='icon']");
+        if (icon) {{
+            icon.href = '{LOGO_PUBLIC_URL}';
+        }}
+    </script>
+    """,
+    height=0,
+    width=0
 )
 
 # -----------------------------------------------------------------------------
