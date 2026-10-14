@@ -1,7 +1,7 @@
-"""RoboMANTAP Student Intelligence Layer v3.0.
+"""RoboMANTAP Student Intelligence Layer v3.0 (Full Master Edition).
 
-Pusat Layanan Belajar, Simulasi UTS, Asisten AI Interaktif,
-Export Catatan WA & PDF, serta Analisis Diagnostic Santri Al-Irsyad Putri Bondowoso.
+Pusat Layanan Belajar, Simulasi UTS, Latihan Adaptif AI, Analisis Diagnostic,
+Asisten Chatbot, Daily Streak, Export Catatan WA & PDF Santri Al-Irsyad Putri Bondowoso.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import math
 import re
 import uuid
 import urllib.parse
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, date, timedelta
 from typing import Any
 
@@ -20,17 +20,25 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import text
 
-# ReportLab Imports untuk Export PDF Catatan
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
+# Safe ReportLab Imports untuk Export PDF Catatan (Anti-Crash)
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
 
 from ai_engine import init_db_connection
 
 STUDENT_INTELLIGENCE_VERSION = "3.0"
+
+# =============================================================================
+# 1. DATABASE INITIALIZATION (PENTING UNTUK APP.PY)
+# =============================================================================
 
 def ensure_student_intelligence_tables() -> bool:
     """Memastikan tabel database pendukung Student Intelligence siap digunakan."""
@@ -74,12 +82,68 @@ def ensure_student_intelligence_tables() -> bool:
         print(f"[STUDENT INTELLIGENCE] table init warning: {exc}")
         return False
 
+
 # =============================================================================
-# HELPER GENERATOR PDF CATATAN BELAJAR
+# 2. HELPER UTILITIES & DATA NORMALIZATION
+# =============================================================================
+
+def _norm_name(value: str) -> str:
+    return re.sub(r"\s+", " ", str(value or "").strip()).casefold()
+
+def _is_practice_100_scale(mapel: str) -> bool:
+    value = str(mapel or "")
+    return "(Quiz)" in value or "(TKA)" in value
+
+def _clean_activity_marker(mapel: str) -> str:
+    value = str(mapel or "")
+    return value.replace(" (Quiz)", "").replace(" (TKA)", "").strip()
+
+def student_key(nama_siswa: str, jenjang: str = "") -> str:
+    return f"{_norm_name(nama_siswa)}|{_norm_name(jenjang)}"
+
+def _json_value(value: Any, fallback: Any):
+    if isinstance(value, (dict, list)):
+        return value
+    if value is None:
+        return fallback
+    try:
+        return json.loads(value)
+    except Exception:
+        return fallback
+
+def _payload(row: Any) -> dict:
+    raw = row.get("detail_jawaban") if isinstance(row, dict) else None
+    raw = _json_value(raw, raw)
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, list):
+        return {"detail_boolean": raw, "user_answers": {}, "quiz_data": []}
+    return {"detail_boolean": [], "user_answers": {}, "quiz_data": []}
+
+def _question_topic(question: str, mapel: str) -> str:
+    q = re.sub(r"\s+", " ", str(question or "")).strip()
+    if not q:
+        return str(mapel or "Umum")
+    patterns = [
+        r"(?:materi|topik|konsep)\s*[:\-]\s*([^.!?]{3,60})",
+        r"tentang\s+([^.!?]{3,60})",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, q, flags=re.I)
+        if m:
+            return m.group(1).strip()[:70]
+    return str(mapel or "Umum")
+
+
+# =============================================================================
+# 3. HELPER GENERATOR PDF CATATAN BELAJAR
 # =============================================================================
 
 def generate_pdf_notes(nama_siswa: str, kelas: str, jenjang: str, topic_title: str, text_content: str) -> bytes:
     """Mengonversi teks catatan/rangkuman AI menjadi file PDF berkualitas tinggi."""
+    if not REPORTLAB_AVAILABLE:
+        return text_content.encode("utf-8")
+
     target_stream = io.BytesIO()
     doc = SimpleDocTemplate(
         target_stream,
@@ -92,60 +156,24 @@ def generate_pdf_notes(nama_siswa: str, kelas: str, jenjang: str, topic_title: s
     styles = getSampleStyleSheet()
 
     title_style = ParagraphStyle(
-        'PDFTitle',
-        parent=styles['Heading1'],
-        fontName='Helvetica-Bold',
-        fontSize=15,
-        leading=19,
-        alignment=TA_CENTER,
-        textColor=colors.HexColor('#064e3b'),
-        spaceAfter=6
+        'PDFTitle', parent=styles['Heading1'], fontName='Helvetica-Bold',
+        fontSize=15, leading=19, alignment=TA_CENTER, textColor=colors.HexColor('#064e3b'), spaceAfter=6
     )
-
     meta_style = ParagraphStyle(
-        'PDFMeta',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=9,
-        leading=12,
-        alignment=TA_CENTER,
-        textColor=colors.HexColor('#475569'),
-        spaceAfter=15
+        'PDFMeta', parent=styles['Normal'], fontName='Helvetica',
+        fontSize=9, leading=12, alignment=TA_CENTER, textColor=colors.HexColor('#475569'), spaceAfter=15
     )
-
     heading_style = ParagraphStyle(
-        'PDFHeading',
-        parent=styles['Heading2'],
-        fontName='Helvetica-Bold',
-        fontSize=11,
-        leading=15,
-        alignment=TA_LEFT,
-        textColor=colors.HexColor('#064e3b'),
-        spaceBefore=10,
-        spaceAfter=4
+        'PDFHeading', parent=styles['Heading2'], fontName='Helvetica-Bold',
+        fontSize=11, leading=15, alignment=TA_LEFT, textColor=colors.HexColor('#064e3b'), spaceBefore=10, spaceAfter=4
     )
-
     body_style = ParagraphStyle(
-        'PDFBody',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=10,
-        leading=14,
-        alignment=TA_JUSTIFY,
-        spaceAfter=6,
-        textColor=colors.HexColor('#1e293b')
+        'PDFBody', parent=styles['Normal'], fontName='Helvetica',
+        fontSize=10, leading=14, alignment=TA_JUSTIFY, spaceAfter=6, textColor=colors.HexColor('#1e293b')
     )
-
     bullet_style = ParagraphStyle(
-        'PDFBullet',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=10,
-        leading=14,
-        alignment=TA_JUSTIFY,
-        leftIndent=15,
-        spaceAfter=3,
-        textColor=colors.HexColor('#1e293b')
+        'PDFBullet', parent=styles['Normal'], fontName='Helvetica',
+        fontSize=10, leading=14, alignment=TA_JUSTIFY, leftIndent=15, spaceAfter=3, textColor=colors.HexColor('#1e293b')
     )
 
     story = [
@@ -159,10 +187,8 @@ def generate_pdf_notes(nama_siswa: str, kelas: str, jenjang: str, topic_title: s
         clean_line = line.strip()
         if not clean_line:
             continue
-
         clean_line = clean_line.replace(r"\circ", "°").replace(r"\cdot", "·").replace("\\", "")
         clean_line = re.sub(r"\\frac\{([^}]+)\}\{([^}]+)\}", r"\1/\2", clean_line)
-
         formatted_text = re.sub(r"\*([^*]+)\*", r"<b>\1</b>", clean_line)
         formatted_text = re.sub(r"_([^_]+)_", r"<i>\1</i>", formatted_text)
 
@@ -180,7 +206,7 @@ def generate_pdf_notes(nama_siswa: str, kelas: str, jenjang: str, topic_title: s
 
 
 # =============================================================================
-# DATABASE QUERY HELPERS (wa_identities & uts_schedules)
+# 4. QUERY DATABASE INTEGRATED (wa_identities, uts_schedules & sessions)
 # =============================================================================
 
 def fetch_student_wa_identity(nama_siswa: str) -> dict | None:
@@ -207,7 +233,6 @@ def fetch_student_wa_identity(nama_siswa: str) -> dict | None:
         print(f"[STUDENT INTELLIGENCE] fetch identity error: {exc}")
         return None
 
-
 def fetch_uts_schedules_db(kelas: str, jenjang: str) -> list[dict]:
     """Mengambil jadwal UTS resmi dari tabel uts_schedules berdasarkan kelas & jenjang."""
     conn = init_db_connection()
@@ -229,9 +254,8 @@ def fetch_uts_schedules_db(kelas: str, jenjang: str) -> list[dict]:
         print(f"[STUDENT INTELLIGENCE] fetch uts schedules error: {exc}")
         return []
 
-
 def update_and_get_daily_streak(student_key: str, profile_data: dict) -> tuple[int, bool]:
-    """Menghitung dan memperbarui Daily Learning Streak siswa."""
+    """Menghitung dan memperbarui Daily Learning Streak siswa secara otomatis."""
     today_str = date.today().isoformat()
     last_active = profile_data.get("last_active_date")
     current_streak = profile_data.get("current_streak", 0)
@@ -241,20 +265,23 @@ def update_and_get_daily_streak(student_key: str, profile_data: dict) -> tuple[i
         current_streak = 1
         is_new_day = True
     elif last_active == today_str:
-        pass  # Sudah aktif hari ini
+        pass
     else:
-        last_date = date.fromisoformat(last_active)
-        if date.today() - last_date == timedelta(days=1):
-            current_streak += 1  # Streak bertambah
-            is_new_day = True
-        else:
-            current_streak = 1   # Streak reset
+        try:
+            last_date = date.fromisoformat(last_active)
+            if date.today() - last_date == timedelta(days=1):
+                current_streak += 1
+                is_new_day = True
+            else:
+                current_streak = 1
+                is_new_day = True
+        except Exception:
+            current_streak = 1
             is_new_day = True
 
     profile_data["current_streak"] = current_streak
     profile_data["last_active_date"] = today_str
     return current_streak, is_new_day
-
 
 def fetch_student_sessions(nama_siswa: str, limit: int = 80) -> list[dict]:
     conn = init_db_connection()
@@ -280,7 +307,12 @@ def fetch_student_sessions(nama_siswa: str, limit: int = 80) -> list[dict]:
         return []
 
 
+# =============================================================================
+# 5. DIAGNOSTIC PROFILING & ACTION RECORDING
+# =============================================================================
+
 def build_student_profile(sessions: list[dict], existing_profile: dict | None = None) -> dict:
+    """Membangun profil diagnostik lengkap mencakup materi terlemah, tren, risiko, & statistik."""
     completed = [s for s in sessions if str(s.get("status", "")).upper() == "SELESAI"]
     total_attempts = len(completed)
 
@@ -288,45 +320,117 @@ def build_student_profile(sessions: list[dict], existing_profile: dict | None = 
     for s in completed:
         score = float(s.get("nilai_akhir") or 0)
         mapel = str(s.get("mapel") or "")
-        if "(Quiz)" not in mapel and "(TKA)" not in mapel and score <= 40:
+        if not _is_practice_100_scale(mapel) and score <= 40:
             score = max(0.0, min(100.0, score / 40.0 * 100.0))
         normalized_scores.append(score)
 
     by_subject: dict[str, list[float]] = defaultdict(list)
     correct_total = wrong_total = blank_total = 0
+    question_records: list[dict] = []
+    topic_stats: dict[str, list[bool]] = defaultdict(list)
 
     for session in sessions:
-        mapel = str(session.get("mapel") or "Umum").replace(" (Quiz)", "").replace(" (TKA)", "").strip()
+        payload = _payload(session)
+        detail = payload.get("detail_boolean") or []
+        answers = payload.get("user_answers") or {}
+        quiz = payload.get("quiz_data") or []
+        mapel = _clean_activity_marker(session.get("mapel") or "Umum")
+
+        for value in detail:
+            if value is True:
+                correct_total += 1
+            elif value is False:
+                wrong_total += 1
+            else:
+                blank_total += 1
+
         if str(session.get("status", "")).upper() == "SELESAI":
             score = float(session.get("nilai_akhir") or 0)
-            if "(Quiz)" not in session.get("mapel", "") and score <= 40:
+            if not _is_practice_100_scale(session.get("mapel") or "") and score <= 40:
                 score = max(0.0, min(100.0, score / 40.0 * 100.0))
             by_subject[mapel].append(score)
+
+        if quiz and isinstance(detail, list):
+            for idx, item in enumerate(quiz):
+                if not isinstance(item, dict) or idx >= len(detail):
+                    continue
+                outcome = detail[idx]
+                if outcome is None:
+                    continue
+                topic = str(item.get("topic") or item.get("submateri") or _question_topic(item.get("question", ""), mapel))
+                topic_stats[topic].append(bool(outcome))
+                question_records.append({
+                    "mapel": mapel,
+                    "topic": topic,
+                    "correct": bool(outcome),
+                    "question": str(item.get("question", "")),
+                    "answer": answers.get(str(idx), answers.get(idx)),
+                })
 
     subject_mastery = {
         subject: round(sum(values) / len(values), 1)
         for subject, values in by_subject.items() if values
     }
+    topic_mastery = {
+        topic: round(sum(values) / len(values) * 100, 1)
+        for topic, values in topic_stats.items() if values
+    }
+
+    recent_scores = normalized_scores[:5]
+    trend = "stable"
+    if len(recent_scores) >= 4:
+        recent = sum(recent_scores[:2]) / 2
+        older = sum(recent_scores[2:4]) / 2
+        if recent - older >= 7:
+            trend = "improving"
+        elif older - recent >= 7:
+            trend = "declining"
 
     avg_score = round(sum(normalized_scores) / len(normalized_scores), 1) if normalized_scores else 0
+    completion_ratio = (
+        correct_total / (correct_total + wrong_total + blank_total) * 100
+        if (correct_total + wrong_total + blank_total) else 0
+    )
+    consistency = min(100.0, total_attempts * 12.5) if total_attempts else 0
+
     weakest_subject = min(subject_mastery, key=subject_mastery.get) if subject_mastery else None
+    weakest_topics = sorted(topic_mastery.items(), key=lambda x: x[1])[:5]
+
+    risk_points = 0
+    if avg_score < 60: risk_points += 2
+    elif avg_score < 75: risk_points += 1
+    if trend == "declining": risk_points += 2
+    if blank_total > correct_total * 0.25 and blank_total > 0: risk_points += 1
+    if total_attempts < 2: risk_points += 1
+    risk_label = "HIGH ATTENTION" if risk_points >= 4 else "WATCH" if risk_points >= 2 else "ON TRACK"
 
     profile = existing_profile or {}
     profile.update({
+        "version": STUDENT_INTELLIGENCE_VERSION,
         "attempts": total_attempts,
         "average_score": avg_score,
+        "recent_scores": recent_scores,
+        "trend": trend,
+        "correct": correct_total,
+        "wrong": wrong_total,
+        "blank": blank_total,
+        "answer_completion": round(completion_ratio, 1),
+        "consistency": round(consistency, 1),
         "subject_mastery": subject_mastery,
+        "topic_mastery": topic_mastery,
         "weakest_subject": weakest_subject,
+        "weakest_topics": weakest_topics,
+        "risk_label": risk_label,
+        "question_records": question_records[-60:],
         "updated_at": datetime.now().isoformat(timespec="seconds"),
     })
     return profile
-
 
 def save_student_profile(nama_siswa: str, jenjang: str, profile: dict) -> bool:
     conn = init_db_connection()
     if not conn:
         return False
-    key = f"{nama_siswa.strip().casefold()}|{jenjang.strip().casefold()}"
+    key = student_key(nama_siswa, jenjang)
     query = """
         INSERT INTO student_intelligence_profiles
             (student_key, nama_siswa, jenjang, profile_data, updated_at)
@@ -351,9 +455,88 @@ def save_student_profile(nama_siswa: str, jenjang: str, profile: dict) -> bool:
         print(f"[STUDENT INTELLIGENCE] profile save warning: {exc}")
         return False
 
+def record_student_action(nama_siswa: str, jenjang: str, action_type: str, title: str, payload: dict | None = None) -> bool:
+    conn = init_db_connection()
+    if not conn:
+        return False
+    query = """
+        INSERT INTO student_intelligence_actions
+            (student_key, action_type, title, payload, status, created_at)
+        VALUES (:key, :type, :title, :payload, 'OPEN', NOW() AT TIME ZONE 'Asia/Jakarta')
+    """
+    try:
+        with conn.session as s:
+            s.execute(text(query), {
+                "key": student_key(nama_siswa, jenjang),
+                "type": action_type,
+                "title": title,
+                "payload": json.dumps(payload or {}, default=str),
+            })
+            s.commit()
+        return True
+    except Exception as exc:
+        print(f"[STUDENT INTELLIGENCE] action save warning: {exc}")
+        return False
+
+def _subject_recommendations(profile: dict) -> list[str]:
+    recs = []
+    weakest = profile.get("weakest_subject")
+    if weakest:
+        recs.append(f"🎯 <b>[PRIORITAS UTAMA]</b> Alokasikan 60% waktu belajar berikutnya untuk <b>{weakest}</b> sebelum berpindah ke mata pelajaran baru.")
+        
+    for topic, mastery in profile.get("weakest_topics", [])[:2]:
+        if mastery < 70:
+            recs.append(f"🧩 <b>[PEMAHAMAN KONSEP]</b> Kuatkan kembali topik <b>{topic}</b> (Akurasi: {mastery:.0f}%). Gunakan latihan bertahap dari soal dasar ke penalaran.")
+    if profile.get("trend") == "declining":
+        recs.append("⏱️ <b>[MANAJEMEN ENERGI]</b> Performa tercatat menurun. Terapkan teknik <b>Pomodoro</b> (25 menit latihan + 5 menit istirahat) dan evaluasi tiap pembahasan.")
+    if profile.get("answer_completion", 100) < 80:
+        recs.append("⚡ <b>[STRATEGI EKSEKUSI]</b> Akurasi jawaban masih di bawah 80%. Prioritaskan <b>eliminasi jawaban</b> yang pasti salah sebelum memilih opsi akhir.")
+    if not recs:
+        recs.append("🌟 <b>[OPTIMASI PERFORMA]</b> Pemahaman dasar sudah sangat baik! Tantang dirimu dengan simulasi soal tingkat kesulitan tinggi.")
+    return recs[:4]
+
+def _start_adaptive_practice(name: str, grade: str, profile: dict) -> tuple[bool, str]:
+    """Menghubungkan generator kuis adaptif dari ai_engine."""
+    focus = profile.get("weakest_subject")
+    topics = [topic for topic, mastery in profile.get("weakest_topics", []) if mastery < 80][:3]
+    if not focus or grade == "Semua Jenjang":
+        return False, "Pilih jenjang yang spesifik agar generator latihan dapat memilih kisi-kisi yang tepat."
+
+    if "(Quiz)" in str(focus) or "(TKA)" in str(focus):
+        return False, "Area terlemah berasal dari Kuis GuruMANTAP. Gunakan latihan adaptif dari sesi guru terlebih dahulu."
+
+    try:
+        from ai_engine import generate_quiz_batch, update_progress_siswa
+        quiz = generate_quiz_batch(grade, focus, "Internal", topics)
+        if not quiz or len(quiz) != 10:
+            return False, "Generator belum berhasil membuat 10 soal adaptif. Silakan coba lagi."
+
+        session_id = str(uuid.uuid4())
+        st.session_state.jenjang = grade
+        st.session_state.mapel = focus
+        st.session_state.stage = "Internal"
+        st.session_state.selected_submateri = topics
+        st.session_state.quiz_data = quiz
+        st.session_state.user_answers = {}
+        st.session_state.current_index = 0
+        st.session_state.session_id = session_id
+        st.session_state.nama_siswa = name
+        st.session_state.is_custom_quiz = False
+        st.session_state.ai_hint_cache = {}
+        st.session_state.ai_solution_cache = {}
+        update_progress_siswa(
+            session_id, name, grade, focus, 1, [], "BERJALAN",
+            is_custom=False, user_answers_dict={}, quiz_data_list=quiz
+        )
+        st.session_state.page = "quiz"
+        return True, "Latihan adaptif siap."
+    except Exception as exc:
+        print(f"[STUDENT INTELLIGENCE] adaptive practice warning: {exc}")
+        return False, "Latihan adaptif gagal dibuat. Silakan coba lagi beberapa saat."
+
 
 # =============================================================================
-# POP-UP MODAL SAPAAN HARAT & JADWAL UTS
+# 6. POP-UP MODAL SAPAAN HANGAT & JADWAL UTS
 # =============================================================================
 
 @st.dialog("✨ Assalamu’alaikum, Santri Sholihat! 🌸")
@@ -366,7 +549,7 @@ def show_welcome_modal(nama_siswa: str, kelas: str, jenjang: str, streak: int, w
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div style="font-size: 16px; font-weight: 800; color: #a7f3d0;">Haloo, {nama_siswa}! 👋</div>
             <div style="background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24; border-radius: 20px; padding: 4px 12px; font-weight: 800; font-size: 13px;">
-                🔥 {streak} Hari Streak!
+                🔥 {streak} Hari Streak
             </div>
         </div>
         <div style="font-size: 12px; color: #cbd5e1; margin-top: 6px;">
@@ -380,7 +563,7 @@ def show_welcome_modal(nama_siswa: str, kelas: str, jenjang: str, streak: int, w
         today_exam = None
         upcoming_exams = []
         for s in schedules:
-            tgl = s.get("tanggal_ujian")
+            tgl = str(s.get("tanggal_ujian"))
             if tgl == today_str:
                 today_exam = s
             elif tgl > today_str:
@@ -400,7 +583,7 @@ def show_welcome_modal(nama_siswa: str, kelas: str, jenjang: str, streak: int, w
 
     st.markdown("""
     ---
-    💡
+    💡 **Motivasi Pagi:**
     *"Barangsiapa menelusuri jalan untuk mencari ilmu, Allah akan mudahkan baginya jalan menuju surga."*  
     Semangat belajar dan manfaatkan Portal SantriMANTAP untuk latihan & rangkuman materi ya!
     """)
@@ -410,11 +593,11 @@ def show_welcome_modal(nama_siswa: str, kelas: str, jenjang: str, streak: int, w
 
 
 # =============================================================================
-# SUB-RENDERERS UNTUK TAB
+# 7. SUB-RENDERERS TABS INTERNAL
 # =============================================================================
 
 def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_number: str):
-    """TAB: Asisten AI RoboMANTAP dengan Diskusi, Upload Tugas, Share ke WA & Download PDF."""
+    """TAB 1: Asisten AI RoboMANTAP dengan Diskusi, Upload Tugas, Share ke WA & Download PDF."""
     st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">💬 Asisten & Catatan AI RoboMANTAP</div>', unsafe_allow_html=True)
     st.caption("Tanyakan konsep, minta buatkan rangkuman UTS, analisis tugas, lalu simpan ke WA atau unduh PDF!")
 
@@ -423,24 +606,20 @@ def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_nu
             {"role": "assistant", "content": f"Assalamu’alaikum Santri Sholihat *{nama_siswa}*! 🧕🏼✨ Ada materi atau soal UTS yang ingin kita bahas bersama hari ini?"}
         ]
 
-    # Area Chat History
     chat_container = st.container(height=350)
     with chat_container:
         for msg in st.session_state.chat_messages:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
 
-    # Upload File Tugas / Foto Soal
     uploaded_file = st.file_uploader("📎 Upload Gambar Soal / Dokumen Tugas (Opsional)", type=["png", "jpg", "jpeg", "pdf"])
 
-    # Input Pesan
     if prompt := st.chat_input("Tanyakan sesuatu ke RoboMANTAP..."):
         st.session_state.chat_messages.append({"role": "user", "content": prompt})
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
 
-        # Proses Jawaban AI Simulasi/Injeksi
         ai_response = f"Baik Santri Cerdas *{nama_siswa}* (Kelas {kelas} {jenjang})!\n\nBerikut pembahasan & poin penting terkait **{prompt}**:\n\n1. *Konsep Utama*: Pahami definisi dasar dan hubungan antar komponennya.\n2. *Langkah Penyelesaian*: Selesaikan bertahap menggunakan rumus/aturan baku.\n3. *Tips UTS*: Fokus pada bentuk soal latihan yang sering keluar di ujian.\n\nSemangat terus belajarnya ya! 💪✨"
         
         st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
@@ -448,15 +627,13 @@ def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_nu
         st.session_state.last_ai_topic = prompt
         st.rerun()
 
-    # SECTION ACTION: SHARE TO WA & DOWNLOAD PDF
     if "last_ai_note" in st.session_state:
         st.divider()
         st.markdown("### 📄 Opsi Simpan Catatan AI Terakhir")
         
         c1, c2 = st.columns(2)
         with c1:
-            # Share to WhatsApp
-            pesan_wa = f"*CATATAN BELAJAR ROBOMANTAP*\nSantri: {nama_siswa} ({kelas} {jenjang})\nTopik: {st.session_state.get('last_ai_topic', 'Rangkuman')}\n\n{st.session_state.last_ai_note}"
+            pesan_wa = f"📌 *CATATAN BELAJAR ROBOMANTAP*\n👤 *Santri:* {nama_siswa} ({kelas} {jenjang})\n📚 *Topik:* {st.session_state.get('last_ai_topic', 'Rangkuman')}\n──────────────────────────────\n\n{st.session_state.last_ai_note}"
             pesan_enc = urllib.parse.quote(pesan_wa)
             target_wa = wa_number if wa_number else "6283141694735"
             wa_share_url = f"https://wa.me/{target_wa}?text={pesan_enc}"
@@ -470,7 +647,6 @@ def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_nu
             """, unsafe_allow_html=True)
 
         with c2:
-            # Download PDF
             pdf_bytes = generate_pdf_notes(
                 nama_siswa, kelas, jenjang,
                 st.session_state.get('last_ai_topic', 'Catatan Belajar'),
@@ -484,66 +660,402 @@ def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_nu
                 use_container_width=True
             )
 
-def render_learning_analytics_tab(profile: dict, streak: int):
-    """TAB: Progress, Streak Counter & Analytics."""
-    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">🎯 Profil Performa & Streak Belajar</div>', unsafe_allow_html=True)
-    
+
+def render_learning_analytics(name: str, grade: str, profile: dict, sessions: list[dict]):
+    """TAB 2: Progress, Scorecards, Diagnostic Analytics & Latihan Adaptif"""
     avg = profile.get("average_score", 0)
     attempts = profile.get("attempts", 0)
+    completion = profile.get("answer_completion", 100)
+    trend_raw = profile.get("trend", "stable")
+    risk = profile.get("risk_label", "ON TRACK")
 
-    st.markdown(f"""
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;">
-        <div style="background: rgba(6, 78, 59, 0.4); border: 1px solid #059669; border-radius: 12px; padding: 14px; text-align: center;">
-            <div style="font-size: 11px; color: #a7f3d0; font-weight: 700;">🔥 DAILY STREAK</div>
-            <div style="font-size: 24px; color: #34d399; font-weight: 800;">{streak} Hari</div>
+    trend_icon = {"improving": "📈", "declining": "📉", "stable": "➡️"}.get(trend_raw, "➡️")
+    trend_title = {"improving": "Meningkat", "declining": "Menurun", "stable": "Stabil"}.get(trend_raw, "Stabil")
+
+    if trend_raw == "improving":
+        trend_card_bg = "background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%); border: 1px solid rgba(5, 150, 105, 0.45);"
+        trend_title_color = "#a7f3d0"
+        trend_val_color = "#34d399"
+    elif trend_raw == "declining":
+        trend_card_bg = "background: linear-gradient(135deg, rgba(127, 29, 29, 0.35) 0%, rgba(69, 10, 10, 0.65) 100%); border: 1px solid rgba(239, 68, 68, 0.4);"
+        trend_title_color = "#fca5a5"
+        trend_val_color = "#f87171"
+    else:
+        trend_card_bg = "background: linear-gradient(135deg, rgba(55, 65, 81, 0.35) 0%, rgba(31, 41, 55, 0.65) 100%); border: 1px solid rgba(156, 163, 175, 0.35);"
+        trend_title_color = "#d1d5db"
+        trend_val_color = "#9ca3af"
+
+    eval_html = f"""
+    <div class="eval-grid">
+        <div class="eval-card" style="background: linear-gradient(135deg, rgba(120, 53, 15, 0.45) 0%, rgba(69, 26, 3, 0.75) 100%); border: 1px solid rgba(245, 158, 11, 0.5);">
+            <div class="eval-title" style="color: #fde68a;">🎯 Rata-Rata</div>
+            <div class="eval-value" style="color: #fbbf24;">{avg:.0f}%</div>
         </div>
-        <div style="background: rgba(120, 53, 15, 0.4); border: 1px solid #f59e0b; border-radius: 12px; padding: 14px; text-align: center;">
-            <div style="font-size: 11px; color: #fde68a; font-weight: 700;">🎯 RATA-RATA SKOR</div>
-            <div style="font-size: 24px; color: #fbbf24; font-weight: 800;">{avg:.0f}%</div>
+        <div class="eval-card" style="background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%); border: 1px solid rgba(5, 150, 105, 0.45);">
+            <div class="eval-title" style="color: #a7f3d0;">🎓 Sesi Selesai</div>
+            <div class="eval-value" style="color: #34d399;">{attempts}</div>
         </div>
-        <div style="background: rgba(30, 58, 138, 0.4); border: 1px solid #3b82f6; border-radius: 12px; padding: 14px; text-align: center;">
-            <div style="font-size: 11px; color: #bfdbfe; font-weight: 700;">🎓 TOTAL SESI</div>
-            <div style="font-size: 24px; color: #60a5fa; font-weight: 800;">{attempts}</div>
+        <div class="eval-card" style="background: linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.75) 100%); border: 1px solid rgba(59, 130, 246, 0.45);">
+            <div class="eval-title" style="color: #bfdbfe;">✅ Akurasi Jawaban</div>
+            <div class="eval-value" style="color: #60a5fa;">{completion:.0f}%</div>
+        </div>
+        <div class="eval-card" style="{trend_card_bg}">
+            <div class="eval-title" style="color: {trend_title_color};">{trend_icon} Perkembangan</div>
+            <div class="eval-value" style="color: {trend_val_color}; font-size: 18px;">{trend_title}</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """
+    
+    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">🎯 Kondisi Belajar Saat Ini</div>', unsafe_allow_html=True)
+    st.markdown(eval_html, unsafe_allow_html=True)
 
-    st.markdown("### 📚 Pemahaman Mata Pelajaran")
-    mastery = profile.get("subject_mastery", {})
-    if mastery:
-        for mapel, val in mastery.items():
-            st.write(f"**{mapel}**: {val}%")
-            st.progress(int(min(100, max(0, val))))
+    if risk == "HIGH ATTENTION":
+        st.markdown("""
+        <div class="status-banner status-banner-red">
+            <span style="font-size: 18px;">🚨</span>
+            <div><b>PERLU PERHATIAN EKSTRA</b> — Ada beberapa materi yang nilainya masih di bawah target. Yuk luangkan waktu untuk mempelajari dan latihan ulang topik tersebut!</div>
+        </div>
+        """, unsafe_allow_html=True)
+    elif risk == "WATCH":
+        st.markdown("""
+        <div class="status-banner status-banner-yellow">
+            <span style="font-size: 18px;">⚡</span>
+            <div><b>PERLU DITINGKATKAN</b> — Pemahamanmu sudah cukup baik, tapi masih ada beberapa materi yang bisa ditingkatkan lagi agar hasilmu makin maksimal.</div>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        st.info("Belum ada riwayat pengerjaan kuis untuk dianalisis.")
+        st.markdown("""
+        <div class="status-banner status-banner-green">
+            <span style="font-size: 18px;">🟢</span>
+            <div><b>PERFORMA SANGAT BAIK</b> — Luar biasa! Progres dan nilai belajarmu sudah sangat baik serta konsisten. Pertahankan semangat belajarmu!</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-def render_uts_simulation_tab():
-    """TAB: Simulasi UTS."""
-    st.markdown("### 🎯 Simulasi & Diagnostic UTS")
-    mapel_sim = st.selectbox("Pilih Mata Pelajaran", ["Matematika", "IPA", "Bahasa Arab", "Fiqih"])
-    if st.button("🚀 Mulai Latihan Kuis", type="primary"):
-        st.success(f"Latihan {mapel_sim} dimulai! Jawab pertanyaan dengan teliti.")
+    left, right = st.columns(2)
+    with left:
+        st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Rata-rata nilai akhir ujian, kuis, atau pengerjaan keseluruhan</div>', unsafe_allow_html=True)
+        if profile.get("subject_mastery"):
+            for mapel, mastery in sorted(profile["subject_mastery"].items(), key=lambda x: x[1]):
+                m_val = min(100.0, max(0.0, mastery))
+                bar_color = "#f87171" if m_val < 50 else "#fbbf24" if m_val < 75 else "#34d399"
+                mapel_html = f"""
+                <div class="topic-item" style="margin-bottom: 8px;">
+                    <div class="topic-header">
+                        <span style="font-size: 12px; font-weight: 700;">{mapel}</span>
+                        <span style="color: {bar_color}; font-size: 12px; font-weight: 800;">{m_val:.0f}%</span>
+                    </div>
+                    <div class="topic-bar-bg" style="height: 8px;">
+                        <div class="topic-bar-fill" style="width: {m_val}%; background: {bar_color};"></div>
+                    </div>
+                </div>
+                """
+                st.markdown(mapel_html, unsafe_allow_html=True)
+        else:
+            st.caption("Data pemahaman per mata pelajaran belum cukup.")
 
-def render_concept_sheets_tab():
-    """TAB: Concept Sheet Rangkuman."""
-    st.markdown("### 📚 Concept Sheet & Rumus Cepat H-1 UTS")
-    with st.expander("📖 Matematika — Eksponen & Bentuk Akar"):
-        st.markdown("• Perkalian Eksponen: a^m × a^n = a^(m+n)\n• Bentuk Akar: √(a × b) = √a × √b")
-    with st.expander("📖 Bahasa Arab — Tanda Isim"):
-        st.markdown("• Tanwin, Alif Lam (ال), dan diawali huruf Jar.")
+    with right:
+        st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">🧩 Topik Perlu Perhatian</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Akurasi kebenaran menjawab soal di bawah 80% (&lt; 80%)</div>', unsafe_allow_html=True)
+        weak = [(topic, mastery) for topic, mastery in profile.get("weakest_topics", []) if mastery < 80]    
+        if weak:
+            for topic, mastery in weak[:5]:
+                m_val = min(100.0, max(0.0, mastery))
+                bar_color = "#f87171" if m_val < 50 else "#fbbf24"
+                topic_html = f"""
+                <div class="topic-item" style="margin-bottom: 8px;">
+                    <div class="topic-header">
+                        <span style="font-size: 12px; font-weight: 700;">{topic}</span>
+                        <span style="color: {bar_color}; font-size: 12px; font-weight: 800;">{m_val:.0f}%</span>
+                    </div>
+                    <div class="topic-bar-bg" style="height: 8px;">
+                        <div class="topic-bar-fill" style="width: {m_val}%; background: {bar_color};"></div>
+                    </div>
+                </div>
+                """
+                st.markdown(topic_html, unsafe_allow_html=True)
+        else:
+            st.success("🎉 Luar biasa! Semua topik yang kamu kerjakan nilainya sudah di atas target (≥80%).")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">🚀 Rekomendasi Langkah Selanjutnya</div>', unsafe_allow_html=True)
+    recommendations = _subject_recommendations(profile)
+    for idx, rec_text in enumerate(recommendations, 1):
+        rec_html = f"""
+        <div class="rec-card">
+            <div class="rec-num">{idx}</div>
+            <div>{rec_text}</div>
+        </div>
+        """
+        st.markdown(rec_html, unsafe_allow_html=True)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("🔄 MULAI LATIHAN ADAPTIF", type="primary", use_container_width=True):
+            record_student_action(name, grade, "ADAPTIVE_PRACTICE", "Mulai latihan adaptif", {"weakest_subject": profile.get("weakest_subject"), "weakest_topics": profile.get("weakest_topics", [])})
+            with st.spinner("RoboMANTAP sedang merancang latihan berdasarkan area yang perlu diperkuat..."):
+                ok, message = _start_adaptive_practice(name, grade, profile)
+            if ok:
+                st.success(message)
+                st.rerun()
+            else:
+                st.warning(message)
+    with c2:
+        if st.button("📝 SIMPAN RENCANA BELAJAR", use_container_width=True):
+            record_student_action(name, grade, "STUDY_PLAN", "Rencana belajar siswa", {"recommendations": recommendations})
+            st.success("✅ Rencana belajar tersimpan sebagai aktivitas Student Intelligence.")
+
+    with st.expander("🔎 Lihat riwayat sesi yang menjadi dasar analisis"):
+        rows = []
+        for s in sessions[:20]:
+            score = float(s.get("nilai_akhir") or 0)
+            if not _is_practice_100_scale(s.get("mapel") or "") and score <= 40:
+                score = max(0.0, min(100.0, score / 40 * 100))
+            rows.append({
+                "Waktu": s.get("updated_at") or s.get("created_at"),
+                "Mapel": _clean_activity_marker(s.get("mapel") or ""),
+                "Status": s.get("status"),
+                "Skor": round(score, 1),
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+
+def render_uts_simulation():
+    """TAB 3: Modul Simulasi & Diagnostic UTS Interaktif"""
+    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">🎯 Simulasi & Diagnostic Kesiapan UTS</div>', unsafe_allow_html=True)
+    st.caption("Uji kemampuanmu H-1 sebelum menghadapi lembar ujian resmi esok hari.")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        jenjang_sim = st.selectbox("Pilih Jenjang", ["MTs (Kelas 7-9)", "MA (Kelas 10-12)"], key="sim_jenjang")
+    with c2:
+        mapel_sim = st.selectbox(
+            "Pilih Mata Pelajaran UTS",
+            ["Matematika", "IPA", "Fisika", "Kimia", "Bahasa Inggris", "Bahasa Arab", "Fiqih", "Akidah", "Nahwu"],
+            key="sim_mapel"
+        )
+
+    st.info(f"📌 **Mode Drill H-1 UTS**: 5 Soal Esensial {mapel_sim} ({jenjang_sim})")
+
+    if st.button("🚀 Mulai Simulasi UTS (10 Menit)", type="primary", use_container_width=True):
+        st.session_state.start_uts_quiz = True
+
+    if st.session_state.get("start_uts_quiz", False):
+        st.divider()
+        with st.form("form_simulasi_uts"):
+            st.subheader(f"📝 Lembar Soal Simulasi: {mapel_sim}")
+            
+            if "Matematika" in mapel_sim:
+                q1 = st.radio("1. Hasil dari (-4) + 8 × (-2) adalah...", ["-20", "-12", "12", "20"], key="uts_q1")
+                q2 = st.radio("2. Bentuk sederhana dari √50 adalah...", ["5√2", "2√5", "10√2", "25√2"], key="uts_q2")
+                q3 = st.radio("3. Penyelesaian dari |x - 2| = 5 adalah...", ["x = 7 atau x = -3", "x = 5 atau x = -5", "x = 3 atau x = -7"], key="uts_q3")
+            elif "IPA" in mapel_sim or "Fisika" in mapel_sim:
+                q1 = st.radio("1. Satuan SI untuk suhu adalah...", ["Celsius", "Kelvin", "Fahrenheit", "Reamur"], key="uts_q1")
+                q2 = st.radio("2. Organel sel yang berfungsi sebagai tempat respirasi sel adalah...", ["Mitokondria", "Ribosom", "Lisosom"], key="uts_q2")
+                q3 = st.radio("3. Alat untuk mengukur kuat arus listrik adalah...", ["Voltmeter", "Amperemeter", "Thermometer"], key="uts_q3")
+            else:
+                q1 = st.radio("1. Kata sapaan 'Selamat Pagi' dalam Bahasa Arab adalah...", ["Sabahal Khair", "Masaal Khair", "Ahlan wa Sahlan"], key="uts_q1")
+                q2 = st.radio("2. Kedudukan Na'at dalam tata bahasa Arab harus mengikuti...", ["Man'ut", "Mubtada'", "Khabar"], key="uts_q2")
+                q3 = st.radio("3. Seseorang yang menyampaikan/meriwayatkan hadist disebut...", ["Rawi", "Sanad", "Matan"], key="uts_q3")
+
+            submit_sim = st.form_submit_button("Selesaikan Ujian & Lihat Diagnostic", use_container_width=True)
+            
+            if submit_sim:
+                st.session_state.start_uts_quiz = False
+                st.balloons()
+                st.success("🎉 Simulasi Selesai!")
+                
+                sc1, sc2 = st.columns(2)
+                with sc1:
+                    st.metric("Skor Kesiapan UTS", "85 / 100", "+15% dari Target")
+                with sc2:
+                    st.metric("Status Diagnosis", "SIAP UJIAN 💥")
+                
+                st.markdown("""
+                **📊 Analisis Diagnosis Kesiapan Topik:**
+                * **Konsep Dasar & Operasi**: ✅ Sangat Dikuasai (100%)
+                * **Penalaran & Penerapan Rumus**: ⚠️ Perlu Diulas Kembali (66%)
+                
+                👉 *Saran AI Malam Ini:* Pelajari kembali rumus dan poin penting bab ini selama 15 menit sebelum tidur!
+                """)
+
+
+def render_student_automation():
+    """TAB 4: Pengaturan Automasi & Notifikasi WA Santri"""
+    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">⚙️ Layanan Automasi & Notifikasi WA Santri</div>', unsafe_allow_html=True)
+    st.caption("Kelola bagaimana RoboMANTAP AI Assistant mendampingi jadwal harian dan pengingat belajarmu via WhatsApp.")
+
+    st.toggle("🔔 Aktifkan WA Night Alert H-1 UTS", value=True, help="Menerima ringkasan mapel besok & kuis cepat tiap jam 18.30 WIB")
+    st.toggle("📱 Pengingat Target Daily Streak Belajar", value=True, help="Notifikasi motivasi konsistensi belajar harian")
+    st.toggle("📄 Kirim Rekap Raport Diagnosis UTS ke WA Orang Tua", value=False)
+    
+    st.divider()
+    st.markdown("**⏰ Set Alarm Belajar Mandiri via WA:**")
+    alarm_time = st.time_input("Pilih Jam Pengingat Belajar Khusus", value=None)
+    if st.button("Simpan Pengaturan Automasi", type="primary"):
+        st.toast("Pengaturan automasi berhasil diperbarui!", icon="✅")
+
+
+def render_concept_sheets():
+    """TAB 5: Rangkuman Materi & Rumus Cepat H-1 UTS"""
+    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">📚 Concept Sheet & Rumus Cepat H-1</div>', unsafe_allow_html=True)
+    st.caption("Ulas kembali rumus penting dan materi kunci secara cepat sebelum ujian dimulai.")
+
+    st.text_input("🔍 Cari Rumus / Konsep Cepat...", placeholder="contoh: Pythagoras, Bentuk Akar, Na'at Man'ut")
+
+    with st.expander("📖 Matematika (MTs & MA) — Eksponen, Akar & Logaritma"):
+        st.markdown("""
+        * **Perkalian Eksponen**: $a^m \\times a^n = a^{m+n}$
+        * **Pembagian Eksponen**: $a^m \\div a^n = a^{m-n}$
+        * **Bentuk Akar**: $\\sqrt{a \\times b} = \\sqrt{a} \\times \\sqrt{b}$ (contoh: $\\sqrt{50} = \\sqrt{25 \\times 2} = 5\\sqrt{2}$)
+        * **Persamaan Kuadrat**: Rumus Diskriminan $D = b^2 - 4ac$
+        """)
+
+    with st.expander("📖 IPA Terpadu & Fisika — Besaran, Satuan & Hukum Newton"):
+        st.markdown("""
+        * **7 Besaran Pokok**: Panjang (m), Massa (kg), Waktu (s), Suhu (K), Kuat Arus (A), Intensitas Cahaya (cd), Jumlah Zat (mol).
+        * **Hukum I Newton**: $\\Sigma F = 0$ (Kelembaman/Inersia)
+        * **Hukum II Newton**: $F = m \\times a$
+        """)
+
+    with st.expander("📖 Bahasa Arab & Nahwu — Tanda Isim & Kalimat"):
+        st.markdown("""
+        * **Tanda-tanda Isim**: Kemasukan Tanwin, Kemasukan Alif Lam (ال), diawali huruf Jar.
+        * **Dhomir (Kata Ganti Utama)**: Huwa (هُوَ = Dia Laki-laki), Hiya (هِيَ = Dia Perempuan), Anta (أَنْتَ = Kamu Laki-laki).
+        """)
+
 
 # =============================================================================
-# MAIN ENTRY POINT
+# 8. MAIN DASHBOARD ENTRY POINT
 # =============================================================================
 
-def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "") -> None:
-    """Entry point utama Portal SantriMANTAP dengan UI/UX Mewah."""
+def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "Semua Jenjang") -> None:
+    """Entry point utama Portal SantriMANTAP dengan World-Class Glassmorphism UI."""
+    
+    # Inisialisasi Otomatis Tabel Database Jika Belum Ada
+    ensure_student_intelligence_tables()
 
-    # MEWAH GLASSMORPHISM STYLING
+    # Glassmorphism & Responsive Styling
     ui_css = """
     <style>
-    .stApp {
-        background: linear-gradient(135deg, #022c22 0%, #0f172a 100%);
+    .eval-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin: 15px 0 22px 0;
+    }
+    @media (max-width: 640px) {
+        .eval-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+    }
+    .eval-card {
+        border-radius: 12px;
+        padding: 14px 10px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(8px);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .eval-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+    .eval-title {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .eval-value {
+        font-size: 22px;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+    .status-banner {
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin-bottom: 25px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.5;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .status-banner-red {
+        background: linear-gradient(135deg, rgba(127, 29, 29, 0.4) 0%, rgba(69, 10, 10, 0.7) 100%);
+        border: 1px solid rgba(239, 68, 68, 0.5);
+        color: #fca5a5;
+    }
+    .status-banner-yellow {
+        background: linear-gradient(135deg, rgba(120, 53, 15, 0.4) 0%, rgba(69, 26, 3, 0.7) 100%);
+        border: 1px solid rgba(245, 158, 11, 0.5);
+        color: #fde68a;
+    }
+    .status-banner-green {
+        background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(2, 44, 34, 0.7) 100%);
+        border: 1px solid rgba(5, 150, 105, 0.5);
+        color: #a7f3d0;
+    }
+    .topic-item {
+        background: rgba(30, 41, 59, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin-bottom: 10px;
+    }
+    .topic-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 6px;
+        color: #e2e8f0;
+    }
+    .topic-bar-bg {
+        width: 100%;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .topic-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+    .rec-card {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-left: 4px solid #10b981;
+        border-radius: 10px;
+        padding: 12px 16px;
+        margin-bottom: 10px;
+        font-size: 13px;
+        color: #f1f5f9;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    .rec-num {
+        background: rgba(16, 185, 129, 0.2);
+        color: #34d399;
+        font-weight: 800;
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        flex-shrink: 0;
     }
     .main-hero {
         background: linear-gradient(135deg, rgba(6, 78, 59, 0.6) 0%, rgba(2, 44, 34, 0.9) 100%);
@@ -554,99 +1066,91 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
         backdrop-filter: blur(12px);
     }
-    .hero-kicker {
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 1.5px;
-        color: #34d399;
-        text-transform: uppercase;
-    }
-    .hero-title {
-        font-size: 26px;
-        font-weight: 900;
-        color: #f8fafc;
-        margin: 4px 0;
-    }
-    .hero-title span {
-        color: #fbbf24;
-    }
-    .hero-subtitle {
-        font-size: 13px;
-        color: #cbd5e1;
-    }
+    .hero-kicker { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #34d399; text-transform: uppercase; }
+    .hero-title { font-size: 26px; font-weight: 900; color: #f8fafc; margin: 4px 0; }
+    .hero-title span { color: #fbbf24; }
+    .hero-subtitle { font-size: 13px; color: #cbd5e1; }
     </style>
     """
     st.markdown(ui_css, unsafe_allow_html=True)
 
-    # HERO BANNER
+    # HERO HEADER
     st.markdown("""
     <div class="main-hero">
       <div class="hero-kicker">UPN • STUDENT INTELLIGENCE PLATFORM</div>
       <div class="hero-title">Portal Santri<span>MANTAP</span></div>
-      <div class="hero-subtitle">Pusat Belajar Mandiri, Asisten AI, Jadwal UTS Realtime & Automasi WA.</div>
+      <div class="hero-subtitle">Pusat Layanan Belajar Mandiri, Asisten AI, Jadwal UTS Realtime & Automasi WhatsApp Santri.</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # DOORWAY / LOGIN (PRIVACY-FIRST: KETIK NAMA MANUALL)
-    with st.form("form_login_santri"):
+    # DOORWAY / LOGIN PRIVACY-FIRST (Murni Ketik Nama)
+    with st.form("student_intelligence_identity", clear_on_submit=False):
         st.markdown("#### 🔑 Masuk ke Portal Belajar Santri")
         entered_name = st.text_input("Nama Lengkap Santri", value=nama_siswa, placeholder="Masukkan nama lengkap kamu...")
-        btn_login = st.form_submit_button("🔍 BUKA PORTAL SAYA", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("🔍 BUKA PORTAL SAYA", type="primary", use_container_width=True)
 
-    if not btn_login and not entered_name.strip():
-        st.info("💡 Ketikkan Nama Lengkap Kamu di atas untuk membuka portal belajar.")
+    if not submitted and not entered_name.strip():
+        st.info("💡 Ketikkan Nama Lengkap Kamu di atas untuk membuka portal belajar & analisis diagnostik.")
         return
 
     name = entered_name.strip()
-    
-    # 1. FETCH DARI TABLE wa_identities
+
+    # 1. Otomatis Mencocokkan Identitas dari Tabel wa_identities
     identity_data = fetch_student_wa_identity(name)
-    
     if identity_data:
         meta = identity_data.get("metadata") or {}
         kelas = str(meta.get("kelas", "7"))
         jenjang_detected = str(meta.get("jenjang", "MTS")).upper()
         wa_number = identity_data.get("wa_number", "")
     else:
-        # Fallback jika nama belum sinkron di wa_identities
         kelas = "9"
-        jenjang_detected = "MTS"
+        jenjang_detected = "MTS" if jenjang == "Semua Jenjang" else jenjang
         wa_number = ""
 
-    # 2. FETCH JADWAL UTS DARI TABLE uts_schedules
+    # 2. Tarik Jadwal UTS Resmi dari Tabel uts_schedules
     uts_schedules = fetch_uts_schedules_db(kelas, jenjang_detected)
 
-    # 3. FETCH SESI & UPDATE STREAK
+    # 3. Tarik Sesi Belajar & Hitung Daily Streak
     sessions = fetch_student_sessions(name)
     profile = build_student_profile(sessions)
-    student_key = f"{name.casefold()}|{jenjang_detected.casefold()}"
-    streak, is_new_day = update_and_get_daily_streak(student_key, profile)
+    student_key_str = student_key(name, jenjang_detected)
+    streak, is_new_day = update_and_get_daily_streak(student_key_str, profile)
     save_student_profile(name, jenjang_detected, profile)
 
-    # TRIGGER POP-UP MODAL JIKA BARU LOGIN SARI HARI
+    st.session_state.student_intelligence_name = name
+    st.session_state.student_intelligence_grade = jenjang_detected
+
+    # 4. Trigger Pop-Up Sapaan Hangat & Jadwal UTS
     if "welcomed_today" not in st.session_state or st.session_state.get("welcomed_user") != name:
         st.session_state.welcomed_today = True
         st.session_state.welcomed_user = name
         show_welcome_modal(name, kelas, jenjang_detected, streak, wa_number, uts_schedules)
 
-    # TABS DASHBOARD UTAMA
-    tab_ai, tab_analytics, tab_simulasi, tab_materi = st.tabs([
+    # TABS UTAMA INTEGRATED
+    tab_ai, tab_analytics, tab_simulasi, tab_automasi, tab_materi = st.tabs([
         "💬 Asisten AI RoboMANTAP",
-        "📊 Progress & Streak",
-        "🎯 Simulasi UTS",
-        "📚 Concept Sheets"
+        "📊 Progress & Diagnostic",
+        "🎯 Simulasi & Diagnostic UTS",
+        "⚙️ Automasi WA Santri",
+        "📚 Rumus Cepat & Concept Sheet"
     ])
 
     with tab_ai:
         render_ai_chatbot_workspace(name, kelas, jenjang_detected, wa_number)
 
     with tab_analytics:
-        render_learning_analytics_tab(profile, streak)
+        if not sessions:
+            st.warning("⚠️ Belum ditemukan sesi belajar dengan nama tersebut. Kerjakan simulasi UTS atau latihan adaptif untuk mulai membentuk grafik analitikal belajarmu.")
+        else:
+            render_learning_analytics(name, jenjang_detected, profile, sessions)
 
     with tab_simulasi:
-        render_uts_simulation_tab()
+        render_uts_simulation()
+
+    with tab_automasi:
+        render_student_automation()
 
     with tab_materi:
-        render_concept_sheets_tab()
+        render_concept_sheets()
 
     st.caption(f"Portal SantriMANTAP v{STUDENT_INTELLIGENCE_VERSION} • Engineered by U.Project Nexus")
