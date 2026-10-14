@@ -16,3 +16,6 @@ matplotlib
 python-pptx
 PyMuPDF
 Pillow
+supabase
+requests
+pytz
