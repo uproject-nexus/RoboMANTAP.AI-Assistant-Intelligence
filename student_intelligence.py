@@ -32,6 +32,48 @@ from ai_engine import init_db_connection
 
 STUDENT_INTELLIGENCE_VERSION = "3.0"
 
+def ensure_student_intelligence_tables() -> bool:
+    """Memastikan tabel database pendukung Student Intelligence siap digunakan."""
+    conn = init_db_connection()
+    if not conn:
+        return False
+
+    statements = [
+        """
+        CREATE TABLE IF NOT EXISTS student_intelligence_profiles (
+            student_key VARCHAR(180) PRIMARY KEY,
+            nama_siswa VARCHAR(150) NOT NULL,
+            jenjang VARCHAR(80),
+            profile_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS student_intelligence_actions (
+            id BIGSERIAL PRIMARY KEY,
+            student_key VARCHAR(180) NOT NULL,
+            action_type VARCHAR(60) NOT NULL,
+            title VARCHAR(200) NOT NULL,
+            payload JSONB DEFAULT '{}'::jsonb,
+            status VARCHAR(30) DEFAULT 'OPEN',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_student_intel_actions_student
+            ON student_intelligence_actions (student_key, created_at DESC)
+        """,
+    ]
+    try:
+        with conn.session as s:
+            for statement in statements:
+                s.execute(text(statement))
+                s.commit()
+        return True
+    except Exception as exc:
+        print(f"[STUDENT INTELLIGENCE] table init warning: {exc}")
+        return False
+
 # =============================================================================
 # HELPER GENERATOR PDF CATATAN BELAJAR
 # =============================================================================
