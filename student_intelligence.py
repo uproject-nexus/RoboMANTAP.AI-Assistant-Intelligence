@@ -1,8 +1,8 @@
-"""RoboMANTAP Student Intelligence Layer v3.1 (Mobile-Optimized Master Edition).
+"""RoboMANTAP Student Intelligence Layer v3.2 (Mobile Polish Edition).
 
 Pusat Layanan Belajar, Simulasi UTS, Latihan Adaptif AI, Analisis Diagnostic,
 Asisten Chatbot, Daily Streak, Export Catatan WA & PDF Santri Al-Irsyad Putri Bondowoso.
-Dioptimalkan khusus untuk tampilan layar smartphone & bebas redundant rerun.
+Dioptimalkan dengan Quick-Tap Prompts, Format Tanggal Indonesia, Zero-Rerun State, & Mobile CSS.
 """
 
 from __future__ import annotations
@@ -35,10 +35,10 @@ except ImportError:
 
 from ai_engine import init_db_connection
 
-STUDENT_INTELLIGENCE_VERSION = "3.1"
+STUDENT_INTELLIGENCE_VERSION = "3.2"
 
 # =============================================================================
-# 1. DATABASE INITIALIZATION (MENCEGAH ERROR IMPORT APP.PY)
+# 1. DATABASE INITIALIZATION (PENTING UNTUK APP.PY BARIS 56)
 # =============================================================================
 
 def ensure_student_intelligence_tables() -> bool:
@@ -101,6 +101,17 @@ def _clean_activity_marker(mapel: str) -> str:
 
 def student_key(nama_siswa: str, jenjang: str = "") -> str:
     return f"{_norm_name(nama_siswa)}|{_norm_name(jenjang)}"
+
+def _format_indo_date(date_val: Any) -> str:
+    """Mengonversi tanggal YYYY-MM-DD menjadi format Indonesia ramah santri."""
+    if not date_val:
+        return "-"
+    try:
+        d = date.fromisoformat(str(date_val)) if isinstance(date_val, str) else date_val
+        months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"]
+        return f"{d.day} {months[d.month - 1]} {d.year}"
+    except Exception:
+        return str(date_val)
 
 def _json_value(value: Any, fallback: Any):
     if isinstance(value, (dict, list)):
@@ -179,7 +190,7 @@ def generate_pdf_notes(nama_siswa: str, kelas: str, jenjang: str, topic_title: s
 
     story = [
         Paragraph("RoboMANTAP — Catatan Belajar Santri", title_style),
-        Paragraph(f"<b>Santri:</b> {nama_siswa} ({kelas} {jenjang}) | <b>Topik:</b> {topic_title} | <b>Tanggal:</b> {datetime.now().strftime('%d/%m/%Y')}", meta_style),
+        Paragraph(f"<b>Santri:</b> {nama_siswa} ({kelas} {jenjang}) | <b>Topik:</b> {topic_title} | <b>Tanggal:</b> {_format_indo_date(date.today())}", meta_style),
         Spacer(1, 4)
     ]
 
@@ -518,7 +529,7 @@ def _start_adaptive_practice(name: str, grade: str, profile: dict) -> tuple[bool
 
 
 # =============================================================================
-# 6. POP-UP MODAL SAPAAN HANGAT (TIDAK MEMAKSA RERUN DUA KALI)
+# 6. POP-UP MODAL SAPAAN HANGAT
 # =============================================================================
 
 @st.dialog("✨ Assalamu’alaikum, Santri Sholihat! 🌸")
@@ -549,13 +560,13 @@ def show_welcome_modal(nama_siswa: str, kelas: str, jenjang: str, streak: int, w
             elif tgl > today_str: upcoming_exams.append(s)
 
         if today_exam:
-            st.success(f"🔥 **HARI INI UJIAN ({today_exam.get('tanggal_ujian')}):** {today_exam.get('mapel')}")
+            st.success(f"🔥 **HARI INI UJIAN ({_format_indo_date(today_exam.get('tanggal_ujian'))}):** {today_exam.get('mapel')}")
         else:
             st.info(f"💡 **Hari Ini:** Tidak ada jadwal ujian. Persiapkan materi mendatang!")
 
         if upcoming_exams:
             for item in upcoming_exams[:3]:
-                st.markdown(f"• **{item.get('tanggal_ujian')}**: {item.get('mapel')}")
+                st.markdown(f"• **{_format_indo_date(item.get('tanggal_ujian'))}**: {item.get('mapel')}")
     else:
         st.caption("Belum ada jadwal UTS terdaftar di database untuk kelasmu.")
 
@@ -564,26 +575,38 @@ def show_welcome_modal(nama_siswa: str, kelas: str, jenjang: str, streak: int, w
     💡 *"Barangsiapa menelusuri jalan untuk mencari ilmu, Allah akan mudahkan baginya jalan menuju surga."*
     """)
 
-    # DIALOG BUTTON TANPA RE-RUN MANUAL SANGAT PENTING
     if st.button("🚀 Masuk ke Portal Saya", type="primary", use_container_width=True):
         st.session_state.modal_closed = True
 
 
 # =============================================================================
-# 7. SUB-RENDERERS TABS INTERNAL (OPTIMIZED FOR MOBILE & NO RERUN)
+# 7. SUB-RENDERERS TABS INTERNAL (MOBILE POLISHED WITH QUICK-PILLS)
 # =============================================================================
 
 def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_number: str):
-    """TAB 1: Asisten Chatbot AI (Meninggalkan st.rerun redundant agar tidak kedip di HP)."""
+    """TAB 1: Chatbot AI dengan Quick-Pill Action Buttons & Instant PDF/WA."""
     st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 2px;">💬 Asisten & Catatan AI RoboMANTAP</div>', unsafe_allow_html=True)
-    st.caption("Tanyakan konsep, minta buatkan rangkuman UTS, lalu simpan ke WA/PDF.")
+    st.caption("Tanyakan konsep, minta rangkuman UTS, atau klik tombol pintas di bawah.")
 
     if "chat_messages" not in st.session_state:
         st.session_state.chat_messages = [
             {"role": "assistant", "content": f"Assalamu’alaikum Santri Sholihat *{nama_siswa}*! 🧕🏼✨ Ada materi atau soal UTS yang ingin kita bahas bersama hari ini?"}
         ]
 
-    # Height diatur pas untuk layar hp
+    # Quick-Pills / Fast-Action Prompt Buttons (Sangat Praktis untuk Layar HP)
+    st.markdown('<div style="font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">⚡ BANTUAN CEPAT (1-TAP):</div>', unsafe_allow_html=True)
+    qp_col1, qp_col2, qp_col3 = st.columns(3)
+    quick_prompt = None
+    with qp_col1:
+        if st.button("📌 Rangkuman UTS", use_container_width=True, key="qp_rangkuman"):
+            quick_prompt = "Buatkan rangkuman poin penting materi UTS terdekat saya."
+    with qp_col2:
+        if st.button("📝 Latihan Soal", use_container_width=True, key="qp_latihan"):
+            quick_prompt = "Berikan 3 contoh soal latihan UTS beserta pembahasannya."
+    with qp_col3:
+        if st.button("💡 Rumus Cepat", use_container_width=True, key="qp_rumus"):
+            quick_prompt = "Tampilkan daftar rumus cepat matematika/IPA untuk UTS."
+
     chat_container = st.container(height=300)
     with chat_container:
         for msg in st.session_state.chat_messages:
@@ -592,8 +615,10 @@ def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_nu
 
     uploaded_file = st.file_uploader("📎 Upload Foto Soal / Tugas (Opsional)", type=["png", "jpg", "jpeg", "pdf"], key="file_up_mobile")
 
-    # TANPA ST.RERUN() DI DALAM PROMPT HANDLER! Streamlit re-render otomatis saat input dikirim.
-    if prompt := st.chat_input("Tanyakan sesuatu ke RoboMANTAP..."):
+    prompt_input = st.chat_input("Tanyakan sesuatu ke RoboMANTAP...")
+    prompt = quick_prompt or prompt_input
+
+    if prompt:
         st.session_state.chat_messages.append({"role": "user", "content": prompt})
         
         ai_response = f"Baik Santri Cerdas *{nama_siswa}* (Kelas {kelas} {jenjang})!\n\nBerikut pembahasan & poin penting terkait **{prompt}**:\n\n1. *Konsep Utama*: Pahami definisi dasar dan hubungan antar komponennya.\n2. *Langkah Penyelesaian*: Selesaikan bertahap menggunakan rumus/aturan baku.\n3. *Tips UTS*: Fokus pada bentuk soal latihan yang sering keluar di ujian.\n\nSemangat terus belajarnya ya! 💪✨"
@@ -606,7 +631,6 @@ def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_nu
         st.divider()
         st.markdown("##### 📄 Opsi Simpan Catatan AI Terakhir")
         
-        # Stacked layout untuk Mobile Comfort
         pesan_wa = f"📌 *CATATAN BELAJAR ROBOMANTAP*\n👤 *Santri:* {nama_siswa} ({kelas} {jenjang})\n📚 *Topik:* {st.session_state.get('last_ai_topic', 'Rangkuman')}\n──────────────────────────────\n\n{st.session_state.last_ai_note}"
         pesan_enc = urllib.parse.quote(pesan_wa)
         target_wa = wa_number if wa_number else "6283141694735"
@@ -635,7 +659,7 @@ def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_nu
 
 
 def render_learning_analytics(name: str, grade: str, profile: dict, sessions: list[dict]):
-    """TAB 2: Analytics & Progress Scorecard (Mobile Friendly Grid & Touch Target)."""
+    """TAB 2: Analytics & Diagnostic Progress."""
     avg = profile.get("average_score", 0)
     attempts = profile.get("attempts", 0)
     completion = profile.get("answer_completion", 100)
@@ -676,7 +700,6 @@ def render_learning_analytics(name: str, grade: str, profile: dict, sessions: li
     else:
         st.markdown("""<div class="status-banner status-banner-green"><span>🟢</span><div><b>PERFORMA SANGAT BAIK</b> — Luar biasa! Pertahankan konsistensimu!</div></div>""", unsafe_allow_html=True)
 
-    # Stacking vertical untuk Mobile
     st.markdown('<div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-top: 10px; margin-bottom: 4px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
     if profile.get("subject_mastery"):
         for mapel, mastery in sorted(profile["subject_mastery"].items(), key=lambda x: x[1]):
@@ -746,7 +769,7 @@ def render_learning_analytics(name: str, grade: str, profile: dict, sessions: li
 
 
 def render_uts_simulation():
-    """TAB 3: Modul Simulasi UTS (Mobile Responsive Form)."""
+    """TAB 3: Modul Simulasi UTS."""
     st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 2px;">🎯 Simulasi & Diagnostic UTS</div>', unsafe_allow_html=True)
     st.caption("Uji kemampuan H-1 UTS secara interaktif.")
 
@@ -804,16 +827,15 @@ def render_concept_sheets():
 
 
 # =============================================================================
-# 8. MAIN DASHBOARD ENTRY POINT (MOBILE-FIRST CSS & REDUNDANCY ELIMINATED)
+# 8. MAIN DASHBOARD ENTRY POINT
 # =============================================================================
 
 def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "Semua Jenjang") -> None:
     ensure_student_intelligence_tables()
 
-    # CSS Khusus Layar Smartphone (Mobile-First CSS Breakpoints)
+    # CSS Khusus Mobile-First Breakpoints
     ui_css = """
     <style>
-    /* Mengurangi Padding Bawaan Streamlit di HP */
     @media (max-width: 768px) {
         .block-container {
             padding-left: 0.6rem !important;
@@ -829,7 +851,6 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         .hero-title { font-size: 20px !important; }
         .hero-subtitle { font-size: 11px !important; }
         
-        /* Grid 2 Kolom Rapi di Layar Kecil */
         .eval-grid {
             grid-template-columns: repeat(2, 1fr) !important;
             gap: 8px !important;
@@ -838,7 +859,6 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         .eval-card { padding: 10px 6px !important; }
         .eval-value { font-size: 18px !important; }
         
-        /* Tab Horisontal yang Nyaman di-Swipe Jari */
         .stTabs [data-baseweb="tab-list"] {
             gap: 2px !important;
             overflow-x: auto !important;
@@ -850,11 +870,10 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
             font-size: 12px !important;
         }
         
-        /* Tombol Pas dengan Ukuran Jempol */
         .stButton > button {
-            padding: 12px 14px !important;
-            font-size: 13px !important;
-            border-radius: 10px !important;
+            padding: 10px 12px !important;
+            font-size: 12px !important;
+            border-radius: 8px !important;
         }
     }
 
@@ -871,12 +890,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
         backdrop-filter: blur(8px);
     }
-    .eval-title {
-        font-size: 10px;
-        font-weight: 700;
-        text-transform: uppercase;
-        margin-bottom: 3px;
-    }
+    .eval-title { font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 3px; }
     .eval-value { font-size: 20px; font-weight: 800; line-height: 1.1; }
     .status-banner {
         border-radius: 10px;
@@ -959,7 +973,6 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
 
     name = entered_name.strip()
 
-    # Match Identity
     identity_data = fetch_student_wa_identity(name)
     if identity_data:
         meta = identity_data.get("metadata") or {}
