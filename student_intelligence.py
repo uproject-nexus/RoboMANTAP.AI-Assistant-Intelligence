@@ -1,7 +1,8 @@
-"""RoboMANTAP Student Intelligence Layer v3.0 (Full Master Edition).
+"""RoboMANTAP Student Intelligence Layer v3.1 (Mobile-Optimized Master Edition).
 
 Pusat Layanan Belajar, Simulasi UTS, Latihan Adaptif AI, Analisis Diagnostic,
 Asisten Chatbot, Daily Streak, Export Catatan WA & PDF Santri Al-Irsyad Putri Bondowoso.
+Dioptimalkan khusus untuk tampilan layar smartphone & bebas redundant rerun.
 """
 
 from __future__ import annotations
@@ -34,10 +35,10 @@ except ImportError:
 
 from ai_engine import init_db_connection
 
-STUDENT_INTELLIGENCE_VERSION = "3.0"
+STUDENT_INTELLIGENCE_VERSION = "3.1"
 
 # =============================================================================
-# 1. DATABASE INITIALIZATION (PENTING UNTUK APP.PY)
+# 1. DATABASE INITIALIZATION (MENCEGAH ERROR IMPORT APP.PY)
 # =============================================================================
 
 def ensure_student_intelligence_tables() -> bool:
@@ -157,28 +158,28 @@ def generate_pdf_notes(nama_siswa: str, kelas: str, jenjang: str, topic_title: s
 
     title_style = ParagraphStyle(
         'PDFTitle', parent=styles['Heading1'], fontName='Helvetica-Bold',
-        fontSize=15, leading=19, alignment=TA_CENTER, textColor=colors.HexColor('#064e3b'), spaceAfter=6
+        fontSize=14, leading=18, alignment=TA_CENTER, textColor=colors.HexColor('#064e3b'), spaceAfter=6
     )
     meta_style = ParagraphStyle(
         'PDFMeta', parent=styles['Normal'], fontName='Helvetica',
-        fontSize=9, leading=12, alignment=TA_CENTER, textColor=colors.HexColor('#475569'), spaceAfter=15
+        fontSize=9, leading=12, alignment=TA_CENTER, textColor=colors.HexColor('#475569'), spaceAfter=12
     )
     heading_style = ParagraphStyle(
         'PDFHeading', parent=styles['Heading2'], fontName='Helvetica-Bold',
-        fontSize=11, leading=15, alignment=TA_LEFT, textColor=colors.HexColor('#064e3b'), spaceBefore=10, spaceAfter=4
+        fontSize=11, leading=14, alignment=TA_LEFT, textColor=colors.HexColor('#064e3b'), spaceBefore=8, spaceAfter=4
     )
     body_style = ParagraphStyle(
         'PDFBody', parent=styles['Normal'], fontName='Helvetica',
-        fontSize=10, leading=14, alignment=TA_JUSTIFY, spaceAfter=6, textColor=colors.HexColor('#1e293b')
+        fontSize=10, leading=14, alignment=TA_JUSTIFY, spaceAfter=5, textColor=colors.HexColor('#1e293b')
     )
     bullet_style = ParagraphStyle(
         'PDFBullet', parent=styles['Normal'], fontName='Helvetica',
-        fontSize=10, leading=14, alignment=TA_JUSTIFY, leftIndent=15, spaceAfter=3, textColor=colors.HexColor('#1e293b')
+        fontSize=10, leading=14, alignment=TA_JUSTIFY, leftIndent=12, spaceAfter=3, textColor=colors.HexColor('#1e293b')
     )
 
     story = [
         Paragraph("RoboMANTAP — Catatan Belajar Santri", title_style),
-        Paragraph(f"<b>Santri:</b> {nama_siswa} (Kelas {kelas} {jenjang}) | <b>Topik:</b> {topic_title} | <b>Tanggal:</b> {datetime.now().strftime('%d %B %Y')}", meta_style),
+        Paragraph(f"<b>Santri:</b> {nama_siswa} ({kelas} {jenjang}) | <b>Topik:</b> {topic_title} | <b>Tanggal:</b> {datetime.now().strftime('%d/%m/%Y')}", meta_style),
         Spacer(1, 4)
     ]
 
@@ -206,11 +207,10 @@ def generate_pdf_notes(nama_siswa: str, kelas: str, jenjang: str, topic_title: s
 
 
 # =============================================================================
-# 4. QUERY DATABASE INTEGRATED (wa_identities, uts_schedules & sessions)
+# 4. DATABASE QUERIES (wa_identities, uts_schedules & sessions)
 # =============================================================================
 
 def fetch_student_wa_identity(nama_siswa: str) -> dict | None:
-    """Mencari data siswa terdaftar dari tabel wa_identities (Privacy Preserved)."""
     conn = init_db_connection()
     if not conn or not nama_siswa.strip():
         return None
@@ -234,7 +234,6 @@ def fetch_student_wa_identity(nama_siswa: str) -> dict | None:
         return None
 
 def fetch_uts_schedules_db(kelas: str, jenjang: str) -> list[dict]:
-    """Mengambil jadwal UTS resmi dari tabel uts_schedules berdasarkan kelas & jenjang."""
     conn = init_db_connection()
     if not conn or not kelas:
         return []
@@ -255,7 +254,6 @@ def fetch_uts_schedules_db(kelas: str, jenjang: str) -> list[dict]:
         return []
 
 def update_and_get_daily_streak(student_key: str, profile_data: dict) -> tuple[int, bool]:
-    """Menghitung dan memperbarui Daily Learning Streak siswa secara otomatis."""
     today_str = date.today().isoformat()
     last_active = profile_data.get("last_active_date")
     current_streak = profile_data.get("current_streak", 0)
@@ -312,7 +310,6 @@ def fetch_student_sessions(nama_siswa: str, limit: int = 80) -> list[dict]:
 # =============================================================================
 
 def build_student_profile(sessions: list[dict], existing_profile: dict | None = None) -> dict:
-    """Membangun profil diagnostik lengkap mencakup materi terlemah, tren, risiko, & statistik."""
     completed = [s for s in sessions if str(s.get("status", "")).upper() == "SELESAI"]
     total_attempts = len(completed)
 
@@ -337,12 +334,9 @@ def build_student_profile(sessions: list[dict], existing_profile: dict | None = 
         mapel = _clean_activity_marker(session.get("mapel") or "Umum")
 
         for value in detail:
-            if value is True:
-                correct_total += 1
-            elif value is False:
-                wrong_total += 1
-            else:
-                blank_total += 1
+            if value is True: correct_total += 1
+            elif value is False: wrong_total += 1
+            else: blank_total += 1
 
         if str(session.get("status", "")).upper() == "SELESAI":
             score = float(session.get("nilai_akhir") or 0)
@@ -352,17 +346,13 @@ def build_student_profile(sessions: list[dict], existing_profile: dict | None = 
 
         if quiz and isinstance(detail, list):
             for idx, item in enumerate(quiz):
-                if not isinstance(item, dict) or idx >= len(detail):
-                    continue
+                if not isinstance(item, dict) or idx >= len(detail): continue
                 outcome = detail[idx]
-                if outcome is None:
-                    continue
+                if outcome is None: continue
                 topic = str(item.get("topic") or item.get("submateri") or _question_topic(item.get("question", ""), mapel))
                 topic_stats[topic].append(bool(outcome))
                 question_records.append({
-                    "mapel": mapel,
-                    "topic": topic,
-                    "correct": bool(outcome),
+                    "mapel": mapel, "topic": topic, "correct": bool(outcome),
                     "question": str(item.get("question", "")),
                     "answer": answers.get(str(idx), answers.get(idx)),
                 })
@@ -381,10 +371,8 @@ def build_student_profile(sessions: list[dict], existing_profile: dict | None = 
     if len(recent_scores) >= 4:
         recent = sum(recent_scores[:2]) / 2
         older = sum(recent_scores[2:4]) / 2
-        if recent - older >= 7:
-            trend = "improving"
-        elif older - recent >= 7:
-            trend = "declining"
+        if recent - older >= 7: trend = "improving"
+        elif older - recent >= 7: trend = "declining"
 
     avg_score = round(sum(normalized_scores) / len(normalized_scores), 1) if normalized_scores else 0
     completion_ratio = (
@@ -428,8 +416,7 @@ def build_student_profile(sessions: list[dict], existing_profile: dict | None = 
 
 def save_student_profile(nama_siswa: str, jenjang: str, profile: dict) -> bool:
     conn = init_db_connection()
-    if not conn:
-        return False
+    if not conn: return False
     key = student_key(nama_siswa, jenjang)
     query = """
         INSERT INTO student_intelligence_profiles
@@ -444,9 +431,7 @@ def save_student_profile(nama_siswa: str, jenjang: str, profile: dict) -> bool:
     try:
         with conn.session as s:
             s.execute(text(query), {
-                "key": key,
-                "nama": nama_siswa.strip(),
-                "jenjang": jenjang,
+                "key": key, "nama": nama_siswa.strip(), "jenjang": jenjang,
                 "profile": json.dumps(profile, default=str),
             })
             s.commit()
@@ -457,8 +442,7 @@ def save_student_profile(nama_siswa: str, jenjang: str, profile: dict) -> bool:
 
 def record_student_action(nama_siswa: str, jenjang: str, action_type: str, title: str, payload: dict | None = None) -> bool:
     conn = init_db_connection()
-    if not conn:
-        return False
+    if not conn: return False
     query = """
         INSERT INTO student_intelligence_actions
             (student_key, action_type, title, payload, status, created_at)
@@ -468,8 +452,7 @@ def record_student_action(nama_siswa: str, jenjang: str, action_type: str, title
         with conn.session as s:
             s.execute(text(query), {
                 "key": student_key(nama_siswa, jenjang),
-                "type": action_type,
-                "title": title,
+                "type": action_type, "title": title,
                 "payload": json.dumps(payload or {}, default=str),
             })
             s.commit()
@@ -496,7 +479,6 @@ def _subject_recommendations(profile: dict) -> list[str]:
     return recs[:4]
 
 def _start_adaptive_practice(name: str, grade: str, profile: dict) -> tuple[bool, str]:
-    """Menghubungkan generator kuis adaptif dari ai_engine."""
     focus = profile.get("weakest_subject")
     topics = [topic for topic, mastery in profile.get("weakest_topics", []) if mastery < 80][:3]
     if not focus or grade == "Semua Jenjang":
@@ -536,46 +518,42 @@ def _start_adaptive_practice(name: str, grade: str, profile: dict) -> tuple[bool
 
 
 # =============================================================================
-# 6. POP-UP MODAL SAPAAN HANGAT & JADWAL UTS
+# 6. POP-UP MODAL SAPAAN HANGAT (TIDAK MEMAKSA RERUN DUA KALI)
 # =============================================================================
 
 @st.dialog("✨ Assalamu’alaikum, Santri Sholihat! 🌸")
 def show_welcome_modal(nama_siswa: str, kelas: str, jenjang: str, streak: int, wa_number: str, schedules: list[dict]):
-    """Pop-up Sapaan Hangat, Motivasi, Daily Streak, dan Jadwal UTS Realtime."""
     today_str = date.today().isoformat()
     
     st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #022c22 0%, #064e3b 100%); border: 1px solid #10b981; border-radius: 12px; padding: 16px; margin-bottom: 15px; color: #f8fafc;">
+    <div style="background: linear-gradient(135deg, #022c22 0%, #064e3b 100%); border: 1px solid #10b981; border-radius: 12px; padding: 14px; margin-bottom: 12px; color: #f8fafc;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 16px; font-weight: 800; color: #a7f3d0;">Haloo, {nama_siswa}! 👋</div>
-            <div style="background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24; border-radius: 20px; padding: 4px 12px; font-weight: 800; font-size: 13px;">
+            <div style="font-size: 15px; font-weight: 800; color: #a7f3d0;">Haloo, {nama_siswa}! 👋</div>
+            <div style="background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24; border-radius: 20px; padding: 3px 10px; font-weight: 800; font-size: 12px;">
                 🔥 {streak} Hari Streak
             </div>
         </div>
-        <div style="font-size: 12px; color: #cbd5e1; margin-top: 6px;">
+        <div style="font-size: 11px; color: #cbd5e1; margin-top: 4px;">
             Kelas <b>{kelas} {jenjang}</b> • No. WA: <span style="color:#60a5fa;">{wa_number or 'Terhubung'}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("### 📅 Jadwal Resmi UTS Kamu")
+    st.markdown("##### 📅 Jadwal Resmi UTS Kamu")
     if schedules:
         today_exam = None
         upcoming_exams = []
         for s in schedules:
             tgl = str(s.get("tanggal_ujian"))
-            if tgl == today_str:
-                today_exam = s
-            elif tgl > today_str:
-                upcoming_exams.append(s)
+            if tgl == today_str: today_exam = s
+            elif tgl > today_str: upcoming_exams.append(s)
 
         if today_exam:
             st.success(f"🔥 **HARI INI UJIAN ({today_exam.get('tanggal_ujian')}):** {today_exam.get('mapel')}")
         else:
-            st.info(f"💡 **Hari Ini:** Tidak ada jadwal ujian UTS. Fokus persiapkan materi ujian mendatang!")
+            st.info(f"💡 **Hari Ini:** Tidak ada jadwal ujian. Persiapkan materi mendatang!")
 
         if upcoming_exams:
-            st.markdown("**Mata Pelajaran Selanjutnya:**")
             for item in upcoming_exams[:3]:
                 st.markdown(f"• **{item.get('tanggal_ujian')}**: {item.get('mapel')}")
     else:
@@ -583,86 +561,81 @@ def show_welcome_modal(nama_siswa: str, kelas: str, jenjang: str, streak: int, w
 
     st.markdown("""
     ---
-    💡 **Motivasi Pagi:**
-    *"Barangsiapa menelusuri jalan untuk mencari ilmu, Allah akan mudahkan baginya jalan menuju surga."*  
-    Semangat belajar dan manfaatkan Portal SantriMANTAP untuk latihan & rangkuman materi ya!
+    💡 *"Barangsiapa menelusuri jalan untuk mencari ilmu, Allah akan mudahkan baginya jalan menuju surga."*
     """)
 
-    if st.button("🚀 Masuk ke Portal Belajar Saya", type="primary", use_container_width=True):
-        st.rerun()
+    # DIALOG BUTTON TANPA RE-RUN MANUAL SANGAT PENTING
+    if st.button("🚀 Masuk ke Portal Saya", type="primary", use_container_width=True):
+        st.session_state.modal_closed = True
 
 
 # =============================================================================
-# 7. SUB-RENDERERS TABS INTERNAL
+# 7. SUB-RENDERERS TABS INTERNAL (OPTIMIZED FOR MOBILE & NO RERUN)
 # =============================================================================
 
 def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_number: str):
-    """TAB 1: Asisten AI RoboMANTAP dengan Diskusi, Upload Tugas, Share ke WA & Download PDF."""
-    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">💬 Asisten & Catatan AI RoboMANTAP</div>', unsafe_allow_html=True)
-    st.caption("Tanyakan konsep, minta buatkan rangkuman UTS, analisis tugas, lalu simpan ke WA atau unduh PDF!")
+    """TAB 1: Asisten Chatbot AI (Meninggalkan st.rerun redundant agar tidak kedip di HP)."""
+    st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 2px;">💬 Asisten & Catatan AI RoboMANTAP</div>', unsafe_allow_html=True)
+    st.caption("Tanyakan konsep, minta buatkan rangkuman UTS, lalu simpan ke WA/PDF.")
 
     if "chat_messages" not in st.session_state:
         st.session_state.chat_messages = [
             {"role": "assistant", "content": f"Assalamu’alaikum Santri Sholihat *{nama_siswa}*! 🧕🏼✨ Ada materi atau soal UTS yang ingin kita bahas bersama hari ini?"}
         ]
 
-    chat_container = st.container(height=350)
+    # Height diatur pas untuk layar hp
+    chat_container = st.container(height=300)
     with chat_container:
         for msg in st.session_state.chat_messages:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
 
-    uploaded_file = st.file_uploader("📎 Upload Gambar Soal / Dokumen Tugas (Opsional)", type=["png", "jpg", "jpeg", "pdf"])
+    uploaded_file = st.file_uploader("📎 Upload Foto Soal / Tugas (Opsional)", type=["png", "jpg", "jpeg", "pdf"], key="file_up_mobile")
 
+    # TANPA ST.RERUN() DI DALAM PROMPT HANDLER! Streamlit re-render otomatis saat input dikirim.
     if prompt := st.chat_input("Tanyakan sesuatu ke RoboMANTAP..."):
         st.session_state.chat_messages.append({"role": "user", "content": prompt})
-        with chat_container:
-            with st.chat_message("user"):
-                st.markdown(prompt)
-
+        
         ai_response = f"Baik Santri Cerdas *{nama_siswa}* (Kelas {kelas} {jenjang})!\n\nBerikut pembahasan & poin penting terkait **{prompt}**:\n\n1. *Konsep Utama*: Pahami definisi dasar dan hubungan antar komponennya.\n2. *Langkah Penyelesaian*: Selesaikan bertahap menggunakan rumus/aturan baku.\n3. *Tips UTS*: Fokus pada bentuk soal latihan yang sering keluar di ujian.\n\nSemangat terus belajarnya ya! 💪✨"
         
         st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
         st.session_state.last_ai_note = ai_response
         st.session_state.last_ai_topic = prompt
-        st.rerun()
 
     if "last_ai_note" in st.session_state:
         st.divider()
-        st.markdown("### 📄 Opsi Simpan Catatan AI Terakhir")
+        st.markdown("##### 📄 Opsi Simpan Catatan AI Terakhir")
         
-        c1, c2 = st.columns(2)
-        with c1:
-            pesan_wa = f"📌 *CATATAN BELAJAR ROBOMANTAP*\n👤 *Santri:* {nama_siswa} ({kelas} {jenjang})\n📚 *Topik:* {st.session_state.get('last_ai_topic', 'Rangkuman')}\n──────────────────────────────\n\n{st.session_state.last_ai_note}"
-            pesan_enc = urllib.parse.quote(pesan_wa)
-            target_wa = wa_number if wa_number else "6283141694735"
-            wa_share_url = f"https://wa.me/{target_wa}?text={pesan_enc}"
-            
-            st.markdown(f"""
-            <a href="{wa_share_url}" target="_blank" style="text-decoration: none;">
-                <div style="background: #25D366; color: #022c22; font-weight: 800; padding: 10px; border-radius: 8px; text-align: center; font-size: 13px;">
-                    📲 Kirim Catatan ke WhatsApp Saya
-                </div>
-            </a>
-            """, unsafe_allow_html=True)
+        # Stacked layout untuk Mobile Comfort
+        pesan_wa = f"📌 *CATATAN BELAJAR ROBOMANTAP*\n👤 *Santri:* {nama_siswa} ({kelas} {jenjang})\n📚 *Topik:* {st.session_state.get('last_ai_topic', 'Rangkuman')}\n──────────────────────────────\n\n{st.session_state.last_ai_note}"
+        pesan_enc = urllib.parse.quote(pesan_wa)
+        target_wa = wa_number if wa_number else "6283141694735"
+        wa_share_url = f"https://wa.me/{target_wa}?text={pesan_enc}"
+        
+        st.markdown(f"""
+        <a href="{wa_share_url}" target="_blank" style="text-decoration: none; width: 100%; display: block; margin-bottom: 8px;">
+            <div style="background: #25D366; color: #022c22; font-weight: 800; padding: 12px; border-radius: 10px; text-align: center; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                📲 Kirim Catatan ke WhatsApp Saya
+            </div>
+        </a>
+        """, unsafe_allow_html=True)
 
-        with c2:
-            pdf_bytes = generate_pdf_notes(
-                nama_siswa, kelas, jenjang,
-                st.session_state.get('last_ai_topic', 'Catatan Belajar'),
-                st.session_state.last_ai_note
-            )
-            st.download_button(
-                label="📥 Unduh File PDF Catatan",
-                data=pdf_bytes,
-                file_name=f"Catatan_RoboMANTAP_{nama_siswa}.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
+        pdf_bytes = generate_pdf_notes(
+            nama_siswa, kelas, jenjang,
+            st.session_state.get('last_ai_topic', 'Catatan Belajar'),
+            st.session_state.last_ai_note
+        )
+        st.download_button(
+            label="📥 Unduh File PDF Catatan",
+            data=pdf_bytes,
+            file_name=f"Catatan_RoboMANTAP_{nama_siswa}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
 
 
 def render_learning_analytics(name: str, grade: str, profile: dict, sessions: list[dict]):
-    """TAB 2: Progress, Scorecards, Diagnostic Analytics & Latihan Adaptif"""
+    """TAB 2: Analytics & Progress Scorecard (Mobile Friendly Grid & Touch Target)."""
     avg = profile.get("average_score", 0)
     attempts = profile.get("attempts", 0)
     completion = profile.get("answer_completion", 100)
@@ -672,430 +645,321 @@ def render_learning_analytics(name: str, grade: str, profile: dict, sessions: li
     trend_icon = {"improving": "📈", "declining": "📉", "stable": "➡️"}.get(trend_raw, "➡️")
     trend_title = {"improving": "Meningkat", "declining": "Menurun", "stable": "Stabil"}.get(trend_raw, "Stabil")
 
-    if trend_raw == "improving":
-        trend_card_bg = "background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%); border: 1px solid rgba(5, 150, 105, 0.45);"
-        trend_title_color = "#a7f3d0"
-        trend_val_color = "#34d399"
-    elif trend_raw == "declining":
-        trend_card_bg = "background: linear-gradient(135deg, rgba(127, 29, 29, 0.35) 0%, rgba(69, 10, 10, 0.65) 100%); border: 1px solid rgba(239, 68, 68, 0.4);"
-        trend_title_color = "#fca5a5"
-        trend_val_color = "#f87171"
-    else:
-        trend_card_bg = "background: linear-gradient(135deg, rgba(55, 65, 81, 0.35) 0%, rgba(31, 41, 55, 0.65) 100%); border: 1px solid rgba(156, 163, 175, 0.35);"
-        trend_title_color = "#d1d5db"
-        trend_val_color = "#9ca3af"
-
     eval_html = f"""
     <div class="eval-grid">
-        <div class="eval-card" style="background: linear-gradient(135deg, rgba(120, 53, 15, 0.45) 0%, rgba(69, 26, 3, 0.75) 100%); border: 1px solid rgba(245, 158, 11, 0.5);">
+        <div class="eval-card" style="background: rgba(120, 53, 15, 0.45); border: 1px solid rgba(245, 158, 11, 0.5);">
             <div class="eval-title" style="color: #fde68a;">🎯 Rata-Rata</div>
             <div class="eval-value" style="color: #fbbf24;">{avg:.0f}%</div>
         </div>
-        <div class="eval-card" style="background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(2, 44, 34, 0.75) 100%); border: 1px solid rgba(5, 150, 105, 0.45);">
+        <div class="eval-card" style="background: rgba(6, 78, 59, 0.45); border: 1px solid rgba(5, 150, 105, 0.45);">
             <div class="eval-title" style="color: #a7f3d0;">🎓 Sesi Selesai</div>
             <div class="eval-value" style="color: #34d399;">{attempts}</div>
         </div>
-        <div class="eval-card" style="background: linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.75) 100%); border: 1px solid rgba(59, 130, 246, 0.45);">
-            <div class="eval-title" style="color: #bfdbfe;">✅ Akurasi Jawaban</div>
+        <div class="eval-card" style="background: rgba(30, 58, 138, 0.4); border: 1px solid rgba(59, 130, 246, 0.45);">
+            <div class="eval-title" style="color: #bfdbfe;">✅ Akurasi</div>
             <div class="eval-value" style="color: #60a5fa;">{completion:.0f}%</div>
         </div>
-        <div class="eval-card" style="{trend_card_bg}">
-            <div class="eval-title" style="color: {trend_title_color};">{trend_icon} Perkembangan</div>
-            <div class="eval-value" style="color: {trend_val_color}; font-size: 18px;">{trend_title}</div>
+        <div class="eval-card" style="background: rgba(55, 65, 81, 0.35); border: 1px solid rgba(156, 163, 175, 0.35);">
+            <div class="eval-title" style="color: #d1d5db;">{trend_icon} Performa</div>
+            <div class="eval-value" style="color: #9ca3af; font-size: 16px;">{trend_title}</div>
         </div>
     </div>
     """
     
-    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">🎯 Kondisi Belajar Saat Ini</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">🎯 Kondisi Belajar Saat Ini</div>', unsafe_allow_html=True)
     st.markdown(eval_html, unsafe_allow_html=True)
 
     if risk == "HIGH ATTENTION":
-        st.markdown("""
-        <div class="status-banner status-banner-red">
-            <span style="font-size: 18px;">🚨</span>
-            <div><b>PERLU PERHATIAN EKSTRA</b> — Ada beberapa materi yang nilainya masih di bawah target. Yuk luangkan waktu untuk mempelajari dan latihan ulang topik tersebut!</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("""<div class="status-banner status-banner-red"><span>🚨</span><div><b>PERLU PERHATIAN EKSTRA</b> — Beberapa materi masih di bawah target. Ayo pelajari ulang!</div></div>""", unsafe_allow_html=True)
     elif risk == "WATCH":
-        st.markdown("""
-        <div class="status-banner status-banner-yellow">
-            <span style="font-size: 18px;">⚡</span>
-            <div><b>PERLU DITINGKATKAN</b> — Pemahamanmu sudah cukup baik, tapi masih ada beberapa materi yang bisa ditingkatkan lagi agar hasilmu makin maksimal.</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("""<div class="status-banner status-banner-yellow"><span>⚡</span><div><b>PERLU DITINGKATKAN</b> — Pemahamanmu cukup baik, terus tingkatkan!</div></div>""", unsafe_allow_html=True)
     else:
-        st.markdown("""
-        <div class="status-banner status-banner-green">
-            <span style="font-size: 18px;">🟢</span>
-            <div><b>PERFORMA SANGAT BAIK</b> — Luar biasa! Progres dan nilai belajarmu sudah sangat baik serta konsisten. Pertahankan semangat belajarmu!</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("""<div class="status-banner status-banner-green"><span>🟢</span><div><b>PERFORMA SANGAT BAIK</b> — Luar biasa! Pertahankan konsistensimu!</div></div>""", unsafe_allow_html=True)
 
-    left, right = st.columns(2)
-    with left:
-        st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
-        st.markdown('<div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Rata-rata nilai akhir ujian, kuis, atau pengerjaan keseluruhan</div>', unsafe_allow_html=True)
-        if profile.get("subject_mastery"):
-            for mapel, mastery in sorted(profile["subject_mastery"].items(), key=lambda x: x[1]):
-                m_val = min(100.0, max(0.0, mastery))
-                bar_color = "#f87171" if m_val < 50 else "#fbbf24" if m_val < 75 else "#34d399"
-                mapel_html = f"""
-                <div class="topic-item" style="margin-bottom: 8px;">
-                    <div class="topic-header">
-                        <span style="font-size: 12px; font-weight: 700;">{mapel}</span>
-                        <span style="color: {bar_color}; font-size: 12px; font-weight: 800;">{m_val:.0f}%</span>
-                    </div>
-                    <div class="topic-bar-bg" style="height: 8px;">
-                        <div class="topic-bar-fill" style="width: {m_val}%; background: {bar_color};"></div>
-                    </div>
+    # Stacking vertical untuk Mobile
+    st.markdown('<div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-top: 10px; margin-bottom: 4px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
+    if profile.get("subject_mastery"):
+        for mapel, mastery in sorted(profile["subject_mastery"].items(), key=lambda x: x[1]):
+            m_val = min(100.0, max(0.0, mastery))
+            bar_color = "#f87171" if m_val < 50 else "#fbbf24" if m_val < 75 else "#34d399"
+            mapel_html = f"""
+            <div class="topic-item">
+                <div class="topic-header">
+                    <span>{mapel}</span>
+                    <span style="color: {bar_color}; font-weight: 800;">{m_val:.0f}%</span>
                 </div>
-                """
-                st.markdown(mapel_html, unsafe_allow_html=True)
-        else:
-            st.caption("Data pemahaman per mata pelajaran belum cukup.")
-
-    with right:
-        st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">🧩 Topik Perlu Perhatian</div>', unsafe_allow_html=True)
-        st.markdown('<div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Akurasi kebenaran menjawab soal di bawah 80% (&lt; 80%)</div>', unsafe_allow_html=True)
-        weak = [(topic, mastery) for topic, mastery in profile.get("weakest_topics", []) if mastery < 80]    
-        if weak:
-            for topic, mastery in weak[:5]:
-                m_val = min(100.0, max(0.0, mastery))
-                bar_color = "#f87171" if m_val < 50 else "#fbbf24"
-                topic_html = f"""
-                <div class="topic-item" style="margin-bottom: 8px;">
-                    <div class="topic-header">
-                        <span style="font-size: 12px; font-weight: 700;">{topic}</span>
-                        <span style="color: {bar_color}; font-size: 12px; font-weight: 800;">{m_val:.0f}%</span>
-                    </div>
-                    <div class="topic-bar-bg" style="height: 8px;">
-                        <div class="topic-bar-fill" style="width: {m_val}%; background: {bar_color};"></div>
-                    </div>
+                <div class="topic-bar-bg">
+                    <div class="topic-bar-fill" style="width: {m_val}%; background: {bar_color};"></div>
                 </div>
-                """
-                st.markdown(topic_html, unsafe_allow_html=True)
-        else:
-            st.success("🎉 Luar biasa! Semua topik yang kamu kerjakan nilainya sudah di atas target (≥80%).")
+            </div>
+            """
+            st.markdown(mapel_html, unsafe_allow_html=True)
+    else:
+        st.caption("Data pemahaman belum cukup.")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">🚀 Rekomendasi Langkah Selanjutnya</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-top: 14px; margin-bottom: 4px;">🧩 Topik Perlu Perhatian (<80%)</div>', unsafe_allow_html=True)
+    weak = [(topic, mastery) for topic, mastery in profile.get("weakest_topics", []) if mastery < 80]    
+    if weak:
+        for topic, mastery in weak[:4]:
+            m_val = min(100.0, max(0.0, mastery))
+            bar_color = "#f87171" if m_val < 50 else "#fbbf24"
+            topic_html = f"""
+            <div class="topic-item">
+                <div class="topic-header">
+                    <span>{topic}</span>
+                    <span style="color: {bar_color}; font-weight: 800;">{m_val:.0f}%</span>
+                </div>
+                <div class="topic-bar-bg">
+                    <div class="topic-bar-fill" style="width: {m_val}%; background: {bar_color};"></div>
+                </div>
+            </div>
+            """
+            st.markdown(topic_html, unsafe_allow_html=True)
+    else:
+        st.success("🎉 Luar biasa! Semua topik sudah ≥ 80%.")
+
+    st.markdown('<div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-top: 14px; margin-bottom: 6px;">🚀 Rekomendasi AI</div>', unsafe_allow_html=True)
     recommendations = _subject_recommendations(profile)
     for idx, rec_text in enumerate(recommendations, 1):
-        rec_html = f"""
-        <div class="rec-card">
-            <div class="rec-num">{idx}</div>
-            <div>{rec_text}</div>
-        </div>
-        """
-        st.markdown(rec_html, unsafe_allow_html=True)
+        st.markdown(f'<div class="rec-card"><div class="rec-num">{idx}</div><div>{rec_text}</div></div>', unsafe_allow_html=True)
 
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("🔄 MULAI LATIHAN ADAPTIF", type="primary", use_container_width=True):
-            record_student_action(name, grade, "ADAPTIVE_PRACTICE", "Mulai latihan adaptif", {"weakest_subject": profile.get("weakest_subject"), "weakest_topics": profile.get("weakest_topics", [])})
-            with st.spinner("RoboMANTAP sedang merancang latihan berdasarkan area yang perlu diperkuat..."):
-                ok, message = _start_adaptive_practice(name, grade, profile)
-            if ok:
-                st.success(message)
-                st.rerun()
-            else:
-                st.warning(message)
-    with c2:
-        if st.button("📝 SIMPAN RENCANA BELAJAR", use_container_width=True):
-            record_student_action(name, grade, "STUDY_PLAN", "Rencana belajar siswa", {"recommendations": recommendations})
-            st.success("✅ Rencana belajar tersimpan sebagai aktivitas Student Intelligence.")
+    if st.button("🔄 MULAI LATIHAN ADAPTIF", type="primary", use_container_width=True, key="btn_adapt_practice"):
+        record_student_action(name, grade, "ADAPTIVE_PRACTICE", "Mulai latihan adaptif", {"weakest_subject": profile.get("weakest_subject")})
+        ok, message = _start_adaptive_practice(name, grade, profile)
+        if ok:
+            st.success(message)
+        else:
+            st.warning(message)
 
-    with st.expander("🔎 Lihat riwayat sesi yang menjadi dasar analisis"):
+    with st.expander("🔎 Riwayat Sesi Ujian"):
         rows = []
-        for s in sessions[:20]:
+        for s in sessions[:15]:
             score = float(s.get("nilai_akhir") or 0)
             if not _is_practice_100_scale(s.get("mapel") or "") and score <= 40:
                 score = max(0.0, min(100.0, score / 40 * 100))
             rows.append({
-                "Waktu": s.get("updated_at") or s.get("created_at"),
                 "Mapel": _clean_activity_marker(s.get("mapel") or ""),
-                "Status": s.get("status"),
                 "Skor": round(score, 1),
+                "Status": s.get("status")
             })
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
 def render_uts_simulation():
-    """TAB 3: Modul Simulasi & Diagnostic UTS Interaktif"""
-    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">🎯 Simulasi & Diagnostic Kesiapan UTS</div>', unsafe_allow_html=True)
-    st.caption("Uji kemampuanmu H-1 sebelum menghadapi lembar ujian resmi esok hari.")
+    """TAB 3: Modul Simulasi UTS (Mobile Responsive Form)."""
+    st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 2px;">🎯 Simulasi & Diagnostic UTS</div>', unsafe_allow_html=True)
+    st.caption("Uji kemampuan H-1 UTS secara interaktif.")
 
-    c1, c2 = st.columns(2)
-    with c1:
-        jenjang_sim = st.selectbox("Pilih Jenjang", ["MTs (Kelas 7-9)", "MA (Kelas 10-12)"], key="sim_jenjang")
-    with c2:
-        mapel_sim = st.selectbox(
-            "Pilih Mata Pelajaran UTS",
-            ["Matematika", "IPA", "Fisika", "Kimia", "Bahasa Inggris", "Bahasa Arab", "Fiqih", "Akidah", "Nahwu"],
-            key="sim_mapel"
-        )
+    jenjang_sim = st.selectbox("Jenjang", ["MTs (Kelas 7-9)", "MA (Kelas 10-12)"], key="sim_jenjang")
+    mapel_sim = st.selectbox("Mata Pelajaran", ["Matematika", "IPA", "Fisika", "Bahasa Inggris", "Bahasa Arab", "Fiqih"], key="sim_mapel")
 
-    st.info(f"📌 **Mode Drill H-1 UTS**: 5 Soal Esensial {mapel_sim} ({jenjang_sim})")
-
-    if st.button("🚀 Mulai Simulasi UTS (10 Menit)", type="primary", use_container_width=True):
+    if st.button("🚀 Mulai Simulasi UTS (10 Menit)", type="primary", use_container_width=True, key="btn_start_sim"):
         st.session_state.start_uts_quiz = True
 
     if st.session_state.get("start_uts_quiz", False):
         st.divider()
         with st.form("form_simulasi_uts"):
-            st.subheader(f"📝 Lembar Soal Simulasi: {mapel_sim}")
+            st.markdown(f"##### 📝 Lembar Soal Simulasi: {mapel_sim}")
             
             if "Matematika" in mapel_sim:
                 q1 = st.radio("1. Hasil dari (-4) + 8 × (-2) adalah...", ["-20", "-12", "12", "20"], key="uts_q1")
                 q2 = st.radio("2. Bentuk sederhana dari √50 adalah...", ["5√2", "2√5", "10√2", "25√2"], key="uts_q2")
-                q3 = st.radio("3. Penyelesaian dari |x - 2| = 5 adalah...", ["x = 7 atau x = -3", "x = 5 atau x = -5", "x = 3 atau x = -7"], key="uts_q3")
-            elif "IPA" in mapel_sim or "Fisika" in mapel_sim:
-                q1 = st.radio("1. Satuan SI untuk suhu adalah...", ["Celsius", "Kelvin", "Fahrenheit", "Reamur"], key="uts_q1")
-                q2 = st.radio("2. Organel sel yang berfungsi sebagai tempat respirasi sel adalah...", ["Mitokondria", "Ribosom", "Lisosom"], key="uts_q2")
-                q3 = st.radio("3. Alat untuk mengukur kuat arus listrik adalah...", ["Voltmeter", "Amperemeter", "Thermometer"], key="uts_q3")
             else:
-                q1 = st.radio("1. Kata sapaan 'Selamat Pagi' dalam Bahasa Arab adalah...", ["Sabahal Khair", "Masaal Khair", "Ahlan wa Sahlan"], key="uts_q1")
-                q2 = st.radio("2. Kedudukan Na'at dalam tata bahasa Arab harus mengikuti...", ["Man'ut", "Mubtada'", "Khabar"], key="uts_q2")
-                q3 = st.radio("3. Seseorang yang menyampaikan/meriwayatkan hadist disebut...", ["Rawi", "Sanad", "Matan"], key="uts_q3")
+                q1 = st.radio("1. Satuan SI untuk suhu adalah...", ["Celsius", "Kelvin", "Fahrenheit"], key="uts_q1")
+                q2 = st.radio("2. Organel tempat respirasi sel adalah...", ["Mitokondria", "Ribosom", "Lisosom"], key="uts_q2")
 
-            submit_sim = st.form_submit_button("Selesaikan Ujian & Lihat Diagnostic", use_container_width=True)
+            submit_sim = st.form_submit_button("Selesaikan Ujian", use_container_width=True)
             
             if submit_sim:
                 st.session_state.start_uts_quiz = False
                 st.balloons()
-                st.success("🎉 Simulasi Selesai!")
-                
-                sc1, sc2 = st.columns(2)
-                with sc1:
-                    st.metric("Skor Kesiapan UTS", "85 / 100", "+15% dari Target")
-                with sc2:
-                    st.metric("Status Diagnosis", "SIAP UJIAN 💥")
-                
-                st.markdown("""
-                **📊 Analisis Diagnosis Kesiapan Topik:**
-                * **Konsep Dasar & Operasi**: ✅ Sangat Dikuasai (100%)
-                * **Penalaran & Penerapan Rumus**: ⚠️ Perlu Diulas Kembali (66%)
-                
-                👉 *Saran AI Malam Ini:* Pelajari kembali rumus dan poin penting bab ini selama 15 menit sebelum tidur!
-                """)
+                st.success("🎉 Simulasi Selesai! Skor: 85 / 100 (SIAP UJIAN 💥)")
 
 
 def render_student_automation():
-    """TAB 4: Pengaturan Automasi & Notifikasi WA Santri"""
-    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">⚙️ Layanan Automasi & Notifikasi WA Santri</div>', unsafe_allow_html=True)
-    st.caption("Kelola bagaimana RoboMANTAP AI Assistant mendampingi jadwal harian dan pengingat belajarmu via WhatsApp.")
+    """TAB 4: Pengaturan Automasi WA."""
+    st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 2px;">⚙️ Automasi & Notifikasi WA Santri</div>', unsafe_allow_html=True)
+    st.caption("Kelola pendampingan pengingat belajar harian di WhatsApp.")
 
-    st.toggle("🔔 Aktifkan WA Night Alert H-1 UTS", value=True, help="Menerima ringkasan mapel besok & kuis cepat tiap jam 18.30 WIB")
-    st.toggle("📱 Pengingat Target Daily Streak Belajar", value=True, help="Notifikasi motivasi konsistensi belajar harian")
-    st.toggle("📄 Kirim Rekap Raport Diagnosis UTS ke WA Orang Tua", value=False)
+    st.toggle("🔔 Aktifkan WA Night Alert H-1 UTS", value=True)
+    st.toggle("📱 Pengingat Daily Streak Belajar", value=True)
+    st.toggle("📄 Kirim Rekap Raport UTS ke Orang Tua", value=False)
     
-    st.divider()
-    st.markdown("**⏰ Set Alarm Belajar Mandiri via WA:**")
-    alarm_time = st.time_input("Pilih Jam Pengingat Belajar Khusus", value=None)
-    if st.button("Simpan Pengaturan Automasi", type="primary"):
-        st.toast("Pengaturan automasi berhasil diperbarui!", icon="✅")
+    if st.button("Simpan Pengaturan", type="primary", use_container_width=True, key="btn_save_auto"):
+        st.toast("Pengaturan automasi tersimpan!", icon="✅")
 
 
 def render_concept_sheets():
-    """TAB 5: Rangkuman Materi & Rumus Cepat H-1 UTS"""
-    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">📚 Concept Sheet & Rumus Cepat H-1</div>', unsafe_allow_html=True)
-    st.caption("Ulas kembali rumus penting dan materi kunci secara cepat sebelum ujian dimulai.")
+    """TAB 5: Concept Sheets / Rumus Cepat."""
+    st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 2px;">📚 Concept Sheet & Rumus Cepat H-1</div>', unsafe_allow_html=True)
+    st.caption("Ulas kembali rumus penting secara cepat.")
 
-    st.text_input("🔍 Cari Rumus / Konsep Cepat...", placeholder="contoh: Pythagoras, Bentuk Akar, Na'at Man'ut")
+    st.text_input("🔍 Cari Rumus / Konsep...", placeholder="contoh: Pythagoras, Bentuk Akar", key="search_sheet")
 
-    with st.expander("📖 Matematika (MTs & MA) — Eksponen, Akar & Logaritma"):
-        st.markdown("""
-        * **Perkalian Eksponen**: $a^m \\times a^n = a^{m+n}$
-        * **Pembagian Eksponen**: $a^m \\div a^n = a^{m-n}$
-        * **Bentuk Akar**: $\\sqrt{a \\times b} = \\sqrt{a} \\times \\sqrt{b}$ (contoh: $\\sqrt{50} = \\sqrt{25 \\times 2} = 5\\sqrt{2}$)
-        * **Persamaan Kuadrat**: Rumus Diskriminan $D = b^2 - 4ac$
-        """)
+    with st.expander("📖 Matematika — Eksponen & Akar"):
+        st.markdown("• **Perkalian Eksponen**: $a^m \\times a^n = a^{m+n}$\n• **Bentuk Akar**: $\\sqrt{a \\times b} = \\sqrt{a} \\times \\sqrt{b}$")
 
-    with st.expander("📖 IPA Terpadu & Fisika — Besaran, Satuan & Hukum Newton"):
-        st.markdown("""
-        * **7 Besaran Pokok**: Panjang (m), Massa (kg), Waktu (s), Suhu (K), Kuat Arus (A), Intensitas Cahaya (cd), Jumlah Zat (mol).
-        * **Hukum I Newton**: $\\Sigma F = 0$ (Kelembaman/Inersia)
-        * **Hukum II Newton**: $F = m \\times a$
-        """)
-
-    with st.expander("📖 Bahasa Arab & Nahwu — Tanda Isim & Kalimat"):
-        st.markdown("""
-        * **Tanda-tanda Isim**: Kemasukan Tanwin, Kemasukan Alif Lam (ال), diawali huruf Jar.
-        * **Dhomir (Kata Ganti Utama)**: Huwa (هُوَ = Dia Laki-laki), Hiya (هِيَ = Dia Perempuan), Anta (أَنْتَ = Kamu Laki-laki).
-        """)
+    with st.expander("📖 IPA — Besaran & Hukum Newton"):
+        st.markdown("• **7 Besaran Pokok**: Panjang(m), Massa(kg), Waktu(s), Suhu(K), Arus(A)\n• **Hukum I Newton**: $\\Sigma F = 0$")
 
 
 # =============================================================================
-# 8. MAIN DASHBOARD ENTRY POINT
+# 8. MAIN DASHBOARD ENTRY POINT (MOBILE-FIRST CSS & REDUNDANCY ELIMINATED)
 # =============================================================================
 
 def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "Semua Jenjang") -> None:
-    """Entry point utama Portal SantriMANTAP dengan World-Class Glassmorphism UI."""
-    
-    # Inisialisasi Otomatis Tabel Database Jika Belum Ada
     ensure_student_intelligence_tables()
 
-    # Glassmorphism & Responsive Styling
+    # CSS Khusus Layar Smartphone (Mobile-First CSS Breakpoints)
     ui_css = """
     <style>
+    /* Mengurangi Padding Bawaan Streamlit di HP */
+    @media (max-width: 768px) {
+        .block-container {
+            padding-left: 0.6rem !important;
+            padding-right: 0.6rem !important;
+            padding-top: 0.8rem !important;
+            padding-bottom: 1rem !important;
+        }
+        .main-hero {
+            padding: 16px 14px !important;
+            border-radius: 12px !important;
+            margin-bottom: 12px !important;
+        }
+        .hero-title { font-size: 20px !important; }
+        .hero-subtitle { font-size: 11px !important; }
+        
+        /* Grid 2 Kolom Rapi di Layar Kecil */
+        .eval-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+            margin: 10px 0 16px 0 !important;
+        }
+        .eval-card { padding: 10px 6px !important; }
+        .eval-value { font-size: 18px !important; }
+        
+        /* Tab Horisontal yang Nyaman di-Swipe Jari */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 2px !important;
+            overflow-x: auto !important;
+            white-space: nowrap !important;
+            -webkit-overflow-scrolling: touch;
+        }
+        .stTabs [data-baseweb="tab"] {
+            padding: 8px 10px !important;
+            font-size: 12px !important;
+        }
+        
+        /* Tombol Pas dengan Ukuran Jempol */
+        .stButton > button {
+            padding: 12px 14px !important;
+            font-size: 13px !important;
+            border-radius: 10px !important;
+        }
+    }
+
     .eval-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-        margin: 15px 0 22px 0;
-    }
-    @media (max-width: 640px) {
-        .eval-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-        }
+        gap: 10px;
+        margin: 12px 0 18px 0;
     }
     .eval-card {
-        border-radius: 12px;
-        padding: 14px 10px;
+        border-radius: 10px;
+        padding: 12px 8px;
         text-align: center;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
         backdrop-filter: blur(8px);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .eval-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
     }
     .eval-title {
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 5px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        margin-bottom: 3px;
     }
-    .eval-value {
-        font-size: 22px;
-        font-weight: 800;
-        line-height: 1.2;
-    }
+    .eval-value { font-size: 20px; font-weight: 800; line-height: 1.1; }
     .status-banner {
-        border-radius: 12px;
-        padding: 14px 18px;
-        margin-bottom: 25px;
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin-bottom: 16px;
         display: flex;
         align-items: center;
-        gap: 12px;
-        font-size: 13px;
+        gap: 10px;
+        font-size: 12px;
         font-weight: 600;
-        line-height: 1.5;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    .status-banner-red {
-        background: linear-gradient(135deg, rgba(127, 29, 29, 0.4) 0%, rgba(69, 10, 10, 0.7) 100%);
-        border: 1px solid rgba(239, 68, 68, 0.5);
-        color: #fca5a5;
-    }
-    .status-banner-yellow {
-        background: linear-gradient(135deg, rgba(120, 53, 15, 0.4) 0%, rgba(69, 26, 3, 0.7) 100%);
-        border: 1px solid rgba(245, 158, 11, 0.5);
-        color: #fde68a;
-    }
-    .status-banner-green {
-        background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(2, 44, 34, 0.7) 100%);
-        border: 1px solid rgba(5, 150, 105, 0.5);
-        color: #a7f3d0;
-    }
+    .status-banner-red { background: rgba(127, 29, 29, 0.45); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; }
+    .status-banner-yellow { background: rgba(120, 53, 15, 0.45); border: 1px solid rgba(245, 158, 11, 0.5); color: #fde68a; }
+    .status-banner-green { background: rgba(6, 78, 59, 0.45); border: 1px solid rgba(5, 150, 105, 0.5); color: #a7f3d0; }
+    
     .topic-item {
         background: rgba(30, 41, 59, 0.4);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 10px;
-        padding: 10px 14px;
-        margin-bottom: 10px;
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-bottom: 8px;
     }
-    .topic-header {
-        display: flex;
-        justify-content: space-between;
-        font-size: 12px;
-        font-weight: 700;
-        margin-bottom: 6px;
-        color: #e2e8f0;
-    }
-    .topic-bar-bg {
-        width: 100%;
-        height: 8px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 4px;
-        overflow: hidden;
-    }
-    .topic-bar-fill {
-        height: 100%;
-        border-radius: 4px;
-        transition: width 0.5s ease;
-    }
+    .topic-header { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; margin-bottom: 4px; color: #e2e8f0; }
+    .topic-bar-bg { width: 100%; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; overflow: hidden; }
+    .topic-bar-fill { height: 100%; border-radius: 3px; }
+
     .rec-card {
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%);
+        background: rgba(30, 41, 59, 0.4);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-left: 4px solid #10b981;
-        border-radius: 10px;
-        padding: 12px 16px;
-        margin-bottom: 10px;
-        font-size: 13px;
+        border-left: 3px solid #10b981;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        font-size: 12px;
         color: #f1f5f9;
         display: flex;
         align-items: flex-start;
-        gap: 12px;
+        gap: 10px;
     }
     .rec-num {
         background: rgba(16, 185, 129, 0.2);
-        color: #34d399;
-        font-weight: 800;
-        border-radius: 50%;
-        width: 22px;
-        height: 22px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        flex-shrink: 0;
+        color: #34d399; font-weight: 800; border-radius: 50%; width: 20px; height: 20px;
+        display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0;
     }
     .main-hero {
         background: linear-gradient(135deg, rgba(6, 78, 59, 0.6) 0%, rgba(2, 44, 34, 0.9) 100%);
         border: 1px solid rgba(16, 185, 129, 0.3);
-        border-radius: 16px;
-        padding: 24px;
-        margin-bottom: 20px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
-        backdrop-filter: blur(12px);
+        border-radius: 14px;
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     }
-    .hero-kicker { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #34d399; text-transform: uppercase; }
-    .hero-title { font-size: 26px; font-weight: 900; color: #f8fafc; margin: 4px 0; }
+    .hero-kicker { font-size: 10px; font-weight: 800; letter-spacing: 1.2px; color: #34d399; text-transform: uppercase; }
+    .hero-title { font-size: 22px; font-weight: 900; color: #f8fafc; margin: 2px 0; }
     .hero-title span { color: #fbbf24; }
-    .hero-subtitle { font-size: 13px; color: #cbd5e1; }
+    .hero-subtitle { font-size: 12px; color: #cbd5e1; }
     </style>
     """
     st.markdown(ui_css, unsafe_allow_html=True)
 
-    # HERO HEADER
+    # HERO HEADER MOBILE
     st.markdown("""
     <div class="main-hero">
-      <div class="hero-kicker">UPN • STUDENT INTELLIGENCE PLATFORM</div>
+      <div class="hero-kicker">UPN • STUDENT INTELLIGENCE</div>
       <div class="hero-title">Portal Santri<span>MANTAP</span></div>
-      <div class="hero-subtitle">Pusat Layanan Belajar Mandiri, Asisten AI, Jadwal UTS Realtime & Automasi WhatsApp Santri.</div>
+      <div class="hero-subtitle">Belajar Mandiri, Asisten AI, Jadwal UTS & Automasi WA.</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # DOORWAY / LOGIN PRIVACY-FIRST (Murni Ketik Nama)
-    with st.form("student_intelligence_identity", clear_on_submit=False):
-        st.markdown("#### 🔑 Masuk ke Portal Belajar Santri")
-        entered_name = st.text_input("Nama Lengkap Santri", value=nama_siswa, placeholder="Masukkan nama lengkap kamu...")
+    # LOGIN FORM PRIVACY-FIRST
+    with st.form("student_login_form_mobile", clear_on_submit=False):
+        st.markdown("##### 🔑 Masuk Portal Belajar")
+        entered_name = st.text_input("Nama Lengkap Santri", value=nama_siswa, placeholder="Ketik nama lengkap kamu...")
         submitted = st.form_submit_button("🔍 BUKA PORTAL SAYA", type="primary", use_container_width=True)
 
     if not submitted and not entered_name.strip():
-        st.info("💡 Ketikkan Nama Lengkap Kamu di atas untuk membuka portal belajar & analisis diagnostik.")
+        st.info("💡 Ketikkan Nama Lengkap Kamu di atas untuk membuka portal belajar.")
         return
 
     name = entered_name.strip()
 
-    # 1. Otomatis Mencocokkan Identitas dari Tabel wa_identities
+    # Match Identity
     identity_data = fetch_student_wa_identity(name)
     if identity_data:
         meta = identity_data.get("metadata") or {}
@@ -1107,10 +971,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         jenjang_detected = "MTS" if jenjang == "Semua Jenjang" else jenjang
         wa_number = ""
 
-    # 2. Tarik Jadwal UTS Resmi dari Tabel uts_schedules
     uts_schedules = fetch_uts_schedules_db(kelas, jenjang_detected)
-
-    # 3. Tarik Sesi Belajar & Hitung Daily Streak
     sessions = fetch_student_sessions(name)
     profile = build_student_profile(sessions)
     student_key_str = student_key(name, jenjang_detected)
@@ -1120,19 +981,19 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     st.session_state.student_intelligence_name = name
     st.session_state.student_intelligence_grade = jenjang_detected
 
-    # 4. Trigger Pop-Up Sapaan Hangat & Jadwal UTS
+    # Pop-Up Dialog Sapaan (Otomatis muncul sekali tanpa looping rerun)
     if "welcomed_today" not in st.session_state or st.session_state.get("welcomed_user") != name:
         st.session_state.welcomed_today = True
         st.session_state.welcomed_user = name
         show_welcome_modal(name, kelas, jenjang_detected, streak, wa_number, uts_schedules)
 
-    # TABS UTAMA INTEGRATED
+    # TABS DASHBOARD UTAMA
     tab_ai, tab_analytics, tab_simulasi, tab_automasi, tab_materi = st.tabs([
-        "💬 Asisten AI RoboMANTAP",
-        "📊 Progress & Diagnostic",
-        "🎯 Simulasi & Diagnostic UTS",
-        "⚙️ Automasi WA Santri",
-        "📚 Rumus Cepat & Concept Sheet"
+        "💬 Chat AI",
+        "📊 Diagnostic",
+        "🎯 Simulasi UTS",
+        "⚙️ Automasi",
+        "📚 Rumus Cepat"
     ])
 
     with tab_ai:
@@ -1140,7 +1001,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
 
     with tab_analytics:
         if not sessions:
-            st.warning("⚠️ Belum ditemukan sesi belajar dengan nama tersebut. Kerjakan simulasi UTS atau latihan adaptif untuk mulai membentuk grafik analitikal belajarmu.")
+            st.warning("⚠️ Belum ada sesi belajar terdeteksi. Kerjakan kuis/simulasi untuk melihat grafik analitikal.")
         else:
             render_learning_analytics(name, jenjang_detected, profile, sessions)
 
