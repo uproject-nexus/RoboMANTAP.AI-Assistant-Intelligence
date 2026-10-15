@@ -1,10 +1,6 @@
 {
-  "builds": [
-    { "src": "main.py", "use": "@vercel/python" },
-    { "src": "tka_main.py", "use": "@vercel/python" }
-  ],
-  "routes": [
-    { "src": "/tka/(.*)", "dest": "tka_main.py" },
-    { "src": "/(.*)", "dest": "main.py" }
+  "rewrites": [
+    { "source": "/tka/(.*)", "destination": "tka_main.py" },
+    { "source": "/(.*)", "destination": "main.py" }
   ]
 }
