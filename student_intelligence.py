@@ -1287,156 +1287,41 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     # Inisialisasi Otomatis Tabel Database Jika Belum Ada
     ensure_student_intelligence_tables()
 
-    # Glassmorphism & Responsive Styling
+    # Mobile-first visual system. Keep the existing database/authentication and
+    # learning functions unchanged; this layer only modernizes presentation.
     ui_css = """
     <style>
-    .eval-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-        margin: 15px 0 22px 0;
+    :root { --si-ink:#10233f; --si-muted:#60708a; --si-green:#087f5b; --si-mint:#d8f7e9; --si-yellow:#fff0b3; --si-line:rgba(100,116,139,.20); }
+    .main-hero { position:relative; isolation:isolate; overflow:hidden; margin:2px 0 20px; padding:clamp(22px,4vw,38px); border-radius:26px; color:#fff; background:radial-gradient(circle at 88% 10%,rgba(255,255,255,.22),transparent 26%),radial-gradient(circle at 10% 100%,rgba(45,212,191,.24),transparent 30%),linear-gradient(125deg,#123b65 0%,#087f70 56%,#16a085 100%); box-shadow:0 16px 36px rgba(8,79,92,.16); }
+    .main-hero:after { content:'✦'; position:absolute; z-index:-1; right:6%; bottom:-36px; font-size:150px; color:rgba(255,255,255,.09); transform:rotate(-12deg); }
+    .hero-kicker { font-size:10px; font-weight:850; letter-spacing:2px; color:#c6ffeb; text-transform:uppercase; }
+    .hero-title { margin:10px 0 8px; font-size:clamp(28px,5vw,42px); line-height:1.08; letter-spacing:-1.2px; font-weight:900; color:#fff; }
+    .hero-title span { color:#ffe58a; }
+    .hero-subtitle { max-width:680px; font-size:14px; line-height:1.7; color:#e8fffa; }
+    .portal-login-card { margin:14px 0; padding:clamp(18px,4vw,28px); border:1px solid rgba(16,185,129,.20); border-radius:22px; background:linear-gradient(135deg,rgba(220,252,231,.78),rgba(240,253,250,.7)); }
+    .portal-login-card h2 { margin:8px 0; color:#123b50; font-size:clamp(22px,4vw,30px); line-height:1.2; letter-spacing:-.5px; }
+    .portal-login-card p { margin:0; color:#52677b; font-size:14px; line-height:1.7; }
+    .portal-login-kicker { color:#087f5b; font-size:10px; font-weight:900; letter-spacing:1.8px; }
+    .portal-login-foot { margin-top:12px; padding:13px 15px; border:1px solid var(--si-line); border-radius:14px; background:rgba(148,163,184,.07); color:var(--si-muted); font-size:13px; line-height:1.65; }
+    div[data-testid="stForm"] { padding:clamp(14px,3vw,22px); border:1px solid var(--si-line); border-radius:20px; background:rgba(255,255,255,.66); box-shadow:0 8px 24px rgba(15,23,42,.035); }
+    div[data-testid="stFormSubmitButton"] button, div[data-testid="stButton"] button { min-height:45px; border-radius:13px; font-weight:750; transition:transform .15s ease,box-shadow .15s ease; }
+    div[data-testid="stFormSubmitButton"] button:hover, div[data-testid="stButton"] button:hover { transform:translateY(-1px); box-shadow:0 7px 18px rgba(16,185,129,.16); }
+    div[data-testid="stTabs"] { margin-top:8px; }
+    div[data-testid="stTabs"] div[role="tablist"] { gap:6px; padding:5px; border-radius:15px; background:rgba(148,163,184,.09); }
+    div[data-testid="stTabs"] button[role="tab"] { min-height:42px; padding:9px 13px; border-radius:11px; font-size:13px; font-weight:750; }
+    div[data-testid="stMetric"] { padding:14px; border:1px solid var(--si-line); border-radius:17px; background:rgba(255,255,255,.58); box-shadow:0 5px 18px rgba(15,23,42,.025); }
+    div[data-testid="stAlert"] { border-radius:14px; }
+    section[data-testid="stMain"] > div { padding-top:clamp(12px,2.5vw,28px); }
+    @media (max-width:760px) {
+      .main-hero { border-radius:21px; padding:22px 19px; margin-bottom:15px; }
+      .hero-title { font-size:30px; letter-spacing:-.8px; }
+      .hero-subtitle { font-size:13px; line-height:1.65; }
+      .portal-login-card { border-radius:18px; padding:19px 17px; }
+      div[data-testid="stTabs"] div[role="tablist"] { overflow-x:auto; flex-wrap:nowrap; scrollbar-width:thin; }
+      div[data-testid="stTabs"] button[role="tab"] { flex:0 0 auto; white-space:nowrap; font-size:12px; padding:8px 10px; }
+      div[data-testid="stMetric"] { padding:11px; }
     }
-    @media (max-width: 640px) {
-        .eval-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-        }
-    }
-    .eval-card {
-        border-radius: 12px;
-        padding: 14px 10px;
-        text-align: center;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
-        backdrop-filter: blur(8px);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .eval-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-    }
-    .eval-title {
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 5px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .eval-value {
-        font-size: 22px;
-        font-weight: 800;
-        line-height: 1.2;
-    }
-    .status-banner {
-        border-radius: 12px;
-        padding: 14px 18px;
-        margin-bottom: 25px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        font-size: 13px;
-        font-weight: 600;
-        line-height: 1.5;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
-    .status-banner-red {
-        background: linear-gradient(135deg, rgba(127, 29, 29, 0.4) 0%, rgba(69, 10, 10, 0.7) 100%);
-        border: 1px solid rgba(239, 68, 68, 0.5);
-        color: #fca5a5;
-    }
-    .status-banner-yellow {
-        background: linear-gradient(135deg, rgba(120, 53, 15, 0.4) 0%, rgba(69, 26, 3, 0.7) 100%);
-        border: 1px solid rgba(245, 158, 11, 0.5);
-        color: #fde68a;
-    }
-    .status-banner-green {
-        background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(2, 44, 34, 0.7) 100%);
-        border: 1px solid rgba(5, 150, 105, 0.5);
-        color: #a7f3d0;
-    }
-    .topic-item {
-        background: rgba(30, 41, 59, 0.4);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 10px;
-        padding: 10px 14px;
-        margin-bottom: 10px;
-    }
-    .topic-header {
-        display: flex;
-        justify-content: space-between;
-        font-size: 12px;
-        font-weight: 700;
-        margin-bottom: 6px;
-        color: #e2e8f0;
-    }
-    .topic-bar-bg {
-        width: 100%;
-        height: 8px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 4px;
-        overflow: hidden;
-    }
-    .topic-bar-fill {
-        height: 100%;
-        border-radius: 4px;
-        transition: width 0.5s ease;
-    }
-    .rec-card {
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-left: 4px solid #10b981;
-        border-radius: 10px;
-        padding: 12px 16px;
-        margin-bottom: 10px;
-        font-size: 13px;
-        color: #f1f5f9;
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-    }
-    .rec-num {
-        background: rgba(16, 185, 129, 0.2);
-        color: #34d399;
-        font-weight: 800;
-        border-radius: 50%;
-        width: 22px;
-        height: 22px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        flex-shrink: 0;
-    }
-    .main-hero {
-        background: linear-gradient(135deg, rgba(6, 78, 59, 0.6) 0%, rgba(2, 44, 34, 0.9) 100%);
-        border: 1px solid rgba(16, 185, 129, 0.3);
-        border-radius: 16px;
-        padding: 24px;
-        margin-bottom: 20px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
-        backdrop-filter: blur(12px);
-    }
-    .hero-kicker { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #34d399; text-transform: uppercase; }
-    .hero-title { font-size: 26px; font-weight: 900; color: #f8fafc; margin: 4px 0; }
-    .hero-title span { color: #fbbf24; }
-    .hero-subtitle { font-size: 13px; color: #cbd5e1; }
-    .main-hero { position: relative; overflow: hidden; border-radius: 24px; padding: clamp(22px,4vw,38px); background: radial-gradient(circle at 90% 0%, rgba(52,211,153,.25), transparent 35%), linear-gradient(125deg,#052e2b 0%,#064e3b 52%,#0f766e 100%); border: 1px solid rgba(110,231,183,.28); box-shadow: 0 18px 45px rgba(2,44,34,.20); }
-    .hero-kicker { letter-spacing: 2px; font-size: 10px; color: #a7f3d0; }
-    .hero-title { font-size: clamp(27px,5vw,40px); letter-spacing: -1.1px; line-height: 1.08; margin: 9px 0; }
-    .hero-subtitle { max-width: 680px; line-height: 1.65; font-size: 14px; }
-    .portal-login-card { margin: 18px 0 12px; padding: clamp(20px,4vw,30px); border-radius: 22px; background: linear-gradient(145deg,rgba(16,185,129,.12),rgba(20,184,166,.05)); border: 1px solid rgba(16,185,129,.25); }
-    .portal-login-card h2 { font-size: clamp(22px,4vw,30px); line-height: 1.2; margin: 8px 0; letter-spacing: -.5px; }
-    .portal-login-card p { color: var(--text-color); opacity: .78; line-height: 1.65; font-size: 14px; margin-bottom: 0; }
-    .portal-login-kicker { color: #059669; font-weight: 850; font-size: 10px; letter-spacing: 1.8px; }
-    .portal-login-foot { padding: 12px 14px; border-radius: 12px; background: rgba(148,163,184,.09); font-size: 13px; line-height: 1.6; }
-    div[data-testid="stForm"] { border: 1px solid rgba(100,116,139,.18); border-radius: 18px; padding: clamp(14px,3vw,22px); background: rgba(148,163,184,.035); }
-    div[data-testid="stFormSubmitButton"] button, div[data-testid="stButton"] button { border-radius: 12px; min-height: 44px; font-weight: 750; transition: transform .15s ease, box-shadow .15s ease; }
-    div[data-testid="stFormSubmitButton"] button:hover, div[data-testid="stButton"] button:hover { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(16,185,129,.18); }
-    div[data-testid="stTabs"] button[role="tab"] { border-radius: 12px 12px 0 0; font-weight: 700; }
-    div[data-testid="stMetric"] { padding: 14px; border: 1px solid rgba(100,116,139,.18); border-radius: 16px; background: rgba(148,163,184,.045); }
-    @media (max-width: 640px) { .main-hero { border-radius: 18px; padding: 21px 18px; } .hero-title { font-size: 28px; } .hero-subtitle { font-size: 13px; } div[data-testid="stTabs"] div[role="tablist"] { gap: 4px; } div[data-testid="stTabs"] button[role="tab"] { padding: 8px 10px; font-size: 12px; } }
+    @media (prefers-reduced-motion: reduce) { * { transition:none !important; scroll-behavior:auto !important; } }
     </style>
     """
     st.markdown(ui_css, unsafe_allow_html=True)
@@ -1444,14 +1329,14 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     # HERO HEADER
     st.markdown("""
     <div class="main-hero">
-      <div class="hero-kicker">UPN • STUDENT INTELLIGENCE PLATFORM</div>
-      <div class="hero-title">Portal Santri<span>MANTAP</span></div>
-      <div class="hero-subtitle">Pusat Layanan Belajar Mandiri, Asisten AI, Jadwal UTS Realtime & Automasi WhatsApp Santri.</div>
+      <div class="hero-kicker">RUANG BELAJAR PERSONAL • ROBOMANTAP</div>
+      <div class="hero-title">Halo, Santri!<br/>Saatnya jadi <span>MANTAP.</span> ✨</div>
+      <div class="hero-subtitle">Satu ruang untuk belajar, berlatih, melihat perkembangan, menyiapkan ujian, dan mendapatkan bantuan saat kamu membutuhkannya.</div>
     </div>
     """, unsafe_allow_html=True)
 
     if st.session_state.get("student_intelligence_authenticated"):
-        if st.button("Keluar dari Portal", key="student_intelligence_logout", use_container_width=True):
+        if st.button("↩️ Keluar dari Portal", key="student_intelligence_logout", use_container_width=True):
             for key in (
                 "student_intelligence_authenticated",
                 "student_intelligence_identity",
@@ -1579,15 +1464,31 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         st.session_state.welcomed_user = name
         show_welcome_modal(name, kelas, jenjang_detected, streak, wa_number, uts_schedules)
 
+    # Compact student identity strip: visible on mobile without taking over the page.
+    st.markdown(
+        f"""<div style="display:flex;align-items:center;gap:12px;margin:0 0 16px;padding:14px 16px;border:1px solid rgba(100,116,139,.18);border-radius:18px;background:linear-gradient(110deg,rgba(209,250,229,.58),rgba(240,253,250,.55));">
+        <div style="display:flex;align-items:center;justify-content:center;flex:0 0 46px;height:46px;border-radius:15px;background:#d1fae5;font-size:23px;">🎓</div>
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:10px;font-weight:850;letter-spacing:1.3px;text-transform:uppercase;color:#087f5b;">RUANG BELAJAR SAYA</div>
+          <div style="font-size:18px;line-height:1.25;font-weight:850;color:#123b50;overflow-wrap:anywhere;">{html.escape(name)}</div>
+          <div style="font-size:12px;color:#60708a;">Kelas {html.escape(kelas)} · {html.escape(jenjang_detected)}</div>
+        </div>
+        <div style="flex:0 0 auto;text-align:center;padding:8px 10px;border-radius:13px;background:#fff4c2;color:#795c00;">
+          <div style="font-size:17px;font-weight:900;">🔥 {int(streak)}</div><div style="font-size:10px;font-weight:750;">hari aktif</div>
+        </div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
     render_uts_schedule_panel(uts_schedules, kelas, jenjang_detected)
 
     # TABS UTAMA INTEGRATED
-    tab_ai, tab_analytics, tab_simulasi, tab_automasi, tab_materi = st.tabs([
-        "💬 Asisten AI RoboMANTAP",
-        "📊 Progress & Diagnostic",
-        "🎯 Simulasi & Diagnostic UTS",
-        "⚙️ Automasi WA Santri",
-        "📚 Rumus Cepat & Concept Sheet"
+    tab_simulasi, tab_ai, tab_analytics, tab_materi, tab_automasi = st.tabs([
+        "🎯 Latihan & UTS",
+        "💬 Asisten AI",
+        "📈 Progress Saya",
+        "📚 Materi Ringkas",
+        "📱 WhatsApp"
     ])
 
     with tab_ai:
