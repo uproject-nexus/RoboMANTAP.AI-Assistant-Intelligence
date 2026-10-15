@@ -289,7 +289,7 @@ def fetch_student_wa_identity_by_username(username: str) -> dict | None:
 
 
 def fetch_uts_schedules_db(kelas: str, jenjang: str) -> list[dict]:
-    """Ambil jadwal resmi dari uts_schedules; fallback ke nama alternatif uts_schedule."""
+    """Ambil jadwal resmi; utamakan uts_schedule dan dukung nama lama uts_schedules."""
     conn = init_db_connection()
     if not conn or not kelas:
         return []
@@ -297,14 +297,14 @@ def fetch_uts_schedules_db(kelas: str, jenjang: str) -> list[dict]:
     queries = [
         """
         SELECT *
-        FROM uts_schedules
+        FROM uts_schedule
         WHERE TRIM(kelas::text) = TRIM(:kelas)
           AND UPPER(TRIM(jenjang)) = UPPER(TRIM(:jenjang))
         ORDER BY tanggal_ujian ASC
         """,
         """
         SELECT *
-        FROM uts_schedule
+        FROM uts_schedules
         WHERE TRIM(kelas::text) = TRIM(:kelas)
           AND UPPER(TRIM(jenjang)) = UPPER(TRIM(:jenjang))
         ORDER BY tanggal_ujian ASC
