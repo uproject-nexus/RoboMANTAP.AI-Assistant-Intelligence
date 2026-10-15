@@ -7,20 +7,7 @@ import hashlib
 import subprocess
 import tempfile
 import pandas as pd
-try:
-    import streamlit as st
-except ImportError:
-    # Fallback jika dijalankan di Vercel (tanpa Streamlit)
-    class DummyStreamlit:
-        def cache_resource(self, *args, **kwargs):
-            def decorator(func):
-                return func
-            return decorator
-        def cache_data(self, *args, **kwargs):
-            def decorator(func):
-                return func
-            return decorator
-    st = DummyStreamlit()
+import streamlit as st
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
