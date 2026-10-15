@@ -176,6 +176,41 @@ def apply_intelligence_theme() -> None:
       .rm-feature-card:hover,.rm-portal-link:hover,[data-testid="stMetric"]:hover{transform:none}
       .rm-feature-icon:active,.rm-portal-icon:active,.rm-bottom-note>span:active{animation-play-state:paused;transform:scale(.92)}
     }
-    @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important;transform:none!important}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important;transform:none!important}}    
+    /* FIX: Tombol buka sidebar Streamlit — mobile */
+    @media (max-width: 768px) {
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="stExpandSidebarButton"] {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: fixed !important;
+            top: 12px !important;
+            left: 12px !important;
+            z-index: 99999 !important;
+            width: 44px !important;
+            height: 44px !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: #ffffff !important;
+            border: 2px solid #dbeafe !important;
+            border-radius: 14px !important;
+            box-shadow: 0 4px 14px rgba(30, 64, 175, 0.16) !important;
+        }
+    
+        [data-testid="stSidebarCollapsedControl"] svg,
+        [data-testid="stExpandSidebarButton"] svg {
+            color: #1d4ed8 !important;
+            fill: none !important;
+            stroke: #1d4ed8 !important;
+            opacity: 1 !important;
+        }
+    
+        [data-testid="stSidebarCollapsedControl"] button,
+        [data-testid="stExpandSidebarButton"] button {
+            color: #1d4ed8 !important;
+            opacity: 1 !important;
+        }
+    }
     </style>
     """, unsafe_allow_html=True)
