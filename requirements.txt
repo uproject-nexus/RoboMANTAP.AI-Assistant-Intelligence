@@ -6,6 +6,7 @@ sqlalchemy
 psycopg2-binary
 supabase
 google-generativeai
+google-genai
 httpx
 python-dotenv
 pandas
