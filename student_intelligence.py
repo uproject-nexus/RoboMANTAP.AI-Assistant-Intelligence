@@ -90,6 +90,7 @@ def parse_schedule_date(value: Any) -> date | None:
 # 1. DATABASE INITIALIZATION (PENTING UNTUK APP.PY)
 # =============================================================================
 
+@st.cache_resource(show_spinner=False)
 def ensure_student_intelligence_tables() -> bool:
     """Memastikan tabel database pendukung Student Intelligence siap digunakan."""
     conn = init_db_connection()

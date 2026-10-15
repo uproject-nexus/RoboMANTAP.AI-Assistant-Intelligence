@@ -25,6 +25,7 @@ from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
 
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 
 try:
@@ -2022,7 +2023,7 @@ def generate_corporate_executive_docx_report(config: dict, data_siswa: list, col
     r2.font.size = Pt(10.5)
     
     # Tanggal Presisi WIB dengan Nama Bulan Bahasa Indonesia
-    now_wib = datetime.utcnow() + timedelta(hours=7)
+    now_wib = datetime.now(ZoneInfo("Asia/Jakarta"))
     nama_bulan = [
         "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
         "Juli", "Agustus", "September", "Oktober", "November", "Desember"
