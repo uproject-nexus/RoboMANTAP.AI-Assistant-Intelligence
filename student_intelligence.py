@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import io
 import json
+import html
+import hashlib
+import secrets
 import math
 import re
 import uuid
 import urllib.parse
 from collections import Counter, defaultdict
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Any
 
 import pandas as pd
@@ -32,7 +35,7 @@ try:
 except ImportError:
     REPORTLAB_AVAILABLE = False
 
-from ai_engine import init_db_connection
+from ai_engine import init_db_connection, stream_ai_text, get_gemini_clients, STREAM_MODELS
 
 STUDENT_INTELLIGENCE_VERSION = "3.0"
 
@@ -70,6 +73,37 @@ def ensure_student_intelligence_tables() -> bool:
         """
         CREATE INDEX IF NOT EXISTS idx_student_intel_actions_student
             ON student_intelligence_actions (student_key, created_at DESC)
+        """,
+        """
+        ALTER TABLE wa_identities ADD COLUMN IF NOT EXISTS username VARCHAR(32)
+        """,
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_wa_identities_username_unique
+        ON wa_identities (LOWER(BTRIM(username)))
+        WHERE username IS NOT NULL AND BTRIM(username) <> ''
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS student_portal_login_challenges (
+            token_hash VARCHAR(64) PRIMARY KEY,
+            username VARCHAR(32) NOT NULL,
+            wa_number VARCHAR(40) NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            expires_at TIMESTAMPTZ NOT NULL,
+            verified_at TIMESTAMPTZ,
+            consumed_at TIMESTAMPTZ
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_portal_login_challenge_expiry
+        ON student_portal_login_challenges (expires_at)
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS student_portal_preferences (
+            wa_number VARCHAR(40) PRIMARY KEY,
+            morning_alert_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            night_alert_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
         """,
     ]
     try:
@@ -209,50 +243,193 @@ def generate_pdf_notes(nama_siswa: str, kelas: str, jenjang: str, topic_title: s
 # 4. QUERY DATABASE INTEGRATED (wa_identities, uts_schedules & sessions)
 # =============================================================================
 
-def fetch_student_wa_identity(nama_siswa: str) -> dict | None:
-    """Mencari data siswa terdaftar dari tabel wa_identities (Privacy Preserved)."""
+def normalize_username(value: str) -> str:
+    """Canonical username: lowercase, no spaces, limited safe characters."""
+    return re.sub(r"[^a-z0-9._]", "", str(value or "").strip().casefold())
+
+
+def validate_username(value: str) -> tuple[bool, str]:
+    raw = str(value or "").strip()
+    normalized = normalize_username(raw)
+    if not raw:
+        return False, "Masukkan username kamu."
+    if len(normalized) < 3 or len(normalized) > 24:
+        return False, "Username harus terdiri dari 3–24 karakter."
+    if normalized != raw.casefold():
+        return False, "Gunakan hanya huruf, angka, titik (.) atau garis bawah (_), tanpa spasi."
+    if not re.match(r"^[a-z0-9][a-z0-9._]{2,23}$", normalized):
+        return False, "Username harus diawali huruf/angka dan hanya berisi huruf, angka, titik, atau garis bawah."
+    return True, normalized
+
+
+def fetch_student_wa_identity_by_username(username: str) -> dict | None:
+    """Lookup identitas siswa berdasarkan username unik dari wa_identities."""
     conn = init_db_connection()
-    if not conn or not nama_siswa.strip():
+    normalized = normalize_username(username)
+    if not conn or not normalized:
         return None
 
     query = """
-        SELECT wa_number, person_id, role, nama, metadata, status
+        SELECT wa_number, person_id, role, nama, metadata, status, username
         FROM wa_identities
-        WHERE LOWER(TRIM(nama)) = LOWER(TRIM(:nama))
-          AND role = 'SISWA'
-          AND status = 'ACTIVE'
+        WHERE LOWER(BTRIM(username)) = :username
+          AND UPPER(role) = 'SISWA'
+          AND UPPER(status) = 'ACTIVE'
         LIMIT 1
     """
     try:
-        with conn.session as s:
-            row = s.execute(text(query), {"nama": nama_siswa.strip()}).mappings().first()
+        with conn.session as session:
+            row = session.execute(text(query), {"username": normalized}).mappings().first()
             if row:
                 return dict(row)
         return None
     except Exception as exc:
-        print(f"[STUDENT INTELLIGENCE] fetch identity error: {exc}")
+        print(f"[STUDENT INTELLIGENCE] username lookup error: {exc}")
         return None
 
+
 def fetch_uts_schedules_db(kelas: str, jenjang: str) -> list[dict]:
-    """Mengambil jadwal UTS resmi dari tabel uts_schedules berdasarkan kelas & jenjang."""
+    """Ambil jadwal resmi dari uts_schedules; fallback ke nama alternatif uts_schedule."""
     conn = init_db_connection()
     if not conn or not kelas:
         return []
 
-    query = """
-        SELECT id, jenjang, kelas, tanggal_ujian, mapel, soal_pemanasan
+    queries = [
+        """
+        SELECT *
         FROM uts_schedules
-        WHERE TRIM(kelas) = TRIM(:kelas)
-          AND LOWER(TRIM(jenjang)) = LOWER(TRIM(:jenjang))
+        WHERE TRIM(kelas::text) = TRIM(:kelas)
+          AND UPPER(TRIM(jenjang)) = UPPER(TRIM(:jenjang))
         ORDER BY tanggal_ujian ASC
-    """
+        """,
+        """
+        SELECT *
+        FROM uts_schedule
+        WHERE TRIM(kelas::text) = TRIM(:kelas)
+          AND UPPER(TRIM(jenjang)) = UPPER(TRIM(:jenjang))
+        ORDER BY tanggal_ujian ASC
+        """,
+    ]
+    for query in queries:
+        try:
+            with conn.session as session:
+                rows = session.execute(
+                    text(query), {"kelas": str(kelas), "jenjang": str(jenjang)}
+                ).mappings().all()
+                return [dict(row) for row in rows]
+        except Exception as exc:
+            print(f"[STUDENT INTELLIGENCE] schedule query fallback: {exc}")
+    return []
+
+
+def create_portal_login_challenge(username: str, wa_number: str) -> str | None:
+    """Create a short-lived WhatsApp confirmation token; raw token is never stored."""
+    conn = init_db_connection()
+    if not conn or not wa_number:
+        return None
+    token = secrets.token_urlsafe(24)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    now_utc = datetime.now(timezone.utc)
+    expires_at = now_utc + timedelta(minutes=5)
     try:
-        with conn.session as s:
-            rows = s.execute(text(query), {"kelas": str(kelas), "jenjang": str(jenjang)}).mappings().all()
-            return [dict(r) for r in rows]
+        with conn.session as session:
+            session.execute(text("""
+                INSERT INTO student_portal_login_challenges
+                    (token_hash, username, wa_number, created_at, expires_at)
+                VALUES (:token_hash, :username, :wa_number, :created_at, :expires_at)
+            """), {
+                "token_hash": token_hash,
+                "username": normalize_username(username),
+                "wa_number": str(wa_number).strip(),
+                "created_at": now_utc,
+                "expires_at": expires_at,
+            })
+            session.commit()
+        return token
     except Exception as exc:
-        print(f"[STUDENT INTELLIGENCE] fetch uts schedules error: {exc}")
-        return []
+        print(f"[STUDENT INTELLIGENCE] challenge create error: {exc}")
+        return None
+
+
+def consume_verified_portal_login(token: str) -> bool:
+    """Consume a confirmed, unexpired challenge exactly once."""
+    conn = init_db_connection()
+    if not conn or not token:
+        return False
+    token_hash = hashlib.sha256(str(token).encode("utf-8")).hexdigest()
+    now_utc = datetime.now(timezone.utc)
+    try:
+        with conn.session as session:
+            row = session.execute(text("""
+                SELECT token_hash
+                FROM student_portal_login_challenges
+                WHERE token_hash = :token_hash
+                  AND verified_at IS NOT NULL
+                  AND consumed_at IS NULL
+                  AND expires_at > :now_utc
+                LIMIT 1
+            """), {"token_hash": token_hash, "now_utc": now_utc}).first()
+            if not row:
+                return False
+            session.execute(text("""
+                UPDATE student_portal_login_challenges
+                SET consumed_at = :now_utc
+                WHERE token_hash = :token_hash
+                  AND consumed_at IS NULL
+            """), {"token_hash": token_hash, "now_utc": now_utc})
+            session.commit()
+        return True
+    except Exception as exc:
+        print(f"[STUDENT INTELLIGENCE] challenge consume error: {exc}")
+        return False
+
+
+def get_student_portal_preferences(wa_number: str) -> dict:
+    defaults = {"morning_alert_enabled": True, "night_alert_enabled": True}
+    conn = init_db_connection()
+    if not conn or not wa_number:
+        return defaults
+    try:
+        with conn.session as session:
+            row = session.execute(text("""
+                SELECT morning_alert_enabled, night_alert_enabled
+                FROM student_portal_preferences WHERE wa_number = :wa_number
+            """), {"wa_number": str(wa_number).strip()}).mappings().first()
+            if row:
+                return {
+                    "morning_alert_enabled": bool(row.get("morning_alert_enabled", True)),
+                    "night_alert_enabled": bool(row.get("night_alert_enabled", True)),
+                }
+    except Exception as exc:
+        print(f"[STUDENT INTELLIGENCE] preference read error: {exc}")
+    return defaults
+
+
+def save_student_portal_preferences(wa_number: str, morning_enabled: bool, night_enabled: bool) -> bool:
+    conn = init_db_connection()
+    if not conn or not wa_number:
+        return False
+    try:
+        with conn.session as session:
+            session.execute(text("""
+                INSERT INTO student_portal_preferences
+                    (wa_number, morning_alert_enabled, night_alert_enabled, updated_at)
+                VALUES (:wa_number, :morning_enabled, :night_enabled, NOW())
+                ON CONFLICT (wa_number) DO UPDATE SET
+                    morning_alert_enabled = EXCLUDED.morning_alert_enabled,
+                    night_alert_enabled = EXCLUDED.night_alert_enabled,
+                    updated_at = NOW()
+            """), {
+                "wa_number": str(wa_number).strip(),
+                "morning_enabled": bool(morning_enabled),
+                "night_enabled": bool(night_enabled),
+            })
+            session.commit()
+        return True
+    except Exception as exc:
+        print(f"[STUDENT INTELLIGENCE] preference save error: {exc}")
+        return False
+
 
 def update_and_get_daily_streak(student_key: str, profile_data: dict) -> tuple[int, bool]:
     """Menghitung dan memperbarui Daily Learning Streak siswa secara otomatis."""
@@ -283,7 +460,7 @@ def update_and_get_daily_streak(student_key: str, profile_data: dict) -> tuple[i
     profile_data["last_active_date"] = today_str
     return current_streak, is_new_day
 
-def fetch_student_sessions(nama_siswa: str, limit: int = 80) -> list[dict]:
+def fetch_student_sessions(nama_siswa: str, limit: int = 80, jenjang: str | None = None) -> list[dict]:
     conn = init_db_connection()
     if not conn or not nama_siswa.strip():
         return []
@@ -294,13 +471,17 @@ def fetch_student_sessions(nama_siswa: str, limit: int = 80) -> list[dict]:
                status, created_at, updated_at
         FROM sesi_ujian
         WHERE LOWER(TRIM(nama_siswa)) = LOWER(TRIM(:nama))
+          AND (:jenjang IS NULL OR UPPER(TRIM(jenjang)) = UPPER(TRIM(:jenjang)))
           AND status NOT IN ('TRIAL', 'ARCHIVED', 'HIDDEN', 'DRAFT')
         ORDER BY COALESCE(updated_at, created_at) DESC
         LIMIT :limit
     """
     try:
         with conn.session as s:
-            rows = s.execute(text(query), {"nama": nama_siswa.strip(), "limit": limit}).mappings().all()
+            rows = s.execute(
+                text(query),
+                {"nama": nama_siswa.strip(), "limit": limit, "jenjang": jenjang},
+            ).mappings().all()
         return [dict(row) for row in rows]
     except Exception as exc:
         print(f"[STUDENT INTELLIGENCE] fetch sessions warning: {exc}")
@@ -596,6 +777,53 @@ def show_welcome_modal(nama_siswa: str, kelas: str, jenjang: str, streak: int, w
 # 7. SUB-RENDERERS TABS INTERNAL
 # =============================================================================
 
+def _generate_student_ai_response(prompt: str, nama_siswa: str, kelas: str, jenjang: str, uploaded_file=None) -> str:
+    """Generate a grounded study answer; supports text, image stimulus, and searchable PDF text."""
+    context = (
+        "Kamu adalah RoboMANTAP, asisten belajar yang ramah, teliti, dan jujur. "
+        "Jawab dalam Bahasa Indonesia yang jelas sesuai tingkat siswa. Berikan langkah penjelasan "
+        "dan contoh seperlunya. Jangan mengarang jadwal resmi; rujuk agenda portal untuk jadwal. "
+        f"Identitas siswa: {nama_siswa}, kelas {kelas} {jenjang}. "
+        f"Waktu lokal: {datetime.now().strftime('%Y-%m-%d %H:%M')} WIB. "
+        f"Pertanyaan siswa: {prompt}"
+    )
+    if uploaded_file is not None:
+        data = uploaded_file.getvalue()
+        file_name = str(getattr(uploaded_file, "name", "lampiran")).lower()
+        if file_name.endswith(".pdf"):
+            try:
+                import fitz
+                with fitz.open(stream=data, filetype="pdf") as pdf:
+                    extracted = "\\n".join(page.get_text("text") for page in pdf)
+                context += "\\n\\nTeks dari dokumen siswa (potongan maksimal 14000 karakter):\\n" + extracted[:14000]
+            except Exception as exc:
+                print(f"[STUDENT INTELLIGENCE] PDF extraction error: {exc}")
+                context += "\\nCatatan: teks PDF tidak berhasil diekstrak; jelaskan berdasarkan pertanyaan saja."
+        elif file_name.endswith((".png", ".jpg", ".jpeg", ".webp")):
+            try:
+                from PIL import Image as PILImage
+                image_obj = PILImage.open(io.BytesIO(data)).convert("RGB")
+                clients = get_gemini_clients()
+                for client in clients:
+                    for model_name in STREAM_MODELS:
+                        try:
+                            response = client.models.generate_content(
+                                model=model_name,
+                                contents=[context + "\\nAnalisis gambar terlampir dengan teliti.", image_obj],
+                            )
+                            answer = str(getattr(response, "text", "") or "").strip()
+                            if answer:
+                                return answer
+                        except Exception:
+                            continue
+                context += "\\nCatatan: analisis gambar tidak berhasil; jawab berdasarkan pertanyaan teks saja."
+            except Exception as exc:
+                print(f"[STUDENT INTELLIGENCE] image analysis error: {exc}")
+                context += "\\nCatatan: gambar tidak berhasil dibaca; jawab berdasarkan pertanyaan teks saja."
+    answer = "".join(str(chunk) for chunk in stream_ai_text(context, max_output_tokens=1800)).strip()
+    return answer or "Maaf, AI belum memberikan jawaban. Coba kirim pertanyaan yang lebih spesifik."
+
+
 def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_number: str):
     """TAB 1: Asisten AI RoboMANTAP dengan Diskusi, Upload Tugas, Share ke WA & Download PDF."""
     st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">💬 Asisten & Catatan AI RoboMANTAP</div>', unsafe_allow_html=True)
@@ -620,8 +848,15 @@ def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_nu
             with st.chat_message("user"):
                 st.markdown(prompt)
 
-        ai_response = f"Baik Santri Cerdas *{nama_siswa}* (Kelas {kelas} {jenjang})!\n\nBerikut pembahasan & poin penting terkait **{prompt}**:\n\n1. *Konsep Utama*: Pahami definisi dasar dan hubungan antar komponennya.\n2. *Langkah Penyelesaian*: Selesaikan bertahap menggunakan rumus/aturan baku.\n3. *Tips UTS*: Fokus pada bentuk soal latihan yang sering keluar di ujian.\n\nSemangat terus belajarnya ya! 💪✨"
-        
+        ai_response = ""
+        try:
+            ai_response = _generate_student_ai_response(
+                prompt, nama_siswa, kelas, jenjang, uploaded_file=uploaded_file
+            )
+        except Exception as exc:
+            print(f"[STUDENT INTELLIGENCE] AI chat error: {exc}")
+            ai_response = "Maaf, Asisten AI sedang mengalami kendala koneksi. Silakan coba kembali beberapa saat lagi."
+
         st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
         st.session_state.last_ai_note = ai_response
         st.session_state.last_ai_topic = prompt
@@ -835,7 +1070,7 @@ def render_uts_simulation():
             key="sim_mapel"
         )
 
-    st.info(f"📌 **Mode Drill H-1 UTS**: 5 Soal Esensial {mapel_sim} ({jenjang_sim})")
+    st.info(f"📌 **Mode Drill H-1 UTS**: 3 Soal Esensial {mapel_sim} ({jenjang_sim})")
 
     if st.button("🚀 Mulai Simulasi UTS (10 Menit)", type="primary", use_container_width=True):
         st.session_state.start_uts_quiz = True
@@ -849,51 +1084,87 @@ def render_uts_simulation():
                 q1 = st.radio("1. Hasil dari (-4) + 8 × (-2) adalah...", ["-20", "-12", "12", "20"], key="uts_q1")
                 q2 = st.radio("2. Bentuk sederhana dari √50 adalah...", ["5√2", "2√5", "10√2", "25√2"], key="uts_q2")
                 q3 = st.radio("3. Penyelesaian dari |x - 2| = 5 adalah...", ["x = 7 atau x = -3", "x = 5 atau x = -5", "x = 3 atau x = -7"], key="uts_q3")
-            elif "IPA" in mapel_sim or "Fisika" in mapel_sim:
+                correct_answers = ["-20", "5√2", "x = 7 atau x = -3"]
+            elif "IPA" in mapel_sim or "Fisika" in mapel_sim or "Kimia" in mapel_sim:
                 q1 = st.radio("1. Satuan SI untuk suhu adalah...", ["Celsius", "Kelvin", "Fahrenheit", "Reamur"], key="uts_q1")
                 q2 = st.radio("2. Organel sel yang berfungsi sebagai tempat respirasi sel adalah...", ["Mitokondria", "Ribosom", "Lisosom"], key="uts_q2")
                 q3 = st.radio("3. Alat untuk mengukur kuat arus listrik adalah...", ["Voltmeter", "Amperemeter", "Thermometer"], key="uts_q3")
+                correct_answers = ["Kelvin", "Mitokondria", "Amperemeter"]
+            elif "Inggris" in mapel_sim:
+                q1 = st.radio("1. Choose the correct sentence.", ["She go to school.", "She goes to school.", "She going school."], key="uts_q1")
+                q2 = st.radio("2. The closest meaning of 'important' is...", ["Significant", "Tiny", "Late"], key="uts_q2")
+                q3 = st.radio("3. The past form of 'write' is...", ["Writed", "Written", "Wrote"], key="uts_q3")
+                correct_answers = ["She goes to school.", "Significant", "Wrote"]
             else:
                 q1 = st.radio("1. Kata sapaan 'Selamat Pagi' dalam Bahasa Arab adalah...", ["Sabahal Khair", "Masaal Khair", "Ahlan wa Sahlan"], key="uts_q1")
                 q2 = st.radio("2. Kedudukan Na'at dalam tata bahasa Arab harus mengikuti...", ["Man'ut", "Mubtada'", "Khabar"], key="uts_q2")
                 q3 = st.radio("3. Seseorang yang menyampaikan/meriwayatkan hadist disebut...", ["Rawi", "Sanad", "Matan"], key="uts_q3")
+                correct_answers = ["Sabahal Khair", "Man'ut", "Rawi"]
 
             submit_sim = st.form_submit_button("Selesaikan Ujian & Lihat Diagnostic", use_container_width=True)
             
             if submit_sim:
                 st.session_state.start_uts_quiz = False
+                answers = [q1, q2, q3]
+                correct_count = sum(
+                    1 for answer, expected in zip(answers, correct_answers)
+                    if answer == expected
+                )
+                score = round(correct_count / len(correct_answers) * 100)
+                st.session_state["last_uts_drill_result"] = {
+                    "mapel": mapel_sim,
+                    "jenjang": jenjang_sim,
+                    "correct": correct_count,
+                    "total": len(correct_answers),
+                    "score": score,
+                    "completed_at": datetime.now().isoformat(timespec="seconds"),
+                }
                 st.balloons()
-                st.success("🎉 Simulasi Selesai!")
-                
+                st.success("Simulasi selesai. Skor dihitung dari jawaban yang kamu pilih.")
+
                 sc1, sc2 = st.columns(2)
                 with sc1:
-                    st.metric("Skor Kesiapan UTS", "85 / 100", "+15% dari Target")
+                    st.metric("Skor Simulasi", f"{score} / 100", f"{correct_count}/{len(correct_answers)} benar")
                 with sc2:
-                    st.metric("Status Diagnosis", "SIAP UJIAN 💥")
-                
-                st.markdown("""
-                **📊 Analisis Diagnosis Kesiapan Topik:**
-                * **Konsep Dasar & Operasi**: ✅ Sangat Dikuasai (100%)
-                * **Penalaran & Penerapan Rumus**: ⚠️ Perlu Diulas Kembali (66%)
-                
-                👉 *Saran AI Malam Ini:* Pelajari kembali rumus dan poin penting bab ini selama 15 menit sebelum tidur!
-                """)
+                    status = "Siap berlatih lanjut" if score >= 80 else ("Perlu penguatan" if score >= 60 else "Perlu belajar ulang")
+                    st.metric("Diagnosis", status)
+
+                if score >= 80:
+                    st.success("Fondasi materi pada drill singkat ini cukup baik. Lanjutkan latihan dengan variasi soal.")
+                elif score >= 60:
+                    st.warning("Kamu sudah memahami sebagian materi. Ulangi konsep yang salah, lalu coba lagi.")
+                else:
+                    st.warning("Jangan khawatir. Pelajari kembali konsep dasar dan minta RoboMANTAP menjelaskan langkahnya.")
+                st.caption("Catatan: drill ini hanya 3 soal singkat dan bukan nilai resmi atau prediksi hasil UTS.")
 
 
-def render_student_automation():
-    """TAB 4: Pengaturan Automasi & Notifikasi WA Santri"""
-    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">⚙️ Layanan Automasi & Notifikasi WA Santri</div>', unsafe_allow_html=True)
-    st.caption("Kelola bagaimana RoboMANTAP AI Assistant mendampingi jadwal harian dan pengingat belajarmu via WhatsApp.")
 
-    st.toggle("🔔 Aktifkan WA Night Alert H-1 UTS", value=True, help="Menerima ringkasan mapel besok & kuis cepat tiap jam 18.30 WIB")
-    st.toggle("📱 Pengingat Target Daily Streak Belajar", value=True, help="Notifikasi motivasi konsistensi belajar harian")
-    st.toggle("📄 Kirim Rekap Raport Diagnosis UTS ke WA Orang Tua", value=False)
-    
-    st.divider()
-    st.markdown("**⏰ Set Alarm Belajar Mandiri via WA:**")
-    alarm_time = st.time_input("Pilih Jam Pengingat Belajar Khusus", value=None)
-    if st.button("Simpan Pengaturan Automasi", type="primary"):
-        st.toast("Pengaturan automasi berhasil diperbarui!", icon="✅")
+def render_student_automation(wa_number: str = ""):
+    """Persist student preferences for the existing morning/night WhatsApp alert endpoints."""
+    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">⚙️ Pengaturan Pengingat WhatsApp</div>', unsafe_allow_html=True)
+    st.caption("Pilihan ini disimpan berdasarkan nomor WhatsApp terverifikasi dan dipakai oleh automasi pengingat RoboMANTAP.")
+    if not wa_number:
+        st.warning("Nomor WhatsApp belum terhubung pada akun ini. Hubungi admin untuk menyinkronkan identitas.")
+        return
+
+    current = get_student_portal_preferences(wa_number)
+    with st.form("student_portal_notification_preferences"):
+        morning_enabled = st.checkbox(
+            "Pengingat pagi dan agenda hari ini",
+            value=current["morning_alert_enabled"],
+            help="Mengontrol pengingat pagi yang dijalankan melalui endpoint morning-alert."
+        )
+        night_enabled = st.checkbox(
+            "Pengingat malam H-1 UTS",
+            value=current["night_alert_enabled"],
+            help="Mengontrol pengingat jadwal UTS untuk hari berikutnya."
+        )
+        submitted = st.form_submit_button("Simpan Pengaturan", type="primary", use_container_width=True)
+    if submitted:
+        if save_student_portal_preferences(wa_number, morning_enabled, night_enabled):
+            st.success("Pengaturan pengingat berhasil disimpan dan akan dibaca oleh WA Bot.")
+        else:
+            st.error("Pengaturan belum tersimpan. Periksa koneksi database dan tabel student_portal_preferences.")
 
 
 def render_concept_sheets():
@@ -923,6 +1194,53 @@ def render_concept_sheets():
         * **Tanda-tanda Isim**: Kemasukan Tanwin, Kemasukan Alif Lam (ال), diawali huruf Jar.
         * **Dhomir (Kata Ganti Utama)**: Huwa (هُوَ = Dia Laki-laki), Hiya (هِيَ = Dia Perempuan), Anta (أَنْتَ = Kamu Laki-laki).
         """)
+
+
+def render_uts_schedule_panel(schedules: list[dict], kelas: str, jenjang: str) -> None:
+    """Prominent, database-driven UTS agenda for the next two weeks."""
+    from zoneinfo import ZoneInfo
+
+    today = datetime.now(ZoneInfo("Asia/Jakarta")).date()
+    upcoming = []
+    for row in schedules or []:
+        raw_date = row.get("tanggal_ujian")
+        try:
+            if isinstance(raw_date, datetime):
+                exam_date = raw_date.date()
+            elif isinstance(raw_date, date):
+                exam_date = raw_date
+            else:
+                exam_date = date.fromisoformat(str(raw_date)[:10])
+        except Exception:
+            continue
+        if today <= exam_date <= today + timedelta(days=14):
+            upcoming.append((exam_date, row))
+
+    upcoming.sort(key=lambda item: item[0])
+    st.markdown("### 🗓️ Agenda UTS Santri")
+    st.caption(f"Jadwal resmi database • Kelas {kelas} {jenjang} • 14 hari ke depan")
+    if not upcoming:
+        st.info("Belum ada jadwal UTS mendatang yang cocok dengan kelas dan jenjang akunmu. Jadwal akan muncul otomatis setelah tersedia di database.")
+        return
+
+    for exam_date, row in upcoming:
+        days_left = (exam_date - today).days
+        status = "HARI INI" if days_left == 0 else ("BESOK" if days_left == 1 else f"{days_left} HARI LAGI")
+        hari_id = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"][exam_date.weekday()]
+        bulan_id = [
+            "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+        ][exam_date.month - 1]
+        date_label = f"{hari_id}, {exam_date.day} {bulan_id} {exam_date.year}"
+        mapel = html.escape(str(row.get("mapel") or "Mata pelajaran belum ditentukan"))
+        st.markdown(
+            f'<div style="border:1px solid rgba(16,185,129,.3);border-radius:12px;'
+            f'padding:12px 14px;margin:8px 0;background:rgba(6,78,59,.18);">'
+            f'<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+            f'<strong>{mapel}</strong><span style="font-size:11px;font-weight:800;color:#34d399;">{status}</span></div>'
+            f'<div style="font-size:12px;opacity:.82;margin-top:5px;">{date_label}</div></div>',
+            unsafe_allow_html=True,
+        )
 
 
 # =============================================================================
@@ -1083,35 +1401,154 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     </div>
     """, unsafe_allow_html=True)
 
-    # DOORWAY / LOGIN PRIVACY-FIRST (Murni Ketik Nama)
-    with st.form("student_intelligence_identity", clear_on_submit=False):
-        st.markdown("#### 🔑 Masuk ke Portal Belajar Santri")
-        entered_name = st.text_input("Nama Lengkap Santri", value=nama_siswa, placeholder="Masukkan nama lengkap kamu...")
-        submitted = st.form_submit_button("🔍 BUKA PORTAL SAYA", type="primary", use_container_width=True)
+    if st.session_state.get("student_intelligence_authenticated"):
+        if st.button("Keluar dari Portal", key="student_intelligence_logout", use_container_width=True):
+            for key in (
+                "student_intelligence_authenticated",
+                "student_intelligence_identity",
+                "student_intelligence_username",
+                "student_intelligence_name",
+                "student_intelligence_grade",
+                "student_intelligence_pending_token",
+                "student_intelligence_pending_username",
+                "student_intelligence_pending_phone",
+                "chat_messages",
+                "last_ai_note",
+                "last_ai_topic",
+            ):
+                st.session_state.pop(key, None)
+            st.rerun()
 
-    if not submitted and not entered_name.strip():
-        st.info("💡 Ketikkan Nama Lengkap Kamu di atas untuk membuka portal belajar & analisis diagnostik.")
+    # Login awal hanya meminta username; akses data pribadi dilindungi konfirmasi WhatsApp.
+    if not st.session_state.get("student_intelligence_authenticated"):
+        pending_token = st.session_state.get("student_intelligence_pending_token")
+        if pending_token:
+            pending_username = st.session_state.get("student_intelligence_pending_username", "")
+            pending_phone = str(st.session_state.get("student_intelligence_pending_phone") or "")
+            phone_digits = re.sub(r"\D", "", pending_phone)
+            wa_message = urllib.parse.quote(f"VERIFIKASI PORTAL {pending_token}")
+            st.markdown("#### Konfirmasi keamanan melalui WhatsApp")
+            st.info(
+                f"Username **{pending_username}** ditemukan. Untuk melindungi data belajar kamu, "
+                "konfirmasi akses melalui nomor WhatsApp yang terdaftar. Tautan berlaku selama 5 menit."
+            )
+            if phone_digits:
+                st.markdown(
+                    f'<a href="https://wa.me/{phone_digits}?text={wa_message}" target="_blank" '
+                    'style="display:block;text-align:center;padding:12px;border-radius:12px;'
+                    'background:#16a34a;color:white;font-weight:700;text-decoration:none;">'
+                    'Konfirmasi lewat WhatsApp</a>',
+                    unsafe_allow_html=True
+                )
+            if st.button("Saya sudah mengirim konfirmasi", type="primary", use_container_width=True):
+                if consume_verified_portal_login(pending_token):
+                    identity_data = fetch_student_wa_identity_by_username(pending_username)
+                    if identity_data and str(identity_data.get("wa_number") or "") == pending_phone:
+                        st.session_state.student_intelligence_authenticated = True
+                        st.session_state.student_intelligence_identity = identity_data
+                        st.session_state.student_intelligence_username = pending_username
+                        st.session_state.student_intelligence_name = str(identity_data.get("nama") or "")
+                        st.session_state.student_intelligence_grade = str(
+                            (identity_data.get("metadata") or {}).get("jenjang") or jenjang or "MTs"
+                        )
+                        for key in (
+                            "student_intelligence_pending_token",
+                            "student_intelligence_pending_username",
+                            "student_intelligence_pending_phone",
+                        ):
+                            st.session_state.pop(key, None)
+                        st.rerun()
+                    else:
+                        st.error("Identitas berubah atau tidak cocok. Silakan mulai masuk kembali.")
+                else:
+                    st.warning("Konfirmasi belum diterima atau tautan sudah kedaluwarsa. Buka tautan WhatsApp, kirim pesannya, lalu coba lagi.")
+            if st.button("Batalkan dan ganti username", use_container_width=True):
+                for key in (
+                    "student_intelligence_pending_token",
+                    "student_intelligence_pending_username",
+                    "student_intelligence_pending_phone",
+                ):
+                    st.session_state.pop(key, None)
+                st.rerun()
+            return
+
+        with st.form("student_intelligence_identity", clear_on_submit=False):
+            st.markdown("#### 🔑 Masuk ke Portal Belajar Santri")
+            entered_username = st.text_input(
+                "Username kamu",
+                placeholder="contoh: santri.aisyah",
+                help="Gunakan username yang dibuat saat verifikasi WhatsApp RoboMANTAP."
+            )
+            submitted = st.form_submit_button(
+                "LANJUTKAN", type="primary", use_container_width=True
+            )
+
+        if not submitted:
+            st.info(
+                "Belum punya username? Daftar atau verifikasi melalui bagian "
+                "**Hubungi WA Sekarang** di halaman utama."
+            )
+            return
+
+        valid, username_or_message = validate_username(entered_username)
+        if not valid:
+            st.error(username_or_message)
+            return
+
+        identity_data = fetch_student_wa_identity_by_username(username_or_message)
+        if not identity_data:
+            st.error(
+                "Username belum ditemukan atau belum aktif. Selesaikan verifikasi WhatsApp "
+                "pada halaman utama, lalu coba kembali."
+            )
+            st.info("Kembali ke beranda, lalu buka bagian **Hubungi WA Sekarang** untuk mendaftar.")
+            return
+
+        phone = str(identity_data.get("wa_number") or "").strip()
+        if not phone:
+            st.error("Nomor WhatsApp akun ini belum terhubung. Hubungi admin RoboMANTAP.")
+            return
+        token = create_portal_login_challenge(username_or_message, phone)
+        if not token:
+            st.error("Sistem belum dapat membuat konfirmasi login. Pastikan migrasi database sudah dijalankan dan coba lagi.")
+            return
+        st.session_state.student_intelligence_pending_token = token
+        st.session_state.student_intelligence_pending_username = username_or_message
+        st.session_state.student_intelligence_pending_phone = phone
+        st.rerun()
+
+    identity_data = st.session_state.get("student_intelligence_identity") or {}
+    meta = identity_data.get("metadata") or {}
+    name = str(identity_data.get("nama") or st.session_state.get("student_intelligence_name") or "").strip()
+    if not name:
+        st.session_state.student_intelligence_authenticated = False
+        st.session_state.pop("student_intelligence_identity", None)
+        st.error("Identitas akun tidak lengkap. Silakan masuk kembali.")
         return
 
-    name = entered_name.strip()
+    kelas = str(meta.get("kelas") or "Belum diatur")
+    jenjang_detected = str(meta.get("jenjang") or st.session_state.get("student_intelligence_grade") or "MTs").upper()
+    wa_number = str(identity_data.get("wa_number") or "")
 
-    # 1. Otomatis Mencocokkan Identitas dari Tabel wa_identities
-    identity_data = fetch_student_wa_identity(name)
-    if identity_data:
-        meta = identity_data.get("metadata") or {}
-        kelas = str(meta.get("kelas", "7"))
-        jenjang_detected = str(meta.get("jenjang", "MTS")).upper()
-        wa_number = identity_data.get("wa_number", "")
-    else:
-        kelas = "9"
-        jenjang_detected = "MTS" if jenjang == "Semua Jenjang" else jenjang
-        wa_number = ""
+    # Refresh identity by username so revoked/disabled registrations are not trusted indefinitely.
+    fresh_identity = fetch_student_wa_identity_by_username(
+        st.session_state.get("student_intelligence_username", "")
+    )
+    if not fresh_identity:
+        st.session_state.student_intelligence_authenticated = False
+        st.session_state.pop("student_intelligence_identity", None)
+        st.session_state.pop("student_intelligence_username", None)
+        st.error("Akun tidak aktif atau tidak dapat diverifikasi. Silakan masuk kembali.")
+        return
+    identity_data = fresh_identity
+    meta = identity_data.get("metadata") or {}
+    name = str(identity_data.get("nama") or name).strip()
+    kelas = str(meta.get("kelas") or kelas)
+    jenjang_detected = str(meta.get("jenjang") or jenjang_detected).upper()
+    wa_number = str(identity_data.get("wa_number") or "")
 
-    # 2. Tarik Jadwal UTS Resmi dari Tabel uts_schedules
     uts_schedules = fetch_uts_schedules_db(kelas, jenjang_detected)
-
-    # 3. Tarik Sesi Belajar & Hitung Daily Streak
-    sessions = fetch_student_sessions(name)
+    sessions = fetch_student_sessions(name, jenjang=jenjang_detected)
     profile = build_student_profile(sessions)
     student_key_str = student_key(name, jenjang_detected)
     streak, is_new_day = update_and_get_daily_streak(student_key_str, profile)
@@ -1120,11 +1557,12 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     st.session_state.student_intelligence_name = name
     st.session_state.student_intelligence_grade = jenjang_detected
 
-    # 4. Trigger Pop-Up Sapaan Hangat & Jadwal UTS
     if "welcomed_today" not in st.session_state or st.session_state.get("welcomed_user") != name:
         st.session_state.welcomed_today = True
         st.session_state.welcomed_user = name
         show_welcome_modal(name, kelas, jenjang_detected, streak, wa_number, uts_schedules)
+
+    render_uts_schedule_panel(uts_schedules, kelas, jenjang_detected)
 
     # TABS UTAMA INTEGRATED
     tab_ai, tab_analytics, tab_simulasi, tab_automasi, tab_materi = st.tabs([
@@ -1148,7 +1586,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         render_uts_simulation()
 
     with tab_automasi:
-        render_student_automation()
+        render_student_automation(wa_number)
 
     with tab_materi:
         render_concept_sheets()
