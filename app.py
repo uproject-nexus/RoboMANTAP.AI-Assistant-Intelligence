@@ -1863,7 +1863,7 @@ if st.session_state.page == "landing":
     # Tombol Futuristik Neon Emerald yang Mengarah ke Render
     st.markdown(
         """
-        <a href="https://robomantap-intelligence-cbt.onrender.com" target="_blank" style="text-decoration: none;">
+        <a href="https://robomantap-kuis-orpin.vercel.app/" target="_blank" style="text-decoration: none;">
             <div style="
                 background: linear-gradient(135deg, #10b981 0%, #059669 100%);
                 color: #020617;
