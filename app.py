@@ -1766,15 +1766,27 @@ if st.session_state.page == "landing":
                 s_kelas = st.text_input("Kelas", placeholder="Contoh: 9A / 12")
             with c2:
                 s_absen = st.text_input("Nomor Absen", placeholder="Contoh: 03")
-                
+            s_username = st.text_input(
+                "Buat Username Unik",
+                placeholder="Contoh: santri.aisyah",
+                help="3–24 karakter: huruf kecil, angka, titik, atau garis bawah."
+            )
+            st.caption(
+                "Buat username unik kamu untuk masuk ke menu Portal SantriMANTAP. "
+                "Pastikan username tidak kamu bagikan kepada teman agar data kamu aman."
+            )
+            
             btn_siswa = st.form_submit_button("SINKRONISASI DATA 💬", type="primary", use_container_width=True)
             
         # Pengecekan diletakkan di LUAR st.form agar bisa memunculkan tombol HTML baru
         if btn_siswa:
-            if not s_nama or not s_kelas or not s_absen:
-                st.error("Lengkapi semua data terlebih dahulu!")
+            username_clean = str(s_username or "").strip().casefold()
+            if not s_nama or not s_kelas or not s_absen or not username_clean:
+                st.error("Lengkapi semua data, termasuk username unik, terlebih dahulu!")
+            elif not re.fullmatch(r"[a-z0-9][a-z0-9._]{2,23}", username_clean):
+                st.error("Username harus 3–24 karakter, diawali huruf/angka, dan hanya memakai huruf kecil, angka, titik, atau garis bawah.")
             else:
-                pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama} - {s_jenjang} - {s_kelas} - {s_absen}"
+                pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama.strip()} - {s_jenjang} - {s_kelas.strip()} - {s_absen.strip()} - {username_clean}"
                 link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
                 
                 st.success("✅ Data Siap! Klik tombol di bawah untuk masuk ke obrolan WhatsApp.")
@@ -1912,6 +1924,20 @@ elif st.session_state.page == "student_intelligence":
     )
     st.write("---")
     if st.button("⬅️ Kembali ke Beranda", use_container_width=True):
+        for key in (
+            "student_intelligence_authenticated",
+            "student_intelligence_identity",
+            "student_intelligence_username",
+            "student_intelligence_name",
+            "student_intelligence_grade",
+            "student_intelligence_pending_token",
+            "student_intelligence_pending_username",
+            "student_intelligence_pending_phone",
+            "chat_messages",
+            "last_ai_note",
+            "last_ai_topic",
+        ):
+            st.session_state.pop(key, None)
         st.session_state.page = "landing"
         st.rerun()
 
