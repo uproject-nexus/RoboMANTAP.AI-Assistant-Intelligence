@@ -1477,7 +1477,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
           <p>Masuk untuk melihat agenda, melanjutkan belajar, dan bertanya kepada Asisten AI RoboMANTAP.</p>
         </section>
         """, unsafe_allow_html=True)
-        with st.form("student_intelligence_identity", clear_on_submit=False):
+        with st.form("student_intelligence_login_form", clear_on_submit=False):
             entered_username = st.text_input(
                 "Username Santri", placeholder="contoh: santri.aisyah",
                 help="Username yang kamu buat saat mendaftar melalui WhatsApp."
