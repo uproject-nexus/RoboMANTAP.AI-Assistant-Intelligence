@@ -139,8 +139,8 @@ components.html(
             ],
             "start_url": ".",
             "display": "standalone",
-            "background_color": "#0B1220",
-            "theme_color": "#0B1220"
+            "background_color": "#FFF9F0",
+            "theme_color": "#5B6CFF"
         }};
 
         const blob = new Blob([JSON.stringify(myManifest)], {{type: 'application/json'}});
@@ -648,40 +648,56 @@ _day_names = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 _month_names = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 _rendered_date = f"{_day_names[_rendered_at_wib.weekday()]}, {_rendered_at_wib.day} { _month_names[_rendered_at_wib.month - 1] } {_rendered_at_wib.year}"
 st.markdown(f"""
-<section class="rm-brand-hero">
-  <div class="rm-brand-logo">{img_mantap_html}</div>
-  <div class="rm-brand-copy">
-    <div class="rm-brand-eyebrow">U.PROJECT NEXUS · LEARNING INTELLIGENCE</div>
-    <div class="rm-brand-title">RoboMANTAP<span>-Intelligence</span></div>
-    <div class="rm-brand-subtitle">Ruang belajar, evaluasi, dan kecerdasan pembelajaran dalam satu ekosistem.</div>
-    <div class="rm-brand-meta"><span>🎓 MA & MTs Al Irsyad Al Islamiyyah Bondowoso</span><span>🕒 {_rendered_date} · {_rendered_at_wib.strftime('%H:%M:%S')} WIB</span></div>
-  </div>
-</section>
+<div class="rm-topbar">
+  <div class="rm-topbar-mark">{img_mantap_html}</div>
+  <div class="rm-topbar-brand"><b>RoboMANTAP<span>-Intelligence</span></b><small>Learning that understands you</small></div>
+  <div class="rm-topbar-spacer"></div>
+  <div class="rm-topbar-date"><span class="rm-live-dot"></span><span>{_rendered_date}<br><b>{_rendered_at_wib.strftime('%H:%M')} WIB</b></span></div>
+</div>
 """, unsafe_allow_html=True)
 
-# Sidebar Control
+# SIDEBAR BARU — navigasi berbasis tujuan, ringkas, cerah, dan adaptif per peran.
 with st.sidebar:
-    st.markdown("""
-    <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 16px; border-radius: 12px; border: 1px solid #059669; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-        <div style="font-size: 26px; margin-bottom: 4px;">🧕🏼</div>
-        <div style="color: #ffffff; font-weight: 700; font-size: 16px; letter-spacing: 0.5px;">RoboMANTAP-Intelligence</div>
-        <div style="color: #6ee7b7; font-size: 11px; font-weight: 500; margin-bottom: 6px;">Learning Intelligence Platform</div>
-        <div style="font-size: 10px; color: #a7f3d0; opacity: 0.85; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 4px; font-style: italic;">Engineered by U.Project Nexus</div>
+    st.markdown(f"""
+    <div class="rm-sidebar-brand">
+      <div class="rm-sidebar-logo">🎓</div>
+      <div class="rm-sidebar-name">RoboMANTAP<span> Intelligence</span></div>
+      <div class="rm-sidebar-caption">Belajar lebih cerdas, setiap hari</div>
+      <div class="rm-sidebar-status"><span></span> Learning system ready</div>
     </div>
-
     """, unsafe_allow_html=True)
-    # -------------------------------------------------------------------------
-    # A. TAMPILAN SIDEBAR JIKA BERADA DI DASHBOARD GURU (PANEL FILTER)
-    # -------------------------------------------------------------------------
-    if st.session_state.page == "guru_dashboard":
-        st.markdown("### ⚙️ Panel Kontrol & Filter")
-        # IMPORTANT: these filters are intentionally inside a Streamlit form.
-        # Changing a filter no longer reruns the entire teacher dashboard.
-        with st.form("guru_dashboard_filter_form", clear_on_submit=False):
-            time_filter_input = st.radio("⏳ Rentang Waktu:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], key="filter_time")
-            only_latest_input = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Gabungkan multi-sesi: 1 nama hanya muncul 1 kali (pengerjaan terbaru).", key="filter_latest")
-            selected_jenjang_input = st.selectbox("🏫 Filter Jenjang:", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], key="filter_jenjang")
 
+    current_page = st.session_state.get("page", "landing")
+    if current_page in ("landing", "student_intelligence", "guru_login", "guru_dashboard", "select_mapel"):
+        st.markdown('<div class="rm-sidebar-section">RUANG UTAMA</div>', unsafe_allow_html=True)
+        if st.button("🏡  Beranda", key="nav_home", use_container_width=True, disabled=current_page == "landing"):
+            st.session_state.page = "landing"
+            st.rerun()
+        if st.button("🌈  Portal Santri", key="nav_student", use_container_width=True, disabled=current_page == "student_intelligence"):
+            st.session_state.page = "student_intelligence"
+            st.rerun()
+        if st.button("🧑‍🏫  Ruang Guru", key="nav_teacher", use_container_width=True, disabled=current_page in ("guru_login", "guru_dashboard")):
+            st.session_state.page = "guru_login"
+            st.rerun()
+        st.markdown('<div class="rm-sidebar-section">LATIHAN & UJIAN</div>', unsafe_allow_html=True)
+        if st.button("🧩  Latihan OMI · MTs", key="nav_omi_mts", use_container_width=True):
+            st.session_state.jenjang = "MTs (Sederajat SMP)"
+            st.session_state.page = "select_mapel"
+            st.rerun()
+        if st.button("🚀  Latihan OMI · MA", key="nav_omi_ma", use_container_width=True):
+            st.session_state.jenjang = "MA (Sederajat SMA)"
+            st.session_state.page = "select_mapel"
+            st.rerun()
+        st.markdown('<div class="rm-sidebar-section">PORTAL TERHUBUNG</div>', unsafe_allow_html=True)
+        st.markdown(f'<a class="rm-sidebar-link" href="{TKA_PORTAL_URL}" target="_blank">🎯 &nbsp; Portal TKA <span>↗</span></a>', unsafe_allow_html=True)
+        st.markdown('<a class="rm-sidebar-link" href="https://robomantap-intelligence-cbt.onrender.com" target="_blank">📝 &nbsp; Kuis Guru <span>↗</span></a>', unsafe_allow_html=True)
+
+    if current_page == "guru_dashboard":
+        st.markdown('<div class="rm-sidebar-section">FILTER MONITORING</div>', unsafe_allow_html=True)
+        with st.form("guru_dashboard_filter_form", clear_on_submit=False):
+            st.radio("Rentang waktu", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], key="filter_time")
+            st.toggle("Sesi terbaru saja", value=True, key="filter_latest", help="Tampilkan sesi terbaru untuk setiap siswa.")
+            selected_jenjang_input = st.selectbox("Jenjang", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], key="filter_jenjang")
             quiz_custom_mapels = _cached_dashboard_custom_mapels()
             if selected_jenjang_input == "MTs (Sederajat SMP)":
                 base_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys())
@@ -690,78 +706,14 @@ with st.sidebar:
             else:
                 base_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys()) + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
             mapel_options = ["Semua Mapel"] + sorted(set(base_mapels + quiz_custom_mapels))
-            selected_mapel_input = st.selectbox("📚 Filter Mata Pelajaran:", mapel_options, key="filter_mapel")
-            selected_status_input = st.selectbox("📌 Filter Status:", ["Semua Status", "BERJALAN", "SELESAI", "EXPIRED"], key="filter_status")
-            apply_dashboard_filters = st.form_submit_button("🔎 TERAPKAN FILTER", use_container_width=True, type="primary")
+            st.selectbox("Mata pelajaran", mapel_options, key="filter_mapel")
+            st.selectbox("Status", ["Semua Status", "BERJALAN", "SELESAI", "EXPIRED"], key="filter_status")
+            st.form_submit_button("Terapkan filter", use_container_width=True, type="primary")
 
-        # Form values are committed only when the teacher presses Apply.
-        time_filter = st.session_state.get("filter_time", "Hari Ini")
-        only_latest = st.session_state.get("filter_latest", True)
-        selected_jenjang_filter = st.session_state.get("filter_jenjang", "Semua Jenjang")
-        selected_mapel_filter = st.session_state.get("filter_mapel", "Semua Mapel")
-        selected_status_filter = st.session_state.get("filter_status", "Semua Status")
-
-    else:
-        st.markdown("""
-        <div style="background: var(--secondary-background-color); border: 1px solid rgba(5, 150, 105, 0.3); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                <span style="font-size: 11px; font-weight: 600; opacity: 0.7;">ENGINE STATUS</span>
-                <span style="font-size: 10px; background: #059669; color: white; padding: 2px 8px; border-radius: 12px; font-weight: 700;">LIVE <span class="blinking-dot-green">🟢</span></span>
-            </div>
-            <div style="font-size: 11px; line-height: 1.6; opacity: 0.9;">
-                ⚡ <b>Model:</b> RoboMANTAP-Intelligence<br>
-                🎯 <b>Core:</b> Bina Prestasi OMI 2026<br>
-                ⏱️ <b>Response:</b> Real-time AI
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        if st.session_state.jenjang and st.session_state.mapel:
-            st.markdown(f"""
-            <div style="background: rgba(5, 150, 105, 0.08); border-left: 4px solid #059669; padding: 10px 12px; border-radius: 6px; margin-bottom: 15px;">
-                <div style="font-size: 10px; opacity: 0.6; text-transform: uppercase; font-weight: 700;">Sesi Aktif</div>
-                <div style="font-size: 12px; font-weight: 700; color: var(--text-color);">{st.session_state.mapel}</div>
-                <div style="font-size: 11px; opacity: 0.8;">{st.session_state.jenjang} • {st.session_state.stage}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("""
-        <div style="background: var(--secondary-background-color); border: 1px solid rgba(128,128,128,0.2); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
-            <div style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 8px;">📋 ATURAN SKORING CBT OMI</div>
-            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
-                <span>✅ Jawaban Benar</span>
-                <b style="color: #059669;">+4 Poin</b>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
-                <span>❌ Jawaban Salah</span>
-                <b style="color: #ef4444;">-1 Poin</b>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 11px;">
-                <span>⚪ Tidak Dijawab</span>
-                <b style="opacity: 0.6;">0 Poin</b>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    if st.button("🏠 Kembali ke Beranda Utama", use_container_width=True):
-        st.session_state.page = "landing"
-        st.session_state.jenjang = None
-        st.session_state.mapel = None
-        st.session_state.guru_auth = False
-        st.rerun()
-
-    sidebar_nexus_html = f'<div style="padding: 6px 14px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); display: inline-block; margin-bottom: 4px; border: 1px solid rgba(0,0,0,0.05);"><img src="data:image/png;base64,{logo_nexus_b64}" style="height: 42px; max-width: 100%; display: block; margin: 0 auto;"></div>' if logo_nexus_b64 else ''
-    st.markdown(f"""
-    <div style="text-align: center; margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(128,128,128,0.2);">
-        <div style="font-size: 10px; opacity: 0.7; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Engineered by</div>
-        {sidebar_nexus_html}
-        <div style="font-size: 11px; opacity: 0.85; line-height: 1.3;">
-            <b style="color: var(--text-color);">U.Project Nexus System</b><br>
-            <span style="font-size: 10px; opacity: 0.7;">AI Integration & B2B Solutions</span><br>
-            <span style="font-size: 9px; opacity: 0.5;">&copy; 2026 All Rights Reserved</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    if current_page not in ("landing", "quiz"):
+        st.markdown('<div class="rm-sidebar-tip"><strong>✨ Tip RoboMANTAP</strong><br>Gunakan rekomendasi belajar dan hasil latihan untuk menentukan langkah berikutnya.</div>', unsafe_allow_html=True)
+    sidebar_nexus_html = f'<img src="data:image/png;base64,{logo_nexus_b64}" alt="U.Project Nexus" style="width:100%;max-width:130px;max-height:42px;object-fit:contain;">' if logo_nexus_b64 else '<b>U.Project Nexus</b>'
+    st.markdown(f'<div class="rm-sidebar-footer">{sidebar_nexus_html}<div>Made for better learning</div><small>© 2026 U.Project Nexus</small></div>', unsafe_allow_html=True)
 
 #===========================================================
 # GENERATOR DOCX. KUIS
@@ -811,225 +763,86 @@ def create_5_quiz_packages(master_quiz):
 # 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
 # ==============================================================================
 if st.session_state.page == "landing":
+    st.markdown("""
+    <section class="rm-welcome-hero">
+      <div class="rm-welcome-copy">
+        <div class="rm-eyebrow"><span class="rm-sparkle">✦</span> YOUR LEARNING, LEVELLED UP</div>
+        <h1>Halo, pejuang ilmu!<br><span>Siap jadi makin MANTAP?</span></h1>
+        <p>Satu tempat untuk berlatih, memahami materi, menyiapkan ujian, dan menemukan cara belajar yang paling cocok untukmu.</p>
+        <div class="rm-hero-chips"><span>🧠 AI-assisted learning</span><span>🎯 Latihan terarah</span><span>🌱 Bertumbuh setiap hari</span></div>
+      </div>
+      <div class="rm-hero-art"><div class="rm-orbit rm-orbit-one"></div><div class="rm-orbit rm-orbit-two"></div><div class="rm-book-stack">📚</div><div class="rm-float-bubble rm-bubble-one">✨</div><div class="rm-float-bubble rm-bubble-two">💡</div><div class="rm-float-bubble rm-bubble-three">🚀</div></div>
+    </section>
+    <div class="rm-section-heading"><div><div class="rm-eyebrow rm-eyebrow-color">PILIH RUANGMU</div><h2>Mulai dari yang kamu butuhkan</h2><p>Semua jalur penting ada di depan—tanpa menu yang menumpuk.</p></div></div>
+    """, unsafe_allow_html=True)
 
-    st.markdown("<h3 style='text-align: center; font-size: 27px;'>Mulai dari sini, tumbuh jadi MANTAP.</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='font-size: 13px; text-align: center; color: #9fb0c5;'>Pilih jenjang untuk membuka ruang latihan OMI, lalu lanjutkan perjalanan belajarmu.</p>", unsafe_allow_html=True)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("""
-        <div class="mode-card">
-            <h2>🏫 TINGKAT MTs</h2>
-            <p>Madrasah Tsanawiyah Al-Irsyad Putri</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Masuk Modul MTs ➔", key="btn_mts", use_container_width=True, type="primary"):
-            st.session_state.jenjang = "MTs (Sederajat SMP)"
+    c1, c2, c3 = st.columns(3, gap="medium")
+    with c1:
+        st.markdown('<div class="rm-feature-card rm-card-lilac"><div class="rm-feature-icon">🎒</div><div class="rm-feature-tag">PERSONAL LEARNING</div><h3>Portal Santri</h3><p>Belajar dengan panduan AI, latihan pintar, rangkuman PDF, dan insight yang mengikuti perjalananmu.</p></div>', unsafe_allow_html=True)
+        if st.button("Buka ruang belajarku ↗", key="home_student", type="primary", use_container_width=True):
+            st.session_state.page = "student_intelligence"
+            st.rerun()
+    with c2:
+        st.markdown('<div class="rm-feature-card rm-card-mint"><div class="rm-feature-icon">🧑‍🏫</div><div class="rm-feature-tag">TEACHING WORKSPACE</div><h3>Ruang Guru</h3><p>Kelola kuis, susun bank soal, buat bahan ajar dengan AI, dan pantau aktivitas siswa.</p></div>', unsafe_allow_html=True)
+        if st.button("Masuk ruang guru ↗", key="home_teacher", use_container_width=True):
+            st.session_state.page = "guru_login"
+            st.rerun()
+    with c3:
+        st.markdown('<div class="rm-feature-card rm-card-peach"><div class="rm-feature-icon">🏆</div><div class="rm-feature-tag">OLIMPIADE & PRACTICE</div><h3>Latihan OMI</h3><p>Latihan bertahap untuk MTs dan MA dengan mata pelajaran sesuai jenjang.</p></div>', unsafe_allow_html=True)
+        if st.button("Pilih jenjang latihan ↗", key="home_omi", use_container_width=True):
             st.session_state.page = "select_mapel"
             st.rerun()
 
-    with col2:
-        st.markdown("""
-        <div class="mode-card">
-            <h2>🏛️ TINGKAT MA</h2>
-            <p>Madrasah Aliyah Al-Irsyad Putri</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Masuk Modul MA ➔", key="btn_ma", use_container_width=True, type="primary"):
-            st.session_state.jenjang = "MA (Sederajat SMA)"
-            st.session_state.page = "select_mapel"
-            st.rerun()
-    
-    # Registrasi dan tautan eksternal dipadatkan dalam satu ruang lipat agar
-    # sidebar tetap fokus pada aksi utama dan tidak terlalu panjang.
-    with st.expander("💬 Registrasi WhatsApp & Portal Eksternal", expanded=False):
-        st.write("---")
-        st.markdown("""
-        <div style="
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            border: 1px solid #3b82f6;
-            border-radius: 8px;
-            padding: 8px 14px;
-            text-align: center;
-        ">
-            <div style="font-weight: bold; font-size: 14px; color: #60a5fa; margin-bottom: 2px; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#25D366" viewBox="0 0 16 16">
-                  <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.099-.834-.308-1.589-.981-.588-.524-.986-1.171-1.101-1.368-.116-.198-.012-.304.087-.403.088-.088.197-.232.296-.348.1-.116.133-.197.198-.329.065-.133.033-.248-.016-.348-.05-.099-.445-1.071-.61-1.465-.16-.385-.32-.331-.445-.338a2.52 2.52 0 0 0-.38-.007c-.131 0-.343.049-.523.247-.18.198-.69.674-.69 1.643 0 .97.705 1.908.803 2.04.099.133 1.387 2.119 3.362 2.97.47.203.837.324 1.124.415.472.15.901.129 1.24.078.378-.057 1.17-.478 1.336-.94.166-.462.166-.857.116-.94-.05-.083-.183-.133-.38-.232z"/>
-                </svg>
-                HUBUNGI WA RoboMANTAP SEKARANG!
-            </div>
-            <div style="font-size: 10px; color: #cbd5e1; line-height: 1.3;">
-                Ruang Belajar yang lebih efektif, efisien, dan lengkap. Kapan saja, di mana saja!
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
+    st.markdown('<div class="rm-section-heading rm-section-heading-compact"><div><div class="rm-eyebrow rm-eyebrow-color">LEBIH SIAP, LEBIH PERCAYA DIRI</div><h2>Peralatan belajar yang terhubung</h2><p>Portal khusus tetap tersedia saat kamu membutuhkannya.</p></div></div>', unsafe_allow_html=True)
+    p1, p2 = st.columns(2, gap="medium")
+    with p1:
+        st.markdown(f'<a class="rm-portal-link rm-link-blue" href="{TKA_PORTAL_URL}" target="_blank"><span class="rm-portal-icon">🎯</span><span><b>Portal TKA 2026</b><small>Persiapkan diri dengan latihan TKA</small></span><strong>↗</strong></a>', unsafe_allow_html=True)
+    with p2:
+        st.markdown('<a class="rm-portal-link rm-link-yellow" href="https://robomantap-intelligence-cbt.onrender.com" target="_blank"><span class="rm-portal-icon">📝</span><span><b>Kuis GuruMANTAP</b><small>Kerjakan kuis yang dibagikan guru</small></span><strong>↗</strong></a>', unsafe_allow_html=True)
+
+    with st.expander("💬 Registrasi / bantuan akses melalui WhatsApp", expanded=False):
+        st.markdown('<div class="rm-registration-intro"><b>Mulai terhubung dengan RoboMANTAP</b><p>Siapkan data yang diperlukan, lalu lanjutkan percakapan di WhatsApp resmi.</p></div>', unsafe_allow_html=True)
         NO_WA_BOT = "6283141694735"
-        wa_registration_role = st.radio(
-            "Pilih kebutuhan", ["👤 Siswa", "🧕🏼 Guru"], horizontal=True,
-            key="wa_registration_role", label_visibility="collapsed"
-        )
-    
+        wa_registration_role = st.radio("Saya adalah", ["👤 Siswa", "🧑‍🏫 Guru"], horizontal=True, key="wa_registration_role", label_visibility="collapsed")
         if wa_registration_role == "👤 Siswa":
             with st.form("form_wa_siswa"):
-                s_nama = st.text_input("Nama Lengkap", placeholder="Masukkan Nama Lengkap Kamu")
+                s_nama = st.text_input("Nama lengkap", placeholder="Nama lengkap siswa")
                 s_jenjang = st.selectbox("Jenjang", ["MTs", "MA"])
-                c1, c2 = st.columns(2)
-                with c1:
-                    s_kelas = st.text_input("Kelas", placeholder="Contoh: 9A / 12")
-                with c2:
-                    s_absen = st.text_input("Nomor Absen", placeholder="Contoh: 03")
-                s_username = st.text_input(
-                    "Buat Username Unik",
-                    placeholder="Contoh: santri.aisyah",
-                    help="3–24 karakter: huruf kecil, angka, titik, atau garis bawah."
-                )
-                st.caption(
-                    "Buat username unik kamu untuk masuk ke menu Portal SantriMANTAP. "
-                    "Pastikan username tidak kamu bagikan kepada teman agar data kamu aman."
-                )
-            
-                btn_siswa = st.form_submit_button("SINKRONISASI DATA 💬", type="primary", use_container_width=True)
-            
-            # Pengecekan diletakkan di LUAR st.form agar bisa memunculkan tombol HTML baru
+                d1, d2 = st.columns(2)
+                with d1: s_kelas = st.text_input("Kelas", placeholder="9A / 12")
+                with d2: s_absen = st.text_input("Nomor absen", placeholder="03")
+                s_username = st.text_input("Username pilihan", placeholder="santri.aisyah", help="3–24 karakter: huruf kecil, angka, titik, atau garis bawah.")
+                st.caption("Jaga username-mu dan jangan bagikan kepada teman.")
+                btn_siswa = st.form_submit_button("Lanjutkan ke WhatsApp", type="primary", use_container_width=True)
             if btn_siswa:
                 username_clean = str(s_username or "").strip().casefold()
                 if not s_nama or not s_kelas or not s_absen or not username_clean:
-                    st.error("Lengkapi semua data, termasuk username unik, terlebih dahulu!")
+                    st.error("Lengkapi semua data terlebih dahulu.")
                 elif not re.fullmatch(r"[a-z0-9][a-z0-9._]{2,23}", username_clean):
                     st.error("Username harus 3–24 karakter, diawali huruf/angka, dan hanya memakai huruf kecil, angka, titik, atau garis bawah.")
                 else:
                     pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama.strip()} - {s_jenjang} - {s_kelas.strip()} - {s_absen.strip()} - {username_clean}"
                     link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
-                
-                    st.success("✅ Data Siap! Klik tombol di bawah untuk masuk ke obrolan WhatsApp.")
-                    # Menggunakan HTML Anchor Tag target="_blank" seperti di student_intelligence
-                    st.markdown(f"""
-                    <a href="{link}" target="_blank" style="text-decoration: none;">
-                        <div style="background-color: #25D366; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 10px;">
-                            Buka WhatsApp RoboMANTAP 🚀
-                        </div>
-                    </a>
-                    """, unsafe_allow_html=True)
-    
-        if wa_registration_role == "🧕🏼 Guru":
+                    st.success("Data siap. Lanjutkan melalui tombol WhatsApp di bawah.")
+                    st.markdown(f'<a class="rm-whatsapp-button" href="{link}" target="_blank">Buka WhatsApp RoboMANTAP ↗</a>', unsafe_allow_html=True)
+        else:
             with st.form("form_wa_guru"):
-                g_nama = st.text_input("Nama Lengkap Ustadzah", placeholder="Masukkan Nama Lengkap Anda")
-                g_kode = st.text_input("PIN Akses Guru", type="password", help="Tanyakan kepada admin UPN untuk kode ini.", placeholder="Masukkan PIN GuruMANTAP")
-            
-                btn_guru = st.form_submit_button("SINKRONISASI DATA 💬", type="primary", use_container_width=True)
-            
+                g_nama = st.text_input("Nama lengkap guru", placeholder="Nama lengkap")
+                g_kode = st.text_input("PIN akses guru", type="password", help="Hubungi admin UPN jika membutuhkan kode akses.")
+                btn_guru = st.form_submit_button("Verifikasi dan lanjutkan", type="primary", use_container_width=True)
             if btn_guru:
                 if not g_nama or not g_kode:
-                    st.error("Nama dan Kode Akses wajib diisi!")
-                elif g_kode != "MANTAP2026": 
-                    st.error("⚠️ Kode PIN Akses Guru salah. Siswa dilarang masuk area ini.")
+                    st.error("Nama dan PIN akses wajib diisi.")
+                elif g_kode != "MANTAP2026":
+                    st.error("PIN akses tidak sesuai.")
                 else:
                     pesan = f"Halo RoboMANTAP! Saya [GURU] : {g_nama} - VALIDATED"
                     link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
-                
-                    st.success("✅ Akses diverifikasi! Klik tombol di bawah untuk masuk ke obrolan WhatsApp.")
-                    st.markdown(f"""
-                    <a href="{link}" target="_blank" style="text-decoration: none;">
-                        <div style="background-color: #25D366; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 10px;">
-                            Buka WhatsApp RoboMANTAP 🚀
-                        </div>
-                    </a>
-                    """, unsafe_allow_html=True)
+                    st.success("Identitas terverifikasi. Lanjutkan melalui WhatsApp.")
+                    st.markdown(f'<a class="rm-whatsapp-button" href="{link}" target="_blank">Buka WhatsApp RoboMANTAP ↗</a>', unsafe_allow_html=True)
 
-                    
-        st.write("---")
-        st.markdown("#### 🎓 TKA RoboMANTAP")
-        st.caption("Mulai latihan kuy.. biar makin siap nih hadapi TKA 2026!")
-        st.markdown(
-            f"""
-            <a href="{TKA_PORTAL_URL}" target="_blank" style="text-decoration: none; color: #020617;">
-                <div style="
-                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                    color: #020617 !important;
-                    padding: 14px 24px;
-                    border-radius: 12px;
-                    text-align: center;
-                    font-weight: 800;
-                    font-size: 15px;
-                    letter-spacing: 0.5px;
-                    transition: all 0.3s ease;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 8px;
-                    margin-top: 8px;
-                    margin-bottom: 20px;
-                    cursor: pointer;
-                ">
-                    MASUK PORTAL TKA →
-                </div>
-            </a>
-            """,
-            unsafe_allow_html=True,
-        )
+    st.markdown('<div class="rm-bottom-note"><span>🌈</span><div><b>Setiap langkah kecil berarti.</b><small>Belajar bukan tentang siapa yang paling cepat, tapi siapa yang terus bertumbuh.</small></div></div>', unsafe_allow_html=True)
 
-        st.write("---")
-        st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
-        st.caption("Yuk, gasken kuis interaktif dari GuruMANTAP!")
-    
-        # Tombol Futuristik Neon Emerald yang Mengarah ke Render
-        st.markdown(
-            """
-            <a href="https://robomantap-intelligence-cbt.onrender.com" target="_blank" style="text-decoration: none;">
-                <div style="
-                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                    color: #020617;
-                    padding: 14px 24px;
-                    border-radius: 12px;
-                    text-align: center;
-                    font-weight: 800;
-                    font-size: 15px;
-                    letter-spacing: 0.5px;
-                    transition: all 0.3s ease;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 8px;
-                    margin-top: 8px;
-                    margin-bottom: 20px;
-                    cursor: pointer;
-                ">
-                    MASUK PORTAL KUIS →
-                </div>
-            </a>
-            """,
-            unsafe_allow_html=True
-        )
-
-    st.write("---")
-    st.markdown("#### 👤 Portal SantriMANTAP")
-    st.markdown("""
-    <div class="guru-card" style="background: linear-gradient(135deg, #172554 0%, #312e81 100%); border-color: #6366f1;">
-        <h2 style="margin:0; font-size: 20px;">🎓 My Learning Intelligence</h2>
-        <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Evaluasi pola belajarmu, identifikasi materi yang butuh perbaikan, lalu susun rencana strategis untuk langkah pembelajaran berikutnya!</p>
-    </div>
-    """, unsafe_allow_html=True)
-    if st.button("Masuk Portal Siswa ➔", use_container_width=True, type="primary"):
-        st.session_state.page = "student_intelligence"
-        st.rerun()
-
-    st.write("---")
-    st.markdown("#### 🧕🏼 Portal GuruMANTAP")
-    st.markdown("""
-    <div class="guru-card">
-        <h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
-        <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal dan fitur automation</p>
-    </div>
-    """, unsafe_allow_html=True)
-    if st.button("🔒 Masuk Portal Guru ➔", use_container_width=True):
-        st.session_state.page = "guru_login"
-        st.rerun()
-
-# ==============================================================================
-# 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
-# ==============================================================================
-#=========================================================================================================
 elif st.session_state.page == "student_intelligence":
     from student_intelligence import render_student_intelligence_dashboard
     render_student_intelligence_dashboard(
