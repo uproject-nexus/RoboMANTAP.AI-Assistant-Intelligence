@@ -1,4 +1,14 @@
-
-*.png
-*.jpg
+# Folder Config & Dev
 .devcontainer/
+.streamlit/
+
+# File Aset Gambar (Memakan memori)
+cover.png
+logo.png
+nexus_logo.png
+
+# File Khusus Streamlit Dashboard UI (Vercel tidak butuh ini)
+app.py
+student_intelligence.py
+tka_studio.py
+tka_docx.py
