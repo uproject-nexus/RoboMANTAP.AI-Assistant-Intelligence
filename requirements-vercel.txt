@@ -8,3 +8,4 @@ supabase
 google-generativeai
 httpx
 python-dotenv
+pandas
