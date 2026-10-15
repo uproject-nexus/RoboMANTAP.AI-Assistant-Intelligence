@@ -18,4 +18,3 @@ PyMuPDF
 Pillow
 supabase
 requests
-pytz
