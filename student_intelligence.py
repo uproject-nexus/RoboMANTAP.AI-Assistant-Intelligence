@@ -289,7 +289,7 @@ def fetch_student_wa_identity_by_username(username: str) -> dict | None:
 
 
 def fetch_uts_schedules_db(kelas: str, jenjang: str) -> list[dict]:
-    """Ambil jadwal resmi; utamakan uts_schedule dan dukung nama lama uts_schedules."""
+    """Ambil jadwal resmi dari uts_schedules; fallback ke nama alternatif uts_schedule."""
     conn = init_db_connection()
     if not conn or not kelas:
         return []
@@ -297,14 +297,14 @@ def fetch_uts_schedules_db(kelas: str, jenjang: str) -> list[dict]:
     queries = [
         """
         SELECT *
-        FROM uts_schedule
+        FROM uts_schedules
         WHERE TRIM(kelas::text) = TRIM(:kelas)
           AND UPPER(TRIM(jenjang)) = UPPER(TRIM(:jenjang))
         ORDER BY tanggal_ujian ASC
         """,
         """
         SELECT *
-        FROM uts_schedules
+        FROM uts_schedule
         WHERE TRIM(kelas::text) = TRIM(:kelas)
           AND UPPER(TRIM(jenjang)) = UPPER(TRIM(:jenjang))
         ORDER BY tanggal_ujian ASC
@@ -352,7 +352,7 @@ def create_portal_login_challenge(username: str, wa_number: str) -> str | None:
 
 
 def consume_verified_portal_login(token: str) -> bool:
-    """Consume a confirmed, unexpired challenge exactly once."""
+    """Atomically consume a confirmed, unexpired challenge exactly once."""
     conn = init_db_connection()
     if not conn or not token:
         return False
@@ -360,23 +360,39 @@ def consume_verified_portal_login(token: str) -> bool:
     now_utc = datetime.now(timezone.utc)
     try:
         with conn.session as session:
+            # Single atomic UPDATE prevents a stale read/race between checking and consuming.
+            # RETURNING means login succeeds only if a verified, live challenge was actually consumed.
             row = session.execute(text("""
-                SELECT token_hash
-                FROM student_portal_login_challenges
+                UPDATE student_portal_login_challenges
+                SET consumed_at = :now_utc
                 WHERE token_hash = :token_hash
                   AND verified_at IS NOT NULL
                   AND consumed_at IS NULL
                   AND expires_at > :now_utc
-                LIMIT 1
+                RETURNING token_hash
             """), {"token_hash": token_hash, "now_utc": now_utc}).first()
             if not row:
+                session.rollback()
+                # Diagnostic read distinguishes an unverified/expired token from DB errors in logs.
+                try:
+                    state = session.execute(text("""
+                        SELECT verified_at, expires_at, consumed_at
+                        FROM student_portal_login_challenges
+                        WHERE token_hash = :token_hash
+                        LIMIT 1
+                    """), {"token_hash": token_hash}).mappings().first()
+                    if state:
+                        print(
+                            "[STUDENT INTELLIGENCE] challenge not consumable: "
+                            f"verified={bool(state.get('verified_at'))}, "
+                            f"expires_at={state.get('expires_at')}, "
+                            f"consumed={bool(state.get('consumed_at'))}"
+                        )
+                    else:
+                        print("[STUDENT INTELLIGENCE] challenge token not found in portal database")
+                except Exception as diagnostic_exc:
+                    print(f"[STUDENT INTELLIGENCE] challenge diagnostic error: {diagnostic_exc}")
                 return False
-            session.execute(text("""
-                UPDATE student_portal_login_challenges
-                SET consumed_at = :now_utc
-                WHERE token_hash = :token_hash
-                  AND consumed_at IS NULL
-            """), {"token_hash": token_hash, "now_utc": now_utc})
             session.commit()
         return True
     except Exception as exc:
