@@ -1766,14 +1766,24 @@ if st.session_state.page == "landing":
                 s_kelas = st.text_input("Kelas", placeholder="Contoh: 9A / 12")
             with c2:
                 s_absen = st.text_input("Nomor Absen", placeholder="Contoh: 03")
-            s_username = st.text_input(
-                "Buat Username Unik",
-                placeholder="Contoh: santri.aisyah",
-                help="3–24 karakter: huruf kecil, angka, titik, atau garis bawah."
-            )
+            c_user, c_pin = st.columns([1.25, 1], gap="medium")
+            with c_user:
+                s_username = st.text_input(
+                    "Buat Username Unik",
+                    placeholder="Contoh: santri.aisyah",
+                    help="3–24 karakter: huruf kecil, angka, titik, atau garis bawah."
+                )
+            with c_pin:
+                s_pin = st.text_input(
+                    "Buat PIN Santri",
+                    placeholder="6 angka",
+                    type="password",
+                    max_chars=6,
+                    help="Buat PIN 6 digit yang mudah kamu ingat, tetapi sulit ditebak."
+                )
             st.caption(
-                "Buat username unik kamu untuk masuk ke menu Portal SantriMANTAP. "
-                "Pastikan username tidak kamu bagikan kepada teman agar data kamu aman."
+                "Username dan PIN dipakai untuk masuk ke Portal SantriMANTAP. "
+                "Jangan bagikan keduanya kepada teman. PIN disimpan dalam bentuk hash, bukan teks asli."
             )
             
             btn_siswa = st.form_submit_button("SINKRONISASI DATA 💬", type="primary", use_container_width=True)
@@ -1781,12 +1791,20 @@ if st.session_state.page == "landing":
         # Pengecekan diletakkan di LUAR st.form agar bisa memunculkan tombol HTML baru
         if btn_siswa:
             username_clean = str(s_username or "").strip().casefold()
-            if not s_nama or not s_kelas or not s_absen or not username_clean:
-                st.error("Lengkapi semua data, termasuk username unik, terlebih dahulu!")
+            if not s_nama or not s_kelas or not s_absen or not username_clean or not s_pin:
+                st.error("Lengkapi semua data, username, dan PIN Santri terlebih dahulu!")
             elif not re.fullmatch(r"[a-z0-9][a-z0-9._]{2,23}", username_clean):
                 st.error("Username harus 3–24 karakter, diawali huruf/angka, dan hanya memakai huruf kecil, angka, titik, atau garis bawah.")
+            elif not re.fullmatch(r"\d{6}", str(s_pin or "")):
+                st.error("PIN Santri harus tepat 6 angka.")
             else:
-                pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama.strip()} - {s_jenjang} - {s_kelas.strip()} - {s_absen.strip()} - {username_clean}"
+                # Kirim hash PBKDF2 ke WA Bot, bukan PIN asli. Salt unik untuk tiap pendaftaran.
+                import secrets as _pin_secrets
+                _pin_salt = _pin_secrets.token_hex(16)
+                _pin_rounds = 310000
+                _pin_digest = hashlib.pbkdf2_hmac("sha256", s_pin.encode("utf-8"), _pin_salt.encode("utf-8"), _pin_rounds).hex()
+                _pin_hash = f"pbkdf2_sha256${_pin_rounds}${_pin_salt}${_pin_digest}"
+                pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama.strip()} - {s_jenjang} - {s_kelas.strip()} - {s_absen.strip()} - {username_clean} - {_pin_hash}"
                 link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
                 
                 st.success("✅ Data Siap! Klik tombol di bawah untuk masuk ke obrolan WhatsApp.")
@@ -1863,7 +1881,7 @@ if st.session_state.page == "landing":
     # Tombol Futuristik Neon Emerald yang Mengarah ke Render
     st.markdown(
         """
-        <a href="https://robomantap-kuis-orpin.vercel.app/" target="_blank" style="text-decoration: none;">
+        <a href="https://robomantap-intelligence-cbt.onrender.com" target="_blank" style="text-decoration: none;">
             <div style="
                 background: linear-gradient(135deg, #10b981 0%, #059669 100%);
                 color: #020617;

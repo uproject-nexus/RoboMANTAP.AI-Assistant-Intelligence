@@ -78,6 +78,9 @@ def ensure_student_intelligence_tables() -> bool:
         ALTER TABLE wa_identities ADD COLUMN IF NOT EXISTS username VARCHAR(32)
         """,
         """
+        ALTER TABLE wa_identities ADD COLUMN IF NOT EXISTS pin_hash TEXT
+        """,
+        """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_wa_identities_username_unique
         ON wa_identities (LOWER(BTRIM(username)))
         WHERE username IS NOT NULL AND BTRIM(username) <> ''
@@ -262,6 +265,21 @@ def validate_username(value: str) -> tuple[bool, str]:
     return True, normalized
 
 
+def verify_student_pin(pin: str, encoded_hash: str) -> bool:
+    """Verify PBKDF2 PIN hash; PIN asli tidak pernah disimpan di database."""
+    try:
+        algorithm, rounds_raw, salt, expected = str(encoded_hash or "").split("$", 3)
+        if algorithm != "pbkdf2_sha256":
+            return False
+        rounds = int(rounds_raw)
+        if rounds < 100000 or rounds > 1000000 or not re.fullmatch(r"\d{6}", str(pin or "")):
+            return False
+        actual = hashlib.pbkdf2_hmac("sha256", str(pin).encode("utf-8"), salt.encode("utf-8"), rounds).hex()
+        return secrets.compare_digest(actual, expected)
+    except Exception:
+        return False
+
+
 def fetch_student_wa_identity_by_username(username: str) -> dict | None:
     """Lookup identitas siswa berdasarkan username unik dari wa_identities."""
     conn = init_db_connection()
@@ -270,7 +288,7 @@ def fetch_student_wa_identity_by_username(username: str) -> dict | None:
         return None
 
     query = """
-        SELECT wa_number, person_id, role, nama, metadata, status, username
+        SELECT wa_number, person_id, role, nama, metadata, status, username, pin_hash
         FROM wa_identities
         WHERE LOWER(BTRIM(username)) = :username
           AND UPPER(role) = 'SISWA'
@@ -1404,6 +1422,21 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     .hero-title { font-size: 26px; font-weight: 900; color: #f8fafc; margin: 4px 0; }
     .hero-title span { color: #fbbf24; }
     .hero-subtitle { font-size: 13px; color: #cbd5e1; }
+    .main-hero { position: relative; overflow: hidden; border-radius: 24px; padding: clamp(22px,4vw,38px); background: radial-gradient(circle at 90% 0%, rgba(52,211,153,.25), transparent 35%), linear-gradient(125deg,#052e2b 0%,#064e3b 52%,#0f766e 100%); border: 1px solid rgba(110,231,183,.28); box-shadow: 0 18px 45px rgba(2,44,34,.20); }
+    .hero-kicker { letter-spacing: 2px; font-size: 10px; color: #a7f3d0; }
+    .hero-title { font-size: clamp(27px,5vw,40px); letter-spacing: -1.1px; line-height: 1.08; margin: 9px 0; }
+    .hero-subtitle { max-width: 680px; line-height: 1.65; font-size: 14px; }
+    .portal-login-card { margin: 18px 0 12px; padding: clamp(20px,4vw,30px); border-radius: 22px; background: linear-gradient(145deg,rgba(16,185,129,.12),rgba(20,184,166,.05)); border: 1px solid rgba(16,185,129,.25); }
+    .portal-login-card h2 { font-size: clamp(22px,4vw,30px); line-height: 1.2; margin: 8px 0; letter-spacing: -.5px; }
+    .portal-login-card p { color: var(--text-color); opacity: .78; line-height: 1.65; font-size: 14px; margin-bottom: 0; }
+    .portal-login-kicker { color: #059669; font-weight: 850; font-size: 10px; letter-spacing: 1.8px; }
+    .portal-login-foot { padding: 12px 14px; border-radius: 12px; background: rgba(148,163,184,.09); font-size: 13px; line-height: 1.6; }
+    div[data-testid="stForm"] { border: 1px solid rgba(100,116,139,.18); border-radius: 18px; padding: clamp(14px,3vw,22px); background: rgba(148,163,184,.035); }
+    div[data-testid="stFormSubmitButton"] button, div[data-testid="stButton"] button { border-radius: 12px; min-height: 44px; font-weight: 750; transition: transform .15s ease, box-shadow .15s ease; }
+    div[data-testid="stFormSubmitButton"] button:hover, div[data-testid="stButton"] button:hover { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(16,185,129,.18); }
+    div[data-testid="stTabs"] button[role="tab"] { border-radius: 12px 12px 0 0; font-weight: 700; }
+    div[data-testid="stMetric"] { padding: 14px; border: 1px solid rgba(100,116,139,.18); border-radius: 16px; background: rgba(148,163,184,.045); }
+    @media (max-width: 640px) { .main-hero { border-radius: 18px; padding: 21px 18px; } .hero-title { font-size: 28px; } .hero-subtitle { font-size: 13px; } div[data-testid="stTabs"] div[role="tablist"] { gap: 4px; } div[data-testid="stTabs"] button[role="tab"] { padding: 8px 10px; font-size: 12px; } }
     </style>
     """
     st.markdown(ui_css, unsafe_allow_html=True)
@@ -1435,103 +1468,71 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
                 st.session_state.pop(key, None)
             st.rerun()
 
-    # Login awal hanya meminta username; akses data pribadi dilindungi konfirmasi WhatsApp.
+    # Login harian menggunakan username + PIN. WhatsApp hanya dipakai untuk registrasi/pemulihan.
     if not st.session_state.get("student_intelligence_authenticated"):
-        pending_token = st.session_state.get("student_intelligence_pending_token")
-        if pending_token:
-            pending_username = st.session_state.get("student_intelligence_pending_username", "")
-            pending_phone = str(st.session_state.get("student_intelligence_pending_phone") or "")
-            phone_digits = re.sub(r"\D", "", pending_phone)
-            wa_message = urllib.parse.quote(f"VERIFIKASI PORTAL {pending_token}")
-            st.markdown("#### Konfirmasi keamanan melalui WhatsApp")
-            st.info(
-                f"Username **{pending_username}** ditemukan. Untuk melindungi data belajar kamu, "
-                "konfirmasi akses melalui nomor WhatsApp yang terdaftar. Tautan berlaku selama 5 menit."
-            )
-            if phone_digits:
-                st.markdown(
-                    f'<a href="https://wa.me/{phone_digits}?text={wa_message}" target="_blank" '
-                    'style="display:block;text-align:center;padding:12px;border-radius:12px;'
-                    'background:#16a34a;color:white;font-weight:700;text-decoration:none;">'
-                    'Konfirmasi lewat WhatsApp</a>',
-                    unsafe_allow_html=True
-                )
-            if st.button("Saya sudah mengirim konfirmasi", type="primary", use_container_width=True):
-                if consume_verified_portal_login(pending_token):
-                    identity_data = fetch_student_wa_identity_by_username(pending_username)
-                    if identity_data and str(identity_data.get("wa_number") or "") == pending_phone:
-                        st.session_state.student_intelligence_authenticated = True
-                        st.session_state.student_intelligence_identity = identity_data
-                        st.session_state.student_intelligence_username = pending_username
-                        st.session_state.student_intelligence_name = str(identity_data.get("nama") or "")
-                        st.session_state.student_intelligence_grade = str(
-                            (identity_data.get("metadata") or {}).get("jenjang") or jenjang or "MTs"
-                        )
-                        for key in (
-                            "student_intelligence_pending_token",
-                            "student_intelligence_pending_username",
-                            "student_intelligence_pending_phone",
-                        ):
-                            st.session_state.pop(key, None)
-                        st.rerun()
-                    else:
-                        st.error("Identitas berubah atau tidak cocok. Silakan mulai masuk kembali.")
-                else:
-                    st.warning("Konfirmasi belum diterima atau tautan sudah kedaluwarsa. Buka tautan WhatsApp, kirim pesannya, lalu coba lagi.")
-            if st.button("Batalkan dan ganti username", use_container_width=True):
-                for key in (
-                    "student_intelligence_pending_token",
-                    "student_intelligence_pending_username",
-                    "student_intelligence_pending_phone",
-                ):
-                    st.session_state.pop(key, None)
-                st.rerun()
-            return
-
+        st.markdown("""
+        <section class="portal-login-card">
+          <div class="portal-login-kicker">RUANG BELAJAR PERSONAL</div>
+          <h2>Senang bertemu kamu, Santri! ✨</h2>
+          <p>Masuk untuk melihat agenda, melanjutkan belajar, dan bertanya kepada Asisten AI RoboMANTAP.</p>
+        </section>
+        """, unsafe_allow_html=True)
         with st.form("student_intelligence_identity", clear_on_submit=False):
-            st.markdown("#### 🔑 Masuk ke Portal Belajar Santri")
             entered_username = st.text_input(
-                "Username kamu",
-                placeholder="contoh: santri.aisyah",
-                help="Gunakan username yang dibuat saat verifikasi WhatsApp RoboMANTAP."
+                "Username Santri", placeholder="contoh: santri.aisyah",
+                help="Username yang kamu buat saat mendaftar melalui WhatsApp."
             )
-            submitted = st.form_submit_button(
-                "LANJUTKAN", type="primary", use_container_width=True
+            entered_pin = st.text_input(
+                "PIN Santri (6 angka)", placeholder="Masukkan PIN kamu",
+                type="password", max_chars=6,
+                help="PIN rahasia kamu. Jangan bagikan kepada siapa pun."
             )
+            submitted = st.form_submit_button("Masuk ke Portal Santri  →", type="primary", use_container_width=True)
 
         if not submitted:
-            st.info(
-                "Belum punya username? Daftar atau verifikasi melalui bagian "
-                "**Hubungi WA Sekarang** di halaman utama."
-            )
+            st.markdown('<div class="portal-login-foot">Belum punya akun? Daftar melalui <b>Hubungi WA Sekarang</b> di halaman utama.</div>', unsafe_allow_html=True)
             return
 
         valid, username_or_message = validate_username(entered_username)
         if not valid:
             st.error(username_or_message)
             return
+        if not re.fullmatch(r"\d{6}", str(entered_pin or "")):
+            st.error("PIN harus tepat 6 angka.")
+            return
 
         identity_data = fetch_student_wa_identity_by_username(username_or_message)
         if not identity_data:
-            st.error(
-                "Username belum ditemukan atau belum aktif. Selesaikan verifikasi WhatsApp "
-                "pada halaman utama, lalu coba kembali."
-            )
-            st.info("Kembali ke beranda, lalu buka bagian **Hubungi WA Sekarang** untuk mendaftar.")
+            st.error("Username belum ditemukan atau akun belum aktif. Selesaikan pendaftaran di halaman utama.")
+            st.info("Buka bagian **Hubungi WA Sekarang**, lalu selesaikan pendaftaran melalui WhatsApp.")
+            return
+        pin_hash = str(identity_data.get("pin_hash") or "")
+        if not pin_hash:
+            st.warning("Akun ini dibuat sebelum sistem PIN tersedia. Silakan perbarui pendaftaran melalui halaman utama agar PIN tersimpan.")
+            return
+        # Small per-session throttle to discourage repeated guesses.
+        now_ts = datetime.now(timezone.utc).timestamp()
+        attempts = st.session_state.get("student_pin_attempts", 0)
+        last_attempt = st.session_state.get("student_pin_last_attempt", 0.0)
+        if attempts >= 5 and now_ts - float(last_attempt or 0.0) < 300:
+            st.error("Terlalu banyak percobaan. Tunggu 5 menit sebelum mencoba lagi.")
+            return
+        if not verify_student_pin(entered_pin, pin_hash):
+            attempts = attempts + 1 if now_ts - float(last_attempt or 0.0) < 300 else 1
+            st.session_state.student_pin_attempts = attempts
+            st.session_state.student_pin_last_attempt = now_ts
+            st.error("Username atau PIN tidak cocok. Periksa kembali lalu coba lagi.")
             return
 
-        phone = str(identity_data.get("wa_number") or "").strip()
-        if not phone:
-            st.error("Nomor WhatsApp akun ini belum terhubung. Hubungi admin RoboMANTAP.")
-            return
-        token = create_portal_login_challenge(username_or_message, phone)
-        if not token:
-            st.error("Sistem belum dapat membuat konfirmasi login. Pastikan migrasi database sudah dijalankan dan coba lagi.")
-            return
-        st.session_state.student_intelligence_pending_token = token
-        st.session_state.student_intelligence_pending_username = username_or_message
-        st.session_state.student_intelligence_pending_phone = phone
+        st.session_state.student_pin_attempts = 0
+        st.session_state.student_pin_last_attempt = 0.0
+        st.session_state.student_intelligence_authenticated = True
+        st.session_state.student_intelligence_identity = identity_data
+        st.session_state.student_intelligence_username = username_or_message
+        st.session_state.student_intelligence_name = str(identity_data.get("nama") or "")
+        st.session_state.student_intelligence_grade = str((identity_data.get("metadata") or {}).get("jenjang") or jenjang or "MTs")
         st.rerun()
+        return
 
     identity_data = st.session_state.get("student_intelligence_identity") or {}
     meta = identity_data.get("metadata") or {}
