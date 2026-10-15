@@ -140,10 +140,15 @@ def apply_intelligence_theme() -> None:
       .rm-topbar-date{font-size:8px;gap:4px;max-width:36%;line-height:1.35}
       .rm-topbar-date b{font-size:9px}
       .rm-live-dot{width:6px;height:6px;flex:0 0 6px}
-      .rm-welcome-hero{padding:19px 15px;border-radius:21px;margin-bottom:17px}
+      .rm-welcome-hero{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:19px 15px 14px;border-radius:21px;margin-bottom:17px}
+      .rm-welcome-copy{max-width:100%;width:100%;min-width:0}
       .rm-welcome-hero h1{font-size:clamp(25px,7.2vw,32px);max-width:100%;overflow-wrap:anywhere}
       .rm-welcome-hero p{font-size:12px;line-height:1.55;max-width:100%}
-      .rm-hero-art{pointer-events:none;opacity:.34}
+      /* On phones, move the playful art into its own centered row instead of pinning it to the right edge. */
+      .rm-hero-art{position:relative;right:auto;bottom:auto;align-self:center;flex:0 0 154px;width:180px;max-width:100%;height:154px;margin:7px auto 0;transform:none;transform-origin:center;opacity:1;pointer-events:none;overflow:visible}
+      .rm-orbit-one{width:148px;height:148px}.rm-orbit-two{width:112px;height:112px}
+      .rm-book-stack{width:76px;height:76px;font-size:38px;border-radius:23px}
+      .rm-bubble-one{top:2px;right:16px}.rm-bubble-two{left:2px;top:59px}.rm-bubble-three{bottom:0;right:14px}
       .rm-hero-chips{max-width:100%;gap:5px}
       .rm-hero-chips span{font-size:9px;padding:5px 7px}
       .rm-section-heading h2{font-size:19px}
@@ -167,7 +172,11 @@ def apply_intelligence_theme() -> None:
       .rm-topbar-date{font-size:7px;max-width:34%}.rm-topbar-date b{font-size:8px}
       .rm-topbar-brand b{font-size:10px}.rm-topbar-brand small{font-size:7px}
       .rm-welcome-hero{padding:16px 12px}.rm-welcome-hero h1{font-size:24px}
-      .rm-hero-art{opacity:.12}.rm-hero-chips span{font-size:8px}
+      .rm-hero-art{flex-basis:136px;width:154px;height:136px;margin-top:5px;opacity:1}
+      .rm-orbit-one{width:132px;height:132px}.rm-orbit-two{width:98px;height:98px}
+      .rm-book-stack{width:67px;height:67px;font-size:33px;border-radius:20px}
+      .rm-bubble-one{right:7px}.rm-bubble-three{right:6px}
+      .rm-hero-chips span{font-size:8px}
       [data-testid="stMetric"]{padding:9px!important}
     }
     @media(hover:none),(pointer:coarse){
@@ -176,41 +185,6 @@ def apply_intelligence_theme() -> None:
       .rm-feature-card:hover,.rm-portal-link:hover,[data-testid="stMetric"]:hover{transform:none}
       .rm-feature-icon:active,.rm-portal-icon:active,.rm-bottom-note>span:active{animation-play-state:paused;transform:scale(.92)}
     }
-    @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important;transform:none!important}}    
-    /* FIX: Tombol buka sidebar Streamlit — mobile */
-    @media (max-width: 768px) {
-        [data-testid="stSidebarCollapsedControl"],
-        [data-testid="stExpandSidebarButton"] {
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            position: fixed !important;
-            top: 12px !important;
-            left: 12px !important;
-            z-index: 99999 !important;
-            width: 44px !important;
-            height: 44px !important;
-            align-items: center !important;
-            justify-content: center !important;
-            background: #ffffff !important;
-            border: 2px solid #dbeafe !important;
-            border-radius: 14px !important;
-            box-shadow: 0 4px 14px rgba(30, 64, 175, 0.16) !important;
-        }
-    
-        [data-testid="stSidebarCollapsedControl"] svg,
-        [data-testid="stExpandSidebarButton"] svg {
-            color: #1d4ed8 !important;
-            fill: none !important;
-            stroke: #1d4ed8 !important;
-            opacity: 1 !important;
-        }
-    
-        [data-testid="stSidebarCollapsedControl"] button,
-        [data-testid="stExpandSidebarButton"] button {
-            color: #1d4ed8 !important;
-            opacity: 1 !important;
-        }
-    }
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important;transform:none!important}}
     </style>
     """, unsafe_allow_html=True)
