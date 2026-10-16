@@ -811,24 +811,54 @@ if st.session_state.page == "landing":
                 d1, d2 = st.columns(2)
                 with d1: s_kelas = st.text_input("Kelas", placeholder="9A / 12")
                 with d2: s_absen = st.text_input("Nomor absen", placeholder="03")
-                s_username = st.text_input("Username pilihan", placeholder="santri.aisyah", help="3–24 karakter: huruf kecil, angka, titik, atau garis bawah.")
-                st.info("Jaga PIN dan username-mu, jangan bagikan kepada teman yaa!")
+                
+                c_user, c_pin = st.columns([1.25, 1], gap="medium")
+                with c_user:
+                    s_username = st.text_input(
+                        "Username pilihan", 
+                        placeholder="santri.aisyah", 
+                        help="3–24 karakter: huruf kecil, angka, titik, atau garis bawah."
+                    )
+                with c_pin:
+                    s_pin = st.text_input(
+                        "Buat PIN Santri",
+                        placeholder="6 angka",
+                        type="password",
+                        max_chars=6,
+                        help="Buat PIN 6 digit yang mudah diingat."
+                    )
+                    
+                st.info("Jaga PIN dan username-mu, jangan bagikan kepada teman yaa! PIN disimpan aman dalam bentuk hash.")
                 btn_siswa = st.form_submit_button("Lanjutkan ke WhatsApp", type="primary", use_container_width=True)
+        
             if btn_siswa:
                 username_clean = str(s_username or "").strip().casefold()
-                if not s_nama or not s_kelas or not s_absen or not username_clean:
-                    st.error("Lengkapi semua data terlebih dahulu.")
+                if not s_nama or not s_kelas or not s_absen or not username_clean or not s_pin:
+                    st.error("Lengkapi semua data, username, dan PIN terlebih dahulu.")
                 elif not re.fullmatch(r"[a-z0-9][a-z0-9._]{2,23}", username_clean):
                     st.error("Username harus 3–24 karakter, diawali huruf/angka, dan hanya memakai huruf kecil, angka, titik, atau garis bawah.")
+                elif not re.fullmatch(r"\d{6}", str(s_pin or "")):
+                    st.error("PIN Santri harus tepat 6 angka.")
                 else:
-                    pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama.strip()} - {s_jenjang} - {s_kelas.strip()} - {s_absen.strip()} - {username_clean}"
+                    import hashlib
+                    import secrets as _pin_secrets
+                    
+                    # Enkripsi PBKDF2 Hash untuk PIN
+                    _pin_salt = _pin_secrets.token_hex(16)
+                    _pin_rounds = 310000
+                    _pin_digest = hashlib.pbkdf2_hmac("sha256", s_pin.encode("utf-8"), _pin_salt.encode("utf-8"), _pin_rounds).hex()
+                    _pin_hash = f"pbkdf2_sha256${_pin_rounds}${_pin_salt}${_pin_digest}"
+                    
+                    pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama.strip()} - {s_jenjang} - {s_kelas.strip()} - {s_absen.strip()} - {username_clean} - {_pin_hash}"
                     link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
+                    
                     st.success("Data siap. Lanjutkan melalui tombol WhatsApp di bawah.")
                     st.markdown(f'<a class="rm-whatsapp-button" href="{link}" target="_blank">Buka WhatsApp RoboMANTAP ↗</a>', unsafe_allow_html=True)
+
         else:
             with st.form("form_wa_guru"):
-                g_nama = st.text_input("Nama lengkap guru", placeholder="Nama lengkap")
-                g_kode = st.text_input("PIN akses guru", type="password", help="Hubungi admin UPN jika membutuhkan kode akses.")
+                g_nama = st.text_input("Nama lengkap Ustadzah", placeholder="Nama lengkap")
+                g_kode = st.text_input("PIN akses GuruMANTAP", type="password", help="Hubungi admin UPN jika membutuhkan kode akses.")
                 btn_guru = st.form_submit_button("Verifikasi dan lanjutkan", type="primary", use_container_width=True)
             if btn_guru:
                 if not g_nama or not g_kode:
