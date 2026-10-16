@@ -673,7 +673,7 @@ with st.sidebar:
         if st.button("🏡  Beranda", key="nav_home", use_container_width=True, disabled=current_page == "landing"):
             st.session_state.page = "landing"
             st.rerun()
-        if st.button("🌸  Ruang SantriMANTAP", key="nav_student", use_container_width=True, disabled=current_page == "student_intelligence"):
+        if st.button("🎒  Ruang SantriMANTAP", key="nav_student", use_container_width=True, disabled=current_page == "student_intelligence"):
             st.session_state.page = "student_intelligence"
             st.rerun()
         if st.button("🧕🏼  Ruang GuruMANTAP", key="nav_teacher", use_container_width=True, disabled=current_page in ("guru_login", "guru_dashboard")):
@@ -778,12 +778,12 @@ if st.session_state.page == "landing":
 
     c1, c2, c3 = st.columns(3, gap="medium")
     with c1:
-        st.markdown('<div class="rm-feature-card rm-card-lilac"><div class="rm-feature-icon">🎒</div><div class="rm-feature-tag">MY.LEARNING-INTELLIGENCE</div><h3>Ruang SantriMANTAP</h3><p>Belajar dengan panduan AI, latihan pintar, rangkuman PDF, dan insight yang mengikuti perjalananmu.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="rm-feature-card rm-card-lilac"><div class="rm-feature-icon">🎒</div><div class="rm-feature-tag">MY.LEARNING-INTELLIGENCE</div><h3>SantriMANTAP</h3><p>Belajar dengan panduan AI, latihan pintar, rangkuman PDF, dan insight yang mengikuti perjalananmu.</p></div>', unsafe_allow_html=True)
         if st.button("Buka ruang belajarku ↗", key="home_student", type="primary", use_container_width=True):
             st.session_state.page = "student_intelligence"
             st.rerun()
     with c2:
-        st.markdown('<div class="rm-feature-card rm-card-mint"><div class="rm-feature-icon">🧕🏼</div><div class="rm-feature-tag">TEACHING WORKSPACE</div><h3>Ruang GuruMANTAP</h3><p>Kelola kuis, susun bank soal, buat bahan ajar dengan AI, dan pantau aktivitas siswa.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="rm-feature-card rm-card-mint"><div class="rm-feature-icon">🧕🏼</div><div class="rm-feature-tag">TEACHING WORKSPACE</div><h3>GuruMANTAP</h3><p>Kelola kuis, susun bank soal, buat bahan ajar dengan AI, dan pantau aktivitas siswa.</p></div>', unsafe_allow_html=True)
         if st.button("Masuk ruang guru ↗", key="home_teacher", use_container_width=True):
             st.session_state.page = "guru_login"
             st.rerun()
@@ -800,10 +800,10 @@ if st.session_state.page == "landing":
     with p2:
         st.markdown('<a class="rm-portal-link rm-link-yellow" href="https://robo-mantap-kuis-19.vercel.app/" target="_blank"><span class="rm-portal-icon">📝</span><span><b>Kuis GuruMANTAP</b><small>Kerjakan kuis yang dibagikan guru</small></span><strong>↗</strong></a>', unsafe_allow_html=True)
 
-    with st.expander("💬 Registrasi / bantuan akses melalui WhatsApp", expanded=False):
-        st.markdown('<div class="rm-registration-intro"><b>Mulai terhubung dengan RoboMANTAP</b><p>Siapkan data yang diperlukan, lalu lanjutkan percakapan di WhatsApp resmi.</p></div>', unsafe_allow_html=True)
+    with st.expander("💬 Hubungi dan mulai belajar lebih praktis bersama WA-RoboMANTAP!", expanded=False):
+        st.markdown('<div class="rm-registration-intro"><b>Yuk, hubungi WA-RoboMANTAP</b><p>Siapkan data yang diperlukan dan mulai percakapan di WhatsApp resmi.</p></div>', unsafe_allow_html=True)
         NO_WA_BOT = "6283141694735"
-        wa_registration_role = st.radio("Saya adalah", ["👤 Siswa", "🧑‍🏫 Guru"], horizontal=True, key="wa_registration_role", label_visibility="collapsed")
+        wa_registration_role = st.radio("Saya adalah", ["👤 Siswa", "🧕🏼 Guru"], horizontal=True, key="wa_registration_role", label_visibility="collapsed")
         if wa_registration_role == "👤 Siswa":
             with st.form("form_wa_siswa"):
                 s_nama = st.text_input("Nama lengkap", placeholder="Nama lengkap siswa")
@@ -812,7 +812,7 @@ if st.session_state.page == "landing":
                 with d1: s_kelas = st.text_input("Kelas", placeholder="9A / 12")
                 with d2: s_absen = st.text_input("Nomor absen", placeholder="03")
                 s_username = st.text_input("Username pilihan", placeholder="santri.aisyah", help="3–24 karakter: huruf kecil, angka, titik, atau garis bawah.")
-                st.caption("Jaga username-mu dan jangan bagikan kepada teman.")
+                st.info("Jaga username-mu dan jangan bagikan kepada teman.")
                 btn_siswa = st.form_submit_button("Lanjutkan ke WhatsApp", type="primary", use_container_width=True)
             if btn_siswa:
                 username_clean = str(s_username or "").strip().casefold()
