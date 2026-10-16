@@ -788,7 +788,7 @@ if st.session_state.page == "landing":
             st.session_state.page = "guru_login"
             st.rerun()
     with c3:
-        st.markdown('<div class="rm-feature-card rm-card-peach"><div class="rm-feature-icon">🏆</div><div class="rm-feature-tag">OLIMPIADE & PRACTICE</div><h3>Latihan OMI</h3><p>Latihan olimpiade secara bertahap untuk MTs dan MA dengan mata pelajaran sesuai jenjang.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="rm-feature-card rm-card-peach"><div class="rm-feature-icon">🏆</div><div class="rm-feature-tag">OLIMPIADE & PRACTICE</div><h3>Latihan OMI</h3><p>Latihan olimpiade secara bertahap untuk MTs dan MA dengan mata pelajaran yang telah disesuaikan.</p></div>', unsafe_allow_html=True)
         if st.button("Pilih jenjang latihan ↗", key="home_omi", use_container_width=True):
             st.session_state.page = "select_mapel"
             st.rerun()
