@@ -27,6 +27,102 @@ def format_wib_datetime(value=None, seconds=False) -> str:
 def apply_intelligence_theme() -> None:
     st.markdown(r"""
     <style>
+    /* ==========================================
+       FIX MOBILE & RADIO BUTTON NAVIGASI
+       ========================================== */
+    /* 1. Sembunyikan titik radio button */
+    [data-testid="stRadio"] input[type="radio"] {
+        display: none !important;
+    }
+    
+    [data-testid="stRadio"] div[role="radiogroup"] {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        justify-content: center !important;
+    }
+    
+    [data-testid="stRadio"] div[role="radiogroup"] label {
+        border: 1px solid var(--rm-border) !important;
+        border-radius: 12px !important;
+        padding: 8px 14px !important;
+        background: #ffffff !important;
+        cursor: pointer !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: var(--rm-ink) !important;
+    }
+    
+    [data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
+        background: linear-gradient(120deg, #5b6cff 0%, #7c72ff 100%) !important;
+        color: #ffffff !important;
+        border-color: #5b6cff !important;
+        box-shadow: 0 4px 12px rgba(91, 108, 255, 0.25) !important;
+    }
+    
+    /* 2. Fix Tampilan Mobile (max-width: 640px) */
+    @media(max-width: 640px) {
+        /* Tombol Keluar tetap sejajar di samping akun */
+        [data-testid="stHorizontalBlock"]:has(button[key="student_intelligence_logout"]) {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 8px !important;
+        }
+    
+        [data-testid="stHorizontalBlock"]:has(button[key="student_intelligence_logout"]) > [data-testid="column"]:first-child {
+            flex: 1 1 auto !important;
+            width: auto !important;
+        }
+    
+        [data-testid="stHorizontalBlock"]:has(button[key="student_intelligence_logout"]) > [data-testid="column"]:last-child {
+            flex: 0 0 auto !important;
+            width: auto !important;
+        }
+    
+        button[key="student_intelligence_logout"] {
+            min-height: 36px !important;
+            height: 36px !important;
+            font-size: 12px !important;
+            padding: 4px 14px !important;
+            width: auto !important;
+        }
+    
+        /* Metrik 4 kolom dipaksa jadi Grid 2x2 di HP */
+        [data-testid="stHorizontalBlock"]:has(.pi-stat) {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+        }
+    
+        [data-testid="stHorizontalBlock"]:has(.pi-stat) > [data-testid="column"] {
+            flex: 1 1 calc(50% - 4px) !important;
+            width: calc(50% - 4px) !important;
+            min-width: calc(50% - 4px) !important;
+            max-width: calc(50% - 4px) !important;
+        }
+    
+        .pi-stat {
+            padding: 10px !important;
+            border-radius: 14px !important;
+        }
+    
+        .pi-stat-value {
+            font-size: 20px !important;
+        }
+    
+        /* Label radio button di HP */
+        [data-testid="stRadio"] div[role="radiogroup"] label {
+            font-size: 12px !important;
+            padding: 7px 10px !important;
+        }
+    }
+
     :root{--rm-bg:#fff9f0;--rm-paper:#fff;--rm-ink:#26324b;--rm-muted:#718096;--rm-blue:#5b6cff;--rm-cyan:#31c5d8;--rm-mint:#43cfa4;--rm-yellow:#ffd66b;--rm-coral:#ff927d;--rm-lilac:#a99aff;--rm-border:#e8eaf3;--rm-shadow:0 12px 32px rgba(75,83,145,.09)}
     html,body,[data-testid="stAppViewContainer"]{background:var(--rm-bg)!important;color:var(--rm-ink)!important;scroll-behavior:smooth}
     [data-testid="stAppViewContainer"]{background-image:radial-gradient(ellipse at 8% 0%,rgba(255,214,107,.16),transparent 28%),radial-gradient(ellipse at 100% 10%,rgba(169,154,255,.12),transparent 25%)!important}
