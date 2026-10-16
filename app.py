@@ -841,7 +841,7 @@ if st.session_state.page == "landing":
                     st.success("Identitas terverifikasi. Lanjutkan melalui WhatsApp.")
                     st.markdown(f'<a class="rm-whatsapp-button" href="{link}" target="_blank">Buka WhatsApp RoboMANTAP ↗</a>', unsafe_allow_html=True)
 
-    st.markdown('<div class="rm-bottom-note"><span>🌸</span><div><b>Setiap langkah kecil berarti.</b><small>Belajar bukan tentang siapa yang paling cepat, tapi siapa yang terus bertumbuh.</small></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="rm-bottom-note"><span>🌈</span><div><b>Setiap langkah kecil berarti!</b><small>Belajar bukan tentang siapa yang paling cepat, tapi siapa yang terus bertumbuh.</small></div></div>', unsafe_allow_html=True)
 
 elif st.session_state.page == "student_intelligence":
     from student_intelligence import render_student_intelligence_dashboard
