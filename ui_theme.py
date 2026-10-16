@@ -125,7 +125,7 @@ def apply_intelligence_theme() -> None:
       .rm-sidebar-link{min-height:42px;padding:11px 12px;font-size:13px}
       .rm-whatsapp-button{min-height:46px;display:flex;align-items:center;justify-content:center}
     }
-    @media(max-width:320px){
+    @media(max-width:640px){
       /* Stack Streamlit columns on phones so narrow widgets never collide. */
       [data-testid="stHorizontalBlock"]{display:flex!important;flex-wrap:wrap!important;gap:.65rem!important;align-items:stretch!important}
       [data-testid="stHorizontalBlock"]>[data-testid="column"]{flex:1 1 100%!important;width:100%!important;min-width:0!important;max-width:100%!important}
