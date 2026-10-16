@@ -690,7 +690,7 @@ with st.sidebar:
             st.rerun()
         st.markdown('<div class="rm-sidebar-section">PORTAL TERHUBUNG</div>', unsafe_allow_html=True)
         st.markdown(f'<a class="rm-sidebar-link" href="{TKA_PORTAL_URL}" target="_blank">🎯 &nbsp; Portal TKA <span>↗</span></a>', unsafe_allow_html=True)
-        st.markdown('<a class="rm-sidebar-link" href="https://robomantap-intelligence-cbt.onrender.com" target="_blank">📝 &nbsp; Kuis Guru <span>↗</span></a>', unsafe_allow_html=True)
+        st.markdown('<a class="rm-sidebar-link" href="https://robo-mantap-kuis-19.vercel.app/" target="_blank">📝 &nbsp; Kuis Guru <span>↗</span></a>', unsafe_allow_html=True)
 
     if current_page == "guru_dashboard":
         st.markdown('<div class="rm-sidebar-section">FILTER MONITORING</div>', unsafe_allow_html=True)
