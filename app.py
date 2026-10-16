@@ -773,17 +773,17 @@ if st.session_state.page == "landing":
       </div>
       <div class="rm-hero-art"><div class="rm-orbit rm-orbit-one"></div><div class="rm-orbit rm-orbit-two"></div><div class="rm-book-stack">📚</div><div class="rm-float-bubble rm-bubble-one">✨</div><div class="rm-float-bubble rm-bubble-two">💡</div><div class="rm-float-bubble rm-bubble-three">🚀</div></div>
     </section>
-    <div class="rm-section-heading"><div><div class="rm-eyebrow rm-eyebrow-color">PILIH RUANGMU</div><h2>Mulai dari yang kamu butuhkan</h2><p>Semua jalur penting ada di depan—tanpa menu yang menumpuk.</p></div></div>
+    <div class="rm-section-heading"><div><div class="rm-eyebrow rm-eyebrow-color">PILIH RUANGMU</div><h2>Mulai dari yang kamu butuhkan</h2><p>Pahami konsepnya, langsung cobain, dan nikmati serunya belajar! 🚀✨</p></div></div>
     """, unsafe_allow_html=True)
 
     c1, c2, c3 = st.columns(3, gap="medium")
     with c1:
-        st.markdown('<div class="rm-feature-card rm-card-lilac"><div class="rm-feature-icon">🎒</div><div class="rm-feature-tag">MY.LEARNING-INTELLIGENCE</div><h3>SantriMANTAP</h3><p>Belajar dengan panduan AI, latihan pintar, rangkuman PDF, dan insight yang mengikuti perjalananmu.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="rm-feature-card rm-card-lilac"><div class="rm-feature-icon">🎒</div><div class="rm-feature-tag">MY.LEARNING-INTELLIGENCE</div><h3>Ruang SantriMANTAP</h3><p>Belajar dengan panduan RoboMANTAP, latihan pintar, rangkuman PDF, dan insight yang mengikuti perjalananmu.</p></div>', unsafe_allow_html=True)
         if st.button("Buka ruang belajarku ↗", key="home_student", type="primary", use_container_width=True):
             st.session_state.page = "student_intelligence"
             st.rerun()
     with c2:
-        st.markdown('<div class="rm-feature-card rm-card-mint"><div class="rm-feature-icon">🧕🏼</div><div class="rm-feature-tag">TEACHING WORKSPACE</div><h3>GuruMANTAP</h3><p>Kelola kuis, susun bank soal, buat bahan ajar dengan AI, dan pantau aktivitas siswa.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="rm-feature-card rm-card-mint"><div class="rm-feature-icon">🧕🏼</div><div class="rm-feature-tag">TEACHING WORKSPACE</div><h3>Ruang GuruMANTAP</h3><p>Kelola kuis, susun bank soal, buat bahan ajar dengan AI, dan pantau aktivitas siswa.</p></div>', unsafe_allow_html=True)
         if st.button("Masuk ruang guru ↗", key="home_teacher", use_container_width=True):
             st.session_state.page = "guru_login"
             st.rerun()
@@ -793,15 +793,15 @@ if st.session_state.page == "landing":
             st.session_state.page = "select_mapel"
             st.rerun()
 
-    st.markdown('<div class="rm-section-heading rm-section-heading-compact"><div><div class="rm-eyebrow rm-eyebrow-color">LEBIH SIAP, LEBIH PERCAYA DIRI</div><h2>Peralatan belajar yang terhubung</h2><p>Portal khusus tetap tersedia saat kamu membutuhkannya.</p></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="rm-section-heading rm-section-heading-compact"><div><div class="rm-eyebrow rm-eyebrow-color">LEBIH SIAP, LEBIH PERCAYA DIRI</div><h2>Peralatan belajar yang terhubung</h2><p>Tiap langkah kecilmu hari ini adalah investasi keren buat masa depan. Gaskeun, kamu pasti bisa! 🚀🔥</p></div></div>', unsafe_allow_html=True)
     p1, p2 = st.columns(2, gap="medium")
     with p1:
         st.markdown(f'<a class="rm-portal-link rm-link-blue" href="{TKA_PORTAL_URL}" target="_blank"><span class="rm-portal-icon">🎯</span><span><b>Portal TKA 2026</b><small>Persiapkan diri dengan latihan TKA</small></span><strong>↗</strong></a>', unsafe_allow_html=True)
     with p2:
         st.markdown('<a class="rm-portal-link rm-link-yellow" href="https://robo-mantap-kuis-19.vercel.app/" target="_blank"><span class="rm-portal-icon">📝</span><span><b>Kuis GuruMANTAP</b><small>Kerjakan kuis yang dibagikan guru</small></span><strong>↗</strong></a>', unsafe_allow_html=True)
 
-    with st.expander("💬 Hubungi dan mulai belajar lebih praktis bersama WA-RoboMANTAP!", expanded=False):
-        st.markdown('<div class="rm-registration-intro"><b>Yuk, hubungi WA-RoboMANTAP</b><p>Siapkan data yang diperlukan dan mulai percakapan di WhatsApp resmi.</p></div>', unsafe_allow_html=True)
+    with st.expander("💬 Hubungi WA-RoboMANTAP sekarang!", expanded=False):
+        st.markdown('<div class="rm-registration-intro"><b>Mulai terhubung dengan WA-RoboMANTAP</b><p>Siapkan data yang diperlukan dan mulai percakapan di WhatsApp resmi.</p></div>', unsafe_allow_html=True)
         NO_WA_BOT = "6283141694735"
         wa_registration_role = st.radio("Saya adalah", ["👤 Siswa", "🧕🏼 Guru"], horizontal=True, key="wa_registration_role", label_visibility="collapsed")
         if wa_registration_role == "👤 Siswa":
