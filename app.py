@@ -58,7 +58,7 @@ st.set_page_config(
 )
 
 
-TKA_PORTAL_URL = os.getenv("TKA_PORTAL_URL", "https://robomantap-tka.onrender.com")
+TKA_PORTAL_URL = os.getenv("TKA_PORTAL_URL", "https://robo-mantap-tka.vercel.app/")
 
 def _tka_review_answer_equal(question: dict, user_answer) -> bool:
     qtype = str(question.get("question_type") or "PG").upper()
