@@ -773,7 +773,7 @@ if st.session_state.page == "landing":
       </div>
       <div class="rm-hero-art"><div class="rm-orbit rm-orbit-one"></div><div class="rm-orbit rm-orbit-two"></div><div class="rm-book-stack">📚</div><div class="rm-float-bubble rm-bubble-one">✨</div><div class="rm-float-bubble rm-bubble-two">💡</div><div class="rm-float-bubble rm-bubble-three">🚀</div></div>
     </section>
-    <div class="rm-section-heading"><div><div class="rm-eyebrow rm-eyebrow-color">PILIH RUANGMU</div><h2>Mulai dari yang kamu butuhkan</h2><p>Pahami konsepnya, langsung cobain, dan nikmati serunya belajar! 🚀✨</p></div></div>
+    <div class="rm-section-heading"><div><div class="rm-eyebrow rm-eyebrow-color">PILIH RUANGMU</div><h2>Mulai dari yang kamu butuhkan</h2><p>Pahami konsepnya, langsung cobain, dan nikmati serunya belajar! ✨</p></div></div>
     """, unsafe_allow_html=True)
 
     c1, c2, c3 = st.columns(3, gap="medium")
@@ -783,17 +783,17 @@ if st.session_state.page == "landing":
             st.session_state.page = "student_intelligence"
             st.rerun()
     with c2:
-        st.markdown('<div class="rm-feature-card rm-card-mint"><div class="rm-feature-icon">🧕🏼</div><div class="rm-feature-tag">TEACHING WORKSPACE</div><h3>Ruang GuruMANTAP</h3><p>Kelola kuis, susun bank soal, buat bahan ajar dengan AI, dan pantau aktivitas siswa.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="rm-feature-card rm-card-mint"><div class="rm-feature-icon">🧕🏼</div><div class="rm-feature-tag">TEACHING WORKSPACE</div><h3>Ruang GuruMANTAP</h3><p>Kelola kuis, susun bank soal, buat bahan ajar dengan RoboMANTAP, dan pantau aktivitas pengerjaan siswa.</p></div>', unsafe_allow_html=True)
         if st.button("Masuk ruang guru ↗", key="home_teacher", use_container_width=True):
             st.session_state.page = "guru_login"
             st.rerun()
     with c3:
-        st.markdown('<div class="rm-feature-card rm-card-peach"><div class="rm-feature-icon">🏆</div><div class="rm-feature-tag">OLIMPIADE & PRACTICE</div><h3>Latihan OMI</h3><p>Latihan bertahap untuk MTs dan MA dengan mata pelajaran sesuai jenjang.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="rm-feature-card rm-card-peach"><div class="rm-feature-icon">🏆</div><div class="rm-feature-tag">OLIMPIADE & PRACTICE</div><h3>Latihan OMI</h3><p>Latihan olimpiade secara bertahap untuk MTs dan MA dengan mata pelajaran sesuai jenjang.</p></div>', unsafe_allow_html=True)
         if st.button("Pilih jenjang latihan ↗", key="home_omi", use_container_width=True):
             st.session_state.page = "select_mapel"
             st.rerun()
 
-    st.markdown('<div class="rm-section-heading rm-section-heading-compact"><div><div class="rm-eyebrow rm-eyebrow-color">LEBIH SIAP, LEBIH PERCAYA DIRI</div><h2>Peralatan belajar yang terhubung</h2><p>Tiap langkah kecilmu hari ini adalah investasi keren buat masa depan. Gaskeun, kamu pasti bisa! 🚀🔥</p></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="rm-section-heading rm-section-heading-compact"><div><div class="rm-eyebrow rm-eyebrow-color">LEBIH SIAP, LEBIH PERCAYA DIRI</div><h2>Peralatan belajar yang terhubung</h2><p>Mulai aja dulu, nikmati prosesnya, dan gaskeun terus! 🔥</p></div></div>', unsafe_allow_html=True)
     p1, p2 = st.columns(2, gap="medium")
     with p1:
         st.markdown(f'<a class="rm-portal-link rm-link-blue" href="{TKA_PORTAL_URL}" target="_blank"><span class="rm-portal-icon">🎯</span><span><b>Portal TKA 2026</b><small>Persiapkan diri dengan latihan TKA</small></span><strong>↗</strong></a>', unsafe_allow_html=True)
@@ -812,7 +812,7 @@ if st.session_state.page == "landing":
                 with d1: s_kelas = st.text_input("Kelas", placeholder="9A / 12")
                 with d2: s_absen = st.text_input("Nomor absen", placeholder="03")
                 s_username = st.text_input("Username pilihan", placeholder="santri.aisyah", help="3–24 karakter: huruf kecil, angka, titik, atau garis bawah.")
-                st.info("Jaga username-mu dan jangan bagikan kepada teman.")
+                st.info("Jaga PIN dan username-mu, jangan bagikan kepada teman yaa!")
                 btn_siswa = st.form_submit_button("Lanjutkan ke WhatsApp", type="primary", use_container_width=True)
             if btn_siswa:
                 username_clean = str(s_username or "").strip().casefold()
