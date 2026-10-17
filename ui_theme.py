@@ -225,3 +225,22 @@ def apply_intelligence_theme() -> None:
 
     </style>
     """, unsafe_allow_html=True)
+    st.markdown(r"""
+    <style>
+    /* Mobile-first layer: sekolah memakai HP, jadi semua dibuat nyaman disentuh */
+    [data-testid="stAppViewBlockContainer"]{padding-bottom:5rem}
+    div[role="radiogroup"]{flex-wrap:nowrap!important;overflow-x:auto;gap:8px!important;padding:6px 2px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+    div[role="radiogroup"]::-webkit-scrollbar{display:none}
+    div[role="radiogroup"]>label{flex:0 0 auto;background:#fff;border:1px solid #e4e7f3;border-radius:999px;padding:9px 15px!important;font-weight:800;white-space:nowrap;box-shadow:0 4px 12px rgba(71,80,146,.07)}
+    div[role="radiogroup"]>label:has(input:checked){background:linear-gradient(120deg,#5b6cff,#a99aff);border-color:transparent;color:#fff!important;box-shadow:0 8px 18px rgba(91,108,255,.28)}
+    div[role="radiogroup"]>label:has(input:checked) *{color:#fff!important}
+    div[role="radiogroup"]>label>div:first-child{display:none}
+    div.stButton>button{min-height:50px}
+    @media(max-width:640px){
+      [data-testid="stHorizontalBlock"]{flex-wrap:wrap!important;gap:.6rem!important}
+      [data-testid="stHorizontalBlock"]>[data-testid="stColumn"],[data-testid="stHorizontalBlock"]>[data-testid="column"]{min-width:100%!important;flex:1 1 100%!important}
+      input,textarea,select{font-size:16px!important}
+      h1{font-size:1.65rem!important}h2{font-size:1.35rem!important}h3{font-size:1.15rem!important}
+    }
+    </style>
+    """, unsafe_allow_html=True)
