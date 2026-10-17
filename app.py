@@ -662,7 +662,7 @@ with st.sidebar:
     <div class="rm-sidebar-brand">
       <div class="rm-sidebar-logo">🎓</div>
       <div class="rm-sidebar-name">RoboMANTAP<span> Learning Intelligence Platform</span></div>
-      <div class="rm-sidebar-caption">Belajar lebih cerdas, setiap hari</div>
+      <div class="rm-sidebar-caption">Belajar lebih cerdas, setiap hari!</div>
       <div class="rm-sidebar-status"><span></span> Engineered by U.Project Nexus</div>
     </div>
     """, unsafe_allow_html=True)
