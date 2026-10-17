@@ -4,13 +4,19 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Portal TKA - RoboMANTAP</title>
 <script src="https://cdn.tailwindcss.com"></script>
+{% include "_theme.html" %}
 <style>
-body{background:#020617}.mode-card{background:linear-gradient(145deg,#0f172a,#111827);border:1px solid #1e293b;border-radius:20px;padding:22px;transition:.2s}.mode-card:hover{transform:translateY(-2px);border-color:#10b981}.btn{display:flex;align-items:center;justify-content:center;width:100%;padding:14px 20px;border-radius:12px;font-weight:800;color:#020617;background:linear-gradient(135deg,#10b981,#059669)}.btn2{display:flex;align-items:center;justify-content:center;width:100%;padding:14px 20px;border-radius:12px;font-weight:800;color:#e2e8f0;background:#0f172a;border:1px solid #334155}.loading{display:none}.busy .label{display:none}.busy .loading{display:inline}
+body{background:transparent}
+.mode-card{background:#FFFFFF;border:1px solid #FBDDEB;border-radius:24px;padding:22px;transition:.2s;box-shadow:0 16px 36px -14px rgba(214,36,127,.25)}
+.mode-card:hover{transform:translateY(-3px);border-color:#D6247F}
+.btn{display:flex;align-items:center;justify-content:center;width:100%;padding:14px 20px;border-radius:14px;font-weight:800;color:#FFF3F9;background:linear-gradient(135deg,#D6247F,#7C3AED);box-shadow:0 10px 24px -8px rgba(214,36,127,.45);transition:.15s}
+.btn2{display:flex;align-items:center;justify-content:center;width:100%;padding:14px 20px;border-radius:14px;font-weight:800;color:#5E3A55;background:#FFF3F9;border:1px solid #F0BFD8}
+.loading{display:none}.busy .label{display:none}.busy .loading{display:inline}
 </style>
 </head>
 <body class="min-h-screen text-slate-100 flex items-center justify-center p-4">
 <div class="w-full max-w-3xl">
-<div class="text-center mb-8"><div class="inline-block px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold tracking-widest uppercase">RoboMANTAP • TKA 2026</div><h1 class="text-3xl sm:text-4xl font-black mt-3">PORTAL LATIHAN TKA</h1><p class="text-slate-400 text-sm mt-2">Latihan TKA kapan saja atau kerjakan TKA yang diterbitkan GuruMANTAP.</p></div>
+<div class="text-center mb-8"><div class="inline-block px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold tracking-widest uppercase">RoboMANTAP • TKA 2026 🌸</div><h1 class="text-3xl sm:text-4xl font-black mt-3">PORTAL LATIHAN TKA ✨</h1><p class="text-slate-400 text-sm mt-2">Latihan TKA kapan saja atau kerjakan TKA yang diterbitkan GuruMANTAP.</p></div>
 {% if error %}<div class="mb-5 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{ error }}</div>{% endif %}
 {% if mode == 'choice' %}
 <div class="grid md:grid-cols-2 gap-5">
