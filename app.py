@@ -793,7 +793,7 @@ if st.session_state.page == "landing":
             st.session_state.page = "select_mapel"
             st.rerun()
 
-    st.markdown('<div class="rm-section-heading rm-section-heading-compact"><div><div class="rm-eyebrow rm-eyebrow-color">LEBIH SIAP, LEBIH PERCAYA DIRI</div><h2>Peralatan belajar yang terhubung</h2><p>Mulai aja dulu, nikmati prosesnya, dan gaskeun terus! 🔥</p></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="rm-section-heading rm-section-heading-compact"><div><div class="rm-eyebrow rm-eyebrow-color">LEBIH SIAP, LEBIH PERCAYA DIRI</div><h2>Peralatan belajar yang terhubung</h2><p>Mulai aja dulu, nikmati prosesnya, dan gaskeun terus! 🙌</p></div></div>', unsafe_allow_html=True)
     p1, p2 = st.columns(2, gap="medium")
     with p1:
         st.markdown(f'<a class="rm-portal-link rm-link-blue" href="{TKA_PORTAL_URL}" target="_blank"><span class="rm-portal-icon">🎯</span><span><b>Portal TKA 2026</b><small>Persiapkan diri dengan latihan TKA</small></span><strong>↗</strong></a>', unsafe_allow_html=True)
