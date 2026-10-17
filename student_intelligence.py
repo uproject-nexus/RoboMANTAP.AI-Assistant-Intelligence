@@ -1251,6 +1251,28 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     div[role="radiogroup"] {gap:7px;}
     div[role="radiogroup"] label {border:1px solid var(--portal-line);border-radius:13px;padding:9px 12px;background:#fff;}
     div[data-testid="stMetric"] {border:1px solid var(--portal-line);border-radius:15px;padding:12px;background:#fff;}
+
+    /* === TAMBAHAN KHUSUS PENYESUAIAN LAYAR HP / MOBILE === */
+    @media (max-width: 768px) {
+        /* Ubah 4 kolom st.columns agar wrap menjadi grid 2x2 */
+        div[data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+        }
+        div[data-testid="column"] {
+            flex: 1 1 calc(50% - 8px) !important;
+            min-width: calc(50% - 8px) !important;
+        }
+        /* Penyesuaian padding & font kartu statistik di HP */
+        .pi-stat {
+            padding: 10px 8px !important;
+            border-radius: 12px !important;
+        }
+        .pi-stat-label { font-size: 10px !important; }
+        .pi-stat-value { font-size: 18px !important; }
+        .pi-muted { font-size: 10px !important; }
+    }
+
     @media(max-width:640px){.block-container{padding-left:.8rem;padding-right:.8rem}.pi-hero{border-radius:21px;padding:22px 18px}.pi-card{padding:15px;border-radius:17px}}
     @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
     </style>
