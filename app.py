@@ -8,6 +8,7 @@ import base64
 import random
 import urllib.parse
 import hashlib
+import hmac
 import threading
 import pandas as pd
 import streamlit as st
@@ -56,8 +57,20 @@ from ai_engine import (
 from student_intelligence import ensure_student_intelligence_tables, render_student_intelligence_dashboard
 from tka_engine import ensure_tka_tables, update_tka_progress
 from tka_studio import render_tka_studio
+from mobile_redesign import inject_mobile_redesign
 
 TKA_PORTAL_URL = os.getenv("TKA_PORTAL_URL", "https://robomantap-tka.onrender.com")
+
+
+def _configured_teacher_access_pin() -> str:
+    """Read the teacher PIN from deployment secrets, never from a source-code default."""
+    configured = str(os.getenv("TEACHER_ACCESS_PIN", "") or "").strip()
+    if configured:
+        return configured
+    try:
+        return str(st.secrets.get("TEACHER_ACCESS_PIN", "") or "").strip()
+    except Exception:
+        return ""
 
 def _tka_review_answer_equal(question: dict, user_answer) -> bool:
     qtype = str(question.get("question_type") or "PG").upper()
@@ -104,11 +117,8 @@ st.set_page_config(
     page_title="RoboMANTAP-Intelligence",
     page_icon="logo.png",
     layout="wide",
-    initial_sidebar_state="auto"
+    initial_sidebar_state="collapsed"
 )
-
-from ui_happy import apply_happy_theme
-apply_happy_theme()
 
 LOGO_PUBLIC_URL = "https://raw.githubusercontent.com/uproject-nexus/RoboMANTAP.AI-Assistant-Intelligence/main/logo.png"
 
@@ -135,8 +145,8 @@ components.html(
 
         // 2. Timpa Manifest PWA (Mengubah Nama & Logo pada Pop-up Install App)
         const myManifest = {{
-            "short_name": "UPN",
-            "name": "U.Project Nexus",
+            "short_name": "RoboMANTAP",
+            "name": "RoboMANTAP · Ruang Belajar Ceria",
             "icons": [
                 {{
                     "src": "{LOGO_PUBLIC_URL}",
@@ -147,8 +157,8 @@ components.html(
             ],
             "start_url": ".",
             "display": "standalone",
-            "background_color": "#f6fbff",
-            "theme_color": "#7b5cff"
+            "background_color": "#fffaf4",
+            "theme_color": "#f45f88"
         }};
 
         const blob = new Blob([JSON.stringify(myManifest)], {{type: 'application/json'}});
@@ -374,7 +384,7 @@ st.markdown("""
         padding: 14px 16px;
         border: 1px solid rgba(16,185,129,.22);
         border-radius: 16px;
-        background: #ffffff;
+        background: linear-gradient(135deg, rgba(2,44,34,.62), rgba(15,23,42,.82));
         box-shadow: 0 12px 35px rgba(0,0,0,.16);
     }
     .upn-live-hero-left {
@@ -422,7 +432,7 @@ st.markdown("""
         white-space: nowrap;
     }
     .upn-live-card {
-        background: #ffffff;
+        background: linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,44,34,.30));
         border: 1px solid rgba(148,163,184,.16);
         border-radius: 18px;
         padding: 15px;
@@ -596,7 +606,7 @@ st.markdown("""
     .upn-live-foot span {
         padding: 4px 7px;
         border-radius: 7px;
-        background: #ffffff;
+        background: rgba(15,23,42,.65);
         border: 1px solid rgba(148,163,184,.10);
     }
     .upn-live-divider {
@@ -638,6 +648,9 @@ st.markdown("""
 
 logo_mantap_b64 = get_image_base64("logo.png")
 logo_nexus_b64 = get_image_base64("nexus_logo.png")
+
+# App-wide light theme and mobile-first interaction layer. Business logic stays unchanged.
+inject_mobile_redesign()
 
 img_mantap_html = f'<img src="data:image/png;base64,{logo_mantap_b64}" style="height: 70px; margin-bottom: 8px;">' if logo_mantap_b64 else '<div style="font-size: 32px;">🎓</div>'
 
@@ -1578,7 +1591,7 @@ def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"
         [Paragraph("Kelas / Jenjang", style_meta_label), Paragraph(":", style_meta_label), Paragraph(kelas, style_meta_val)],
         [Paragraph("Topik Utama", style_meta_label), Paragraph(":", style_meta_label), Paragraph(topik, style_meta_val)],
         [Paragraph("Tanggal", style_meta_label), Paragraph(":", style_meta_label), Paragraph(tgl_presisi, style_meta_val)],
-        [Paragraph("Nama Siswa", style_meta_label), Paragraph(":", style_meta_label), Paragraph("......................................................................", style_meta_val)],
+        [Paragraph("Nama Santriwati", style_meta_label), Paragraph(":", style_meta_label), Paragraph("......................................................................", style_meta_val)],
     ]
     
     t_meta_inner = Table(meta_rows, colWidths=[3.5 * cm, 0.4 * cm, 10.5 * cm])
@@ -1707,13 +1720,22 @@ def create_5_quiz_packages(master_quiz):
 # ==============================================================================
 if st.session_state.page == "landing":
 
-    st.markdown("<h3 style='text-align: center; font-size: 25px;'>🏆 BINA PRESTASI OMI 2026</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <section class="rm-welcome-hero">
+      <div class="rm-welcome-top">{img_mantap_html}<span class="rm-welcome-badge">🌈 RUANG BELAJAR CERIA</span></div>
+      <div class="rm-welcome-kicker">ROBO MANTAP · MADRASAH PUTRI</div>
+      <h1 class="rm-welcome-title">Belajar dengan riang,<br/><span>tumbuh bersama.</span></h1>
+      <p class="rm-welcome-copy">Tempat latihan, eksplorasi, dan prestasi yang dirancang untuk menemani langkah belajarmu setiap hari.</p>
+      <div class="rm-welcome-tags"><span>📚 Materi & latihan</span><span>🌷 Adab dan akhlak</span><span>✨ Progres belajar</span></div>
+      <div class="rm-welcome-decoration" aria-hidden="true">✦</div>
+    </section>
+    <div class="rm-section-heading"><div class="rm-section-eyebrow">MULAI DARI SINI</div><div class="rm-section-title">Pilih jenjang belajarmu</div><div class="rm-section-copy">Pilih tingkat pendidikan untuk membuka latihan dan pembinaan yang sesuai.</div></div>
+    """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("""
-        <div class="mode-card">
+        <div class="mode-card mode-card-mts">
             <h2>🏫 TINGKAT MTs</h2>
             <p>Madrasah Tsanawiyah Al-Irsyad Putri</p>
         </div>
@@ -1725,7 +1747,7 @@ if st.session_state.page == "landing":
 
     with col2:
         st.markdown("""
-        <div class="mode-card">
+        <div class="mode-card mode-card-ma">
             <h2>🏛️ TINGKAT MA</h2>
             <p>Madrasah Aliyah Al-Irsyad Putri</p>
         </div>
@@ -1739,26 +1761,27 @@ if st.session_state.page == "landing":
     st.write("---")
     st.markdown("""
     <div style="
-        background: linear-gradient(135deg,#7b5cff,#4cc9f0);
-        border: 1px solid #3b82f6;
-        border-radius: 8px;
-        padding: 8px 14px;
+        background: linear-gradient(115deg, #e2faf1 0%, #fff2db 52%, #ffe6f0 100%);
+        border: 1px solid #f1dfe4;
+        border-radius: 18px;
+        padding: 14px 16px;
         text-align: center;
+        box-shadow: 0 8px 22px rgba(70, 66, 90, .05);
     ">
-        <div style="font-weight: bold; font-size: 14px; color: #60a5fa; margin-bottom: 2px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+        <div style="font-weight: 900; font-size: 14px; color: #b63f70; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; gap: 6px;">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#25D366" viewBox="0 0 16 16">
               <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.099-.834-.308-1.589-.981-.588-.524-.986-1.171-1.101-1.368-.116-.198-.012-.304.087-.403.088-.088.197-.232.296-.348.1-.116.133-.197.198-.329.065-.133.033-.248-.016-.348-.05-.099-.445-1.071-.61-1.465-.16-.385-.32-.331-.445-.338a2.52 2.52 0 0 0-.38-.007c-.131 0-.343.049-.523.247-.18.198-.69.674-.69 1.643 0 .97.705 1.908.803 2.04.099.133 1.387 2.119 3.362 2.97.47.203.837.324 1.124.415.472.15.901.129 1.24.078.378-.057 1.17-.478 1.336-.94.166-.462.166-.857.116-.94-.05-.083-.183-.133-.38-.232z"/>
             </svg>
             HUBUNGI WA RoboMANTAP SEKARANG!
         </div>
-        <div style="font-size: 10px; color: #cbd5e1; line-height: 1.3;">
+        <div style="font-size: 12px; color: #59657c; line-height: 1.5;">
             Ruang Belajar yang lebih efektif, efisien, dan lengkap. Kapan saja, di mana saja!
         </div>
     </div>
     """, unsafe_allow_html=True)
     
     NO_WA_BOT = "6283141694735"
-    tab_siswa, tab_guru = st.tabs(["👤 Siswa", "🧕🏼 Guru"])    
+    tab_siswa, tab_guru = st.tabs(["👧 Santriwati", "🧕 Ustadzah"])    
     
     with tab_siswa:
         with st.form("form_wa_siswa"):
@@ -1778,7 +1801,7 @@ if st.session_state.page == "landing":
                 )
             with c_pin:
                 s_pin = st.text_input(
-                    "Buat PIN Santri",
+                    "Buat PIN Santriwati",
                     placeholder="6 angka",
                     type="password",
                     max_chars=6,
@@ -1795,11 +1818,11 @@ if st.session_state.page == "landing":
         if btn_siswa:
             username_clean = str(s_username or "").strip().casefold()
             if not s_nama or not s_kelas or not s_absen or not username_clean or not s_pin:
-                st.error("Lengkapi semua data, username, dan PIN Santri terlebih dahulu!")
+                st.error("Lengkapi semua data, username, dan PIN Santriwati terlebih dahulu!")
             elif not re.fullmatch(r"[a-z0-9][a-z0-9._]{2,23}", username_clean):
                 st.error("Username harus 3–24 karakter, diawali huruf/angka, dan hanya memakai huruf kecil, angka, titik, atau garis bawah.")
             elif not re.fullmatch(r"\d{6}", str(s_pin or "")):
-                st.error("PIN Santri harus tepat 6 angka.")
+                st.error("PIN Santriwati harus tepat 6 angka.")
             else:
                 # Kirim hash PBKDF2 ke WA Bot, bukan PIN asli. Salt unik untuk tiap pendaftaran.
                 import secrets as _pin_secrets
@@ -1830,7 +1853,9 @@ if st.session_state.page == "landing":
         if btn_guru:
             if not g_nama or not g_kode:
                 st.error("Nama dan Kode Akses wajib diisi!")
-            elif g_kode != "MANTAP2026": 
+            elif not _configured_teacher_access_pin():
+                st.error("PIN akses guru belum dikonfigurasi. Admin harus mengatur TEACHER_ACCESS_PIN di Secrets/environment deployment.")
+            elif not hmac.compare_digest(g_kode, _configured_teacher_access_pin()):
                 st.error("⚠️ Kode PIN Akses Guru salah. Siswa dilarang masuk area ini.")
             else:
                 pesan = f"Halo RoboMANTAP! Saya [GURU] : {g_nama} - VALIDATED"
@@ -1911,26 +1936,26 @@ if st.session_state.page == "landing":
     )
 
     st.write("---")
-    st.markdown("#### 👤 Portal SantriMANTAP")
+    st.markdown("#### 👧 Portal SantriwatiMANTAP")
     st.markdown("""
-    <div class="guru-card" style="background: linear-gradient(135deg, #172554 0%, #312e81 100%); border-color: #6366f1;">
+    <div class="guru-card student-hub-card">
         <h2 style="margin:0; font-size: 20px;">🎓 My Learning Intelligence</h2>
-        <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Evaluasi pola belajarmu, identifikasi materi yang butuh perbaikan, lalu susun rencana strategis untuk langkah pembelajaran berikutnya!</p>
+        <p style="font-size: 12px; margin-top:7px;">Kenali progresmu, temukan materi prioritas, dan lanjutkan belajar lewat mini-game edukatif.</p>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("Masuk Portal Siswa ➔", use_container_width=True, type="primary"):
+    if st.button("Masuk Portal Santriwati ➔", use_container_width=True, type="primary"):
         st.session_state.page = "student_intelligence"
         st.rerun()
 
     st.write("---")
-    st.markdown("#### 🧕🏼 Portal GuruMANTAP")
+    st.markdown("#### 🧕 Portal UstadzahMANTAP")
     st.markdown("""
     <div class="guru-card">
         <h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
         <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal dan fitur automation</p>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("🔒 Masuk Portal Guru ➔", use_container_width=True):
+    if st.button("🔒 Masuk Portal Ustadzah ➔", use_container_width=True):
         st.session_state.page = "guru_login"
         st.rerun()
 
@@ -1966,7 +1991,7 @@ elif st.session_state.page == "student_intelligence":
 # 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
 # ==============================================================================
 elif st.session_state.page == "guru_login":
-    st.subheader("🔒 Akses Portal GuruMANTAP")
+    st.subheader("🔒 Akses Portal UstadzahMANTAP")
 
     st.markdown("""
     <div style="background-color: rgba(28, 131, 225, 0.1); border-left: 4px solid #1c83e1; padding: 10px 12px; border-radius: 6px; font-size: 10px; color: var(--text-color); margin-bottom: 15px;">
@@ -1975,15 +2000,18 @@ elif st.session_state.page == "guru_login":
     """, unsafe_allow_html=True)
     
     with st.form("guru_login_form", clear_on_submit=False):
-        pin_input = st.text_input("Masukkan PIN Akses:", type="password", placeholder="Masukkan PIN GuruMANTAP...")
+        pin_input = st.text_input("Masukkan PIN Akses Ustadzah:", type="password", placeholder="Masukkan PIN GuruMANTAP...")
         login_submit = st.form_submit_button("Login", type="primary", use_container_width=True)
     if login_submit:
-        if pin_input == "MANTAP2026":
+        expected_teacher_pin = _configured_teacher_access_pin()
+        if not expected_teacher_pin:
+            st.error("PIN akses guru belum dikonfigurasi. Admin harus mengatur TEACHER_ACCESS_PIN di Secrets/environment deployment.")
+        elif hmac.compare_digest(pin_input, expected_teacher_pin):
             st.session_state.guru_auth = True
             st.session_state.page = "guru_dashboard"
             st.rerun()
         else:
-            st.error("PIN Salah. Silakhan coba lagi!")
+            st.error("PIN salah. Silakan coba lagi.")
     st.write("---")
     if st.button("⬅️ Kembali ke Beranda", use_container_width=True):
         st.session_state.page = "landing"
@@ -1997,7 +2025,7 @@ elif st.session_state.page == "guru_dashboard":
     st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔴 Live Monitoring", "✨ Quiz Custom", "⚡ Automation", "📚 Bank Soal", "🎓 TKA Studio"])
     with tab1:
-        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Evaluasi Siswa</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Evaluasi Santriwati</p>", unsafe_allow_html=True)
 
         time_filter = st.session_state.get("filter_time", "Hari Ini")
         selected_jenjang_filter = st.session_state.get("filter_jenjang", "Semua Jenjang")
@@ -2254,11 +2282,11 @@ elif st.session_state.page == "guru_dashboard":
                 <!-- BARIS 1: 3 KOLOM METRIK AKTIVITAS -->
                 <div class="kpi-grid-top">
                     <div class="kpi-card">
-                        <div class="kpi-title">👥 Total Siswa</div>
+                        <div class="kpi-title">👧 Total Santriwati</div>
                         <div class="kpi-value">{val_total}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-title">⚡ Siswa Aktif</div>
+                        <div class="kpi-title">⚡ Santriwati Aktif</div>
                         <div class="kpi-value" style="color: #34d399;">{val_aktif}</div>
                     </div>
                     <div class="kpi-card">
@@ -2890,7 +2918,7 @@ elif st.session_state.page == "guru_dashboard":
             st.markdown(
                 f"""
                 <div style="
-                    background-color: #7b5cff;
+                    background-color: #1e293b;
                     border-left: 4px solid #3b82f6;
                     padding: 10px 14px;
                     border-radius: 6px;
@@ -3579,9 +3607,9 @@ elif st.session_state.page == "setup":
     col_h1, col_h2 = st.columns([3, 1])
     with col_h1:
         st.markdown(f"""
-        <div style="font-size: 25px; font-weight: 800; line-height: 1.3; color: #f8fafc;">
+        <div style="font-size: 25px; font-weight: 800; line-height: 1.3; color: #29354e;">
             ⚙️ Persiapan CBT<br>
-            <span style="font-size: 15px; color: #34d399; font-weight: 600;">
+            <span style="font-size: 15px; color: #cb4e7c; font-weight: 750;">
                 {st.session_state.mapel} &bull; {st.session_state.jenjang}
             </span>
         </div>
@@ -3600,7 +3628,7 @@ elif st.session_state.page == "setup":
     with st.form(key="cbt_setup_form", clear_on_submit=False):
         
         # --- DATA DIRI ---
-        st.markdown('<div style="font-size: 22px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">📝 Data Diri Siswa</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size: 22px; font-weight: 700; color: #29354e; margin-bottom: 6px;">📝 Data Diri Siswa</div>', unsafe_allow_html=True)
         nama_input = st.text_input(
             "Nama Lengkap:", 
             value=st.session_state.get("nama_siswa", ""), 
@@ -3608,13 +3636,13 @@ elif st.session_state.page == "setup":
             label_visibility="collapsed"
         )
 
-        st.markdown("<hr style='margin: 15px 0; border-color: rgba(255,255,255,0.08);'>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 15px 0; border-color: #f0e5de;'>", unsafe_allow_html=True)
 
         # --- GRID KONFIGURASI & PETUNJUK ---
         c1, c2 = st.columns([6, 6])
 
         with c1:
-            st.markdown('<div style="font-size: 22px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">1. Konfigurasi Ujian</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size: 22px; font-weight: 700; color: #29354e; margin-bottom: 8px;">1. Konfigurasi Ujian</div>', unsafe_allow_html=True)
             
             # Opsi Radio Horizontal agar ringkas di HP
             stage_input = st.radio(
@@ -3636,14 +3664,14 @@ elif st.session_state.page == "setup":
             st.write("---")
         
         with c2:
-            st.markdown('<div style="font-size: 22px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">2. Petunjuk CBT RoboMANTAP</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size: 22px; font-weight: 700; color: #29354e; margin-bottom: 8px;">2. Petunjuk CBT RoboMANTAP</div>', unsafe_allow_html=True)
             
             # Card Petunjuk Bergaya Glassmorphism Dark
             petunjuk_html = """
-            <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 14px; font-size: 12px; color: #cbd5e1; line-height: 1.6;">
+            <div style="background: linear-gradient(135deg, #fff1f6, #fff9e9); border: 1px solid #f0dfe5; border-radius: 16px; padding: 14px 15px; font-size: 12px; color: #536078; line-height: 1.7;">
                 <div style="margin-bottom: 6px;">🎯 <b>Jumlah Soal:</b> TEPAT 10 Soal Pilihan Ganda</div>
                 <div style="margin-bottom: 6px;">📜 <b>Standar Pembinaan:</b> Mengacu Juknis OMI 2026 (Sains, Keislaman, & Literasi Data)</div>
-                <div>📊 <b>Skoring:</b> Benar (<span style="color:#34d399; font-weight:700;">+4</span>), Salah (<span style="color:#f87171; font-weight:700;">-1</span>), Kosong (0)</div>
+                <div>📊 <b>Skoring:</b> Benar (<span style="color:#148a71; font-weight:800;">+4</span>), Salah (<span style="color:#d94f70; font-weight:800;">-1</span>), Kosong (0)</div>
             </div>
             """
             st.markdown(petunjuk_html, unsafe_allow_html=True)

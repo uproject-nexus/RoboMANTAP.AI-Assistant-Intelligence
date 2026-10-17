@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
 from ai_engine import get_ai_hint_stream
 from tka_engine import (
@@ -25,10 +26,13 @@ from tka_engine import (
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates-tka")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
 STREAMLIT_URL = os.getenv("STREAMLIT_URL", "https://robomantap-intelligence.streamlit.app/")
 
 app = FastAPI(title="RoboMANTAP TKA Portal")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+if os.path.isdir(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 STUDENT_SESSIONS: dict[str, dict[str, Any]] = {}
 ai_hint_cache: dict[tuple, str] = {}
 

@@ -8,6 +8,7 @@ from typing import Dict, Any
 from fastapi import FastAPI, Request, Form, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
 from ai_engine import (
     create_table_if_not_exists,
@@ -23,7 +24,10 @@ app = FastAPI(title="RoboMANTAP CBT Engine")
 # Path absolut agar folder templates selalu terdeteksi di Linux Render
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+if os.path.isdir(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Inisialisasi Tabel DB
 try:
@@ -34,7 +38,7 @@ except Exception as e:
 # In-Memory Session Storage
 STUDENT_SESSIONS: Dict[str, Dict[str, Any]] = {}
 
-STREAMLIT_URL = "https://robomantap-intelligence.streamlit.app/" # Sesuaikan dengan URL Streamlit app.py kamu
+STREAMLIT_URL = os.getenv("STREAMLIT_URL", "https://robomantap-intelligence.streamlit.app/").strip() # URL main Streamlit app; override via deployment environment.
 
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):

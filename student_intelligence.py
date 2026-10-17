@@ -36,6 +36,7 @@ except ImportError:
     REPORTLAB_AVAILABLE = False
 
 from ai_engine import init_db_connection, stream_ai_text, get_gemini_clients, STREAM_MODELS
+from student_games import render_student_game_lab
 
 STUDENT_INTELLIGENCE_VERSION = "4.0"
 
@@ -1223,51 +1224,52 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     ensure_student_intelligence_tables()
     st.markdown(r"""
     <style>
-    :root { --sm-ink:#102a43; --sm-muted:#587084; --sm-teal:#087f8c; --sm-green:#16a085; --sm-line:#dce8ed; }
+    :root { --sm-ink:#29354e; --sm-muted:#68758d; --sm-teal:#d34f7c; --sm-green:#24a994; --sm-line:#f0e5de; }
     .stApp { background: radial-gradient(ellipse at 8% 0%, rgba(45,212,191,.13), transparent 34%), radial-gradient(ellipse at 100% 8%, rgba(129,140,248,.11), transparent 30%); }
     .block-container { max-width: 1180px; padding-top: 1.15rem; padding-bottom: 3rem; }
-    .sm-hero { position:relative; overflow:hidden; border-radius:26px; padding:clamp(22px,4vw,38px); color:#f8ffff; background:linear-gradient(120deg,#073b4c 0%,#087f8c 48%,#16a085 100%); box-shadow:0 18px 48px rgba(8,127,140,.20); margin-bottom:18px; }
-    .sm-hero:after { content:""; position:absolute; width:240px;height:240px;right:-58px;top:-95px;border-radius:50%;border:1px solid rgba(255,255,255,.18);box-shadow:0 0 0 25px rgba(255,255,255,.045),0 0 0 55px rgba(255,255,255,.035); }
-    .sm-eyebrow { text-transform:uppercase; letter-spacing:2px; font-size:10px; font-weight:850; opacity:.78; }
+    .sm-hero { position:relative; overflow:hidden; border-radius:26px; padding:clamp(22px,4vw,38px); color:#29354e; background:linear-gradient(120deg,#ffdce8 0%,#ffe8be 48%,#d9f8ec 100%); border:1px solid #f4dfe3; box-shadow:0 12px 32px rgba(104,76,96,.08); margin-bottom:18px; }
+    .sm-hero:after { content:""; position:absolute; width:240px;height:240px;right:-58px;top:-95px;border-radius:50%;border:1px solid rgba(255,255,255,.55);box-shadow:0 0 0 25px rgba(255,255,255,.14),0 0 0 55px rgba(255,255,255,.10); }
+    .sm-eyebrow { text-transform:uppercase; letter-spacing:2px; font-size:10px; font-weight:900; color:#be4771; opacity:1; }
     .sm-title { font-size:clamp(28px,4.6vw,46px);font-weight:900;line-height:1.08;letter-spacing:-1.4px;margin:9px 0 10px; }
-    .sm-subtitle { font-size:14px;line-height:1.65;max-width:650px;color:#e3fbfb; }
-    .sm-chip { display:inline-flex;align-items:center;gap:7px;padding:7px 11px;margin:12px 6px 0 0;border:1px solid rgba(255,255,255,.23);border-radius:999px;background:rgba(255,255,255,.11);font-size:11px;font-weight:750; }
-    .sm-section-kicker { color:#087f8c;font-size:10px;letter-spacing:1.6px;font-weight:900;text-transform:uppercase;margin-bottom:5px; }
+    .sm-subtitle { font-size:14px;line-height:1.65;max-width:650px;color:#56627a; }
+    .sm-chip { display:inline-flex;align-items:center;gap:7px;padding:7px 11px;margin:12px 6px 0 0;border:1px solid rgba(255,255,255,.8);border-radius:999px;background:rgba(255,255,255,.68);color:#46526b;font-size:11px;font-weight:800; }
+    .sm-section-kicker { color:#d34f7c;font-size:10px;letter-spacing:1.6px;font-weight:900;text-transform:uppercase;margin-bottom:5px; }
     .sm-section-title { color:var(--sm-ink);font-size:clamp(21px,3vw,28px);font-weight:900;letter-spacing:-.6px;line-height:1.2;margin:0 0 6px; }
     .sm-muted { color:var(--sm-muted);font-size:13px;line-height:1.6; }
-    .sm-card { height:100%; border:1px solid var(--sm-line);border-radius:20px;padding:18px;background:rgba(255,255,255,.82);box-shadow:0 7px 22px rgba(16,42,67,.045); }
+    .sm-motivation { display:flex; align-items:center; gap:12px; padding:13px 15px; margin:14px 0 17px; border:1px solid #f2dfe4; border-radius:18px; background:linear-gradient(110deg,#fff0f5 0%,#fff8e7 58%,#e5faf3 100%); }
+    .sm-motivation-icon { flex:0 0 40px; width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:14px; background:rgba(255,255,255,.82); font-size:21px; }
+    .sm-motivation-label { color:#c34b76; font-size:9px; font-weight:950; letter-spacing:1.5px; margin-bottom:3px; }
+    .sm-motivation-copy { color:#48546c; font-size:12px; font-weight:750; line-height:1.55; }
+    .sm-card { height:100%; border:1px solid var(--sm-line);border-radius:20px;padding:18px;background:rgba(255,255,255,.94);box-shadow:0 7px 22px rgba(62,70,93,.045); }
     .sm-card-icon { width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:#e4f8f5;font-size:21px;margin-bottom:12px; }
     .sm-card-title { color:var(--sm-ink);font-size:15px;font-weight:850;margin-bottom:5px; }
-    .sm-stat { border:1px solid var(--sm-line);border-radius:18px;padding:15px;background:rgba(255,255,255,.82); }
+    .sm-stat { border:1px solid var(--sm-line);border-radius:18px;padding:15px;background:rgba(255,255,255,.96);box-shadow:0 6px 18px rgba(62,70,93,.04); }
     .sm-stat-label { color:var(--sm-muted);font-size:11px;font-weight:750; }
     .sm-stat-value { color:var(--sm-ink);font-size:clamp(22px,3vw,30px);font-weight:900;line-height:1.25;margin-top:4px; }
     .portal-agenda-card { display:flex;align-items:center;gap:13px;border:1px solid #dce8ed;border-radius:16px;padding:12px 14px;margin:8px 0;background:rgba(255,255,255,.85); }
-    .portal-agenda-date { flex:0 0 48px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#e4f8f5;border-radius:12px;padding:6px 4px;color:#087f8c; }
+    .portal-agenda-date { flex:0 0 48px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ffe5ef;border-radius:12px;padding:6px 4px;color:#c94675; }
     .portal-agenda-date span { font-size:22px;line-height:1;font-weight:900; }.portal-agenda-date small { font-size:9px;font-weight:900;margin-top:4px; }
     .portal-agenda-body { flex:1;min-width:0; }.portal-agenda-body strong { color:#102a43;font-size:13px; }.portal-agenda-body div { color:#587084;font-size:11px;margin-top:4px; }
-    .portal-agenda-status { font-size:10px;font-weight:900;color:#087f8c;background:#e4f8f5;border-radius:999px;padding:6px 9px;white-space:nowrap; }
+    .portal-agenda-status { font-size:10px;font-weight:900;color:#187b6d;background:#dff8f2;border-radius:999px;padding:6px 9px;white-space:nowrap; }
     div[data-testid="stForm"] { border:1px solid var(--sm-line);border-radius:20px;padding:clamp(14px,3vw,22px);background:rgba(255,255,255,.70); }
     div[data-testid="stButton"] button, div[data-testid="stFormSubmitButton"] button, div[data-testid="stDownloadButton"] button { min-height:44px;border-radius:13px;font-weight:800; }
     div[role="radiogroup"] { gap:7px; }
     div[role="radiogroup"] label { border:1px solid var(--sm-line);border-radius:12px;padding:8px 11px;background:rgba(255,255,255,.75); }
-    div[data-testid="stMetric"] { border:1px solid var(--sm-line);border-radius:15px;padding:12px;background:rgba(255,255,255,.78); }
-    @media(max-width:640px) { .block-container{padding-left: .8rem;padding-right:.8rem;} .sm-hero{border-radius:20px;padding:22px 18px;} .sm-card{padding:15px;border-radius:17px;} .portal-agenda-card{gap:9px;padding:10px;} .portal-agenda-status{font-size:9px;padding:5px 7px;} }
+    div[data-testid="stMetric"] { border:1px solid var(--sm-line);border-radius:17px;padding:12px;background:rgba(255,255,255,.92); }
+    @media(max-width:640px) { .block-container{padding-left: .8rem;padding-right:.8rem;} .sm-hero{border-radius:20px;padding:22px 18px;} .sm-card{padding:15px;border-radius:17px;} .portal-agenda-card{gap:9px;padding:10px;} .portal-agenda-status{font-size:9px;padding:5px 7px;} .sm-motivation{padding:11px;align-items:flex-start;} .sm-motivation-icon{width:35px;height:35px;flex-basis:35px;} }
     </style>
     """, unsafe_allow_html=True)
-    from ui_happy import apply_happy_theme
-    apply_happy_theme()
 
     now = jakarta_now()
     today = now.date()
-    from ui_happy import greeting, render_quote
     st.markdown(f"""
     <section class="sm-hero">
-      <div class="sm-eyebrow">✨ Ruang Belajar Santriwati</div>
-      <div class="sm-title">{greeting(now.hour)}!<br/>Yuk belajar dengan ceria 🌈</div>
-      <span class="sm-chip">📅 {format_tanggal_id(today)}</span><span class="sm-chip">🕒 {now.strftime('%H:%M')} WIB</span>
+      <div class="sm-eyebrow">RoboMANTAP · Student Intelligence</div>
+      <div class="sm-title">Belajar dengan arah.<br/>Tumbuh jadi MANTAP.</div>
+      <div class="sm-subtitle">Satu ruang untuk memahami materi, berlatih dengan tujuan, memantau perkembangan, dan menyiapkan diri menghadapi ujian.</div>
+      <span class="sm-chip">📅 {format_tanggal_id(today)}</span><span class="sm-chip">🕒 {now.strftime('%H:%M')} WIB</span><span class="sm-chip">🛡️ Portal personal</span>
     </section>
     """, unsafe_allow_html=True)
-    render_quote()
 
     if st.session_state.get("student_intelligence_authenticated"):
         top_left, top_right = st.columns([5, 1])
@@ -1283,10 +1285,10 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
 
     # Login remains tied to the authoritative wa_identities record.
     if not st.session_state.get("student_intelligence_authenticated"):
-        st.markdown('<div class="sm-card"><div class="sm-section-kicker">Ruang belajar personal</div><div class="sm-section-title">Selamat datang, Santri! ✨</div><div class="sm-muted">Masuk untuk membuka ruang belajar yang sesuai dengan identitas dan jenjangmu.</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="sm-card"><div class="sm-section-kicker">Ruang belajar personal</div><div class="sm-section-title">Selamat datang, Santriwati! ✨</div><div class="sm-muted">Masuk untuk membuka ruang belajar yang sesuai dengan identitas dan jenjangmu.</div></div>', unsafe_allow_html=True)
         with st.form("student_intelligence_login_form", clear_on_submit=False):
-            entered_username = st.text_input("Username Santri", placeholder="contoh: santri.aisyah", help="Username yang didaftarkan melalui WhatsApp RoboMANTAP.")
-            entered_pin = st.text_input("PIN Santri · 6 angka", placeholder="Masukkan PIN rahasia", type="password", max_chars=6)
+            entered_username = st.text_input("Username Santriwati", placeholder="contoh: santriwati.aisyah", help="Username yang didaftarkan melalui WhatsApp RoboMANTAP.")
+            entered_pin = st.text_input("PIN Santriwati · 6 angka", placeholder="Masukkan PIN rahasia", type="password", max_chars=6)
             submitted = st.form_submit_button("Masuk ke ruang belajar →", type="primary", use_container_width=True)
         if not submitted:
             st.info("Belum punya akun? Selesaikan pendaftaran melalui menu **Hubungi WA Sekarang** di halaman utama.")
@@ -1365,11 +1367,23 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     <div class="sm-section-kicker">Ruang personal kamu</div><div class="sm-section-title">Assalamu’alaikum, {html.escape(name.split()[0])}! 👋</div>
     <div class="sm-muted">{html.escape(kelas)} {html.escape(jenjang_detected)} · Streak belajar <b>{streak} hari</b> · {('Selamat, aktivitas hari ini sudah tercatat.' if not is_new_day else 'Awal yang baik—aktivitas belajarmu hari ini mulai dihitung.')}</div>
     """, unsafe_allow_html=True)
-    metrics = st.columns(4)
-    with metrics[0]: st.markdown(f'<div class="sm-stat"><div class="sm-stat-label">Rata-rata skor</div><div class="sm-stat-value">{avg:.0f}<small style="font-size:13px">%</small></div><div class="sm-muted">Berdasarkan sesi tersimpan</div></div>', unsafe_allow_html=True)
-    with metrics[1]: st.markdown(f'<div class="sm-stat"><div class="sm-stat-label">Sesi tercatat</div><div class="sm-stat-value">{attempts_count}</div><div class="sm-muted">Aktivitas belajar</div></div>', unsafe_allow_html=True)
-    with metrics[2]: st.markdown(f'<div class="sm-stat"><div class="sm-stat-label">Streak</div><div class="sm-stat-value">🔥 {streak}</div><div class="sm-muted">Hari konsisten</div></div>', unsafe_allow_html=True)
-    with metrics[3]:
+    daily_motivation = [
+        "Setiap langkah kecil yang konsisten akan membawamu lebih jauh.",
+        "Salah saat latihan bukan akhir—itu petunjuk tentang hal yang bisa kamu pahami berikutnya.",
+        "Jaga rasa ingin tahu, adab, dan semangat untuk terus belajar.",
+        "Kamu tidak harus tahu semuanya hari ini. Cukup berkembang sedikit demi sedikit.",
+        "Istirahat yang cukup juga bagian dari strategi belajar yang cerdas.",
+        "Berani bertanya adalah tanda kamu sedang berusaha memahami.",
+        "Ilmu tumbuh bersama ketekunan, kejujuran, dan sikap rendah hati.",
+    ]
+    motivation_text = daily_motivation[today.toordinal() % len(daily_motivation)]
+    st.markdown(f'<div class="sm-motivation"><div class="sm-motivation-icon">🌷</div><div><div class="sm-motivation-label">PENGINGAT HARI INI</div><div class="sm-motivation-copy">{html.escape(motivation_text)}</div></div></div>', unsafe_allow_html=True)
+    metric_row_one = st.columns(2)
+    with metric_row_one[0]: st.markdown(f'<div class="sm-stat"><div class="sm-stat-label">Rata-rata skor</div><div class="sm-stat-value">{avg:.0f}<small style="font-size:13px">%</small></div><div class="sm-muted">Berdasarkan sesi tersimpan</div></div>', unsafe_allow_html=True)
+    with metric_row_one[1]: st.markdown(f'<div class="sm-stat"><div class="sm-stat-label">Sesi tercatat</div><div class="sm-stat-value">{attempts_count}</div><div class="sm-muted">Aktivitas belajar</div></div>', unsafe_allow_html=True)
+    metric_row_two = st.columns(2)
+    with metric_row_two[0]: st.markdown(f'<div class="sm-stat"><div class="sm-stat-label">Streak</div><div class="sm-stat-value">🔥 {streak}</div><div class="sm-muted">Hari konsisten</div></div>', unsafe_allow_html=True)
+    with metric_row_two[1]:
         if next_exam:
             val = "Hari ini" if days_to_exam == 0 else "Besok" if days_to_exam == 1 else f"H-{days_to_exam}"
             sub = str(next_exam[1].get("mapel") or "Ujian")
@@ -1377,7 +1391,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         st.markdown(f'<div class="sm-stat"><div class="sm-stat-label">Ujian berikutnya</div><div class="sm-stat-value" style="font-size:23px">{html.escape(val)}</div><div class="sm-muted">{html.escape(sub)}</div></div>', unsafe_allow_html=True)
 
     # Navigasi berdasarkan pekerjaan siswa, bukan tumpukan tab lama.
-    nav_options = ["🏠 Beranda", "🎯 Misi Belajar", "🤖 Tutor AI", "📈 Perkembangan", "📚 Perpustakaan", "🎮 Game Seru", "🔔 Pengingat"]
+    nav_options = ["🏠 Beranda", "🎯 Misi Belajar", "🎮 Game Lab", "🤖 Tutor AI", "📈 Perkembangan", "📚 Perpustakaan", "🔔 Pengingat"]
     if "student_portal_section" not in st.session_state:
         st.session_state.student_portal_section = "🏠 Beranda"
     section = st.radio("Navigasi Portal", nav_options, key="student_portal_section", horizontal=True, label_visibility="collapsed")
@@ -1454,9 +1468,8 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
                 st.markdown(st.session_state.last_ai_note)
                 st.caption(f"Topik: {st.session_state.get('last_ai_topic', 'Catatan belajar')}")
 
-    elif section == "🎮 Game Seru":
-        from games_hub import render_games_hub
-        render_games_hub(name)
+    elif section == "🎮 Game Lab":
+        render_student_game_lab()
 
     elif section == "🔔 Pengingat":
         st.markdown('<div class="sm-section-kicker">Pengaturan personal</div><div class="sm-section-title">Pengingat WhatsApp.</div><div class="sm-muted">Preferensi disimpan untuk nomor WhatsApp yang terhubung. Pengiriman aktual bergantung pada konfigurasi dan scheduler WA Bot.</div>', unsafe_allow_html=True)
