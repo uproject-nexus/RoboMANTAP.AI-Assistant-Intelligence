@@ -4,15 +4,6 @@ import streamlit as st
 
 ROUNDS = 10
 
-GAME_CSS = """<style>
-.hv-game{border-radius:24px;padding:18px 20px;color:#26324b;margin:10px 0 6px;font-size:1.1rem;font-weight:900;box-shadow:0 8px 22px rgba(71,80,146,.14)}
-.hv-game small{display:block;font-weight:700;margin-top:4px;opacity:.85}
-.hv-q{background:#fff;border:2px dashed #a99aff;border-radius:24px;padding:20px;font-size:1.3rem;font-weight:900;text-align:center;margin:10px 0;color:#26324b}
-.hv-ar{font-size:3.2rem;line-height:1.3}
-.hv-chip{display:inline-block;background:#fff;border:1px solid #e4e7f3;border-radius:999px;padding:4px 12px;font-weight:800;margin:0 6px 6px 0;color:#3848c8}
-</style>"""
-
-
 def _math_questions(n=ROUNDS):
     out = []
     for _ in range(n):
@@ -72,10 +63,10 @@ def _hijaiyah_questions(n=ROUNDS):
     return out
 
 GAMES = {
-    "math":  ("🧮 Kilat Matematika", "Hitung cepat tambah, kurang, kali!", "linear-gradient(135deg,#ff927d,#ffd66b)", _math_questions),
-    "sains": ("🔬 Detektif Sains", "Jelajahi alam, tubuh, dan planet.", "linear-gradient(135deg,#31c5d8,#43cfa4)", lambda: random.sample(SAINS, ROUNDS)),
-    "islam": ("🕌 Cerdas Islami", "Seputar rukun, nabi, dan ibadah.", "linear-gradient(135deg,#5b6cff,#a99aff)", lambda: random.sample(ISLAM, ROUNDS)),
-    "hijaiyah": ("📖 Tebak Hijaiyah", "Kenali huruf hijaiyah dengan seru.", "linear-gradient(135deg,#a99aff,#ff927d)", _hijaiyah_questions),
+    "math":  ("🧮 Kilat Matematika", "Hitung cepat tambah, kurang, kali!", "linear-gradient(135deg,#ffd23f,#ff9f6b)", _math_questions),
+    "sains": ("🔬 Detektif Sains", "Jelajahi alam, tubuh, dan planet.", "linear-gradient(135deg,#4cc9f0,#06d6a0)", lambda: random.sample(SAINS, ROUNDS)),
+    "islam": ("🕌 Cerdas Islami", "Seputar rukun, nabi, dan ibadah.", "linear-gradient(135deg,#a58bff,#ff7ac6)", lambda: random.sample(ISLAM, ROUNDS)),
+    "hijaiyah": ("📖 Tebak Hijaiyah", "Kenali huruf hijaiyah dengan seru.", "linear-gradient(135deg,#ff7ac6,#ffd23f)", _hijaiyah_questions),
 }
 
 def _start(key):
@@ -96,8 +87,7 @@ def _exit():
     st.session_state.gh = None
 
 def render_games_hub(name: str = "Santri") -> None:
-    st.markdown(GAME_CSS, unsafe_allow_html=True)
-    st.markdown('<div class="pi-kicker2">Belajar sambil bermain</div><div class="pi-h2">Game Seru 🎮</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sm-section-kicker">Belajar sambil bermain</div><div class="sm-section-title">Game Seru 🎮</div>', unsafe_allow_html=True)
     g = st.session_state.get("gh")
     best = st.session_state.setdefault("gh_best", {})
 

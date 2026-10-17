@@ -1,3 +1,4 @@
+import io
 import os
 import re
 import uuid
@@ -11,9 +12,25 @@ import threading
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+import tempfile                        # <--- Tambahkan ini
+import matplotlib.pyplot as plt
 from sqlalchemy import text
 # from-import python-docx untuk generate Word dan Pdf berlogo
+from docx import Document
+from docx.oxml import parse_xml
+from docx.oxml.ns import nsdecls
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from reportlab.lib.pagesizes import A4
 from datetime import datetime, timedelta
+from docx.shared import Pt, RGBColor, Inches
+from docx.enum.table import WD_ALIGN_VERTICAL
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
+)
 
 from bank_soal_engine import (
     extract_blueprint_from_docx,
@@ -36,29 +53,11 @@ from ai_engine import (
     normalize_custom_timer_config, build_language_guidance
 )
 
-from ui_theme import apply_intelligence_theme, now_wib, normalize_wib_datetime
-from quiz_sessions import (
-    _quiz_signature, _quiz_question_ids, build_stable_student_quiz_order,
-    ensure_quiz_session_order_table, _get_saved_quiz_order,
-    get_or_create_student_quiz_order,
-)
-from document_engine import (
-    clean_math_string, clean_solution_preview, contains_arabic,
-    apply_arabic_paragraph_style, apply_arabic_run_style,
-    add_omml_fraction, add_omml_matrix, append_text_with_fractions,
-    generate_quiz_docx, draw_cover_background, generate_frac_image,
-    clean_pdf_text, create_lkpd_pdf_buffer,
-)
+from student_intelligence import ensure_student_intelligence_tables, render_student_intelligence_dashboard
+from tka_engine import ensure_tka_tables, update_tka_progress
+from tka_studio import render_tka_studio
 
-st.set_page_config(
-    page_title="RoboMANTAP-Intelligence",
-    page_icon="logo.png",
-    layout="wide",
-    initial_sidebar_state="auto"
-)
-
-
-TKA_PORTAL_URL = os.getenv("TKA_PORTAL_URL", "https://robo-mantap-tka.vercel.app/")
+TKA_PORTAL_URL = os.getenv("TKA_PORTAL_URL", "https://robomantap-tka.onrender.com")
 
 def _tka_review_answer_equal(question: dict, user_answer) -> bool:
     qtype = str(question.get("question_type") or "PG").upper()
@@ -101,6 +100,15 @@ if "review_session" in st.query_params:
             st.session_state.is_tka_session = (review_data.get("activity_type") == "TKA")
             st.session_state.loaded_review_id = review_id
 
+st.set_page_config(
+    page_title="RoboMANTAP-Intelligence",
+    page_icon="logo.png",
+    layout="wide",
+    initial_sidebar_state="auto"
+)
+
+from ui_happy import apply_happy_theme
+apply_happy_theme()
 
 LOGO_PUBLIC_URL = "https://raw.githubusercontent.com/uproject-nexus/RoboMANTAP.AI-Assistant-Intelligence/main/logo.png"
 
@@ -127,8 +135,8 @@ components.html(
 
         // 2. Timpa Manifest PWA (Mengubah Nama & Logo pada Pop-up Install App)
         const myManifest = {{
-            "short_name": "RoboMANTAP",
-            "name": "RoboMANTAP-Intelligence",
+            "short_name": "UPN",
+            "name": "U.Project Nexus",
             "icons": [
                 {{
                     "src": "{LOGO_PUBLIC_URL}",
@@ -139,8 +147,8 @@ components.html(
             ],
             "start_url": ".",
             "display": "standalone",
-            "background_color": "#FFF9F0",
-            "theme_color": "#5B6CFF"
+            "background_color": "#f6fbff",
+            "theme_color": "#7b5cff"
         }};
 
         const blob = new Blob([JSON.stringify(myManifest)], {{type: 'application/json'}});
@@ -169,22 +177,13 @@ components.html(
 # -----------------------------------------------------------------------------
 @st.cache_resource(show_spinner=False)
 def _initialize_database_once():
-    # Initialize only the core CBT schema at startup. Feature-specific schemas are
-    # initialized lazily when a student enters that workspace.
     create_table_if_not_exists()
+    # Student Intelligence uses additive tables only; existing CBT tables remain unchanged.
+    ensure_student_intelligence_tables()
+    ensure_tka_tables()
     return True
 
-@st.cache_resource(show_spinner=False)
-def _initialize_tka_tables_once():
-    from tka_engine import ensure_tka_tables
-    return ensure_tka_tables()
-
-if not st.session_state.get("_rm_startup_ready", False):
-    with st.spinner("Menyiapkan RoboMANTAP-Intelligence dan memeriksa layanan inti..."):
-        _initialize_database_once()
-    st.session_state["_rm_startup_ready"] = True
-else:
-    _initialize_database_once()
+_initialize_database_once()
 
 @st.cache_data(ttl=30, show_spinner=False)
 def _cached_dashboard_custom_mapels():
@@ -204,8 +203,62 @@ def _cached_dashboard_custom_mapels():
         return df['mapel'].dropna().astype(str).tolist() if not df.empty else []
     except Exception:
         return []
-# Accessibility and performance: no global copy/selection blocking and no
-# always-on screen wake lock. Exam timing is enforced by the server-side timer.
+# ==============================================================================
+# ANTI-COPAS & DISABLE KLIK KANAN (PERLINDUNGAN HALAMAN KUIS)
+# ==============================================================================
+
+st.markdown("""
+    <style>
+    /* Matikan seleksi teks pada soal & pilihan jawaban */
+    body, html, iframe, [data-testid="stMarkdownContainer"] {
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        user-select: none !important;
+    }
+    </style>
+    
+    <script>
+    // Matikan Klik Kanan
+    document.addEventListener('contextmenu', event => event.preventDefault());
+    
+    // Matikan Shortcut Copy (Ctrl+C, Ctrl+A, Ctrl+U, Ctrl+S)
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && (e.key === 'c' || e.key === 'u' || e.key === 's' || e.key === 'a')) {
+            e.preventDefault();
+        }
+    });
+
+    // Matikan Event Copy Teks
+    document.addEventListener('copy', function(e) {
+        e.preventDefault();
+    });
+    </script>
+""", unsafe_allow_html=True)
+
+components.html(
+    """
+    <script>
+    if ('wakeLock' in navigator) {
+        let wakeLock = null;
+        const requestWakeLock = async () => {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+            } catch (err) {
+                console.log(`${err.name}, ${err.message}`);
+            }
+        };
+        requestWakeLock();
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
+    }
+    </script>
+    """,
+    height=0,
+)
 
 # Custom Styling 
 st.markdown("""
@@ -310,7 +363,7 @@ st.markdown("""
     }
 
     /* =========================================================
-       ROBOMANTAP INTELLIGENCE LIVE TRACKING — MODERN MONITORING CARDS
+       UPN LIVE TRACKING — MODERN MONITORING CARDS
        ========================================================= */
     .upn-live-hero {
         display: flex;
@@ -321,7 +374,7 @@ st.markdown("""
         padding: 14px 16px;
         border: 1px solid rgba(16,185,129,.22);
         border-radius: 16px;
-        background: linear-gradient(135deg, rgba(2,44,34,.62), rgba(15,23,42,.82));
+        background: #ffffff;
         box-shadow: 0 12px 35px rgba(0,0,0,.16);
     }
     .upn-live-hero-left {
@@ -369,7 +422,7 @@ st.markdown("""
         white-space: nowrap;
     }
     .upn-live-card {
-        background: linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,44,34,.30));
+        background: #ffffff;
         border: 1px solid rgba(148,163,184,.16);
         border-radius: 18px;
         padding: 15px;
@@ -543,7 +596,7 @@ st.markdown("""
     .upn-live-foot span {
         padding: 4px 7px;
         border-radius: 7px;
-        background: rgba(15,23,42,.65);
+        background: #ffffff;
         border: 1px solid rgba(148,163,184,.10);
     }
     .upn-live-divider {
@@ -563,7 +616,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Helper Base64 Image
-@st.cache_data(show_spinner=False)
 def get_image_base64(path):
     if os.path.exists(path):
         with open(path, "rb") as img_file:
@@ -583,8 +635,6 @@ st.markdown("""
 @media(max-width:760px){.premium-hero{padding:18px 16px;border-radius:20px}.premium-title{font-size:24px}.premium-subtitle{font-size:12px}.premium-pills{gap:5px}.premium-pills span{font-size:9px;padding:4px 7px}.preview-hero{display:block}.preview-meta{justify-content:flex-start;margin-top:9px}.hub-code,.hub-empty{min-height:auto}.answer-card{font-size:11px}.story-card{align-items:flex-start}}
 </style>
 """, unsafe_allow_html=True)
-
-apply_intelligence_theme()
 
 logo_mantap_b64 = get_image_base64("logo.png")
 logo_nexus_b64 = get_image_base64("nexus_logo.png")
@@ -626,6 +676,133 @@ if "student_adaptive_topics" not in st.session_state: st.session_state.student_a
 # ------------------------------------------------------------------------------
 # RANDOMISASI PRODUCTION: URUTAN SOAL UNIK PER SESI SISWA
 # ------------------------------------------------------------------------------
+def _quiz_signature(quiz_data):
+    """Fingerprint master quiz agar urutan tidak tertukar ketika paket berubah."""
+    payload = []
+    for idx, q in enumerate(quiz_data):
+        payload.append({
+            "id": q.get("id", idx + 1),
+            "question": q.get("question", ""),
+            "options": q.get("options", []),
+            "correct_answer": q.get("correct_answer", ""),
+        })
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+def _quiz_question_ids(quiz_data):
+    """ID logis soal. Jika ID generator tidak valid/duplikat, gunakan indeks."""
+    ids = []
+    seen = set()
+    for idx, q in enumerate(quiz_data):
+        candidate = str(q.get("id", idx + 1))
+        if not candidate or candidate in seen:
+            candidate = f"IDX-{idx + 1}"
+        seen.add(candidate)
+        ids.append(candidate)
+    return ids
+
+def build_stable_student_quiz_order(quiz_data, session_id, question_order=None):
+    """
+    Mengembalikan quiz dalam urutan siswa yang stabil.
+    question_order adalah daftar ID soal yang sudah disimpan di database.
+    Fallback memakai seed session_id untuk kompatibilitas sesi lama.
+    """
+    if not quiz_data:
+        return []
+
+    if question_order:
+        by_id = {str(q.get("id", i + 1)): q for i, q in enumerate(quiz_data)}
+        ordered = [by_id[qid] for qid in map(str, question_order) if qid in by_id]
+        if len(ordered) == len(quiz_data):
+            return ordered
+
+    # Fallback kompatibilitas dengan implementasi randomisasi sebelumnya.
+    shuffled = list(quiz_data)
+    random.Random(str(session_id)).shuffle(shuffled)
+    return shuffled
+
+def ensure_quiz_session_order_table():
+    """
+    Memastikan tabel persistensi urutan soal tersedia.
+
+    Catatan penting: Streamlit SQLConnection/SQLAlchemy tidak selalu menerima
+    beberapa statement DDL dalam satu execute(). Karena itu CREATE TABLE dan
+    CREATE INDEX dijalankan terpisah agar kompatibel dengan deployment
+    PostgreSQL/Supabase yang digunakan RoboMANTAP.
+    """
+    conn = init_db_connection()
+    if conn is None:
+        print("LOG DB quiz order init: koneksi PostgreSQL tidak tersedia.")
+        return False
+
+    create_table_sql = """
+    CREATE TABLE IF NOT EXISTS kuis_session_orders (
+        session_id VARCHAR(100) PRIMARY KEY,
+        kode_kuis VARCHAR(20) NOT NULL,
+        quiz_signature VARCHAR(64) NOT NULL,
+        question_order JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """
+
+    create_index_sql = """
+    CREATE INDEX IF NOT EXISTS idx_kuis_session_orders_kode
+        ON kuis_session_orders (kode_kuis)
+    """
+
+    try:
+        with conn.session as s:
+            # Jalankan DDL satu per satu. Jangan menggabungkannya dalam satu
+            # execute() karena driver/deployment tertentu menolak multi-statement.
+            s.execute(text(create_table_sql))
+            s.commit()
+
+            s.execute(text(create_index_sql))
+            s.commit()
+
+        return True
+    except Exception as e:
+        print(f"LOG DB quiz order init error: {type(e).__name__}: {e}")
+        return False
+
+def _get_saved_quiz_order(session_id, quiz_signature):
+    conn = init_db_connection()
+    if not conn:
+        return None
+    try:
+        with conn.session as s:
+            row = s.execute(
+                text("""
+                    SELECT question_order
+                    FROM kuis_session_orders
+                    WHERE session_id = :session_id
+                      AND quiz_signature = :quiz_signature
+                    LIMIT 1
+                """),
+                {"session_id": session_id, "quiz_signature": quiz_signature},
+            ).fetchone()
+            if row:
+                return row[0] if isinstance(row[0], list) else json.loads(row[0])
+    except Exception as e:
+        print(f"LOG DB get quiz order error: {e}")
+    return None
+
+def get_or_create_student_quiz_order(kode_kuis, mapel, quiz_data, session_id):
+    """
+    Versi Super Cepat (Anti-Lag / Zero DB Lock):
+    Mengacak urutan soal secara unik berdasarkan session_id siswa di memori lokal.
+    """
+    if not quiz_data:
+        return [], None
+
+    # Gunakan session_id sebagai Seed agar pengacakan unik per siswa 
+    # tetapi tetap konsisten (tidak berubah-ubah saat rerun/refresh)
+    shuffled = list(quiz_data)
+    random.Random(str(session_id)).shuffle(shuffled)
+    
+    return shuffled, None
+
+# Database Kisi-Kisi Operasional OMI 2026
 KISI_KISI_OMI = {
     "MTs (Sederajat SMP)": {
         "Matematika": ["Bilangan", "Aljabar", "Aritmetika Sosial", "Geometri", "Peluang", "Statistika", "Perbandingan & Proporsi", "Problem Solving", "Konteks OMI (Keislaman & Sains)"],
@@ -642,62 +819,43 @@ KISI_KISI_OMI = {
     }
 }
 
-# Header Utama — identitas produk dan timestamp operasional WIB
-_rendered_at_wib = now_wib()
-_day_names = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
-_month_names = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
-_rendered_date = f"{_day_names[_rendered_at_wib.weekday()]}, {_rendered_at_wib.day} { _month_names[_rendered_at_wib.month - 1] } {_rendered_at_wib.year}"
+# Header Utama
 st.markdown(f"""
-<div class="rm-topbar">
-  <div class="rm-topbar-mark">{img_mantap_html}</div>
-  <div class="rm-topbar-brand"><b>RoboMANTAP<span>-Intelligence</span></b><small>Learning that understands you</small></div>
-  <div class="rm-topbar-spacer"></div>
-  <div class="rm-topbar-date"><span class="rm-live-dot"></span><span>{_rendered_date}<br><b>{_rendered_at_wib.strftime('%H:%M')} WIB</b></span></div>
+<div class="school-header">
+    <div style="text-align: center;">
+        {img_mantap_html}
+    </div>
+    <div class="school-title">MA DAN MTs AL IRSYAD AL ISLAMIYYAH BONDOWOSO</div>
+    <div class="school-subtitle">
+        Madrasah Aliyah dan Tsanawiyah Al Irsyad Putri Bondowoso (MANTAP) &nbsp;•&nbsp; 
+        <span style="color: #6ee7b7; font-weight: 600;">Powered by RoboMANTAP-Intelligence</span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
-# SIDEBAR BARU — navigasi berbasis tujuan, ringkas, cerah, dan adaptif per peran.
+# Sidebar Control
 with st.sidebar:
-    st.markdown(f"""
-    <div class="rm-sidebar-brand">
-      <div class="rm-sidebar-logo">🎓</div>
-      <div class="rm-sidebar-name">RoboMANTAP<span> Learning Intelligence Platform</span></div>
-      <div class="rm-sidebar-caption">Belajar lebih cerdas, setiap hari!</div>
-      <div class="rm-sidebar-status"><span></span> Engineered by U.Project Nexus</div>
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 16px; border-radius: 12px; border: 1px solid #059669; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div style="font-size: 26px; margin-bottom: 4px;">🧕🏼</div>
+        <div style="color: #ffffff; font-weight: 700; font-size: 16px; letter-spacing: 0.5px;">RoboMANTAP-Intelligence</div>
+        <div style="color: #6ee7b7; font-size: 11px; font-weight: 500; margin-bottom: 6px;">Learning Intelligence Platform</div>
+        <div style="font-size: 10px; color: #a7f3d0; opacity: 0.85; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 4px; font-style: italic;">Engineered by U.Project Nexus</div>
     </div>
+
     """, unsafe_allow_html=True)
-
-    current_page = st.session_state.get("page", "landing")
-    if current_page in ("landing", "student_intelligence", "guru_login", "guru_dashboard", "select_mapel"):
-        st.markdown('<div class="rm-sidebar-section">RUANG UTAMA</div>', unsafe_allow_html=True)
-        if st.button("🏡  Beranda", key="nav_home", use_container_width=True, disabled=current_page == "landing"):
-            st.session_state.page = "landing"
-            st.rerun()
-        if st.button("🎒  Ruang SantriMANTAP", key="nav_student", use_container_width=True, disabled=current_page == "student_intelligence"):
-            st.session_state.page = "student_intelligence"
-            st.rerun()
-        if st.button("🧕🏼  Ruang GuruMANTAP", key="nav_teacher", use_container_width=True, disabled=current_page in ("guru_login", "guru_dashboard")):
-            st.session_state.page = "guru_login"
-            st.rerun()
-        st.markdown('<div class="rm-sidebar-section">LATIHAN & UJIAN</div>', unsafe_allow_html=True)
-        if st.button("🧩  Latihan OMI · MTs", key="nav_omi_mts", use_container_width=True):
-            st.session_state.jenjang = "MTs (Sederajat SMP)"
-            st.session_state.page = "select_mapel"
-            st.rerun()
-        if st.button("🚀  Latihan OMI · MA", key="nav_omi_ma", use_container_width=True):
-            st.session_state.jenjang = "MA (Sederajat SMA)"
-            st.session_state.page = "select_mapel"
-            st.rerun()
-        st.markdown('<div class="rm-sidebar-section">PORTAL TERHUBUNG</div>', unsafe_allow_html=True)
-        st.markdown(f'<a class="rm-sidebar-link" href="{TKA_PORTAL_URL}" target="_blank">🎯 &nbsp; Portal TKA <span>↗</span></a>', unsafe_allow_html=True)
-        st.markdown('<a class="rm-sidebar-link" href="https://robo-mantap-kuis-19.vercel.app/" target="_blank">📝 &nbsp; Kuis Guru <span>↗</span></a>', unsafe_allow_html=True)
-
-    if current_page == "guru_dashboard":
-        st.markdown('<div class="rm-sidebar-section">FILTER MONITORING</div>', unsafe_allow_html=True)
+    # -------------------------------------------------------------------------
+    # A. TAMPILAN SIDEBAR JIKA BERADA DI DASHBOARD GURU (PANEL FILTER)
+    # -------------------------------------------------------------------------
+    if st.session_state.page == "guru_dashboard":
+        st.markdown("### ⚙️ Panel Kontrol & Filter")
+        # IMPORTANT: these filters are intentionally inside a Streamlit form.
+        # Changing a filter no longer reruns the entire teacher dashboard.
         with st.form("guru_dashboard_filter_form", clear_on_submit=False):
-            st.radio("Rentang waktu", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], key="filter_time")
-            st.toggle("Sesi terbaru saja", value=True, key="filter_latest", help="Tampilkan sesi terbaru untuk setiap siswa.")
-            selected_jenjang_input = st.selectbox("Jenjang", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], key="filter_jenjang")
+            time_filter_input = st.radio("⏳ Rentang Waktu:", ["Hari Ini", "Kemarin", "3 Hari Terakhir"], key="filter_time")
+            only_latest_input = st.toggle("🎯 Sesi Terbaru Saja", value=True, help="Gabungkan multi-sesi: 1 nama hanya muncul 1 kali (pengerjaan terbaru).", key="filter_latest")
+            selected_jenjang_input = st.selectbox("🏫 Filter Jenjang:", ["Semua Jenjang", "MTs (Sederajat SMP)", "MA (Sederajat SMA)"], key="filter_jenjang")
+
             quiz_custom_mapels = _cached_dashboard_custom_mapels()
             if selected_jenjang_input == "MTs (Sederajat SMP)":
                 base_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys())
@@ -706,25 +864,810 @@ with st.sidebar:
             else:
                 base_mapels = list(KISI_KISI_OMI["MTs (Sederajat SMP)"].keys()) + list(KISI_KISI_OMI["MA (Sederajat SMA)"].keys())
             mapel_options = ["Semua Mapel"] + sorted(set(base_mapels + quiz_custom_mapels))
-            st.selectbox("Mata pelajaran", mapel_options, key="filter_mapel")
-            st.selectbox("Status", ["Semua Status", "BERJALAN", "SELESAI", "EXPIRED"], key="filter_status")
-            st.form_submit_button("Terapkan filter", use_container_width=True, type="primary")
+            selected_mapel_input = st.selectbox("📚 Filter Mata Pelajaran:", mapel_options, key="filter_mapel")
+            selected_status_input = st.selectbox("📌 Filter Status:", ["Semua Status", "BERJALAN", "SELESAI", "EXPIRED"], key="filter_status")
+            apply_dashboard_filters = st.form_submit_button("🔎 TERAPKAN FILTER", use_container_width=True, type="primary")
 
-    if current_page not in ("landing", "quiz"):
-        st.markdown('<div class="rm-sidebar-tip"><strong>✨ Tip RoboMANTAP</strong><br>Gunakan rekomendasi belajar dan hasil latihan untuk menentukan langkah berikutnya.</div>', unsafe_allow_html=True)
-    sidebar_nexus_html = f'<img src="data:image/png;base64,{logo_nexus_b64}" alt="U.Project Nexus" style="width:100%;max-width:130px;max-height:42px;object-fit:contain;">' if logo_nexus_b64 else '<b>U.Project Nexus</b>'
-    st.markdown(f'<div class="rm-sidebar-footer">{sidebar_nexus_html}<div>Made for better learning</div><small>© 2026 U.Project Nexus</small></div>', unsafe_allow_html=True)
+        # Form values are committed only when the teacher presses Apply.
+        time_filter = st.session_state.get("filter_time", "Hari Ini")
+        only_latest = st.session_state.get("filter_latest", True)
+        selected_jenjang_filter = st.session_state.get("filter_jenjang", "Semua Jenjang")
+        selected_mapel_filter = st.session_state.get("filter_mapel", "Semua Mapel")
+        selected_status_filter = st.session_state.get("filter_status", "Semua Status")
+
+    else:
+        st.markdown("""
+        <div style="background: var(--secondary-background-color); border: 1px solid rgba(5, 150, 105, 0.3); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <span style="font-size: 11px; font-weight: 600; opacity: 0.7;">ENGINE STATUS</span>
+                <span style="font-size: 10px; background: #059669; color: white; padding: 2px 8px; border-radius: 12px; font-weight: 700;">LIVE <span class="blinking-dot-green">🟢</span></span>
+            </div>
+            <div style="font-size: 11px; line-height: 1.6; opacity: 0.9;">
+                ⚡ <b>Model:</b> U.Project Nexus Intelligence v3.6<br>
+                🎯 <b>Core:</b> Bina Prestasi OMI 2026<br>
+                ⏱️ <b>Response:</b> Real-time AI
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.session_state.jenjang and st.session_state.mapel:
+            st.markdown(f"""
+            <div style="background: rgba(5, 150, 105, 0.08); border-left: 4px solid #059669; padding: 10px 12px; border-radius: 6px; margin-bottom: 15px;">
+                <div style="font-size: 10px; opacity: 0.6; text-transform: uppercase; font-weight: 700;">Sesi Aktif</div>
+                <div style="font-size: 12px; font-weight: 700; color: var(--text-color);">{st.session_state.mapel}</div>
+                <div style="font-size: 11px; opacity: 0.8;">{st.session_state.jenjang} • {st.session_state.stage}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div style="background: var(--secondary-background-color); border: 1px solid rgba(128,128,128,0.2); padding: 12px 14px; border-radius: 10px; margin-bottom: 15px;">
+            <div style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 8px;">📋 ATURAN SKORING CBT OMI</div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                <span>✅ Jawaban Benar</span>
+                <b style="color: #059669;">+4 Poin</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                <span>❌ Jawaban Salah</span>
+                <b style="color: #ef4444;">-1 Poin</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                <span>⚪ Tidak Dijawab</span>
+                <b style="opacity: 0.6;">0 Poin</b>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    if st.button("🏠 Kembali ke Beranda Utama", use_container_width=True):
+        st.session_state.page = "landing"
+        st.session_state.jenjang = None
+        st.session_state.mapel = None
+        st.session_state.guru_auth = False
+        st.rerun()
+
+    sidebar_nexus_html = f'<div style="padding: 6px 14px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); display: inline-block; margin-bottom: 4px; border: 1px solid rgba(0,0,0,0.05);"><img src="data:image/png;base64,{logo_nexus_b64}" style="height: 42px; max-width: 100%; display: block; margin: 0 auto;"></div>' if logo_nexus_b64 else ''
+    st.markdown(f"""
+    <div style="text-align: center; margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(128,128,128,0.2);">
+        <div style="font-size: 10px; opacity: 0.7; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Engineered by</div>
+        {sidebar_nexus_html}
+        <div style="font-size: 11px; opacity: 0.85; line-height: 1.3;">
+            <b style="color: var(--text-color);">U.Project Nexus System</b><br>
+            <span style="font-size: 10px; opacity: 0.7;">AI Integration & B2B Solutions</span><br>
+            <span style="font-size: 9px; opacity: 0.5;">&copy; 2026 All Rights Reserved</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 #===========================================================
 # GENERATOR DOCX. KUIS
 #===========================================================
 # PEMBERSIH
+def clean_math_string(text: str) -> str:
+    r"""Pembersih notasi matematika untuk Word; khususnya mencegah \circ -> circ/circl mentah."""
+    if not text:
+        return ""
+    text = str(text)
+    replacements = {
+        r"\rightarrow": "→", r"\to": "→", r"\Rightarrow": "⇒",
+        r"\leftarrow": "←", r"\leftrightarrow": "↔",
+        r"\circ": "∘", r"\circl": "∘",
+        r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
+        r"\leq": "≤", r"\geq": "≥", r"\le": "≤", r"\ge": "≥",
+        r"\pm": "±", r"\mp": "∓", r"\infty": "∞", r"\pi": "π",
+        r"\alpha": "α", r"\beta": "β", r"\theta": "θ", r"\lambda": "λ",
+        r"\in": "∈", r"\notin": "∉", r"\forall": "∀", r"\exists": "∃",
+        r"\emptyset": "∅", r"\angle": "∠", r"\perp": "⊥", r"\parallel": "∥",
+        r"\implies": "⇒",
+        r"\impliedby": "⇐",
+        r"\iff": "⇔",
+        r"\Longleftrightarrow": "⇔",
+        r"\longleftrightarrow": "↔",
+        r"\Longleftarrow": "⇐",
+        r"\Longrightarrow": "⇒",
+        
+        r"\approx": "≈",
+        r"\equiv": "≡",
+        r"\propto": "∝",
+        
+        r"\sum": "Σ",
+        r"\prod": "Π",
+        r"\int": "∫",
+        r"\partial": "∂",
+        r"\nabla": "∇",
+        
+        r"\Delta": "Δ",
+        r"\Omega": "Ω",
+        r"\Gamma": "Γ",
+        r"\Lambda": "Λ",
+        r"\Sigma": "Σ",
+        r"\Phi": "Φ",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    text = re.sub(r"(?<![A-Za-z])circl(?![A-Za-z])", "∘", text)
+    text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
+    text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
+    text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
+    text = re.sub(r'\\sqrt\{([^}]+)\}', r'√(\1)', text)
+    text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
+    sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
+    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄⁵₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
+    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sup_map), text)
+    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z])', lambda m: (m.group(1) or m.group(2)).translate(sub_map), text)
+    text = text.replace("$", "")
+    text = text.replace("left(", "(").replace("right)", ")").replace("dots", "…")
+    text = text.replace("{", "").replace("}", "")
+    text = re.sub(r'\\([a-zA-Z]+)', r'\1', text).replace("\\", "")
+    return re.sub(r'\s+', ' ', text).strip()
+
+clean_math_text = clean_math_string
+
+def clean_solution_preview(text: str) -> str:
+    """Pembersih KHUSUS Solution Basis pada preview Quiz Custom.
+
+    Tujuannya bukan mengubah isi pembahasan, tetapi membuat notasi matematika/
+    ilmiah yang dikirim AI tetap terbaca di Streamlit: arrow, relasi, komposisi,
+    pecahan, akar, pangkat, indeks, dan token rusak seperti ``circl``.
+    """
+    if not text:
+        return ""
+
+    value = str(text).strip()
+
+    # Token rusak yang sering muncul ketika LaTeX dipotong oleh model.
+    value = re.sub(r"(?<![A-Za-z])circl(?![A-Za-z])", lambda _: r"\circ", value)
+
+    # Perintah sederhana lebih aman ditampilkan sebagai Unicode pada preview,
+    # sehingga tidak pernah terlihat sebagai backslash mentah.
+    simple_math = {
+        r"\longrightarrow": "→", r"\rightarrow": "→", r"\to": "→",
+        r"\Longrightarrow": "⇒", r"\Rightarrow": "⇒",
+        r"\leftarrow": "←", r"\leftrightarrow": "↔",
+        r"\times": "×", r"\cdot": "·", r"\div": "÷",
+        r"\neq": "≠", r"\leq": "≤", r"\le": "≤",
+        r"\geq": "≥", r"\ge": "≥", r"\pm": "±",
+        r"\infty": "∞", r"\circ": "∘", r"\perp": "⊥",
+        r"\parallel": "∥", r"\angle": "∠", r"\in": "∈",
+        r"\notin": "∉", r"\forall": "∀", r"\exists": "∃",
+        r"\emptyset": "∅", r"\pi": "π", r"\alpha": "α",
+        r"\beta": "β", r"\gamma": "γ", r"\delta": "δ",
+        r"\theta": "θ", r"\lambda": "λ", r"\mu": "μ",
+        r"\approx": "≈", r"\equiv": "≡", r"\propto": "∝",
+        r"\sum": "Σ", r"\int": "∫", r"\partial": "∂",
+        r"\Delta": "Δ", r"\Omega": "Ω", r"\degree": "°",
+    }
+    for old, new in simple_math.items():
+        value = value.replace(old, new)
+
+    value = value.replace(" -> ", " → ").replace(" => ", " ⇒ ")
+    value = value.replace("->", "→").replace("=>", "⇒")
+    value = re.sub(r"\\left\s*([\(\[\{])", r"\1", value)
+    value = re.sub(r"\\right\s*([\)\]\}])", r"\1", value)
+    value = re.sub(r"\\(?:mathrm|text|mathbf|operatorname)\{([^{}]+)\}", r"\1", value)
+    value = re.sub(r"\\ce\{([^{}]+)\}", r"\1", value)
+
+    # Pecahan/akar tetap memakai KaTeX agar tampil sebagai notasi matematika,
+    # tetapi hanya bagian rumusnya yang dibungkus, bukan seluruh paragraf.
+    def wrap_formula(match):
+        expr = match.group(0)
+        return f"${expr}$"
+
+    value = re.sub(r"\\frac\{[^{}]+\}\{[^{}]+\}", wrap_formula, value)
+    value = re.sub(r"\\sqrt(?:\{[^{}]+\}|[A-Za-z0-9]+)", wrap_formula, value)
+
+    # Pangkat/indeks sederhana tanpa delimiter: ubah ke Unicode agar tidak mentah.
+    sup_map = str.maketrans("0123456789+-=()nxyi", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ")
+    sub_map = str.maketrans("0123456789+-=()nixy", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ")
+    value = re.sub(r"\^\{([^}]+)\}|\^([A-Za-z0-9])", lambda m: (m.group(1) or m.group(2)).translate(sup_map), value)
+    value = re.sub(r"_\{([^}]+)\}|_([A-Za-z0-9])", lambda m: (m.group(1) or m.group(2)).translate(sub_map), value)
+
+    # Hapus delimiter math kosong yang kadang ditinggalkan generator.
+    value = value.replace("$$$$", "")
+    value = re.sub(r"\$\s*\$", "", value)
+    return value.strip()
+
+
+def contains_arabic(text: str) -> bool:
+    return bool(re.search(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]", str(text or "")))
+
+
+def apply_arabic_paragraph_style(paragraph):
+    """Aktifkan RTL untuk paragraf Word yang mengandung aksara Arab."""
+    if not paragraph:
+        return
+    try:
+        ppr = paragraph._p.get_or_add_pPr()
+        bidi = parse_xml(r'<w:bidi xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="1"/>')
+        ppr.append(bidi)
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    except Exception:
+        pass
+
+
+def apply_arabic_run_style(run):
+    """Gunakan font complex-script yang aman untuk aksara Arab di Word."""
+    if not run:
+        return
+    try:
+        run.font.name = "Traditional Arabic"
+        rpr = run._r.get_or_add_rPr()
+        rfonts = rpr.rFonts
+        if rfonts is None:
+            rfonts = parse_xml(r'<w:rFonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+            rpr.append(rfonts)
+        rfonts.set('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}cs', 'Traditional Arabic')
+        rfonts.set('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}ascii', 'Aptos')
+    except Exception:
+        pass
+
+
+def add_omml_fraction(paragraph, num_text: str, den_text: str):
+    """Menyisipkan struktur Pecahan Tegak Resmi Microsoft Word (Equation)."""
+    num_clean = clean_math_string(num_text)
+    den_clean = clean_math_string(den_text)
+    
+    omml_xml = (
+        f'<m:oMath {nsdecls("m")}>'
+        f'  <m:f>'
+        f'    <m:num><m:r><m:t>{num_clean}</m:t></m:r></m:num>'
+        f'    <m:den><m:r><m:t>{den_clean}</m:t></m:r></m:den>'
+        f'  </m:f>'
+        f'</m:oMath>'
+    )
+    paragraph._p.append(parse_xml(omml_xml))
+
+def add_omml_matrix(paragraph, matrix_type: str, content: str):
+    """Menyisipkan struktur Matriks 2D Bertingkat Resmi Microsoft Word (Equation)."""
+    beg_chr, end_chr = "(", ")"
+    if matrix_type == "bmatrix":
+        beg_chr, end_chr = "[", "]"
+    elif matrix_type in ["vmatrix", "Vmatrix"]:
+        beg_chr, end_chr = "|", "|"
+    elif matrix_type == "matrix":
+        beg_chr, end_chr = "", ""
+
+    # Memecah baris (\\ atau \cr) dan kolom (&)
+    rows = [r.strip() for r in re.split(r'\\\\|\\cr', content) if r.strip()]
+    
+    matrix_xml_rows = []
+    for r in rows:
+        cols = [c.strip() for c in r.split('&')]
+        cols_xml = []
+        for c in cols:
+            cleaned_c = html.escape(clean_math_string(c))
+            cols_xml.append(f'<m:e><m:r><m:t>{cleaned_c}</m:t></m:r></m:e>')
+        matrix_xml_rows.append(f'<m:mr>{"".join(cols_xml)}</m:mr>')
+
+    # Gunakan tag resmi OMML Word: <m:m>
+    inner_matrix = f'<m:m>{"".join(matrix_xml_rows)}</m:m>'
+
+    if beg_chr or end_chr:
+        omml_xml = (
+            f'<m:oMath {nsdecls("m")}>'
+            f'  <m:d>'
+            f'    <m:dPr>'
+            f'      <m:begChr m:val="{beg_chr}"/>'
+            f'      <m:endChr m:val="{end_chr}"/>'
+            f'    </m:dPr>'
+            f'    <m:e>{inner_matrix}</m:e>'
+            f'  </m:d>'
+            f'</m:oMath>'
+        )
+    else:
+        omml_xml = f'<m:oMath {nsdecls("m")}>{inner_matrix}</m:oMath>'
+
+    paragraph._p.append(parse_xml(omml_xml))
+
+
+def append_text_with_fractions(paragraph, text: str, is_bold: bool = False, color_rgb: RGBColor = None):
+    """Membagi paragraf: teks biasa, pecahan \\frac, dan matriks \\begin{...matrix}."""
+    if not text:
+        return
+
+    math_pattern = re.compile(
+        r'\\begin\{(?P<mtype>[pbvV]?matrix)\}(?P<mcontent>.*?)\\end\{(?P=mtype)\}|\\(?:f|tf)rac\{(?P<num>[^}]+)\}\{(?P<den>[^}]+)\}',
+        re.DOTALL
+    )
+    last_idx = 0
+
+    for match in math_pattern.finditer(text):
+        start, end = match.span()
+        
+        # Cetak teks biasa sebelum rumus
+        if start > last_idx:
+            plain_part = clean_math_string(text[last_idx:start])
+            if plain_part:
+                run = paragraph.add_run(plain_part + " ")
+                run.bold = is_bold
+                if contains_arabic(plain_part):
+                    apply_arabic_paragraph_style(paragraph)
+                    apply_arabic_run_style(run)
+                if color_rgb:
+                    run.font.color.rgb = color_rgb
+
+        # Jika Matriks -> Rendernya pakai add_omml_matrix
+        if match.group('mtype'):
+            add_omml_matrix(paragraph, match.group('mtype'), match.group('mcontent'))
+            
+        # Jika Pecahan -> Rendernya pakai add_omml_fraction (asli)
+        elif match.group('num'):
+            add_omml_fraction(paragraph, match.group('num'), match.group('den'))
+        
+        run_space = paragraph.add_run(" ")
+        run_space.bold = is_bold
+
+        last_idx = end
+
+    # Cetak sisa teks setelah rumus terakhir
+    if last_idx < len(text):
+        plain_part = clean_math_string(text[last_idx:])
+        if plain_part:
+            run = paragraph.add_run(plain_part)
+            run.bold = is_bold
+            if contains_arabic(plain_part):
+                apply_arabic_paragraph_style(paragraph)
+                apply_arabic_run_style(run)
+            if color_rgb:
+                run.font.color.rgb = color_rgb
+
+# GENERATOR KUIS
+def generate_quiz_docx(config: dict, quiz_list: list) -> bytes:
+    """Membuat file Word (.docx) berformat LKPD resmi lengkap dengan logo, kop instansi, dan layout rapi."""
+    doc = Document()
+
+    header_table = doc.add_table(rows=1, cols=2)
+    header_table.autofit = False
+    
+    cells = header_table.rows[0].cells
+    cells[0].width = Inches(1.6)
+    cells[1].width = Inches(4.7)
+    
+    # Vertikal Center
+    cells[0].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+    cells[1].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+
+    # Kolom Kiri: Logo Instansi
+    p_logo = cells[0].paragraphs[0]
+    p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    logo_path = "logo.png"  # File logo.png di root directory
+    if os.path.exists(logo_path):
+        p_logo.add_run().add_picture(logo_path, width=Inches(1.5))
+    else:
+        # Fallback jika file logo belum diunggah
+        r_logo = p_logo.add_run("[LOGO MANTAP]")
+        r_logo.bold = True
+        r_logo.font.size = Pt(12)
+        r_logo.font.color.rgb = RGBColor(6, 78, 59)
+
+    # Kolom Kanan: Teks Kop Instansi
+    p_title = cells[1].paragraphs[0]
+    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_title.paragraph_format.space_after = Pt(2)
+    
+    r1 = p_title.add_run("LEMBAR KUIS GuruMANTAP\n")
+    r1.bold = True
+    r1.font.size = Pt(13)
+    r1.font.color.rgb = RGBColor(6, 78, 59) # Warna Hijau Edukasi
+    
+    r2 = p_title.add_run("Madrasah Aliyah dan Tsanawiyah Al-Irsyad Al-Islamiyah Putri Bondowoso\n")
+    r2.bold = True
+    r2.font.size = Pt(10.5)
+    
+    # Ambil tanggal WIB presisi saat dokumen dibuat
+    now_wib = datetime.utcnow() + timedelta(hours=7)
+    nama_bulan = [
+        "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ]
+    tgl_presisi = f"{now_wib.day} {nama_bulan[now_wib.month]} {now_wib.year}"
+    # Teks Tanggal Terbit
+    r3 = p_title.add_run(f"Tanggal: {tgl_presisi}")
+    r3.italic = True
+    r3.font.size = Pt(9.5)
+    r3.font.color.rgb = RGBColor(100, 100, 100)
+
+    # --- 2. GARIS PEMBATAS HIJAU SOLID DI BAWAH KOP ---
+    p_div = doc.add_paragraph()
+    p_div.paragraph_format.space_before = Pt(4)
+    p_div.paragraph_format.space_after = Pt(10)
+    pBdr = parse_xml(
+        r'<w:pBdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        r'<w:bottom w:val="single" w:sz="20" w:space="1" w:color="064E3B"/>'
+        r'</w:pBdr>'
+    )
+    p_div._p.get_or_add_pPr().append(pBdr)
+
+    # --- 3. JUDUL PAKET KUIS ---
+    p_paket = doc.add_paragraph()
+    p_paket.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_paket.paragraph_format.space_after = Pt(10)
+    r_paket = p_paket.add_run(f"PAKET KUIS {config.get('mapel', 'Mata Pelajaran').upper()}")
+    r_paket.bold = True
+    r_paket.font.size = Pt(13)
+    r_paket.font.color.rgb = RGBColor(6, 78, 59)
+
+    # --- 4. META INFO KUIS (Tabel 3 Kolom Lurus Sejajar) ---
+    meta_items = [
+        ("Jenjang / Kelas", f"{config.get('jenjang', '-')} ({config.get('kelas', '-')})"),
+        ("Materi Utama", f"{clean_math_string(config.get('materi', '-'))}"),
+        ("Jumlah Soal", f"{len(quiz_list)} Soal | Opsi: {'A-D' if option_count_for_jenjang(config.get('jenjang', 'MTs')) == 4 else 'A-E'} | Durasi: {timedelta(seconds=int(normalize_custom_timer_config(config).get('timer_seconds', 0)))}"),
+        ("Masa Aktif Kuis", f"{config.get('time_start_str', '--:--')} hingga {config.get('time_end_str', '--:--')} WIB")
+    ]
+
+    meta_table = doc.add_table(rows=0, cols=3)
+    meta_table.autofit = False
+
+    for label, val in meta_items:
+        row_cells = meta_table.add_row().cells
+        
+        # Kolom 1: Label (Bold)
+        p0 = row_cells[0].paragraphs[0]
+        r0 = p0.add_run(label)
+        r0.bold = True
+        p0.paragraph_format.space_before = Pt(2)
+        p0.paragraph_format.space_after = Pt(2)
+        row_cells[0].width = Inches(1.5)
+        
+        # Kolom 2: Titik Dua
+        p1 = row_cells[1].paragraphs[0]
+        r1 = p1.add_run(":")
+        r1.bold = True
+        p1.paragraph_format.space_before = Pt(2)
+        p1.paragraph_format.space_after = Pt(2)
+        row_cells[1].width = Inches(0.2)
+        
+        # Kolom 3: Teks Nilai
+        p2 = row_cells[2].paragraphs[0]
+        p2.add_run(val)
+        p2.paragraph_format.space_before = Pt(2)
+        p2.paragraph_format.space_after = Pt(2)
+        row_cells[2].width = Inches(4.8)
+
+    # Spasi Penghubung Pas menuju Soal (Tanpa Garis Pembatas Lagi)
+    p_space = doc.add_paragraph()
+    p_space.paragraph_format.space_before = Pt(12)
+    p_space.paragraph_format.space_after = Pt(4)
+
+    # --- 5. LOOP SOAL & PEMBAHASAN ---
+    for idx, item in enumerate(quiz_list, start=1):
+        # 1. Soal
+        p_q = doc.add_paragraph()
+        p_q.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_q.paragraph_format.space_before = Pt(8)
+        
+        # Cetak Nomor + Teks Soal (Pecahan Tegak Otomatis)
+        p_q.add_run(f"Soal {idx}. ").bold = True
+        append_text_with_fractions(p_q, item.get('question', ''), is_bold=True)
+
+        # 2. Opsi Jawaban
+        for opt in item.get('options', []):
+            p_opt = doc.add_paragraph()
+            p_opt.paragraph_format.left_indent = Inches(0.25)
+            p_opt.paragraph_format.space_after = Pt(2)
+            append_text_with_fractions(p_opt, opt)
+
+        # 3. Kunci Jawaban
+        p_ans = doc.add_paragraph()
+        p_ans.paragraph_format.left_indent = Inches(0.25)
+        p_ans.add_run("Kunci Jawaban: ").bold = True
+        append_text_with_fractions(p_ans, item.get('correct_answer', ''), is_bold=True, color_rgb=RGBColor(5, 150, 105))
+
+        # 4. Pembahasan
+        if item.get('solution_basis'):
+            p_sol = doc.add_paragraph()
+            p_sol.paragraph_format.left_indent = Inches(0.25)
+            p_sol.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            p_sol.add_run("Pembahasan: ").bold = True
+            append_text_with_fractions(p_sol, item.get('solution_basis'))
+            p_sol.paragraph_format.space_after = Pt(12)
+
+
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+# ===========================================================
+# GENERATOR PDF. LKPD
+# ===========================================================
+# BACKGROUND LKPD
+def draw_cover_background(canvas_obj, doc):
+    canvas_obj.saveState()
+    cover_path = "cover.png"
+    if os.path.exists(cover_path):
+        canvas_obj.drawImage(cover_path, 0, 0, width=A4[0], height=A4[1])
+    canvas_obj.restoreState()
+
+# HELPER MERAPIKAN LKPD
+_PDF_FRAC_CACHE = {}
+
+def generate_frac_image(num_str: str, den_str: str) -> str:
+    """Membuat file gambar PNG pecahan tegak lurus untuk PDF."""
+    cache_key = f"{num_str}_{den_str}"
+    if cache_key in _PDF_FRAC_CACHE and os.path.exists(_PDF_FRAC_CACHE[cache_key]):
+        return _PDF_FRAC_CACHE[cache_key]
+
+    try:
+        fig = plt.figure(figsize=(0.35, 0.35), dpi=200)
+        fig.patch.set_alpha(0.0)
+        ax = fig.add_subplot(111)
+        ax.axis('off')
+
+        math_str = f"$\\frac{{{num_str}}}{{{den_str}}}$"
+        ax.text(0.5, 0.5, math_str, fontsize=11, ha='center', va='center', color='#1F2937')
+
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+        plt.savefig(tmp.name, format='png', bbox_inches='tight', pad_inches=0.01, transparent=True)
+        plt.close(fig)
+
+        _PDF_FRAC_CACHE[cache_key] = tmp.name
+        return tmp.name
+    except Exception:
+        return None
+
+def clean_pdf_text(text: str) -> str:
+    """
+    Master Helper PDF (3 Lapis Anti-Kotak Hitam + Pecahan Campuran Presisi):
+    Mengonversi LaTeX, Unicode Pangkat/Subscript, Logaritma, Kimia, dan Pecahan
+    (termasuk pecahan campuran seperti 5⅓ atau 5 1/3) menjadi HTML ReportLab / PNG Inline.
+    """
+    if not text:
+        return ""
+
+    # Kamus Lengkap Pecahan Unicode
+    frac_map = {
+        "¼": ("1", "4"), "½": ("1", "2"), "¾": ("3", "4"),
+        "⅐": ("1", "7"), "⅑": ("1", "9"), "⅒": ("1", "10"),
+        "⅓": ("1", "3"), "⅔": ("2", "3"),
+        "⅕": ("1", "5"), "⅖": ("2", "5"), "⅗": ("3", "5"), "⅘": ("4", "5"),
+        "⅙": ("1", "6"), "⅚": ("5", "6"),
+        "⅛": ("1", "8"), "⅜": ("3", "8"), "⅝": ("5", "8"), "⅞": ("7", "8")
+    }
+
+    # 0. Normalisasi Format Kurung Dulu: 5(1/3) -> 5 1/3
+    text = re.sub(r'(\d+)\s*\(([0-9]{1,2})/([0-9]{1,2})\)', r'\1 \2/\3', text)
+
+    # 1. Konversi Pecahan Unicode (Ditambah Penanganan Pecahan Campuran 5⅓)
+    for uni, (num, den) in frac_map.items():
+        if uni in text:
+            img_path = generate_frac_image(num, den)
+            if img_path:
+                img_tag = f'<img src="{img_path}" height="13" valign="middle"/>'
+            else:
+                img_tag = f'<sup>{num}</sup>/<sub>{den}</sub>'
+
+            # A. Jika Pecahan Campuran (ada angka bulat di depan, contoh: 5⅓ atau 5 ⅓)
+            text = re.sub(rf'(\d+)\s*{re.escape(uni)}', rf'\1&nbsp;{img_tag}', text)
+            
+            # B. Jika Pecahan Berdiri Sendiri (contoh: ⅓)
+            text = text.replace(uni, img_tag)
+
+    # 2. Konversi Perintah LaTeX \frac{a}{b} dan \tfrac{a}{b}
+    def repl_latex_frac(match):
+        num, den = match.group(1).strip(), match.group(2).strip()
+        img_path = generate_frac_image(num, den)
+        if img_path:
+            return f'<img src="{img_path}" height="13" valign="middle"/>'
+        return f'<sup>{num}</sup>/<sub>{den}</sub>'
+
+    text = re.sub(r'\\(?:f|tf)rac\{([^}]+)\}\{([^}]+)\}', repl_latex_frac, text)
+
+    # 3A. Konversi Pecahan Campuran Miring (Contoh: 5 1/3 -> 5 <sup>1</sup>/<sub>3</sub>)
+    def repl_mixed_slash_frac(match):
+        whole, num, den = match.group(1), match.group(2), match.group(3)
+        img_path = generate_frac_image(num, den)
+        if img_path:
+            return f'{whole}&nbsp;<img src="{img_path}" height="13" valign="middle"/>'
+        return f'{whole}&nbsp;<sup>{num}</sup>/<sub>{den}</sub>'
+
+    text = re.sub(r'(\d+)\s+([0-9]{1,2})/([0-9]{1,2})\b', repl_mixed_slash_frac, text)
+
+    # 3B. Konversi Pecahan Biasa Miring (Contoh: 1/3, 3/8)
+    def repl_slash_frac(match):
+        num, den = match.group(1), match.group(2)
+        img_path = generate_frac_image(num, den)
+        if img_path:
+            return f'<img src="{img_path}" height="13" valign="middle"/>'
+        return f'<sup>{num}</sup>/<sub>{den}</sub>'
+
+    text = re.sub(r'\b([0-9]{1,2})/([0-9]{1,2})\b', repl_slash_frac, text)
+
+    # 4. SAPU BERSIH LAPIS TERAKHIR (Sweeper: Musnahkan sisa pecahan Unicode apapun)
+    def sweep_unicode_fractions(match):
+        ch = match.group(0)
+        if ch in frac_map:
+            n, d = frac_map[ch]
+            return f'<sup>{n}</sup>/<sub>{d}</sub>'
+        return f'<sup>?</sup>/<sub>?</sub>'
+
+    text = re.sub(r'[\u2150-\u2189\u00bc-\u00be]', sweep_unicode_fractions, text)
+
+    # 5. Konversi Unicode Superscript (⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻) -> <sup>...</sup>
+    sup_chars = "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿˣʸⁱ"
+    sup_trans = str.maketrans(sup_chars, "0123456789+-=()nxyi")
+    text = re.sub(r'[' + re.escape(sup_chars) + r']+', lambda m: f"<sup>{m.group(0).translate(sup_trans)}</sup>", text)
+
+    # 6. Konversi Unicode Subscript (₀₁₂₃₄₅₆₇₈₉₊₋) -> <sub>...</sub>
+    sub_chars = "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₙᵢₓᵧ"
+    sub_trans = str.maketrans(sub_chars, "0123456789+-=()nixy")
+    text = re.sub(r'[' + re.escape(sub_chars) + r']+', lambda m: f"<sub>{m.group(0).translate(sub_trans)}</sub>", text)
+
+    # 7. Konversi LaTeX Pangkat (^) dan Subscript (_) -> <sup> & <sub>
+    text = re.sub(r'\^\{([^}]+)\}|\^([\-0-9a-zA-Z]+)', r'<sup>\1\2</sup>', text)
+    text = re.sub(r'\_\{([^}]+)\}|\_([0-9a-zA-Z]+)', r'<sub>\1\2</sub>', text)
+
+    # 8. Tangani Akar (\sqrt)
+    text = re.sub(r'\\sqrt\{([^}]+)\}', r'√( \1 )', text)
+    text = re.sub(r'\\sqrt\s*([a-zA-Z0-9_]+)', r'√\1', text)
+
+    # 9. Tangani Panah & Simbol LaTeX
+    text = re.sub(r'\\(?:rightarrow|to)\b', '→', text)
+    text = re.sub(r'\\Rightarrow\b', '⇒', text)
+    text = re.sub(r'\\leftarrow\b', '←', text)
+    text = re.sub(r'\\(?:dots|cdots|ldots)', '…', text)
+    text = re.sub(r'\\left\b\s*[\(\[\{\.\|]?', '(', text)
+    text = re.sub(r'\\right\b\s*[\)\]\}\.\|]?', ')', text)
+
+    # 10. Bersihkan Simbol Matematika Standar & Backslash
+    replacements = {
+        r"\times": "×", r"\cdot": "·", r"\div": "÷", r"\neq": "≠",
+        r"\leq": "≤", r"\geq": "≥", r"\pm": "±", r"\infty": "∞",
+        r"\pi": "π", r"\alpha": "α", r"\beta": "β", r"\theta": "θ",
+        r"\log": "log", "$": ""
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    text = text.replace("{", "").replace("}", "")
+    text = re.sub(r'\\([a-zA-Z]+)', r'\1', text).replace("\\", "")
+
+    return re.sub(r'\s+', ' ', text).strip()
+    
+# GENERATOR LKPD
+def create_lkpd_pdf_buffer(mapel, kelas, topik, ai_content, logo_path="logo.png"):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4, leftMargin=2.0 * cm, rightMargin=2.0 * cm,
+        topMargin=2.0 * cm, bottomMargin=2.0 * cm
+    )
+    styles = getSampleStyleSheet()
+    
+    # Ambil Tanggal Presisi WIB saat PDF dibuat
+    now_wib = datetime.utcnow() + timedelta(hours=7)
+    nama_bulan = [
+        "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ]
+    tgl_presisi = f"{now_wib.day} {nama_bulan[now_wib.month]} {now_wib.year}"
+    
+    # Custom Typography Styles
+    style_cover_school = ParagraphStyle('CoverSchool', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor('#064E3B'), alignment=TA_CENTER)
+    style_cover_title = ParagraphStyle('CoverTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=18, leading=22, textColor=colors.HexColor('#059669'), alignment=TA_CENTER)
+    style_cover_sub = ParagraphStyle('CoverSub', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=13, textColor=colors.HexColor('#374151'), alignment=TA_CENTER)
+    style_section_heading = ParagraphStyle('SecHeading', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.white)
+    
+    # Paragraf Body Rata Kanan-Kiri (JUSTIFY)
+    style_body = ParagraphStyle('BodyTextCustom', parent=styles['Normal'], fontName='Helvetica', fontSize=9.5, leading=13.5, textColor=colors.HexColor('#1F2937'), alignment=TA_JUSTIFY)
+    
+    # Meta Info Styles (Label & Value)
+    style_meta_label = ParagraphStyle('MetaLabel', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9.5, leading=13, textColor=colors.HexColor('#064E3B'))
+    style_meta_val = ParagraphStyle('MetaVal', parent=styles['Normal'], fontName='Helvetica', fontSize=9.5, leading=13, textColor=colors.HexColor('#1F2937'))
+
+    story = []
+    story.append(Spacer(1, 1.5 * cm))
+
+    # Header Logo
+    if os.path.exists(logo_path):
+        img_logo = Image(logo_path, width=3.8 * cm, height=2.2 * cm)
+        img_logo.hAlign = 'CENTER'
+        story.append(img_logo)
+        story.append(Spacer(1, 0.4 * cm))
+
+    # Header Instansi & Judul LKPD
+    school_html = "Madrasah Aliyah dan Tsanawiyah<br/><b>Al-Irsyad Al-Islamiyah Putri Bondowoso</b>"
+    story.append(Paragraph(school_html, style_cover_school))
+    story.append(Spacer(1, 0.6 * cm))
+    story.append(Paragraph("LEMBAR KERJA PESERTA DIDIK", style_cover_title))
+    story.append(Paragraph("(LKPD)", style_cover_title))
+    story.append(Spacer(1, 0.2 * cm))
+    story.append(Paragraph("Model Pembelajaran HOTS & Integrasi Nilai Keislaman", style_cover_sub))
+    story.append(Spacer(1, 0.8 * cm))
+
+    # Meta Info Box (Tabel 3 Kolom Lurus Sejajar)
+    meta_rows = [
+        [Paragraph("Mata Pelajaran", style_meta_label), Paragraph(":", style_meta_label), Paragraph(mapel, style_meta_val)],
+        [Paragraph("Kelas / Jenjang", style_meta_label), Paragraph(":", style_meta_label), Paragraph(kelas, style_meta_val)],
+        [Paragraph("Topik Utama", style_meta_label), Paragraph(":", style_meta_label), Paragraph(topik, style_meta_val)],
+        [Paragraph("Tanggal", style_meta_label), Paragraph(":", style_meta_label), Paragraph(tgl_presisi, style_meta_val)],
+        [Paragraph("Nama Siswa", style_meta_label), Paragraph(":", style_meta_label), Paragraph("......................................................................", style_meta_val)],
+    ]
+    
+    t_meta_inner = Table(meta_rows, colWidths=[3.5 * cm, 0.4 * cm, 10.5 * cm])
+    t_meta_inner.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+
+    t_meta_box = Table([[t_meta_inner]], colWidths=[15.5 * cm])
+    t_meta_box.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#ECFDF5')),
+        ('BOX', (0,0), (-1,-1), 1.5, colors.HexColor('#059669')),
+        ('PADDING', (0,0), (-1,-1), 10),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
+    ]))
+    t_meta_box.hAlign = 'CENTER'
+    story.append(t_meta_box)
+    story.append(PageBreak())
+
+    # --- HALAMAN 2: ISI LKPD ---
+    # [A] TUJUAN PEMBELAJARAN
+    head_a = Paragraph("[A] TUJUAN PEMBELAJARAN (HOTS)", style_section_heading)
+    t_head_a = Table([[head_a]], colWidths=[16.5 * cm])
+    t_head_a.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')), ('PADDING', (0,0), (-1,-1), 6)]))
+    story.append(t_head_a)
+    story.append(Spacer(1, 0.2 * cm))
+
+    tujuan_list = ai_content.get("tujuan", [])
+    tujuan_text = "<br/>".join([f"{i+1}. {clean_pdf_text(t)}" for i, t in enumerate(tujuan_list)])
+    story.append(Paragraph(tujuan_text, style_body))
+    story.append(Spacer(1, 0.5 * cm))
+
+    # [B] APERSEPSI & EKSPLORASI KONSEP
+    head_b = Paragraph("[B] APERSEPSI & EKSPLORASI KONSEP", style_section_heading)
+    t_head_b = Table([[head_b]], colWidths=[16.5 * cm])
+    t_head_b.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')), ('PADDING', (0,0), (-1,-1), 6)]))
+    story.append(t_head_b)
+    story.append(Spacer(1, 0.2 * cm))
+
+    p_ringkasan = Paragraph(clean_pdf_text(ai_content.get("ringkasan", "")), style_body)
+    t_box_b = Table([[p_ringkasan]], colWidths=[16.5 * cm])
+    t_box_b.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F0F9FF')), ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#BAE6FD')), ('PADDING', (0,0), (-1,-1), 8)]))
+    story.append(t_box_b)
+    story.append(Spacer(1, 0.5 * cm))
+
+    # [C] TUGAS EKSPLORASI MANDIRI (3 SOAL)
+    head_c = Paragraph("[C] TUGAS EKSPLORASI MANDIRI", style_section_heading)
+    t_head_c = Table([[head_c]], colWidths=[16.5 * cm])
+    t_head_c.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#059669')), ('PADDING', (0,0), (-1,-1), 6)]))
+    story.append(t_head_c)
+    story.append(Spacer(1, 0.3 * cm))
+
+    # Loop 3 Soal Eksplorasi (range 1 hingga 4)
+    for i in range(1, 6):
+        soal_raw = ai_content.get(f'soal_{i}', f'Soal eksplorasi nomor {i} belum tersedia.')
+        soal_clean = clean_pdf_text(soal_raw)
+        story.append(Paragraph(f"<b>Soal {i}:</b> {soal_clean}", style_body))
+        story.append(Spacer(1, 0.15 * cm))
+        p_ans = Paragraph("<font color='#9CA3AF'><i>Lembar Jawaban:</i></font><br/><br/><br/><br/>", style_body)
+        t_ans = Table([[p_ans]], colWidths=[16.5 * cm])
+        t_ans.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F9FAFB')), ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#E5E7EB')), ('PADDING', (0,0), (-1,-1), 6)]))
+        story.append(t_ans)
+        story.append(Spacer(1, 0.4 * cm))
+
+    # [D] REFLEKSI KEISLAMAN & HIKMAH
+    head_d = Paragraph("[D] REFLEKSI KEISLAMAN & HIKMAH", style_section_heading)
+    t_head_d = Table([[head_d]], colWidths=[16.5 * cm])
+    t_head_d.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#D97706')), ('PADDING', (0,0), (-1,-1), 6)]))
+    story.append(t_head_d)
+    story.append(Spacer(1, 0.2 * cm))
+    refleksi_clean = clean_pdf_text(ai_content.get("refleksi", ""))
+    p_refleksi = Paragraph(f'<i>"{refleksi_clean}"</i>', style_body)
+    t_box_d = Table([[p_refleksi]], colWidths=[16.5 * cm])
+    t_box_d.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#FEF3C7')), ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#FDE68A')), ('PADDING', (0,0), (-1,-1), 8)]))
+    story.append(t_box_d)
+
+    doc.build(story, onFirstPage=draw_cover_background, onLaterPages=draw_cover_background)
+    buffer.seek(0)
+    return buffer
+
+# ========================================
+# RENDER CUSTOM TIMER
+# ========================================
 @st.fragment(run_every="1s")
 def render_custom_timer(start_time_wib, timer_seconds):
-    # Timer ujian memakai timestamp aware WIB; refresh per detik memang diperlukan
-    # untuk akurasi countdown. Refresh 10 detik hanya dipakai untuk live monitoring.
-    sekarang_wib = now_wib()
-    start_time_wib = normalize_wib_datetime(start_time_wib)
+    sekarang_wib = datetime.utcnow() + timedelta(hours=7)
     terpakai_detik = int((sekarang_wib - start_time_wib).total_seconds())
     sisa_detik = timer_seconds - terpakai_detik
 
@@ -763,118 +1706,239 @@ def create_5_quiz_packages(master_quiz):
 # 1. TAMPILAN AWAL (GERBANG SISWA & GURU)
 # ==============================================================================
 if st.session_state.page == "landing":
-    st.markdown("""
-    <section class="rm-welcome-hero">
-      <div class="rm-welcome-copy">
-        <div class="rm-eyebrow"><span class="rm-sparkle">✦</span> YOUR LEARNING, LEVELLED UP</div>
-        <h1>Halo, pejuang ilmu!<br><span>Siap jadi makin MANTAP?</span></h1>
-        <p>Satu tempat untuk berlatih, memahami materi, menyiapkan ujian, dan menemukan cara belajar yang paling cocok untukmu.</p>
-        <div class="rm-hero-chips"><span>🧠 AI-assisted learning</span><span>🎯 Latihan terarah</span><span>🌱 Bertumbuh setiap hari</span></div>
-      </div>
-      <div class="rm-hero-art"><div class="rm-orbit rm-orbit-one"></div><div class="rm-orbit rm-orbit-two"></div><div class="rm-book-stack">📚</div><div class="rm-float-bubble rm-bubble-one">✨</div><div class="rm-float-bubble rm-bubble-two">💡</div><div class="rm-float-bubble rm-bubble-three">🚀</div></div>
-    </section>
-    <div class="rm-section-heading"><div><div class="rm-eyebrow rm-eyebrow-color">PILIH RUANGMU</div><h2>Mulai dari yang kamu butuhkan</h2><p>Pahami konsepnya, langsung cobain, dan nikmati serunya belajar! ✨</p></div></div>
-    """, unsafe_allow_html=True)
 
-    c1, c2, c3 = st.columns(3, gap="medium")
-    with c1:
-        st.markdown('<div class="rm-feature-card rm-card-lilac"><div class="rm-feature-icon">🎒</div><div class="rm-feature-tag">MY.LEARNING-INTELLIGENCE</div><h3>Ruang SantriMANTAP</h3><p>Belajar dengan panduan RoboMANTAP, latihan pintar, rangkuman PDF, dan insight yang mengikuti perjalananmu.</p></div>', unsafe_allow_html=True)
-        if st.button("Buka ruang belajarku ↗", key="home_student", type="primary", use_container_width=True):
-            st.session_state.page = "student_intelligence"
-            st.rerun()
-    with c2:
-        st.markdown('<div class="rm-feature-card rm-card-mint"><div class="rm-feature-icon">🧕🏼</div><div class="rm-feature-tag">TEACHING WORKSPACE</div><h3>Ruang GuruMANTAP</h3><p>Kelola kuis, susun bank soal, buat bahan ajar dengan RoboMANTAP, dan pantau aktivitas pengerjaan siswa.</p></div>', unsafe_allow_html=True)
-        if st.button("Masuk ruang guru ↗", key="home_teacher", use_container_width=True):
-            st.session_state.page = "guru_login"
-            st.rerun()
-    with c3:
-        st.markdown('<div class="rm-feature-card rm-card-peach"><div class="rm-feature-icon">🏆</div><div class="rm-feature-tag">OLIMPIADE & PRACTICE</div><h3>Latihan OMI</h3><p>Latihan olimpiade secara bertahap untuk MTs dan MA dengan mata pelajaran yang telah disesuaikan.</p></div>', unsafe_allow_html=True)
-        if st.button("Pilih jenjang latihan ↗", key="home_omi", use_container_width=True):
+    st.markdown("<h3 style='text-align: center; font-size: 25px;'>🏆 BINA PRESTASI OMI 2026</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 12px; text-align: center; opacity: 0.8;'>Pilih Jenjang Pendidikan untuk Memulai Pembinaan Olimpiade</p>", unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("""
+        <div class="mode-card">
+            <h2>🏫 TINGKAT MTs</h2>
+            <p>Madrasah Tsanawiyah Al-Irsyad Putri</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Masuk Modul MTs ➔", key="btn_mts", use_container_width=True, type="primary"):
+            st.session_state.jenjang = "MTs (Sederajat SMP)"
             st.session_state.page = "select_mapel"
             st.rerun()
 
-    st.markdown('<div class="rm-section-heading rm-section-heading-compact"><div><div class="rm-eyebrow rm-eyebrow-color">LEBIH SIAP, LEBIH PERCAYA DIRI</div><h2>Peralatan belajar yang terhubung</h2><p>Mulai aja dulu, nikmati prosesnya, dan gaskeun terus! 🙌</p></div></div>', unsafe_allow_html=True)
-    p1, p2 = st.columns(2, gap="medium")
-    with p1:
-        st.markdown(f'<a class="rm-portal-link rm-link-blue" href="{TKA_PORTAL_URL}" target="_blank"><span class="rm-portal-icon">🎯</span><span><b>Portal TKA 2026</b><small>Persiapkan diri dengan latihan TKA</small></span><strong>↗</strong></a>', unsafe_allow_html=True)
-    with p2:
-        st.markdown('<a class="rm-portal-link rm-link-yellow" href="https://robo-mantap-kuis-19.vercel.app/" target="_blank"><span class="rm-portal-icon">📝</span><span><b>Kuis GuruMANTAP</b><small>Kerjakan kuis yang dibagikan guru</small></span><strong>↗</strong></a>', unsafe_allow_html=True)
-
-    with st.expander("💬 Hubungi WA-RoboMANTAP sekarang!", expanded=False):
-        st.markdown('<div class="rm-registration-intro"><b>Mulai terhubung dengan WA-RoboMANTAP</b><p>Siapkan data yang diperlukan dan mulai percakapan di WhatsApp resmi.</p></div>', unsafe_allow_html=True)
-        NO_WA_BOT = "6283141694735"
-        wa_registration_role = st.radio("Saya adalah", ["👤 Siswa", "🧕🏼 Guru"], horizontal=True, key="wa_registration_role", label_visibility="collapsed")
-        if wa_registration_role == "👤 Siswa":
-            with st.form("form_wa_siswa"):
-                s_nama = st.text_input("Nama lengkap", placeholder="Nama lengkap siswa")
-                s_jenjang = st.selectbox("Jenjang", ["MTs", "MA"])
-                d1, d2 = st.columns(2)
-                with d1: s_kelas = st.text_input("Kelas", placeholder="9A / 12")
-                with d2: s_absen = st.text_input("Nomor absen", placeholder="03")
+    with col2:
+        st.markdown("""
+        <div class="mode-card">
+            <h2>🏛️ TINGKAT MA</h2>
+            <p>Madrasah Aliyah Al-Irsyad Putri</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Masuk Modul MA ➔", key="btn_ma", use_container_width=True, type="primary"):
+            st.session_state.jenjang = "MA (Sederajat SMA)"
+            st.session_state.page = "select_mapel"
+            st.rerun()
+    
+    # --- UI KARTU PAKSAAN HALUS ---
+    st.write("---")
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg,#7b5cff,#4cc9f0);
+        border: 1px solid #3b82f6;
+        border-radius: 8px;
+        padding: 8px 14px;
+        text-align: center;
+    ">
+        <div style="font-weight: bold; font-size: 14px; color: #60a5fa; margin-bottom: 2px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#25D366" viewBox="0 0 16 16">
+              <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.099-.834-.308-1.589-.981-.588-.524-.986-1.171-1.101-1.368-.116-.198-.012-.304.087-.403.088-.088.197-.232.296-.348.1-.116.133-.197.198-.329.065-.133.033-.248-.016-.348-.05-.099-.445-1.071-.61-1.465-.16-.385-.32-.331-.445-.338a2.52 2.52 0 0 0-.38-.007c-.131 0-.343.049-.523.247-.18.198-.69.674-.69 1.643 0 .97.705 1.908.803 2.04.099.133 1.387 2.119 3.362 2.97.47.203.837.324 1.124.415.472.15.901.129 1.24.078.378-.057 1.17-.478 1.336-.94.166-.462.166-.857.116-.94-.05-.083-.183-.133-.38-.232z"/>
+            </svg>
+            HUBUNGI WA RoboMANTAP SEKARANG!
+        </div>
+        <div style="font-size: 10px; color: #cbd5e1; line-height: 1.3;">
+            Ruang Belajar yang lebih efektif, efisien, dan lengkap. Kapan saja, di mana saja!
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    NO_WA_BOT = "6283141694735"
+    tab_siswa, tab_guru = st.tabs(["👤 Siswa", "🧕🏼 Guru"])    
+    
+    with tab_siswa:
+        with st.form("form_wa_siswa"):
+            s_nama = st.text_input("Nama Lengkap", placeholder="Masukkan Nama Lengkap Kamu")
+            s_jenjang = st.selectbox("Jenjang", ["MTs", "MA"])
+            c1, c2 = st.columns(2)
+            with c1:
+                s_kelas = st.text_input("Kelas", placeholder="Contoh: 9A / 12")
+            with c2:
+                s_absen = st.text_input("Nomor Absen", placeholder="Contoh: 03")
+            c_user, c_pin = st.columns([1.25, 1], gap="medium")
+            with c_user:
+                s_username = st.text_input(
+                    "Buat Username Unik",
+                    placeholder="Contoh: santri.aisyah",
+                    help="3–24 karakter: huruf kecil, angka, titik, atau garis bawah."
+                )
+            with c_pin:
+                s_pin = st.text_input(
+                    "Buat PIN Santri",
+                    placeholder="6 angka",
+                    type="password",
+                    max_chars=6,
+                    help="Buat PIN 6 digit yang mudah kamu ingat, tetapi sulit ditebak."
+                )
+            st.caption(
+                "Username dan PIN dipakai untuk masuk ke Portal SantriMANTAP. "
+                "Jangan bagikan keduanya kepada teman. PIN disimpan dalam bentuk hash, bukan teks asli."
+            )
+            
+            btn_siswa = st.form_submit_button("SINKRONISASI DATA 💬", type="primary", use_container_width=True)
+            
+        # Pengecekan diletakkan di LUAR st.form agar bisa memunculkan tombol HTML baru
+        if btn_siswa:
+            username_clean = str(s_username or "").strip().casefold()
+            if not s_nama or not s_kelas or not s_absen or not username_clean or not s_pin:
+                st.error("Lengkapi semua data, username, dan PIN Santri terlebih dahulu!")
+            elif not re.fullmatch(r"[a-z0-9][a-z0-9._]{2,23}", username_clean):
+                st.error("Username harus 3–24 karakter, diawali huruf/angka, dan hanya memakai huruf kecil, angka, titik, atau garis bawah.")
+            elif not re.fullmatch(r"\d{6}", str(s_pin or "")):
+                st.error("PIN Santri harus tepat 6 angka.")
+            else:
+                # Kirim hash PBKDF2 ke WA Bot, bukan PIN asli. Salt unik untuk tiap pendaftaran.
+                import secrets as _pin_secrets
+                _pin_salt = _pin_secrets.token_hex(16)
+                _pin_rounds = 310000
+                _pin_digest = hashlib.pbkdf2_hmac("sha256", s_pin.encode("utf-8"), _pin_salt.encode("utf-8"), _pin_rounds).hex()
+                _pin_hash = f"pbkdf2_sha256${_pin_rounds}${_pin_salt}${_pin_digest}"
+                pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama.strip()} - {s_jenjang} - {s_kelas.strip()} - {s_absen.strip()} - {username_clean} - {_pin_hash}"
+                link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
                 
-                c_user, c_pin = st.columns([1.25, 1], gap="medium")
-                with c_user:
-                    s_username = st.text_input(
-                        "Username pilihan", 
-                        placeholder="santri.aisyah", 
-                        help="3–24 karakter: huruf kecil, angka, titik, atau garis bawah."
-                    )
-                with c_pin:
-                    s_pin = st.text_input(
-                        "Buat PIN Santri",
-                        placeholder="6 angka",
-                        type="password",
-                        max_chars=6,
-                        help="Buat PIN 6 digit yang mudah diingat."
-                    )
-                    
-                st.info("Jaga PIN dan username-mu, jangan bagikan kepada teman yaa! PIN disimpan aman dalam bentuk hash.")
-                btn_siswa = st.form_submit_button("Lanjutkan ke WhatsApp", type="primary", use_container_width=True)
-        
-            if btn_siswa:
-                username_clean = str(s_username or "").strip().casefold()
-                if not s_nama or not s_kelas or not s_absen or not username_clean or not s_pin:
-                    st.error("Lengkapi semua data, username, dan PIN terlebih dahulu.")
-                elif not re.fullmatch(r"[a-z0-9][a-z0-9._]{2,23}", username_clean):
-                    st.error("Username harus 3–24 karakter, diawali huruf/angka, dan hanya memakai huruf kecil, angka, titik, atau garis bawah.")
-                elif not re.fullmatch(r"\d{6}", str(s_pin or "")):
-                    st.error("PIN Santri harus tepat 6 angka.")
-                else:
-                    import hashlib
-                    import secrets as _pin_secrets
-                    
-                    # Enkripsi PBKDF2 Hash untuk PIN
-                    _pin_salt = _pin_secrets.token_hex(16)
-                    _pin_rounds = 310000
-                    _pin_digest = hashlib.pbkdf2_hmac("sha256", s_pin.encode("utf-8"), _pin_salt.encode("utf-8"), _pin_rounds).hex()
-                    _pin_hash = f"pbkdf2_sha256${_pin_rounds}${_pin_salt}${_pin_digest}"
-                    
-                    pesan = f"Halo RoboMANTAP! Saya [SISWA] : {s_nama.strip()} - {s_jenjang} - {s_kelas.strip()} - {s_absen.strip()} - {username_clean} - {_pin_hash}"
-                    link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
-                    
-                    st.success("Data siap. Lanjutkan melalui tombol WhatsApp di bawah.")
-                    st.markdown(f'<a class="rm-whatsapp-button" href="{link}" target="_blank">Buka WhatsApp RoboMANTAP ↗</a>', unsafe_allow_html=True)
+                st.success("✅ Data Siap! Klik tombol di bawah untuk masuk ke obrolan WhatsApp.")
+                # Menggunakan HTML Anchor Tag target="_blank" seperti di student_intelligence
+                st.markdown(f"""
+                <a href="{link}" target="_blank" style="text-decoration: none;">
+                    <div style="background-color: #25D366; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 10px;">
+                        Buka WhatsApp RoboMANTAP 🚀
+                    </div>
+                </a>
+                """, unsafe_allow_html=True)
+    
+    with tab_guru:
+        with st.form("form_wa_guru"):
+            g_nama = st.text_input("Nama Lengkap Ustadzah", placeholder="Masukkan Nama Lengkap Anda")
+            g_kode = st.text_input("PIN Akses Guru", type="password", help="Tanyakan kepada admin UPN untuk kode ini.", placeholder="Masukkan PIN GuruMANTAP")
+            
+            btn_guru = st.form_submit_button("SINKRONISASI DATA 💬", type="primary", use_container_width=True)
+            
+        if btn_guru:
+            if not g_nama or not g_kode:
+                st.error("Nama dan Kode Akses wajib diisi!")
+            elif g_kode != "MANTAP2026": 
+                st.error("⚠️ Kode PIN Akses Guru salah. Siswa dilarang masuk area ini.")
+            else:
+                pesan = f"Halo RoboMANTAP! Saya [GURU] : {g_nama} - VALIDATED"
+                link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
+                
+                st.success("✅ Akses diverifikasi! Klik tombol di bawah untuk masuk ke obrolan WhatsApp.")
+                st.markdown(f"""
+                <a href="{link}" target="_blank" style="text-decoration: none;">
+                    <div style="background-color: #25D366; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 10px;">
+                        Buka WhatsApp RoboMANTAP 🚀
+                    </div>
+                </a>
+                """, unsafe_allow_html=True)
 
-        else:
-            with st.form("form_wa_guru"):
-                g_nama = st.text_input("Nama lengkap Ustadzah", placeholder="Nama lengkap")
-                g_kode = st.text_input("PIN akses GuruMANTAP", type="password", help="Hubungi admin UPN jika membutuhkan kode akses.")
-                btn_guru = st.form_submit_button("Verifikasi dan lanjutkan", type="primary", use_container_width=True)
-            if btn_guru:
-                if not g_nama or not g_kode:
-                    st.error("Nama dan PIN akses wajib diisi.")
-                elif g_kode != "MANTAP2026":
-                    st.error("PIN akses tidak sesuai.")
-                else:
-                    pesan = f"Halo RoboMANTAP! Saya [GURU] : {g_nama} - VALIDATED"
-                    link = f"https://wa.me/{NO_WA_BOT}?text={urllib.parse.quote(pesan)}"
-                    st.success("Identitas terverifikasi. Lanjutkan melalui WhatsApp.")
-                    st.markdown(f'<a class="rm-whatsapp-button" href="{link}" target="_blank">Buka WhatsApp RoboMANTAP ↗</a>', unsafe_allow_html=True)
+                    
+    st.write("---")
+    st.markdown("#### 🎓 TKA RoboMANTAP")
+    st.caption("Mulai latihan kuy.. biar makin siap nih hadapi TKA 2026!")
+    st.markdown(
+        f"""
+        <a href="{TKA_PORTAL_URL}" target="_blank" style="text-decoration: none; color: #020617;">
+            <div style="
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: #020617 !important;
+                padding: 14px 24px;
+                border-radius: 12px;
+                text-align: center;
+                font-weight: 800;
+                font-size: 15px;
+                letter-spacing: 0.5px;
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                margin-top: 8px;
+                margin-bottom: 20px;
+                cursor: pointer;
+            ">
+                MASUK PORTAL TKA →
+            </div>
+        </a>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    st.markdown('<div class="rm-bottom-note"><span>🌈</span><div><b>Setiap langkah kecil berarti!</b><small>Belajar bukan tentang siapa yang paling cepat, tapi siapa yang terus bertumbuh.</small></div></div>', unsafe_allow_html=True)
+    st.write("---")
+    st.markdown("#### 📝 Sesi Quiz GuruMANTAP")
+    st.caption("Yuk, gasken kuis interaktif dari GuruMANTAP!")
+    
+    # Tombol Futuristik Neon Emerald yang Mengarah ke Render
+    st.markdown(
+        """
+        <a href="https://robomantap-intelligence-cbt.onrender.com" target="_blank" style="text-decoration: none;">
+            <div style="
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: #020617;
+                padding: 14px 24px;
+                border-radius: 12px;
+                text-align: center;
+                font-weight: 800;
+                font-size: 15px;
+                letter-spacing: 0.5px;
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                margin-top: 8px;
+                margin-bottom: 20px;
+                cursor: pointer;
+            ">
+                MASUK PORTAL KUIS →
+            </div>
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
 
+    st.write("---")
+    st.markdown("#### 👤 Portal SantriMANTAP")
+    st.markdown("""
+    <div class="guru-card" style="background: linear-gradient(135deg, #172554 0%, #312e81 100%); border-color: #6366f1;">
+        <h2 style="margin:0; font-size: 20px;">🎓 My Learning Intelligence</h2>
+        <p style="font-size: 10px; opacity:0.85; margin-top:5px;">Evaluasi pola belajarmu, identifikasi materi yang butuh perbaikan, lalu susun rencana strategis untuk langkah pembelajaran berikutnya!</p>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.button("Masuk Portal Siswa ➔", use_container_width=True, type="primary"):
+        st.session_state.page = "student_intelligence"
+        st.rerun()
+
+    st.write("---")
+    st.markdown("#### 🧕🏼 Portal GuruMANTAP")
+    st.markdown("""
+    <div class="guru-card">
+        <h2 style="margin:0; font-size: 20px;"><span class="blinking-dot-red">🔴</span> Live Monitoring & AI Generator</h2>
+        <p style="font-size: 10px; opacity:0.8; margin-top:5px;">Pantau skor siswa secara real-time, generate soal dan fitur automation</p>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.button("🔒 Masuk Portal Guru ➔", use_container_width=True):
+        st.session_state.page = "guru_login"
+        st.rerun()
+
+# ==============================================================================
+# 2. LOGIN GURU & DASHBOARD (NEW UPGRADE)
+# ==============================================================================
+#=========================================================================================================
 elif st.session_state.page == "student_intelligence":
-    from student_intelligence import render_student_intelligence_dashboard
     render_student_intelligence_dashboard(
         st.session_state.get("student_intelligence_name", ""),
         st.session_state.get("student_intelligence_grade", "Semua Jenjang"),
@@ -931,12 +1995,8 @@ elif st.session_state.page == "guru_dashboard":
         st.stop()
 
     st.markdown("<p style='font-size: 27px; font-weight: bold; margin-bottom: 8px;'>🖥️ Dashboard GuruMANTAP</p>", unsafe_allow_html=True)
-    guru_section = st.radio(
-        "Ruang kerja GuruMANTAP",
-        ["🔴 Live Monitoring", "✨ Quiz Custom", "⚡ Automation", "📚 Bank Soal", "🎓 TKA Studio"],
-        horizontal=True, key="guru_workspace_section", label_visibility="collapsed"
-    )
-    if guru_section == "🔴 Live Monitoring":
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔴 Live Monitoring", "✨ Quiz Custom", "⚡ Automation", "📚 Bank Soal", "🎓 TKA Studio"])
+    with tab1:
         st.markdown("<p style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>Monitoring & Evaluasi Siswa</p>", unsafe_allow_html=True)
 
         time_filter = st.session_state.get("filter_time", "Hari Ini")
@@ -955,7 +2015,7 @@ elif st.session_state.page == "guru_dashboard":
             st.markdown(
                 '<p style="font-size: 12px; opacity: 0.82;">'
                 '<span class="blinking-dot-green">🟢</span> '
-                '<b>LIVE AKTIF!</b> · memperbarui data setiap 10 detik, matikan Live bila tidak diperlukan.'
+                '<b>LIVE AKTIF!</b> · memperbarui data secara real time, matikan Live bila Hp/Perangkat terasa Lemot.'
                 '</p>',
                 unsafe_allow_html=True
             )
@@ -1267,16 +2327,16 @@ elif st.session_state.page == "guru_dashboard":
                         )
 
                         if isinstance(waktu_mulai_raw, str):
-                            waktu_mulai_dt = normalize_wib_datetime(datetime.strptime(
+                            waktu_mulai_dt = datetime.strptime(
                                 str(waktu_mulai_raw)[:19], "%Y-%m-%d %H:%M:%S"
-                            ))
+                            )
                         else:
-                            waktu_mulai_dt = normalize_wib_datetime(pd.to_datetime(waktu_mulai_raw).to_pydatetime())
+                            waktu_mulai_dt = pd.to_datetime(waktu_mulai_raw).to_pydatetime()
 
                         waktu_mulai_str = waktu_mulai_dt.strftime("%H:%M WIB")
 
                         if row["status_real"] == "BERJALAN":
-                            waktu_sekarang_wib = now_wib()
+                            waktu_sekarang_wib = datetime.utcnow() + timedelta(hours=7)
                             selisih_detik = max(
                                 0,
                                 int((waktu_sekarang_wib - waktu_mulai_dt).total_seconds())
@@ -1284,11 +2344,11 @@ elif st.session_state.page == "guru_dashboard":
                         else:
                             waktu_selesai_raw = row["updated_at"]
                             if isinstance(waktu_selesai_raw, str):
-                                waktu_selesai_dt = normalize_wib_datetime(datetime.strptime(
+                                waktu_selesai_dt = datetime.strptime(
                                     str(waktu_selesai_raw)[:19], "%Y-%m-%d %H:%M:%S"
-                                ))
+                                )
                             else:
-                                waktu_selesai_dt = normalize_wib_datetime(pd.to_datetime(waktu_selesai_raw).to_pydatetime())
+                                waktu_selesai_dt = pd.to_datetime(waktu_selesai_raw).to_pydatetime()
 
                             selisih_detik = max(
                                 0,
@@ -1690,7 +2750,7 @@ elif st.session_state.page == "guru_dashboard":
 
         # Fragment Execution Logic
         if auto_refresh:
-            @st.fragment(run_every="10s")
+            @st.fragment(run_every="1s")
             def active_live_view():
                 render_monitoring_content()
             active_live_view()
@@ -1698,7 +2758,7 @@ elif st.session_state.page == "guru_dashboard":
             render_monitoring_content()
 
 
-    if guru_section == "✨ Quiz Custom":
+    with tab2:
         custom_cfg = st.session_state.get("custom_quiz_config", {})
         custom_quiz = st.session_state.get("custom_quiz_draft", [])
         material_code = st.session_state.get("material_bundle_code", "")
@@ -1706,7 +2766,7 @@ elif st.session_state.page == "guru_dashboard":
 
         st.markdown("""
         <div class="premium-hero">
-            <div class="premium-kicker">ROBOMANTAP-INTELLIGENCE • QUIZ WORKSPACE</div>
+            <div class="premium-kicker">UPN • QUIZ INTELLIGENCE</div>
             <div class="premium-title">🧩 RoboMANTAP <span>Quiz Custom</span></div>
             <div class="premium-subtitle">Buat soal secara manual atau dari materi yang dilampirkan.</div>
             <div class="premium-pills">
@@ -1718,7 +2778,7 @@ elif st.session_state.page == "guru_dashboard":
         st.markdown("#### 📚 Material Hub • File Drop Guru")
         st.caption("Paket materi serbaguna untuk Quiz, LKPD, dan Media Ajar!")
 
-        upload_col = st.container()
+        upload_col, status_col = st.columns([1.7, 1], gap="large")
         with upload_col:
             material_files = st.file_uploader(
                 "Drag & drop materi GuruMANTAP di sini",
@@ -1733,6 +2793,14 @@ elif st.session_state.page == "guru_dashboard":
                     for f in material_files
                 )
                 st.markdown(f"<div class='file-list'>{file_rows}</div>", unsafe_allow_html=True)
+
+        with status_col:
+            current_code_html = (
+                f"<div class='hub-code'><div class='hub-code-label'>FILE DROP AKTIF</div><div class='hub-code-value'>{html.escape(material_code)}</div><div class='hub-code-note'>{material_pack.get('file_count',0) if isinstance(material_pack, dict) else 0} file tersimpan untuk sesi ini.</div></div>"
+                if material_code else
+                "<div class='hub-empty'><div class='hub-code-label'>MATERIAL HUB</div><div class='hub-empty-title'>Belum ada materi aktif</div><div class='hub-code-note'>Drop file → simpan → gunakan kode yang sama di Quiz / LKPD / PPT.</div></div>"
+            )
+            st.markdown(current_code_html, unsafe_allow_html=True)
 
         save_material_col, recall_col = st.columns(2)
         with save_material_col:
@@ -1754,12 +2822,11 @@ elif st.session_state.page == "guru_dashboard":
                         db_ok = save_material_bundle_to_db(new_code, built_pack, meta_cfg)
                         st.session_state.material_bundle_code = new_code
                         st.session_state.material_bundle = built_pack | {"bundle_code": new_code, "config": meta_cfg}
-                        material_code = new_code
-                        material_pack = st.session_state.material_bundle
                         if db_ok:
                             st.success(f"✅ Materi berhasil disimpan. File Drop: **{new_code}**")
                         else:
                             st.warning(f"✅ Materi berhasil dibaca untuk sesi ini. Kode aktif: **{new_code}** (penyimpanan database belum terhubung).")
+                        st.rerun()
         with recall_col:
             with st.form("material_recall_form", clear_on_submit=False):
                 recall_input = st.text_input("🔑 Ambil File Drop", value=material_code, placeholder="Contoh: MD-7K29FA", key="material_recall_code")
@@ -1770,20 +2837,10 @@ elif st.session_state.page == "guru_dashboard":
                 if recalled:
                     st.session_state.material_bundle_code = code
                     st.session_state.material_bundle = recalled
-                    material_code = code
-                    material_pack = recalled
                     st.success(f"✅ File Drop **{code}** aktif kembali.")
+                    st.rerun()
                 else:
                     st.error("Kode File Drop tidak ditemukan di Material Hub.")
-
-        # Render status after save/recall handlers so the current run can display
-        # the new state without forcing an additional full-app rerun.
-        current_code_html = (
-            f"<div class='hub-code'><div class='hub-code-label'>FILE DROP AKTIF</div><div class='hub-code-value'>{html.escape(material_code)}</div><div class='hub-code-note'>{material_pack.get('file_count',0) if isinstance(material_pack, dict) else 0} file tersimpan untuk sesi ini.</div></div>"
-            if material_code else
-            "<div class='hub-empty'><div class='hub-code-label'>MATERIAL HUB</div><div class='hub-empty-title'>Belum ada materi aktif</div><div class='hub-code-note'>Drop file → simpan → gunakan kode yang sama di Quiz / LKPD / PPT.</div></div>"
-        )
-        st.markdown(current_code_html, unsafe_allow_html=True)
 
         st.markdown("---")
         st.markdown("""
@@ -1833,7 +2890,7 @@ elif st.session_state.page == "guru_dashboard":
             st.markdown(
                 f"""
                 <div style="
-                    background-color: #1e293b;
+                    background-color: #7b5cff;
                     border-left: 4px solid #3b82f6;
                     padding: 10px 14px;
                     border-radius: 6px;
@@ -1897,8 +2954,8 @@ elif st.session_state.page == "guru_dashboard":
 
             st.markdown("##### 📅 Masa Aktif Kuis")
             st.caption("Atur jam buka dan jam tutup kuis dalam WIB.")
-            now_wib_time = now_wib().time()
-            default_end_time = (now_wib() + timedelta(hours=2)).time()
+            now_wib_time = (datetime.utcnow() + timedelta(hours=7)).time()
+            default_end_time = (datetime.utcnow() + timedelta(hours=9)).time()
             col_act1, col_act2 = st.columns(2)
             with col_act1:
                 time_start = st.time_input("Jam Buka", value=custom_cfg.get("time_start_val", now_wib_time), key="input_time_start")
@@ -1913,9 +2970,9 @@ elif st.session_state.page == "guru_dashboard":
             )
 
         if submitted:
-            current_wib = now_wib()
-            dt_start = datetime.combine(current_wib.date(), time_start)
-            dt_end = datetime.combine(current_wib.date(), time_end)
+            now_wib = datetime.utcnow() + timedelta(hours=7)
+            dt_start = datetime.combine(now_wib.date(), time_start)
+            dt_end = datetime.combine(now_wib.date(), time_end)
             if dt_end <= dt_start:
                 dt_end += timedelta(days=1)
 
@@ -2067,10 +3124,10 @@ elif st.session_state.page == "guru_dashboard":
         </div>
         """, unsafe_allow_html=True)
 
-    if guru_section == "⚡ Automation":
+    with tab3:
         st.markdown("""
         <div class="premium-hero automation-hero">
-            <div class="premium-kicker">ROBOMANTAP-INTELLIGENCE • AUTOMATION STUDIO</div>
+            <div class="premium-kicker">UPN • AUTOMATION STUDIO</div>
             <div class="premium-title">⚡ RoboMANTAP <span>Automation</span></div>
             <div class="premium-subtitle">Buat Media ajar dari topik manual atau berkas yang terlampir.</div>
             <div class="premium-pills"><span>LKPD PDF</span><span>Media PPTX</span><span>Speaker Notes</span><span>Material Reuse</span></div>
@@ -2079,12 +3136,9 @@ elif st.session_state.page == "guru_dashboard":
 
         shared_code = st.session_state.get("material_bundle_code", "")
         shared_pack = st.session_state.get("material_bundle", None)
-        automation_section = st.radio(
-            "Pilih studio", ["📄 LKPD Studio", "📊 Media Ajar PPT", "📦 Paket Pembelajaran"],
-            horizontal=True, key="automation_studio_section", label_visibility="collapsed"
-        )
+        auto1, auto2, auto3 = st.tabs(["📄 LKPD Studio", "📊 Media Ajar PPT", "📦 Paket Pembelajaran"])
 
-        if automation_section == "📄 LKPD Studio":
+        with auto1:
             st.markdown("##### 📄 LKPD Studio")
             st.caption("LKPD generatif premium yang sesuai dengan Material Hub.")
             with st.form("lkpd_generation_form", clear_on_submit=False):
@@ -2130,7 +3184,7 @@ elif st.session_state.page == "guru_dashboard":
                     key="download_lkpd_premium",
                 )
 
-        if automation_section == "📊 Media Ajar PPT":
+        with auto2:
             st.markdown("##### 📊 Media Ajar Studio")
             st.caption("Storyboard → visual shape → speaker notes → Siap presentasi!")
             with st.form("media_generation_form", clear_on_submit=False):
@@ -2201,7 +3255,7 @@ elif st.session_state.page == "guru_dashboard":
                     key="download_media_ppt",
                 )
 
-        if automation_section == "📦 Paket Pembelajaran":
+        with auto3:
             st.markdown("##### 📦 Paket Pembelajaran Terintegrasi")
             st.caption("Gunakan satu topik / satu File Drop untuk menghasilkan LKPD PDF dan Media Ajar PPT dalam satu alur kerja.")
             with st.form("package_generation_form", clear_on_submit=False):
@@ -2262,10 +3316,10 @@ elif st.session_state.page == "guru_dashboard":
         """, unsafe_allow_html=True)
 # ==============================================================================
 
-    if guru_section == "📚 Bank Soal":
+    with tab4:
         st.markdown("""
         <div class="premium-hero automation-hero">
-            <div class="premium-kicker">ROBOMANTAP-INTELLIGENCE • ASSESSMENT INTELLIGENCE</div>
+            <div class="premium-kicker">UPN • ASSESSMENT INTELLIGENCE</div>
             <div class="premium-title">📚 RoboMANTAP <span>Bank Soal</span></div>
             <div class="premium-subtitle">Upload kisi-kisi → baca blueprint → buat variasi → validasi → export</div>
             <div class="premium-pills"><span>Blueprint First</span><span>Variant Engine</span><span>AI QA</span><span>Traceability</span><span>DOCX Ready</span></div>
@@ -2393,26 +3447,26 @@ elif st.session_state.page == "guru_dashboard":
                 if qa.get("notes"):
                     st.caption("QA: " + " • ".join(map(str, qa.get("notes", [])[:3])))
 
-                bank_preview_type = st.radio(
-                    "Bentuk soal", ["PG", "Isian", "Uraian"], horizontal=True,
-                    key="bank_preview_type", label_visibility="collapsed"
-                )
-                form_questions = [q for q in questions if q.get("question_type") == bank_preview_type]
-                if not form_questions:
-                    st.info("Tidak ada soal dengan bentuk ini pada kisi-kisi.")
-                for i, q in enumerate(form_questions, start=1):
-                    icon = "✅" if q.get("_qa_status") == "pass" else "⚠️"
-                    with st.expander(
-                        f"{icon} {i:02d} • {q.get('blueprint_id')} • V{q.get('variant')} • No. {q.get('source_number')}",
-                        expanded=(i == 1),
-                    ):
-                        st.caption(f"Blueprint {q.get('blueprint_id')} • Variasi {q.get('variant')} • Level {q.get('cognitive_level') or '—'} • Bentuk {q.get('question_type')}")
-                        st.markdown(q.get("question", ""))
-                        for opt in q.get("options", []):
-                            st.markdown(f"- {opt}")
-                        st.success(f"Jawaban: **{q.get('correct_answer', '')}**")
-                        with st.expander("Lihat Pembahasan"):
-                            st.markdown(q.get("solution_basis", "Belum tersedia."))
+                tabs = st.tabs(["Pilihan Ganda", "Isian", "Uraian"])
+                for form_code, tab in zip(["PG", "Isian", "Uraian"], tabs):
+                    with tab:
+                        form_questions = [q for q in questions if q.get("question_type") == form_code]
+                        if not form_questions:
+                            st.info("Tidak ada soal dengan bentuk ini pada kisi-kisi.")
+                            continue
+                        for i, q in enumerate(form_questions, start=1):
+                            icon = "✅" if q.get("_qa_status") == "pass" else "⚠️"
+                            with st.expander(
+                                f"{icon} {i:02d} • {q.get('blueprint_id')} • V{q.get('variant')} • No. {q.get('source_number')}",
+                                expanded=(i == 1),
+                            ):
+                                st.caption(f"Blueprint {q.get('blueprint_id')} • Variasi {q.get('variant')} • Level {q.get('cognitive_level') or '—'} • Bentuk {q.get('question_type')}")
+                                st.markdown(q.get("question", ""))
+                                for opt in q.get("options", []):
+                                    st.markdown(f"- {opt}")
+                                st.success(f"Jawaban: **{q.get('correct_answer', '')}**")
+                                with st.expander("Lihat Pembahasan"):
+                                    st.markdown(q.get("solution_basis", "Belum tersedia."))
 
                 st.markdown("#### 4. Download Word")
                 with st.form("bank_docx_form", clear_on_submit=False):
@@ -2489,9 +3543,7 @@ elif st.session_state.page == "guru_dashboard":
 # 3. TAMPILAN PILIHAN MATA PELAJARAN OMI 2026 (SISWA)
 # ==============================================================================
 
-    if guru_section == "🎓 TKA Studio":
-        _initialize_tka_tables_once()
-        from tka_studio import render_tka_studio
+    with tab5:
         render_tka_studio()
 
 elif st.session_state.page == "select_mapel":
@@ -2736,9 +3788,9 @@ elif st.session_state.page == "setup_custom":
                 # Restore Waktu Ujian & Indeks Soal
                 raw_created = existing_session["created_at"]
                 if isinstance(raw_created, str):
-                    start_dt = normalize_wib_datetime(datetime.strptime(str(raw_created)[:19], "%Y-%m-%d %H:%M:%S"))
+                    start_dt = datetime.strptime(str(raw_created)[:19], "%Y-%m-%d %H:%M:%S")
                 else:
-                    start_dt = normalize_wib_datetime(pd.to_datetime(raw_created).to_pydatetime())
+                    start_dt = pd.to_datetime(raw_created).to_pydatetime()
                 
                 st.session_state.start_time_wib = start_dt
                 st.session_state.custom_timer_seconds = timer_sec
@@ -2780,7 +3832,7 @@ elif st.session_state.page == "setup_custom":
                 st.session_state.user_answers = {}
                 st.session_state.current_index = 0
                 st.session_state.custom_timer_seconds = timer_sec
-                st.session_state.start_time_wib = now_wib()
+                st.session_state.start_time_wib = datetime.utcnow() + timedelta(hours=7)
                 
                 update_progress_siswa(
                     st.session_state.session_id, 
@@ -2800,6 +3852,7 @@ elif st.session_state.page == "setup_custom":
 # 5. ENGINE TEST KUIS (OPTIMIZED WITH ST.FRAGMENT FOR ZERO LAG)
 # ==============================================================================
 # ==============================================================================
+# ANTI-COPAS & DISABLE KLIK KANAN (PERLINDUNGAN HALAMAN KUIS)
 # ==============================================================================
 elif st.session_state.page == "quiz":
     quiz_data = st.session_state.get("quiz_data", [])
@@ -2839,7 +3892,7 @@ elif st.session_state.page == "quiz":
 
     # Anti-Cheat & Live Timer WIB
     if "start_time_wib" not in st.session_state:
-        st.session_state.start_time_wib = now_wib()
+        st.session_state.start_time_wib = datetime.utcnow() + timedelta(hours=7)
 
     timer_seconds = st.session_state.get("custom_timer_seconds", 0)
     if is_custom and timer_seconds > 0:
@@ -3009,8 +4062,6 @@ elif st.session_state.page == "result":
     # Sinkronisasi Status SELESAI ke Database Guru.
     # Review TKA harus tetap memakai marker (TKA), jangan ditulis ulang sebagai (Quiz).
     if is_tka:
-        from tka_engine import update_tka_progress
-        _initialize_tka_tables_once()
         update_tka_progress(
             session_id=st.session_state.session_id,
             nama=st.session_state.nama_siswa,
