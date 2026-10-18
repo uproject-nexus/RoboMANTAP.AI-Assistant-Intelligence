@@ -1252,28 +1252,123 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     div[role="radiogroup"] label {border:1px solid var(--portal-line);border-radius:13px;padding:9px 12px;background:#fff;}
     div[data-testid="stMetric"] {border:1px solid var(--portal-line);border-radius:15px;padding:12px;background:#fff;}
 
-    /* === TAMBAHAN KHUSUS PENYESUAIAN LAYAR HP / MOBILE === */
+    /* === MOBILE LAYOUT: scoped ke Portal SantriMANTAP === */
+    /* Jangan mengubah semua kolom Streamlit secara membabi buta.
+       Tema global memang menumpuk kolom menjadi 100%; kartu statistik portal
+       secara khusus diizinkan menjadi grid 2x2 di HP. */
     @media (max-width: 768px) {
-        /* Ubah 4 kolom st.columns agar wrap menjadi grid 2x2 */
-        div[data-testid="stHorizontalBlock"] {
+        .stApp:has(.pi-hero) .pi-stat {
+            box-sizing: border-box;
+            min-width: 0;
+            height: 100%;
+            padding: 11px 10px !important;
+            border-radius: 13px !important;
+            overflow-wrap: anywhere;
+        }
+        .stApp:has(.pi-hero) .pi-stat-label {
+            font-size: 10px !important;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+        .stApp:has(.pi-hero) .pi-stat-value {
+            font-size: clamp(18px, 5vw, 23px) !important;
+            line-height: 1.2;
+            overflow-wrap: anywhere;
+        }
+        .stApp:has(.pi-hero) .pi-muted {
+            font-size: 12px !important;
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+        }
+        /* Override aturan global 100% hanya untuk baris yang berisi statistik. */
+        .stApp:has(.pi-hero) div[data-testid="stHorizontalBlock"]:has(.pi-stat) {
+            display: flex !important;
             flex-wrap: wrap !important;
+            align-items: stretch !important;
             gap: 8px !important;
+            min-width: 0 !important;
         }
-        div[data-testid="column"] {
-            flex: 1 1 calc(50% - 8px) !important;
-            min-width: calc(50% - 8px) !important;
+        .stApp:has(.pi-hero) div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"] {
+            box-sizing: border-box !important;
+            flex: 1 1 calc(50% - 4px) !important;
+            width: calc(50% - 4px) !important;
+            min-width: 0 !important;
+            max-width: calc(50% - 4px) !important;
         }
-        /* Penyesuaian padding & font kartu statistik di HP */
-        .pi-stat {
-            padding: 10px 8px !important;
-            border-radius: 12px !important;
+        .stApp:has(.pi-hero) div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"] > div {
+            box-sizing: border-box;
+            width: 100%;
+            min-width: 0 !important;
+            max-width: 100% !important;
         }
-        .pi-stat-label { font-size: 10px !important; }
-        .pi-stat-value { font-size: 18px !important; }
-        .pi-muted { font-size: 10px !important; }
+        /* Navigasi enam bagian menjadi pilihan 2 kolom, bukan deretan yang meluber. */
+        .stApp:has(.pi-hero) div[data-testid="stRadio"] div[role="radiogroup"] {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 7px !important;
+            width: 100% !important;
+        }
+        .stApp:has(.pi-hero) div[data-testid="stRadio"] div[role="radiogroup"] > label {
+            box-sizing: border-box;
+            display: flex !important;
+            align-items: center;
+            min-width: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 9px 10px !important;
+            white-space: normal !important;
+            overflow-wrap: anywhere;
+            line-height: 1.35;
+        }
+        .stApp:has(.pi-hero) div[data-testid="stRadio"] div[role="radiogroup"] > label > div {
+            min-width: 0 !important;
+        }
+        .stApp:has(.pi-hero) .pi-card,
+        .stApp:has(.pi-hero) .pi-hero,
+        .stApp:has(.pi-hero) div[data-testid="stForm"] {
+            box-sizing: border-box;
+            max-width: 100%;
+            overflow-wrap: anywhere;
+        }
+        .stApp:has(.pi-hero) div[data-testid="stButton"] button,
+        .stApp:has(.pi-hero) div[data-testid="stFormSubmitButton"] button,
+        .stApp:has(.pi-hero) div[data-testid="stDownloadButton"] button {
+            box-sizing: border-box;
+            width: 100%;
+            min-width: 0;
+            min-height: 44px;
+            height: auto;
+            white-space: normal !important;
+            overflow-wrap: anywhere;
+            line-height: 1.35;
+        }
+        .stApp:has(.pi-hero) input,
+        .stApp:has(.pi-hero) textarea,
+        .stApp:has(.pi-hero) [data-baseweb="select"] {
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        .stApp:has(.pi-hero) [data-testid="stDataFrame"],
+        .stApp:has(.pi-hero) [data-testid="stTable"] {
+            max-width: 100%;
+            min-width: 0;
+            overflow-x: auto;
+        }
     }
 
-    @media(max-width:640px){.block-container{padding-left:.8rem;padding-right:.8rem}.pi-hero{border-radius:21px;padding:22px 18px}.pi-card{padding:15px;border-radius:17px}}
+    @media(max-width:640px){
+        .stApp:has(.pi-hero) .block-container{padding-left:.65rem;padding-right:.65rem;padding-top:.7rem}
+        .stApp:has(.pi-hero) .pi-hero{border-radius:21px;padding:22px 17px}
+        .stApp:has(.pi-hero) .pi-title{font-size:clamp(27px,8vw,36px);letter-spacing:-.7px;overflow-wrap:anywhere}
+        .stApp:has(.pi-hero) .pi-sub{font-size:13px;overflow-wrap:anywhere}
+        .stApp:has(.pi-hero) .pi-h2{font-size:clamp(21px,6vw,26px);overflow-wrap:anywhere}
+        .stApp:has(.pi-hero) .pi-card{padding:15px;border-radius:17px}
+    }
+    @media(max-width:360px){
+        .stApp:has(.pi-hero) div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"]{flex-basis:calc(50% - 4px)!important;width:calc(50% - 4px)!important;max-width:calc(50% - 4px)!important}
+        .stApp:has(.pi-hero) .pi-stat{padding:9px 8px!important}
+        .stApp:has(.pi-hero) .pi-stat-value{font-size:18px!important}
+    }
     @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
     </style>
     """, unsafe_allow_html=True)
