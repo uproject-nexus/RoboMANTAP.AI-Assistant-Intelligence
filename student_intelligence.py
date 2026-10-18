@@ -922,7 +922,7 @@ def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_nu
 
     if "last_ai_note" in st.session_state:
         st.divider()
-        st.markdown("### 📄 Opsi Simpan Catatan AI Terakhir")
+        st.markdown("##### 📄 Opsi Simpan Catatan AI Terakhir")
         
         c1, c2 = st.columns(2)
         with c1:
@@ -1000,6 +1000,7 @@ def render_learning_analytics(name: str, grade: str, profile: dict, sessions: li
     """
     
     st.markdown('<div class="pi-analytics-heading">🎯 Kondisi Belajar Saat Ini</div>', unsafe_allow_html=True)
+    st.markdown("##### 🎯 Kondisi Belajar Saat Ini")
     st.markdown(eval_html, unsafe_allow_html=True)
 
     if risk == "HIGH ATTENTION":
@@ -1026,7 +1027,7 @@ def render_learning_analytics(name: str, grade: str, profile: dict, sessions: li
 
     left, right = st.columns(2)
     with left:
-        st.markdown('<div class="pi-analytics-heading" style="font-size:16px">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
+        st.markdown("##### 📚 Pemahaman Mata Pelajaran")
         st.markdown('<div class="pi-analytics-subtitle">Rata-rata nilai akhir ujian, kuis, atau pengerjaan keseluruhan</div>', unsafe_allow_html=True)
         if profile.get("subject_mastery"):
             for mapel, mastery in sorted(profile["subject_mastery"].items(), key=lambda x: x[1]):
