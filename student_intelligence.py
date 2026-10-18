@@ -828,10 +828,6 @@ def _start_adaptive_practice(name: str, grade: str, profile: dict) -> tuple[bool
 
 
 # =============================================================================
-# 6. POP-UP MODAL SAPAAN HANGAT & JADWAL UTS
-# =============================================================================
-
-# =============================================================================
 # 6. LEARNING WORKSPACES
 # =============================================================================
 
@@ -878,7 +874,7 @@ def _generate_student_ai_response(prompt: str, nama_siswa: str, kelas: str, jenj
             except Exception as exc:
                 print(f"[STUDENT INTELLIGENCE] image analysis error: {exc}")
                 context += "\\nCatatan: gambar tidak berhasil dibaca; jawab berdasarkan pertanyaan teks saja."
-    answer = "".join(str(chunk) for chunk in stream_ai_text(context, max_output_tokens=1800)).strip()
+    answer = "".join(str(chunk) for chunk in stream_ai_text(context, max_output_tokens=8000)).strip()
     return answer or "Maaf, AI belum memberikan jawaban. Coba kirim pertanyaan yang lebih spesifik."
 
 
@@ -922,7 +918,7 @@ def render_ai_chatbot_workspace(nama_siswa: str, kelas: str, jenjang: str, wa_nu
 
     if "last_ai_note" in st.session_state:
         st.divider()
-        st.markdown("##### 📄 Opsi Simpan Catatan AI Terakhir")
+        st.markdown("##### 📄 Simpan Catatan Kamu, dan dipelajari lagi yaa!")
         
         c1, c2 = st.columns(2)
         with c1:
@@ -1117,8 +1113,6 @@ def render_student_automation(wa_number: str = ""):
 
 def render_concept_sheets(nama_siswa: str = "Santri", kelas: str = "", jenjang: str = "MTs") -> None:
     """Studio materi personal: membuat penjelasan sesuai topik, tujuan, dan jenjang siswa."""
-    st.markdown('<div class="sm-section-kicker">Materi yang menyesuaikan kebutuhanmu</div><div class="sm-section-title">Studio Materi Personal.</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sm-muted">Tidak lagi sekadar daftar rumus statis. Tulis topik yang sedang dipelajari, pilih bentuk bantuan, lalu RoboMANTAP menyusun materi untuk jenjangmu.</div>', unsafe_allow_html=True)
     with st.form("portal_personal_material_form", clear_on_submit=False):
         subject = st.selectbox("Mata pelajaran", ["Matematika", "Bahasa Indonesia", "Bahasa Inggris", "IPA", "Fisika", "Kimia", "Biologi", "Ekonomi", "Sejarah", "Geografi", "Sosiologi", "Bahasa Arab", "Nahwu", "Fikih", "Akidah Akhlak", "Lainnya"], key="portal_material_subject")
         topic = st.text_input("Topik yang ingin dipahami", placeholder="Contoh: persamaan linear, ide pokok, hukum Newton, i'rab na'at", key="portal_material_topic")
@@ -1152,7 +1146,7 @@ def render_concept_sheets(nama_siswa: str = "Santri", kelas: str = "", jenjang: 
     material = st.session_state.get("portal_personal_material")
     if material:
         st.divider()
-        st.markdown(f"### 📘 {html.escape(str(st.session_state.get('portal_personal_material_topic') or 'Materi personal'))}")
+        st.markdown(f"##### 📘 {html.escape(str(st.session_state.get('portal_personal_material_topic') or 'Materi personal'))}")
         st.markdown(material)
         pdf_bytes = generate_pdf_notes(nama_siswa, kelas, jenjang, str(st.session_state.get("portal_personal_material_topic") or "Rangkuman Belajar"), str(material))
         safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", str(nama_siswa or "Santri")).strip("_") or "Santri"
@@ -1171,8 +1165,8 @@ def render_uts_schedule_panel(schedules: list[dict], kelas: str, jenjang: str, c
             upcoming.append((exam_date, row))
     upcoming.sort(key=lambda item: (item[0], str(item[1].get("jam_mulai") or "")))
 
-    st.markdown("### 🗓️ Agenda akademik" if compact else "## 🗓️ Agenda ujian kamu")
-    st.caption(f"Jadwal dari database • Kelas {kelas} {jenjang} • Acuan waktu Asia/Jakarta")
+    st.markdown("##### 🗓️ Agenda akademik" if compact else "##### 🗓️ Agenda ujian kamu")
+    st.caption(f"Jadwal disesuaikan dengan sistem sekolah • Kelas {kelas} {jenjang}")
     if not upcoming:
         st.info("Belum ada ujian terjadwal untuk kelas dan jenjang akunmu. Informasi ini akan muncul setelah jadwal resmi tersedia.")
         return
@@ -1335,7 +1329,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
 
     now = jakarta_now()
     today = now.date()
-    st.markdown(f"""<section class="pi-hero"><div class="pi-kicker">U.Project Nexus · RoboMANTAP Intelligence</div><div class="pi-title">Hai, Santri!<br/>Hari ini kita naik level.</div><div class="pi-sub">Ruang belajar seru serba ada: tanya Tutor AI RoboMANTAP, latihan pintar, dan buat rangkuman materi yang kamu inginkan! ✨</div><span class="pi-chip">📅 {format_tanggal_id(today)}</span><span class="pi-chip">🕒 {now.strftime('%H:%M')} WIB</span><span class="pi-chip">✦ AI Learning Companion</span></section>""", unsafe_allow_html=True)
+    st.markdown(f"""<section class="pi-hero"><div class="pi-kicker">U.Project Nexus · RoboMANTAP Intelligence</div><div class="pi-title">Hai, Santri!<br/>Hari ini kita naik level.</div><div class="pi-sub">Ruang belajar seru serba ada: Tutor RoboMANTAP, latihan pintar, dan buat rangkuman materi yang kamu inginkan! ✨</div><span class="pi-chip">📅 {format_tanggal_id(today)}</span><span class="pi-chip">🕒 {now.strftime('%H:%M')} WIB</span><span class="pi-chip">✦ AI Learning Companion</span></section>""", unsafe_allow_html=True)
 
     if st.session_state.get("student_intelligence_authenticated"):
         top_left, top_right = st.columns([5, 1])
@@ -1350,9 +1344,9 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
                 st.rerun()
 
     if not st.session_state.get("student_intelligence_authenticated"):
-        st.markdown('<div class="pi-card"><div class="pi-kicker2">Ruang belajar personal</div><div class="pi-h2">Masuk untuk mulai belajar!</div><div class="pi-muted">Gunakan username dan PIN dari pendaftaran akun bersama WA-RoboMANTAP.</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="pi-card"><div class="pi-kicker2">Ruang belajar personal</div><div class="pi-h2">Masuk untuk mulai belajar!</div><div class="pi-muted">Gunakan username dan PIN dari pendaftaran akun di WA-RoboMANTAP.</div></div>', unsafe_allow_html=True)
         with st.form("student_intelligence_login_form", clear_on_submit=False):
-            entered_username = st.text_input("Username Santri", placeholder="contoh: santri.aisyah", help="Username yang didaftarkan melalui WhatsApp RoboMANTAP.")
+            entered_username = st.text_input("Username Santri", placeholder="contoh: username_unik.kamu", help="Username yang didaftarkan melalui WhatsApp RoboMANTAP.")
             entered_pin = st.text_input("PIN Santri · 6 angka", placeholder="Masukkan PIN rahasia", type="password", max_chars=6)
             submitted = st.form_submit_button("Masuk ke ruang belajar →", type="primary", use_container_width=True)
         if not submitted:
@@ -1432,7 +1426,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     st.markdown(f'''<div class="pi-stats-grid">
       <div class="pi-stat"><div class="pi-stat-label">📊 Rata-rata hasil</div><div class="pi-stat-value">{avg:.0f}<small style="font-size:13px">%</small></div><div class="pi-muted">Dari sesi tersimpan</div></div>
       <div class="pi-stat"><div class="pi-stat-label">📚 Sesi belajar</div><div class="pi-stat-value">{attempts_count}</div><div class="pi-muted">Riwayat yang ditemukan</div></div>
-      <div class="pi-stat"><div class="pi-stat-label">🔥 Konsistensi</div><div class="pi-stat-value">{streak}</div><div class="pi-muted">Hari beruntun</div></div>
+      <div class="pi-stat"><div class="pi-stat-label">📌 Konsistensi</div><div class="pi-stat-value">{streak} 🔥</div><div class="pi-muted">Hari beruntun</div></div>
       <div class="pi-stat"><div class="pi-stat-label">🗓️ Ujian terdekat</div><div class="pi-stat-value" style="font-size:23px">{html.escape(exam_label)}</div><div class="pi-muted">{html.escape(exam_subject)}</div></div>
     </div>''', unsafe_allow_html=True)
 
