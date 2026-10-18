@@ -1336,12 +1336,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         with top_left:
             ident = st.session_state.get("student_intelligence_identity") or {}
             imeta = ident.get("metadata") or {}
-            st.caption(f"Akun: **{html.escape(str(ident.get('nama') or st.session_state.get('student_intelligence_name') or 'Santri'))}** · {html.escape(str(imeta.get('kelas') or 'Kelas belum diatur'))} {html.escape(str(imeta.get('jenjang') or st.session_state.get('student_intelligence_grade') or ''))}")
-        with top_right:
-            if st.button("Keluar", key="student_intelligence_logout", use_container_width=True):
-                for key in ("student_intelligence_authenticated","student_intelligence_identity","student_intelligence_username","student_intelligence_name","student_intelligence_grade","student_intelligence_pending_token","student_intelligence_pending_username","student_intelligence_pending_phone","chat_messages","last_ai_note","last_ai_topic","student_pin_attempts","student_pin_last_attempt"):
-                    st.session_state.pop(key, None)
-                st.rerun()
+            st.caption(f"Akun: **{html.escape(str(ident.get('nama') or st.session_state.get('student_intelligence_name') or 'Santri'))}** · Kelas {html.escape(str(imeta.get('kelas') or 'Kelas belum diatur'))} {html.escape(str(imeta.get('jenjang') or st.session_state.get('student_intelligence_grade') or ''))}")
 
     if not st.session_state.get("student_intelligence_authenticated"):
         st.markdown('<div class="pi-card"><div class="pi-kicker2">Ruang belajar personal</div><div class="pi-h2">Buka ruang belajar Kamu!</div><div class="pi-muted">Gunakan username dan PIN dari pendaftaran akun di WA-RoboMANTAP.</div></div>', unsafe_allow_html=True)
@@ -1479,7 +1474,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
             st.info("Belum cukup data untuk mengidentifikasi kelemahan personal. Latihan pertama akan membantu membangun riwayat belajar.")
         with st.container(border=True):
             st.markdown("#### 🚀 Mulai sesi latihan adaptif")
-            st.write("Latihan dibuat melalui generator kuis RoboMANTAP yang sudah tersedia. Jika generator tidak dapat membuat paket yang valid, portal akan menampilkan kendala dan tidak mengklaim latihan berhasil.")
+            st.write("Yuk, mulai latihan soal dari Materi yang masih butuh kamu tingkatkan!")
             if st.button("Buat latihan untuk saya", type="primary", use_container_width=True, key="pi_adaptive_start"):
                 record_student_action(name, jenjang_detected, "ADAPTIVE_PRACTICE", "Mulai latihan adaptif", {"weakest_subject": weakest_subject, "weakest_topics": weak_topics[:3]})
                 with st.spinner("AI sedang menyiapkan latihan berdasarkan data yang tersedia…"):
@@ -1489,13 +1484,13 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
                 else:
                     st.warning(message)
         if weak_topics:
-            st.markdown("#### Topik yang layak diulang")
+            st.markdown("##### Topik yang layak diulang")
             for topic_name, mastery in weak_topics[:5]:
                 st.progress(max(0.0, min(1.0, float(mastery or 0) / 100)), text=f"{topic_name} · indikator {float(mastery or 0):.0f}%")
         st.caption("Catatan: nilai indikator topik hanya ditampilkan bila tersedia dari sesi yang tersimpan.")
 
     elif section == "📄 Rangkuman PDF":
-        st.markdown('<div class="pi-kicker2">Perpustakaan yang kamu bangun sendiri</div><div class="pi-h2">Rangkuman singkat, rapi, siap diunduh.</div><div class="pi-muted">Masukkan satu topik spesifik. AI menyusun inti konsep, penjelasan, contoh, dan poin ingatan; hasilnya dapat diunduh sebagai PDF dengan tata letak A4 dan paragraf rata kiri-kanan.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="pi-kicker2">Perpustakaan yang kamu bangun sendiri</div><div class="pi-h2">Rangkuman singkat, rapi, siap diunduh.</div><div class="pi-muted">Masukkan satu topik spesifik. RoboMANTAP menyusun inti konsep, penjelasan, contoh, dan poin-poin agar Kamu mudah mengingat!</div>', unsafe_allow_html=True)
         render_concept_sheets(name, kelas, jenjang_detected)
         material = st.session_state.get("portal_personal_material")
         if material:
@@ -1503,14 +1498,14 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
             st.caption("PDF memakai ukuran A4, metadata siswa, judul topik, dan paragraf justify agar nyaman dibaca maupun dicetak.")
 
     elif section == "🗓️ Jadwal Ujian":
-        st.markdown('<div class="pi-kicker2">Agenda dari data akademik</div><div class="pi-h2">Tahu apa yang akan dihadapi.</div><div class="pi-muted">Daftar ini hanya menampilkan jadwal yang ditemukan untuk kelas dan jenjang akunmu. Gunakan Tutor AI untuk membuat rencana persiapan berdasarkan mapel dan sisa waktu.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="pi-kicker2">Agenda dari data akademik</div><div class="pi-h2">Tahu apa yang akan dihadapi.</div><div class="pi-muted">Daftar ini hanya menampilkan jadwal yang ditemukan untuk kelas dan jenjang akunmu. Gunakan Tutor RoboMANTAP untuk membuat rencana persiapan berdasarkan mapel dan sisa waktu.</div>', unsafe_allow_html=True)
         render_uts_schedule_panel(uts_schedules, kelas, jenjang_detected)
         if next_exam:
             exam_date, exam_row = next_exam
             days = (exam_date - today).days
-            if st.button("Buat rencana persiapan dengan AI", type="primary", use_container_width=True, key="pi_exam_plan"):
+            if st.button("Buat rencana persiapan dengan RoboMANTAP", type="primary", use_container_width=True, key="pi_exam_plan"):
                 prompt = (f"Buat rencana belajar realistis untuk siswa kelas {kelas} jenjang {jenjang_detected} menghadapi ujian {exam_row.get('mapel') or 'mata pelajaran'} pada {format_tanggal_id(exam_date)}. Sisa waktu {days} hari. Buat jadwal harian ringkas, konsep yang perlu diperiksa, sesi latihan dan evaluasi. Jangan mengarang kisi-kisi resmi; minta siswa memasukkan kisi-kisi guru bila dibutuhkan.")
-                with st.spinner("AI sedang menyusun rencana persiapan…"):
+                with st.spinner("RoboMANTAP sedang menyusun rencana persiapan…"):
                     try: plan = _generate_student_ai_response(prompt, name, kelas, jenjang_detected)
                     except Exception as exc:
                         print(f"[STUDENT INTELLIGENCE] exam plan error: {exc}"); plan = ""
