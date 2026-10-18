@@ -1347,7 +1347,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
         st.markdown('<div class="pi-card"><div class="pi-kicker2">Ruang belajar personal</div><div class="pi-h2">Buka ruang belajar Kamu!</div><div class="pi-muted">Gunakan username dan PIN dari pendaftaran akun di WA-RoboMANTAP.</div></div>', unsafe_allow_html=True)
         with st.form("student_intelligence_login_form", clear_on_submit=False):
             entered_username = st.text_input("Username Santri", placeholder="contoh: username_unik.kamu", help="Username yang didaftarkan melalui WhatsApp RoboMANTAP.")
-            entered_pin = st.text_input("PIN Santri · 6 angka", placeholder="Masukkan PIN rahasia", type="password", max_chars=6)
+            entered_pin = st.text_input("PIN Santri · 6 angka", placeholder="Masukkan PIN Kamu", type="password", max_chars=6)
             submitted = st.form_submit_button("Masuk ke ruang belajar →", type="primary", use_container_width=True)
         if not submitted:
             st.info("Belum punya akun? Selesaikan pendaftaran melalui menu pendaftaran WhatsApp di halaman utama.", icon="👋")
@@ -1419,7 +1419,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     next_exam = upcoming_dates[0] if upcoming_dates else None
     days_to_exam = (next_exam[0] - today).days if next_exam else None
 
-    st.markdown(f'<div class="pi-kicker2">Dashboard pribadimu</div><div class="pi-h2">Assalamu’alaikum, {html.escape(name.split()[0])}! 👋</div><div class="pi-muted">{html.escape(kelas)} {html.escape(jenjang_detected)} · {"Aktivitas hari ini mulai dihitung—ayo buat satu kemajuan kecil." if is_new_day else "Setiap sesi belajar membantumu mengenali cara belajar yang lebih efektif."}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="pi-kicker2">Dashboard pribadimu</div><div class="pi-h2">Assalamu’alaikum, {html.escape(name.split()[0])}! 👋</div><div class="pi-muted">Kelas {html.escape(kelas)} {html.escape(jenjang_detected)} · {"Aktivitas hari ini mulai dihitung—ayo buat satu kemajuan kecil! 🌱" if is_new_day else "Satu ilmu tiap hari, bikin kamu makin hebat! 🌟"}</div>', unsafe_allow_html=True)
     exam_label = ("Hari ini" if days_to_exam == 0 else "Besok" if days_to_exam == 1 else f"H-{days_to_exam}") if next_exam else "—"
     exam_subject = str(next_exam[1].get("mapel") or "Ujian") if next_exam else "Belum ada agenda"
     # HTML grid sengaja dipakai agar aturan global st.columns tidak memaksa metrik menjadi 1 kolom di HP.
