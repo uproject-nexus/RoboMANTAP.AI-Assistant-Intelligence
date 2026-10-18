@@ -126,10 +126,14 @@ def apply_intelligence_theme() -> None:
       .rm-whatsapp-button{min-height:46px;display:flex;align-items:center;justify-content:center}
     }
     @media(max-width:640px){
-      /* Stack Streamlit columns on phones so narrow widgets never collide. */
-      [data-testid="stHorizontalBlock"]{display:flex!important;flex-wrap:wrap!important;gap:.65rem!important;align-items:stretch!important}
-      [data-testid="stHorizontalBlock"]>[data-testid="column"]{flex:1 1 100%!important;width:100%!important;min-width:0!important;max-width:100%!important}
-      [data-testid="stHorizontalBlock"]>[data-testid="column"]>div{min-width:0!important;max-width:100%!important}
+      /* Default: stack complex Streamlit layouts to prevent narrow widgets from colliding. */
+      [data-testid="stHorizontalBlock"]{display:flex!important;flex-wrap:wrap!important;gap:.65rem!important;align-items:stretch!important;min-width:0!important}
+      [data-testid="stHorizontalBlock"]>[data-testid="column"]{flex:1 1 100%!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important}
+      [data-testid="stHorizontalBlock"]>[data-testid="column"]>div{min-width:0!important;max-width:100%!important;box-sizing:border-box!important}
+      /* Explicit exception: compact student-stat cards are designed for a 2x2 phone grid. */
+      [data-testid="stHorizontalBlock"]:has(.pi-stat){display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;gap:8px!important;align-items:stretch!important}
+      [data-testid="stHorizontalBlock"]:has(.pi-stat)>[data-testid="column"]{flex:0 0 calc(50% - 4px)!important;width:calc(50% - 4px)!important;min-width:0!important;max-width:calc(50% - 4px)!important}
+      [data-testid="stHorizontalBlock"]:has(.pi-stat)>[data-testid="column"]>div{width:100%!important;min-width:0!important;max-width:100%!important}
       [data-testid="stAppViewBlockContainer"]{padding-left:10px!important;padding-right:10px!important}
       .rm-topbar{gap:7px;padding:8px;border-radius:15px}
       .rm-topbar-mark{width:34px;height:34px;flex:0 0 34px;border-radius:11px}
@@ -178,6 +182,14 @@ def apply_intelligence_theme() -> None:
       .rm-bubble-one{right:7px}.rm-bubble-three{right:6px}
       .rm-hero-chips span{font-size:8px}
       [data-testid="stMetric"]{padding:9px!important}
+      /* Prevent widgets and embedded content from setting a wider-than-phone layout. */
+      [data-testid="stAppViewBlockContainer"],[data-testid="stMainBlockContainer"],[data-testid="stVerticalBlock"],[data-testid="stHorizontalBlock"],[data-testid="column"]{min-width:0!important;box-sizing:border-box!important}
+      [data-testid="stDataFrame"],[data-testid="stTable"],[data-testid="stCodeBlock"],[data-testid="stCode"]{max-width:100%!important;min-width:0!important;overflow-x:auto!important}
+      [data-testid="stDataFrame"]>div,[data-testid="stTable"]>div{max-width:100%!important}
+      [data-testid="stMarkdownContainer"] table{display:block!important;max-width:100%!important;overflow-x:auto!important;white-space:nowrap}
+      [data-testid="stForm"]{width:100%!important;max-width:100%!important;box-sizing:border-box!important;padding:12px!important}
+      [data-testid="stTextInput"],[data-testid="stNumberInput"],[data-testid="stTextArea"],[data-testid="stSelectbox"],[data-testid="stMultiSelect"],[data-testid="stDateInput"],[data-testid="stTimeInput"]{width:100%!important;min-width:0!important}
+      [data-testid="stMarkdownContainer"]{overflow-wrap:anywhere;word-break:normal}
     }
     @media(hover:none),(pointer:coarse){
       div.stButton>button,div.stDownloadButton>button,[data-testid="stFormSubmitButton"] button{transition:transform .12s ease,filter .12s ease,box-shadow .12s ease;-webkit-tap-highlight-color:transparent}
