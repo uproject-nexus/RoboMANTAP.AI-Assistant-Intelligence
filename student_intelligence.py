@@ -791,7 +791,7 @@ def _start_adaptive_practice(name: str, grade: str, profile: dict) -> tuple[bool
     """Menghubungkan generator kuis adaptif dari ai_engine."""
     focus = profile.get("weakest_subject")
     topics = [topic for topic, mastery in profile.get("weakest_topics", []) if mastery < 80][:3]
-    if not focus or grade == "Semua Jenjang":
+    if not focus or grade == "jenjang":
         return False, "Pilih jenjang yang spesifik agar generator latihan dapat memilih kisi-kisi yang tepat."
 
     if "(Quiz)" in str(focus) or "(TKA)" in str(focus):
