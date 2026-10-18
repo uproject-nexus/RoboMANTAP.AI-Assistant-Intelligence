@@ -1252,84 +1252,122 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     div[role="radiogroup"] label {border:1px solid var(--portal-line);border-radius:13px;padding:9px 12px;background:#fff;}
     div[data-testid="stMetric"] {border:1px solid var(--portal-line);border-radius:15px;padding:12px;background:#fff;}
 
-    /* === MOBILE-FIRST: Portal SantriMANTAP === */
+    /* === MOBILE LAYOUT: scoped ke Portal SantriMANTAP === */
+    /* Jangan mengubah semua kolom Streamlit secara membabi buta.
+       Tema global memang menumpuk kolom menjadi 100%; kartu statistik portal
+       secara khusus diizinkan menjadi grid 2x2 di HP. */
     @media (max-width: 768px) {
-        /* Override ui_theme.py only for the 4 compact student-stat cards. */
-        div[data-testid="stAppViewBlockContainer"] div[data-testid="stHorizontalBlock"]:has(.pi-stat) {
-            display:flex !important;
-            flex-direction:row !important;
-            flex-wrap:wrap !important;
-            align-items:stretch !important;
-            gap:8px !important;
-            min-width:0 !important;
+        .stApp:has(.pi-hero) .pi-stat {
+            box-sizing: border-box;
+            min-width: 0;
+            height: 100%;
+            padding: 11px 10px !important;
+            border-radius: 13px !important;
+            overflow-wrap: anywhere;
         }
-        div[data-testid="stAppViewBlockContainer"] div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"] {
-            flex:0 0 calc(50% - 4px) !important;
-            width:calc(50% - 4px) !important;
-            min-width:0 !important;
-            max-width:calc(50% - 4px) !important;
-            box-sizing:border-box !important;
+        .stApp:has(.pi-hero) .pi-stat-label {
+            font-size: 10px !important;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
         }
-        div[data-testid="stAppViewBlockContainer"] div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"] > div {
-            width:100% !important; max-width:100% !important; min-width:0 !important;
+        .stApp:has(.pi-hero) .pi-stat-value {
+            font-size: clamp(18px, 5vw, 23px) !important;
+            line-height: 1.2;
+            overflow-wrap: anywhere;
         }
-        .pi-stat {
-            height:100% !important;
-            min-height:104px;
-            padding:11px 10px !important;
-            border-radius:14px !important;
-            overflow-wrap:anywhere;
-            box-sizing:border-box !important;
+        .stApp:has(.pi-hero) .pi-muted {
+            font-size: 12px !important;
+            line-height: 1.5;
+            overflow-wrap: anywhere;
         }
-        .pi-stat-label {font-size:clamp(10px,2.8vw,12px) !important;line-height:1.35 !important;overflow-wrap:anywhere;}
-        .pi-stat-value {font-size:clamp(19px,5.6vw,24px) !important;line-height:1.2 !important;overflow-wrap:anywhere;}
-        .pi-muted {font-size:11px !important;line-height:1.45 !important;overflow-wrap:anywhere;}
-        /* Six navigation options: two touch-friendly columns instead of a long horizontal strip. */
-        div[data-testid="stAppViewBlockContainer"] [data-testid="stRadio"] div[role="radiogroup"] {
-            display:grid !important;
-            grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-            align-items:stretch !important;
-            gap:7px !important;
-            width:100% !important;
+        /* Override aturan global 100% hanya untuk baris yang berisi statistik. */
+        .stApp:has(.pi-hero) div[data-testid="stHorizontalBlock"]:has(.pi-stat) {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            align-items: stretch !important;
+            gap: 8px !important;
+            min-width: 0 !important;
         }
-        div[data-testid="stAppViewBlockContainer"] [data-testid="stRadio"] div[role="radiogroup"] > label {
-            display:flex !important;
-            align-items:center !important;
-            min-width:0 !important;
-            width:100% !important;
-            min-height:43px !important;
-            padding:9px 8px !important;
-            margin:0 !important;
-            box-sizing:border-box !important;
-            white-space:normal !important;
-            overflow-wrap:anywhere !important;
-            border:1px solid var(--portal-line) !important;
-            border-radius:12px !important;
-            background:#fff !important;
+        .stApp:has(.pi-hero) div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"] {
+            box-sizing: border-box !important;
+            flex: 1 1 calc(50% - 4px) !important;
+            width: calc(50% - 4px) !important;
+            min-width: 0 !important;
+            max-width: calc(50% - 4px) !important;
         }
-        div[data-testid="stAppViewBlockContainer"] [data-testid="stRadio"] label p {font-size:12px !important;line-height:1.3 !important;margin:0 !important;}
-        .pi-hero {width:100%;box-sizing:border-box;border-radius:21px;padding:22px 18px;margin-bottom:15px;}
-        .pi-title {font-size:clamp(27px,7.5vw,34px);line-height:1.12;overflow-wrap:anywhere;}
-        .pi-sub {font-size:13px;line-height:1.55;max-width:100%;}
-        .pi-chip {font-size:10px;padding:7px 9px;line-height:1.3;}
-        .pi-card {height:auto;min-width:0;padding:15px;border-radius:16px;box-sizing:border-box;overflow-wrap:anywhere;}
-        .pi-card-title {font-size:14px;line-height:1.35;overflow-wrap:anywhere;}
-        .pi-h2 {font-size:clamp(21px,5.8vw,27px);line-height:1.22;overflow-wrap:anywhere;}
-        div[data-testid="stForm"] {width:100%;max-width:100%;padding:13px!important;box-sizing:border-box;}
-        div[data-testid="stButton"] button,div[data-testid="stFormSubmitButton"] button,div[data-testid="stDownloadButton"] button {width:100%;min-height:44px;white-space:normal;line-height:1.3;padding:10px 12px;}
-        [data-testid="stDataFrame"],[data-testid="stTable"] {max-width:100%;min-width:0;overflow-x:auto;}
-        [data-testid="stMarkdownContainer"] table {display:block;max-width:100%;overflow-x:auto;white-space:nowrap;}
-        [data-testid="stMarkdownContainer"] img {max-width:100%;height:auto;}
+        .stApp:has(.pi-hero) div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"] > div {
+            box-sizing: border-box;
+            width: 100%;
+            min-width: 0 !important;
+            max-width: 100% !important;
+        }
+        /* Navigasi enam bagian menjadi pilihan 2 kolom, bukan deretan yang meluber. */
+        .stApp:has(.pi-hero) div[data-testid="stRadio"] div[role="radiogroup"] {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 7px !important;
+            width: 100% !important;
+        }
+        .stApp:has(.pi-hero) div[data-testid="stRadio"] div[role="radiogroup"] > label {
+            box-sizing: border-box;
+            display: flex !important;
+            align-items: center;
+            min-width: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 9px 10px !important;
+            white-space: normal !important;
+            overflow-wrap: anywhere;
+            line-height: 1.35;
+        }
+        .stApp:has(.pi-hero) div[data-testid="stRadio"] div[role="radiogroup"] > label > div {
+            min-width: 0 !important;
+        }
+        .stApp:has(.pi-hero) .pi-card,
+        .stApp:has(.pi-hero) .pi-hero,
+        .stApp:has(.pi-hero) div[data-testid="stForm"] {
+            box-sizing: border-box;
+            max-width: 100%;
+            overflow-wrap: anywhere;
+        }
+        .stApp:has(.pi-hero) div[data-testid="stButton"] button,
+        .stApp:has(.pi-hero) div[data-testid="stFormSubmitButton"] button,
+        .stApp:has(.pi-hero) div[data-testid="stDownloadButton"] button {
+            box-sizing: border-box;
+            width: 100%;
+            min-width: 0;
+            min-height: 44px;
+            height: auto;
+            white-space: normal !important;
+            overflow-wrap: anywhere;
+            line-height: 1.35;
+        }
+        .stApp:has(.pi-hero) input,
+        .stApp:has(.pi-hero) textarea,
+        .stApp:has(.pi-hero) [data-baseweb="select"] {
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        .stApp:has(.pi-hero) [data-testid="stDataFrame"],
+        .stApp:has(.pi-hero) [data-testid="stTable"] {
+            max-width: 100%;
+            min-width: 0;
+            overflow-x: auto;
+        }
     }
-    @media(max-width:420px) {
-        div[data-testid="stAppViewBlockContainer"] {padding-left:10px!important;padding-right:10px!important;}
-        .pi-hero {padding:19px 14px;border-radius:18px;}
-        .pi-stat {padding:10px 8px!important;min-height:100px;}
-        .pi-stat-value {font-size:clamp(18px,5.4vw,22px)!important;}
-        div[data-testid="stAppViewBlockContainer"] [data-testid="stRadio"] div[role="radiogroup"] {gap:6px!important;}
-        div[data-testid="stAppViewBlockContainer"] [data-testid="stRadio"] div[role="radiogroup"] > label {padding:8px 6px!important;min-height:42px!important;}
-        div[data-testid="stAppViewBlockContainer"] [data-testid="stRadio"] label p {font-size:11px!important;}
-        .pi-card {padding:13px;border-radius:14px;}
+
+    @media(max-width:640px){
+        .stApp:has(.pi-hero) .block-container{padding-left:.65rem;padding-right:.65rem;padding-top:.7rem}
+        .stApp:has(.pi-hero) .pi-hero{border-radius:21px;padding:22px 17px}
+        .stApp:has(.pi-hero) .pi-title{font-size:clamp(27px,8vw,36px);letter-spacing:-.7px;overflow-wrap:anywhere}
+        .stApp:has(.pi-hero) .pi-sub{font-size:13px;overflow-wrap:anywhere}
+        .stApp:has(.pi-hero) .pi-h2{font-size:clamp(21px,6vw,26px);overflow-wrap:anywhere}
+        .stApp:has(.pi-hero) .pi-card{padding:15px;border-radius:17px}
+    }
+    @media(max-width:360px){
+        .stApp:has(.pi-hero) div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"]{flex-basis:calc(50% - 4px)!important;width:calc(50% - 4px)!important;max-width:calc(50% - 4px)!important}
+        .stApp:has(.pi-hero) .pi-stat{padding:9px 8px!important}
+        .stApp:has(.pi-hero) .pi-stat-value{font-size:18px!important}
     }
     @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
     </style>
