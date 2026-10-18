@@ -944,6 +944,13 @@ elif st.session_state.page == "guru_dashboard":
         selected_mapel_filter = st.session_state.get("filter_mapel", "Semua Mapel")
         selected_status_filter = st.session_state.get("filter_status", "Semua Status")
  
+        only_latest = st.toggle(
+            "📌 Ringkas sesi terbaru per siswa & mapel",
+            value=True,
+            key="live_monitoring_only_latest",
+            help="Aktif: tampilkan sesi terbaru setiap siswa untuk tiap mata pelajaran. Nonaktif: tampilkan semua riwayat sesi.",
+        )
+
         auto_refresh = st.toggle(
             "🔄 Live Now!",
             value=False,

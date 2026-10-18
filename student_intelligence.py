@@ -999,7 +999,7 @@ def render_learning_analytics(name: str, grade: str, profile: dict, sessions: li
     </div>
     """
     
-    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">🎯 Kondisi Belajar Saat Ini</div>', unsafe_allow_html=True)
+    st.markdown('<div class="pi-analytics-heading">🎯 Kondisi Belajar Saat Ini</div>', unsafe_allow_html=True)
     st.markdown(eval_html, unsafe_allow_html=True)
 
     if risk == "HIGH ATTENTION":
@@ -1026,8 +1026,8 @@ def render_learning_analytics(name: str, grade: str, profile: dict, sessions: li
 
     left, right = st.columns(2)
     with left:
-        st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
-        st.markdown('<div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Rata-rata nilai akhir ujian, kuis, atau pengerjaan keseluruhan</div>', unsafe_allow_html=True)
+        st.markdown('<div class="pi-analytics-heading" style="font-size:16px">📚 Pemahaman Mata Pelajaran</div>', unsafe_allow_html=True)
+        st.markdown('<div class="pi-analytics-subtitle">Rata-rata nilai akhir ujian, kuis, atau pengerjaan keseluruhan</div>', unsafe_allow_html=True)
         if profile.get("subject_mastery"):
             for mapel, mastery in sorted(profile["subject_mastery"].items(), key=lambda x: x[1]):
                 m_val = min(100.0, max(0.0, mastery))
@@ -1048,8 +1048,8 @@ def render_learning_analytics(name: str, grade: str, profile: dict, sessions: li
             st.caption("Data pemahaman per mata pelajaran belum cukup.")
 
     with right:
-        st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">🧩 Topik Perlu Perhatian</div>', unsafe_allow_html=True)
-        st.markdown('<div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Akurasi kebenaran menjawab soal di bawah 80% (&lt; 80%)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="pi-analytics-heading" style="font-size:16px">🧩 Topik Perlu Perhatian</div>', unsafe_allow_html=True)
+        st.markdown('<div class="pi-analytics-subtitle">Akurasi kebenaran menjawab soal di bawah 80% (&lt; 80%)</div>', unsafe_allow_html=True)
         weak = [(topic, mastery) for topic, mastery in profile.get("weakest_topics", []) if mastery < 80]    
         if weak:
             for topic, mastery in weak[:5]:
@@ -1071,7 +1071,7 @@ def render_learning_analytics(name: str, grade: str, profile: dict, sessions: li
             st.success("🎉 Luar biasa! Semua topik yang kamu kerjakan nilainya sudah di atas target (≥80%).")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">🚀 Rekomendasi Langkah Selanjutnya</div>', unsafe_allow_html=True)
+    st.markdown('<div class="pi-analytics-heading" style="font-size:16px">🚀 Rekomendasi Langkah Selanjutnya</div>', unsafe_allow_html=True)
     recommendations = _subject_recommendations(profile)
     for idx, rec_text in enumerate(recommendations, 1):
         rec_html = f"""
@@ -1243,131 +1243,115 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     .pi-card {height:100%;border:1px solid var(--portal-line);border-radius:20px;padding:18px;background:#fff;box-shadow:0 7px 24px #10243d08;}
     .pi-icon {width:44px;height:44px;border-radius:15px;background:#e5f7ef;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:12px;}
     .pi-card-title {color:var(--portal-ink);font-size:15px;font-weight:900;margin-bottom:6px;}
-    .pi-stat {height:100%;border:1px solid var(--portal-line);border-radius:17px;padding:14px;background:#fff;}
-    .pi-stat-label {color:var(--portal-muted);font-size:11px;font-weight:800;}
-    .pi-stat-value {color:var(--portal-ink);font-size:clamp(23px,3vw,31px);font-weight:900;line-height:1.2;margin-top:5px;}
+    .pi-stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;width:100%;margin:12px 0 18px;box-sizing:border-box;}
+    .pi-stat {height:100%;min-width:0;box-sizing:border-box;border:1px solid #dbe7f1;border-radius:17px;padding:14px;background:linear-gradient(145deg,#ffffff 0%,#f0fbf7 100%);box-shadow:0 5px 16px rgba(23,66,83,.06);overflow-wrap:anywhere;}
+    .pi-stat-label {color:#52657b;font-size:11px;font-weight:800;line-height:1.4;}
+    .pi-stat-value {color:#12334a;font-size:clamp(23px,3vw,31px);font-weight:900;line-height:1.2;margin-top:5px;overflow-wrap:anywhere;}
+    .pi-stat:nth-child(2){background:linear-gradient(145deg,#fff 0%,#eef6ff 100%);border-color:#d8e8ff}
+    .pi-stat:nth-child(3){background:linear-gradient(145deg,#fff 0%,#fff8e9 100%);border-color:#f4e5b8}
+    .pi-stat:nth-child(4){background:linear-gradient(145deg,#fff 0%,#f7f0ff 100%);border-color:#e8dcff}
+    .pi-stat .pi-muted{color:#5b6d80;font-size:11px;line-height:1.45;margin-top:4px;}
+    .portal-agenda-card{display:grid;grid-template-columns:58px minmax(0,1fr) auto;align-items:center;gap:12px;padding:13px;margin:10px 0;border:1px solid #dce9f4;border-radius:18px;background:linear-gradient(110deg,#ffffff 0%,#f1fbff 55%,#f4fff8 100%);box-shadow:0 5px 16px rgba(30,64,90,.06);min-width:0;box-sizing:border-box}
+    .portal-agenda-date{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:58px;border-radius:14px;background:linear-gradient(145deg,#d9f6eb,#dceeff);color:#145c54;font-weight:900}
+    .portal-agenda-date span{font-size:24px;line-height:1.1}.portal-agenda-date small{font-size:10px;letter-spacing:.08em}
+    .portal-agenda-body{min-width:0;overflow-wrap:anywhere}.portal-agenda-body strong{display:block;color:#18364e;font-size:14px;line-height:1.4;margin-bottom:4px}.portal-agenda-body div{color:#5b7084;font-size:12px;line-height:1.5}
+    .portal-agenda-status{display:inline-flex;align-items:center;justify-content:center;max-width:100%;padding:6px 9px;border-radius:999px;background:#e2f8ed;color:#176849;font-size:10px;font-weight:900;text-align:center;white-space:normal}
+    .eval-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0 16px}
+    .eval-card{min-width:0;box-sizing:border-box;padding:14px;border-radius:17px;box-shadow:0 5px 16px rgba(23,66,83,.06);overflow-wrap:anywhere}
+    .eval-title{font-size:12px;font-weight:850;line-height:1.45;color:#324b60!important}.eval-value{font-size:25px;font-weight:900;line-height:1.25;margin-top:7px;color:#173b52!important}
+    .status-banner{display:flex;align-items:flex-start;gap:10px;padding:14px;border-radius:16px;margin:12px 0 18px;font-size:13px;line-height:1.6;color:#29465b!important}
+    .status-banner b{color:#18364e!important}.status-banner-red{background:#fff0ed;border:1px solid #ffd1c9}.status-banner-yellow{background:#fff8df;border:1px solid #f4e2a5}.status-banner-green{background:#e8fbf0;border:1px solid #bcebd0}
+    .topic-item{background:#fff;border:1px solid #e2ebf2;border-radius:13px;padding:10px 11px;color:#243e54;box-shadow:0 3px 10px rgba(23,66,83,.04)}
+    .topic-header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:7px;color:#29465b;overflow-wrap:anywhere}.topic-header span:first-child{min-width:0;overflow-wrap:anywhere}.topic-bar-bg{width:100%;background:#e8eef4;border-radius:999px;overflow:hidden}.topic-bar-fill{height:100%;border-radius:999px}
+    .rec-card{display:flex;align-items:flex-start;gap:11px;background:linear-gradient(110deg,#fff 0%,#f4fbff 100%);border:1px solid #dceaf4;border-radius:15px;padding:13px;margin:9px 0;color:#2b465b;font-size:13px;line-height:1.6;box-shadow:0 4px 13px rgba(23,66,83,.04)}
+    .rec-num{flex:0 0 29px;width:29px;height:29px;border-radius:10px;display:grid;place-items:center;background:#dff7ed;color:#087f5b;font-weight:900}
+    .pi-analytics-heading{font-size:18px;font-weight:900;color:#17384e;margin:12px 0 7px}.pi-analytics-subtitle{font-size:12px;color:#5b7084;line-height:1.6;margin-bottom:10px}
+    @media(max-width:760px){.pi-stats-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.pi-stat{padding:11px 10px;border-radius:14px}.pi-stat-label{font-size:10px}.pi-stat-value{font-size:22px}.pi-stat .pi-muted{font-size:10px}.eval-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.eval-card{padding:12px;border-radius:14px}.eval-value{font-size:22px}.portal-agenda-card{grid-template-columns:48px minmax(0,1fr);gap:9px;padding:10px;border-radius:15px}.portal-agenda-date{grid-row:span 2;min-height:52px}.portal-agenda-date span{font-size:21px}.portal-agenda-status{grid-column:2;justify-self:start;font-size:9px;padding:5px 8px}.portal-agenda-body strong{font-size:13px}.portal-agenda-body div{font-size:11px}.status-banner{padding:12px;font-size:12px}.rec-card{padding:11px;font-size:12px}}
+    @media(max-width:360px){.pi-stats-grid{gap:6px}.pi-stat{padding:9px 8px}.pi-stat-value{font-size:19px}.eval-grid{gap:6px}.eval-card{padding:10px}.eval-title{font-size:11px}.eval-value{font-size:19px}.portal-agenda-card{grid-template-columns:42px minmax(0,1fr);gap:8px}.portal-agenda-date span{font-size:19px}}
     div[data-testid="stForm"] {border:1px solid var(--portal-line);border-radius:20px;padding:clamp(14px,3vw,22px);background:#ffffffd9;}
     div[data-testid="stButton"] button,div[data-testid="stFormSubmitButton"] button,div[data-testid="stDownloadButton"] button {min-height:44px;border-radius:13px;font-weight:800;}
     div[role="radiogroup"] {gap:7px;}
     div[role="radiogroup"] label {border:1px solid var(--portal-line);border-radius:13px;padding:9px 12px;background:#fff;}
     div[data-testid="stMetric"] {border:1px solid var(--portal-line);border-radius:15px;padding:12px;background:#fff;}
 
-    /* === MOBILE LAYOUT: scoped ke Portal SantriMANTAP === */
-    /* Jangan mengubah semua kolom Streamlit secara membabi buta.
-       Tema global memang menumpuk kolom menjadi 100%; kartu statistik portal
-       secara khusus diizinkan menjadi grid 2x2 di HP. */
+    /* === MOBILE-FIRST: Portal SantriMANTAP === */
     @media (max-width: 768px) {
-        .stApp:has(.pi-hero) .pi-stat {
-            box-sizing: border-box;
-            min-width: 0;
-            height: 100%;
-            padding: 11px 10px !important;
-            border-radius: 13px !important;
-            overflow-wrap: anywhere;
+        /* Override ui_theme.py only for the 4 compact student-stat cards. */
+        div[data-testid="stAppViewBlockContainer"] div[data-testid="stHorizontalBlock"]:has(.pi-stat) {
+            display:flex !important;
+            flex-direction:row !important;
+            flex-wrap:wrap !important;
+            align-items:stretch !important;
+            gap:8px !important;
+            min-width:0 !important;
         }
-        .stApp:has(.pi-hero) .pi-stat-label {
-            font-size: 10px !important;
-            line-height: 1.35;
-            overflow-wrap: anywhere;
+        div[data-testid="stAppViewBlockContainer"] div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"] {
+            flex:0 0 calc(50% - 4px) !important;
+            width:calc(50% - 4px) !important;
+            min-width:0 !important;
+            max-width:calc(50% - 4px) !important;
+            box-sizing:border-box !important;
         }
-        .stApp:has(.pi-hero) .pi-stat-value {
-            font-size: clamp(18px, 5vw, 23px) !important;
-            line-height: 1.2;
-            overflow-wrap: anywhere;
+        div[data-testid="stAppViewBlockContainer"] div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"] > div {
+            width:100% !important; max-width:100% !important; min-width:0 !important;
         }
-        .stApp:has(.pi-hero) .pi-muted {
-            font-size: 12px !important;
-            line-height: 1.5;
-            overflow-wrap: anywhere;
+        .pi-stat {
+            height:100% !important;
+            min-height:104px;
+            padding:11px 10px !important;
+            border-radius:14px !important;
+            overflow-wrap:anywhere;
+            box-sizing:border-box !important;
         }
-        /* Override aturan global 100% hanya untuk baris yang berisi statistik. */
-        .stApp:has(.pi-hero) div[data-testid="stHorizontalBlock"]:has(.pi-stat) {
-            display: flex !important;
-            flex-wrap: wrap !important;
-            align-items: stretch !important;
-            gap: 8px !important;
-            min-width: 0 !important;
+        .pi-stat-label {font-size:clamp(10px,2.8vw,12px) !important;line-height:1.35 !important;overflow-wrap:anywhere;}
+        .pi-stat-value {font-size:clamp(19px,5.6vw,24px) !important;line-height:1.2 !important;overflow-wrap:anywhere;}
+        .pi-muted {font-size:11px !important;line-height:1.45 !important;overflow-wrap:anywhere;}
+        /* Six navigation options: two touch-friendly columns instead of a long horizontal strip. */
+        div[data-testid="stAppViewBlockContainer"] [data-testid="stRadio"] div[role="radiogroup"] {
+            display:grid !important;
+            grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+            align-items:stretch !important;
+            gap:7px !important;
+            width:100% !important;
         }
-        .stApp:has(.pi-hero) div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"] {
-            box-sizing: border-box !important;
-            flex: 1 1 calc(50% - 4px) !important;
-            width: calc(50% - 4px) !important;
-            min-width: 0 !important;
-            max-width: calc(50% - 4px) !important;
+        div[data-testid="stAppViewBlockContainer"] [data-testid="stRadio"] div[role="radiogroup"] > label {
+            display:flex !important;
+            align-items:center !important;
+            min-width:0 !important;
+            width:100% !important;
+            min-height:43px !important;
+            padding:9px 8px !important;
+            margin:0 !important;
+            box-sizing:border-box !important;
+            white-space:normal !important;
+            overflow-wrap:anywhere !important;
+            border:1px solid var(--portal-line) !important;
+            border-radius:12px !important;
+            background:#fff !important;
         }
-        .stApp:has(.pi-hero) div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"] > div {
-            box-sizing: border-box;
-            width: 100%;
-            min-width: 0 !important;
-            max-width: 100% !important;
-        }
-        /* Navigasi enam bagian menjadi pilihan 2 kolom, bukan deretan yang meluber. */
-        .stApp:has(.pi-hero) div[data-testid="stRadio"] div[role="radiogroup"] {
-            display: grid !important;
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-            gap: 7px !important;
-            width: 100% !important;
-        }
-        .stApp:has(.pi-hero) div[data-testid="stRadio"] div[role="radiogroup"] > label {
-            box-sizing: border-box;
-            display: flex !important;
-            align-items: center;
-            min-width: 0 !important;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 9px 10px !important;
-            white-space: normal !important;
-            overflow-wrap: anywhere;
-            line-height: 1.35;
-        }
-        .stApp:has(.pi-hero) div[data-testid="stRadio"] div[role="radiogroup"] > label > div {
-            min-width: 0 !important;
-        }
-        .stApp:has(.pi-hero) .pi-card,
-        .stApp:has(.pi-hero) .pi-hero,
-        .stApp:has(.pi-hero) div[data-testid="stForm"] {
-            box-sizing: border-box;
-            max-width: 100%;
-            overflow-wrap: anywhere;
-        }
-        .stApp:has(.pi-hero) div[data-testid="stButton"] button,
-        .stApp:has(.pi-hero) div[data-testid="stFormSubmitButton"] button,
-        .stApp:has(.pi-hero) div[data-testid="stDownloadButton"] button {
-            box-sizing: border-box;
-            width: 100%;
-            min-width: 0;
-            min-height: 44px;
-            height: auto;
-            white-space: normal !important;
-            overflow-wrap: anywhere;
-            line-height: 1.35;
-        }
-        .stApp:has(.pi-hero) input,
-        .stApp:has(.pi-hero) textarea,
-        .stApp:has(.pi-hero) [data-baseweb="select"] {
-            max-width: 100%;
-            box-sizing: border-box;
-        }
-        .stApp:has(.pi-hero) [data-testid="stDataFrame"],
-        .stApp:has(.pi-hero) [data-testid="stTable"] {
-            max-width: 100%;
-            min-width: 0;
-            overflow-x: auto;
-        }
+        div[data-testid="stAppViewBlockContainer"] [data-testid="stRadio"] label p {font-size:12px !important;line-height:1.3 !important;margin:0 !important;}
+        .pi-hero {width:100%;box-sizing:border-box;border-radius:21px;padding:22px 18px;margin-bottom:15px;}
+        .pi-title {font-size:clamp(27px,7.5vw,34px);line-height:1.12;overflow-wrap:anywhere;}
+        .pi-sub {font-size:13px;line-height:1.55;max-width:100%;}
+        .pi-chip {font-size:10px;padding:7px 9px;line-height:1.3;}
+        .pi-card {height:auto;min-width:0;padding:15px;border-radius:16px;box-sizing:border-box;overflow-wrap:anywhere;}
+        .pi-card-title {font-size:14px;line-height:1.35;overflow-wrap:anywhere;}
+        .pi-h2 {font-size:clamp(21px,5.8vw,27px);line-height:1.22;overflow-wrap:anywhere;}
+        div[data-testid="stForm"] {width:100%;max-width:100%;padding:13px!important;box-sizing:border-box;}
+        div[data-testid="stButton"] button,div[data-testid="stFormSubmitButton"] button,div[data-testid="stDownloadButton"] button {width:100%;min-height:44px;white-space:normal;line-height:1.3;padding:10px 12px;}
+        [data-testid="stDataFrame"],[data-testid="stTable"] {max-width:100%;min-width:0;overflow-x:auto;}
+        [data-testid="stMarkdownContainer"] table {display:block;max-width:100%;overflow-x:auto;white-space:nowrap;}
+        [data-testid="stMarkdownContainer"] img {max-width:100%;height:auto;}
     }
-
-    @media(max-width:640px){
-        .stApp:has(.pi-hero) .block-container{padding-left:.65rem;padding-right:.65rem;padding-top:.7rem}
-        .stApp:has(.pi-hero) .pi-hero{border-radius:21px;padding:22px 17px}
-        .stApp:has(.pi-hero) .pi-title{font-size:clamp(27px,8vw,36px);letter-spacing:-.7px;overflow-wrap:anywhere}
-        .stApp:has(.pi-hero) .pi-sub{font-size:13px;overflow-wrap:anywhere}
-        .stApp:has(.pi-hero) .pi-h2{font-size:clamp(21px,6vw,26px);overflow-wrap:anywhere}
-        .stApp:has(.pi-hero) .pi-card{padding:15px;border-radius:17px}
-    }
-    @media(max-width:360px){
-        .stApp:has(.pi-hero) div[data-testid="stHorizontalBlock"]:has(.pi-stat) > div[data-testid="column"]{flex-basis:calc(50% - 4px)!important;width:calc(50% - 4px)!important;max-width:calc(50% - 4px)!important}
-        .stApp:has(.pi-hero) .pi-stat{padding:9px 8px!important}
-        .stApp:has(.pi-hero) .pi-stat-value{font-size:18px!important}
+    @media(max-width:420px) {
+        div[data-testid="stAppViewBlockContainer"] {padding-left:10px!important;padding-right:10px!important;}
+        .pi-hero {padding:19px 14px;border-radius:18px;}
+        .pi-stat {padding:10px 8px!important;min-height:100px;}
+        .pi-stat-value {font-size:clamp(18px,5.4vw,22px)!important;}
+        div[data-testid="stAppViewBlockContainer"] [data-testid="stRadio"] div[role="radiogroup"] {gap:6px!important;}
+        div[data-testid="stAppViewBlockContainer"] [data-testid="stRadio"] div[role="radiogroup"] > label {padding:8px 6px!important;min-height:42px!important;}
+        div[data-testid="stAppViewBlockContainer"] [data-testid="stRadio"] label p {font-size:11px!important;}
+        .pi-card {padding:13px;border-radius:14px;}
     }
     @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
     </style>
@@ -1466,14 +1450,15 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
     days_to_exam = (next_exam[0] - today).days if next_exam else None
 
     st.markdown(f'<div class="pi-kicker2">Dashboard pribadimu</div><div class="pi-h2">Assalamu’alaikum, {html.escape(name.split()[0])}! 👋</div><div class="pi-muted">{html.escape(kelas)} {html.escape(jenjang_detected)} · {"Aktivitas hari ini mulai dihitung—ayo buat satu kemajuan kecil." if is_new_day else "Setiap sesi belajar membantumu mengenali cara belajar yang lebih efektif."}</div>', unsafe_allow_html=True)
-    metrics = st.columns(4)
-    with metrics[0]: st.markdown(f'<div class="pi-stat"><div class="pi-stat-label">Rata-rata hasil</div><div class="pi-stat-value">{avg:.0f}<small style="font-size:13px">%</small></div><div class="pi-muted">Dari sesi tersimpan</div></div>', unsafe_allow_html=True)
-    with metrics[1]: st.markdown(f'<div class="pi-stat"><div class="pi-stat-label">Sesi belajar</div><div class="pi-stat-value">{attempts_count}</div><div class="pi-muted">Riwayat yang ditemukan</div></div>', unsafe_allow_html=True)
-    with metrics[2]: st.markdown(f'<div class="pi-stat"><div class="pi-stat-label">Konsistensi</div><div class="pi-stat-value">🔥 {streak}</div><div class="pi-muted">Hari beruntun</div></div>', unsafe_allow_html=True)
-    with metrics[3]:
-        exam_label = ("Hari ini" if days_to_exam == 0 else "Besok" if days_to_exam == 1 else f"H-{days_to_exam}") if next_exam else "—"
-        exam_subject = str(next_exam[1].get("mapel") or "Ujian") if next_exam else "Belum ada agenda"
-        st.markdown(f'<div class="pi-stat"><div class="pi-stat-label">Ujian terdekat</div><div class="pi-stat-value" style="font-size:23px">{html.escape(exam_label)}</div><div class="pi-muted">{html.escape(exam_subject)}</div></div>', unsafe_allow_html=True)
+    exam_label = ("Hari ini" if days_to_exam == 0 else "Besok" if days_to_exam == 1 else f"H-{days_to_exam}") if next_exam else "—"
+    exam_subject = str(next_exam[1].get("mapel") or "Ujian") if next_exam else "Belum ada agenda"
+    # HTML grid sengaja dipakai agar aturan global st.columns tidak memaksa metrik menjadi 1 kolom di HP.
+    st.markdown(f'''<div class="pi-stats-grid">
+      <div class="pi-stat"><div class="pi-stat-label">📊 Rata-rata hasil</div><div class="pi-stat-value">{avg:.0f}<small style="font-size:13px">%</small></div><div class="pi-muted">Dari sesi tersimpan</div></div>
+      <div class="pi-stat"><div class="pi-stat-label">📚 Sesi belajar</div><div class="pi-stat-value">{attempts_count}</div><div class="pi-muted">Riwayat yang ditemukan</div></div>
+      <div class="pi-stat"><div class="pi-stat-label">🔥 Konsistensi</div><div class="pi-stat-value">{streak}</div><div class="pi-muted">Hari beruntun</div></div>
+      <div class="pi-stat"><div class="pi-stat-label">🗓️ Ujian terdekat</div><div class="pi-stat-value" style="font-size:23px">{html.escape(exam_label)}</div><div class="pi-muted">{html.escape(exam_subject)}</div></div>
+    </div>''', unsafe_allow_html=True)
 
     nav_options = ["🏡 Hari Ini", "🧠 Pahami Materi", "🎯 Latihan Pintar", "📄 Rangkuman PDF", "🗓️ Jadwal Ujian", "✨ Insight Saya"]
     if st.session_state.get("student_portal_section") not in nav_options:

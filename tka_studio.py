@@ -153,6 +153,17 @@ def _mapel_controls(jenjang: str) -> tuple[str, str]:
 
 @st.fragment
 def render_tka_studio():
+    # CSS scoped to Streamlit pill controls; keep the working TKA workflow unchanged.
+    st.markdown(
+        """<style>
+        div[data-testid="stPills"]{width:100%;max-width:100%;min-width:0}
+        div[data-testid="stPills"] [role="radiogroup"]{display:flex!important;flex-wrap:wrap!important;gap:8px!important;width:100%;max-width:100%}
+        div[data-testid="stPills"] [role="radio"]{min-width:0!important;white-space:normal!important;justify-content:center!important}
+        div[data-testid="stPills"] button{min-height:40px!important;border-radius:999px!important}
+        @media(max-width:640px){div[data-testid="stPills"] [role="radiogroup"]{gap:6px!important}div[data-testid="stPills"] [role="radio"]{flex:1 1 0!important;padding:7px 9px!important;font-size:13px!important}div[data-testid="stRadio"] [role="radiogroup"]{display:flex!important;flex-wrap:wrap!important;gap:7px!important}div[data-testid="stRadio"] label{max-width:100%;white-space:normal!important;line-height:1.35!important}}
+        </style>""",
+        unsafe_allow_html=True,
+    )
     if not st.session_state.get("_tka_topics_backfilled"):
         backfill_tka_image_topics()
         st.session_state._tka_topics_backfilled = True
