@@ -1344,7 +1344,7 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
                 st.rerun()
 
     if not st.session_state.get("student_intelligence_authenticated"):
-        st.markdown('<div class="pi-card"><div class="pi-kicker2">Ruang belajar personal</div><div class="pi-h2">Masuk untuk mulai belajar!</div><div class="pi-muted">Gunakan username dan PIN dari pendaftaran akun di WA-RoboMANTAP.</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="pi-card"><div class="pi-kicker2">Ruang belajar personal</div><div class="pi-h2">Buka ruang belajar Kamu!</div><div class="pi-muted">Gunakan username dan PIN dari pendaftaran akun di WA-RoboMANTAP.</div></div>', unsafe_allow_html=True)
         with st.form("student_intelligence_login_form", clear_on_submit=False):
             entered_username = st.text_input("Username Santri", placeholder="contoh: username_unik.kamu", help="Username yang didaftarkan melalui WhatsApp RoboMANTAP.")
             entered_pin = st.text_input("PIN Santri · 6 angka", placeholder="Masukkan PIN rahasia", type="password", max_chars=6)
