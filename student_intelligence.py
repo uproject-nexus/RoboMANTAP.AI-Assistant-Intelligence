@@ -1000,7 +1000,6 @@ def render_learning_analytics(name: str, grade: str, profile: dict, sessions: li
     """
     
     st.markdown('<div class="pi-analytics-heading">🎯 Kondisi Belajar Saat Ini</div>', unsafe_allow_html=True)
-    st.markdown("##### 🎯 Kondisi Belajar Saat Ini")
     st.markdown(eval_html, unsafe_allow_html=True)
 
     if risk == "HIGH ATTENTION":
@@ -1114,30 +1113,6 @@ def render_learning_analytics(name: str, grade: str, profile: dict, sessions: li
 
 def render_student_automation(wa_number: str = ""):
     """Persist student preferences for the existing morning/night WhatsApp alert endpoints."""
-    st.markdown('<div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">⚙️ Pengaturan Pengingat WhatsApp</div>', unsafe_allow_html=True)
-    st.caption("Pilihan ini disimpan berdasarkan nomor WhatsApp terverifikasi dan dipakai oleh automasi pengingat RoboMANTAP.")
-    if not wa_number:
-        st.warning("Nomor WhatsApp belum terhubung pada akun ini. Hubungi admin untuk menyinkronkan identitas.")
-        return
-
-    current = get_student_portal_preferences(wa_number)
-    with st.form("student_portal_notification_preferences"):
-        morning_enabled = st.checkbox(
-            "Pengingat pagi dan agenda hari ini",
-            value=current["morning_alert_enabled"],
-            help="Mengontrol pengingat pagi yang dijalankan melalui endpoint morning-alert."
-        )
-        night_enabled = st.checkbox(
-            "Pengingat malam H-1 UTS",
-            value=current["night_alert_enabled"],
-            help="Mengontrol pengingat jadwal UTS untuk hari berikutnya."
-        )
-        submitted = st.form_submit_button("Simpan Pengaturan", type="primary", use_container_width=True)
-    if submitted:
-        if save_student_portal_preferences(wa_number, morning_enabled, night_enabled):
-            st.success("Pengaturan pengingat berhasil disimpan dan akan dibaca oleh WA Bot.")
-        else:
-            st.error("Pengaturan belum tersimpan. Periksa koneksi database dan tabel student_portal_preferences.")
 
 
 def render_concept_sheets(nama_siswa: str = "Santri", kelas: str = "", jenjang: str = "MTs") -> None:
@@ -1553,19 +1528,10 @@ def render_student_intelligence_dashboard(nama_siswa: str = "", jenjang: str = "
                 st.download_button("Unduh rencana persiapan (.txt)", data=st.session_state.pi_exam_plan_result, file_name="Rencana_Persiapan_Ujian_RoboMANTAP.txt", mime="text/plain", use_container_width=True)
 
     elif section == "✨ Insight Saya":
-        st.markdown('<div class="pi-kicker2">Analisis dari aktivitas nyata</div><div class="pi-h2">Kenali pola belajarmu.</div><div class="pi-muted">Insight akan semakin berguna seiring bertambahnya hasil kuis dan sesi yang tersimpan.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="pi-kicker2">Analisis dari aktivitas nyata</div><div class="pi-h2">Kenali pola belajarmu.</div><div class="pi-muted">Insight akan semakin berguna seiring bertambahnya hasil latihan kamu.</div>', unsafe_allow_html=True)
         if not sessions:
             st.info("Belum ada sesi belajar yang cocok dengan identitas dan jenjang akunmu. Setelah mengerjakan kuis yang menyimpan hasil, ringkasan perkembangan akan muncul di sini.")
         else:
             render_learning_analytics(name, jenjang_detected, profile, sessions)
         with st.expander("Bagaimana intelligence bekerja?"):
             st.write("Portal menggabungkan riwayat sesi yang ditemukan, skor, topik yang tercatat, agenda ujian, dan permintaanmu ke AI. Data kosong tidak diganti dengan angka simulasi. Rekomendasi adalah bantuan belajar, bukan diagnosis psikologis atau jaminan nilai ujian.")
-        if wa_number:
-            st.divider()
-            st.markdown("#### Pengingat WhatsApp (opsional)")
-            st.caption("Pengingat bukan menu utama belajar. Pengaturan ini tersedia di sini sebagai pendukung, jika nomor WhatsApp sudah terhubung.")
-            with st.expander("Atur pengingat agenda"):
-                render_student_automation(wa_number)
-
-    st.divider()
-    st.caption(f"RoboMANTAP-Intelligence · Portal SantriMANTAP · Data personal berdasarkan akun terverifikasi · Waktu Asia/Jakarta")
